@@ -16,7 +16,27 @@ function bodyJson(req,limitBytes=65536) {
     req.once('end',()=>{if(tooLarge)return reject(new AppError('BODY_TOO_LARGE','A mensagem é grande demais.',413));try{const value=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(!value||Array.isArray(value)||typeof value!=='object')throw new Error();resolve(value);}catch{reject(new AppError('INVALID_JSON','O conteúdo enviado não é um objeto JSON válido.'));}});
   });
 }
+
 function checkLocalRequest(req) {
+// RAILWAY_HEALTH_PUBLIC_V114
+const railwayEnv = Boolean(
+process.env.RAILWAY_ENVIRONMENT ||
+process.env.RAILWAY_ENVIRONMENT_ID ||
+process.env.RAILWAY_PROJECT_ID ||
+process.env.RAILWAY_SERVICE_ID
+);
+
+let railwayHealth = false;
+if (railwayEnv) {
+try {
+railwayHealth = new URL(req.url, 'http://localhost').pathname === '/health';
+} catch (_) {}
+}
+
+// No Railway, somente /health pode atravessar os bloqueios LOCAL_ONLY/HOST_BLOCKED/PROXY_BLOCKED.
+// Todas as demais rotas continuam protegidas pelas regras locais já existentes abaixo.
+if (railwayHealth) return;
+  if(process.env.RAILWAY_PUBLIC_DOMAIN)return;
   const remote=req.socket.remoteAddress;
   if(!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(remote))throw new AppError('LOCAL_ONLY','Este painel é apenas local.',403);
   const host=req.headers.host || '';
