@@ -19,14 +19,28 @@ async function startServer(options={}) {
   try {
     runtime=createRuntime(config,options.runtimeOptions);
     const app=options.appFactory?options.appFactory(runtime):require('./app').createApp(runtime);
-    server=http.createServer(app);server.requestTimeout=120000;server.headersTimeout=15000;
-    await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(config.port,config.host,resolve);});
-    server.on('error',()=>console.error('[Sofia] Falha no servidor HTTP.'));
-    runtime.backups.daily();
-    runtime.scheduler.start();
-    timer=setInterval(()=>{if(!runtime.core.busy)runtime.backups.daily();},60000);timer.unref();
-    const port=server.address().port;
-    console.log('Sofia OS online em http://localhost:'+port);
+    const PORT = Number(process.env.PORT) || config.port || 8080;
+const HOST = process.env.PORT ? '0.0.0.0' : (config.host || '127.0.0.1');
+
+server=http.createServer(app);
+server.requestTimeout=120000;
+server.headersTimeout=15000;
+
+await new Promise((resolve,reject)=>{
+  server.once('error',reject);
+  server.listen(PORT,HOST,resolve);
+});
+
+server.on('error',()=>console.error('[Sofia] Falha no servidor HTTP.'));
+runtime.backups.daily();
+runtime.scheduler.start();
+
+timer=setInterval(()=>{
+  if(!runtime.core.busy)runtime.backups.daily();
+},60000);
+timer.unref();
+
+console.log(`Sofia OS online em http://${HOST}:${PORT}`);
     console.log('Core v125 | Memória em data/sofia.sqlite | Acesso apenas neste computador.');
     console.log('Início normal: chave preservada, sem nova colagem. Ctrl+C encerra com segurança.');
     if(!runtime.store.settings().routingEnabled)console.log('Memória e módulos locais disponíveis. A IA ainda não está conectada aos filtros.');
