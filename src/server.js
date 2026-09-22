@@ -25,6 +25,56 @@ const HOST = process.env.PORT ? '0.0.0.0' : (config.host || '127.0.0.1');
 server=http.createServer((req,res)=>{
       try {
         const parsed=new URL(req.url,'http://localhost');
+        // SOFIA_PRIVACY_PAGE_V117
+        if(req.method==='GET' && parsed.pathname==='/privacy') {
+          const html=`<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sofia OS - Política de Privacidade</title>
+<style>
+body{font-family:Arial,sans-serif;max-width:820px;margin:48px auto;padding:0 20px;line-height:1.65;color:#171717}
+h1,h2{line-height:1.25} h1{margin-bottom:8px} .muted{color:#666} a{color:inherit}
+</style>
+</head>
+<body>
+<h1>Política de Privacidade — Sofia OS</h1>
+<p class="muted">Última atualização: 22 de setembro de 2026.</p>
+
+<p>A Sofia OS utiliza informações fornecidas pelos usuários somente na medida necessária para operar e melhorar suas funcionalidades.</p>
+
+<h2>1. Dados tratados</h2>
+<p>Quando uma pessoa interage com a Sofia OS, inclusive pelo WhatsApp, podem ser tratados dados como mensagens enviadas, identificadores técnicos, metadados necessários ao funcionamento do serviço e informações que o próprio usuário decidir fornecer.</p>
+
+<h2>2. Finalidades</h2>
+<p>Esses dados podem ser usados para receber e responder solicitações, executar funcionalidades solicitadas, manter a segurança e a estabilidade do serviço, solucionar falhas e cumprir obrigações legais aplicáveis.</p>
+
+<h2>3. Prestadores e integrações</h2>
+<p>Para funcionar, a Sofia OS pode utilizar serviços de terceiros estritamente necessários à operação, como Meta/WhatsApp, infraestrutura de hospedagem e provedores de inteligência artificial quando configurados. Cada prestador também pode tratar dados de acordo com seus próprios termos e políticas.</p>
+
+<h2>4. Compartilhamento e venda</h2>
+<p>A Sofia OS não vende dados pessoais. Informações somente podem ser compartilhadas quando necessário para prestar o serviço, proteger a operação, cumprir uma obrigação legal ou atender a uma solicitação válida do próprio usuário.</p>
+
+<h2>5. Retenção e segurança</h2>
+<p>Os dados são mantidos pelo período necessário às finalidades do serviço, às configurações adotadas e às obrigações aplicáveis. São adotadas medidas razoáveis de segurança para reduzir riscos de acesso, alteração, perda ou divulgação não autorizados.</p>
+
+<h2>6. Direitos e exclusão</h2>
+<p>O usuário pode solicitar acesso, correção ou exclusão de informações relacionadas ao serviço pelo canal oficial de atendimento da Sofia OS no WhatsApp. Solicitações serão tratadas de acordo com a legislação aplicável e com eventuais obrigações de retenção.</p>
+
+<h2>7. Atualizações desta política</h2>
+<p>Esta política pode ser atualizada para refletir mudanças no serviço, em integrações ou em requisitos legais. A versão publicada nesta página será a versão vigente.</p>
+
+<p><strong>Sofia OS</strong></p>
+</body>
+</html>`;
+
+          res.statusCode=200;
+          res.setHeader('Content-Type','text/html; charset=utf-8');
+          res.setHeader('Cache-Control','no-store');
+          res.end(html);
+          return;
+        }
         if(req.method==='GET' && parsed.pathname==='/webhook') {
           // META_WEBHOOK_VERIFY_V116
           const expected=String(process.env.WHATSAPP_VERIFY_TOKEN || '');
