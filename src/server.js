@@ -22,7 +22,38 @@ async function startServer(options={}) {
     const PORT = Number(process.env.PORT) || config.port || 8080;
 const HOST = process.env.PORT ? '0.0.0.0' : (config.host || '127.0.0.1');
 
-server=http.createServer(app);
+server=http.createServer((req,res)=>{
+      try {
+        const parsed=new URL(req.url,'http://localhost');
+        if(req.method==='GET' && parsed.pathname==='/webhook') {
+          // META_WEBHOOK_VERIFY_V116
+          const expected=String(process.env.WHATSAPP_VERIFY_TOKEN || '');
+          const mode=parsed.searchParams.get('hub.mode');
+          const token=parsed.searchParams.get('hub.verify_token');
+          const challenge=parsed.searchParams.get('hub.challenge');
+
+          if(!expected) {
+            res.statusCode=503;
+            res.setHeader('Content-Type','text/plain; charset=utf-8');
+            res.end('WHATSAPP_VERIFY_TOKEN_NOT_CONFIGURED');
+            return;
+          }
+
+          if(mode==='subscribe' && token===expected && challenge!==null) {
+            res.statusCode=200;
+            res.setHeader('Content-Type','text/plain; charset=utf-8');
+            res.end(challenge);
+            return;
+          }
+
+          res.statusCode=403;
+          res.setHeader('Content-Type','text/plain; charset=utf-8');
+          res.end('Forbidden');
+          return;
+        }
+      } catch (_) {}
+      return app(req,res);
+    });
 server.requestTimeout=120000;
 server.headersTimeout=15000;
 

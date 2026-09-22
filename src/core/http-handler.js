@@ -18,6 +18,19 @@ function bodyJson(req,limitBytes=65536) {
 }
 
 function checkLocalRequest(req) {
+  // RAILWAY_PUBLIC_META_V116
+  const railwayEnvV116 = Boolean(
+    process.env.RAILWAY_ENVIRONMENT ||
+    process.env.RAILWAY_ENVIRONMENT_ID ||
+    process.env.RAILWAY_PROJECT_ID ||
+    process.env.RAILWAY_SERVICE_ID
+  );
+  if (railwayEnvV116) {
+    try {
+      const pathnameV116 = new URL(req.url, 'http://localhost').pathname;
+      if (pathnameV116 === '/health' || pathnameV116 === '/webhook') return;
+    } catch (_) {}
+  }
 // RAILWAY_HEALTH_PUBLIC_V114
 const railwayEnv = Boolean(
 process.env.RAILWAY_ENVIRONMENT ||
