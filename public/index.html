@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Sofia OS · v125</title><script>(function(){try{var p=localStorage.getItem('sofiaTheme')||'system';var dark=p==='dark'||(p==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=dark?'dark':'light';document.documentElement.dataset.themePreference=p;}catch(e){document.documentElement.dataset.theme='dark';document.documentElement.dataset.themePreference='system';}})();</script><link rel="stylesheet" href="/style.css?v=125"><link rel="stylesheet" href="/ui-current.css?v=125"><script src="/app.js?v=125" defer></script></head>
+<body class="mode-user">
+<div class="shell">
+  <aside class="sidebar">
+    <header class="brand"><span class="orb" aria-hidden="true">S</span><div><h1>Sofia<span> OS</span></h1><p>Continuidade, ação e memória.</p></div></header>
+    <button id="newConversation" class="primary wide chat-nav"><span class="nav-icon" aria-hidden="true">💬</span><span class="nav-label">Chat</span></button>
+
+    <div id="userNavigation" class="user-only">
+      <nav id="primaryUserNav" class="primary-user-nav" aria-label="Navegação principal">
+        <button id="startJump" data-tab="start" class="nav active" aria-current="page"><span class="nav-icon" aria-hidden="true">🏠</span><span class="nav-label">Início</span></button>
+        <button id="summaryJump" class="nav" type="button"><span class="nav-icon" aria-hidden="true">📋</span><span class="nav-label">Resumo</span></button>
+      </nav>
+      <button id="appsMenuToggle" class="sidebar-section-toggle" type="button" aria-expanded="false" aria-controls="appsMenu"><span class="sidebar-section-title">APPS</span><span class="section-chevron" aria-hidden="true">›</span></button>
+      <nav id="appsMenu" class="apps-menu is-collapsed" aria-hidden="true" aria-label="Aplicativos da Sofia">
+        <button data-tab="commitments" class="nav"><span class="nav-icon" aria-hidden="true">📅</span><span class="nav-label">Agenda</span></button>
+        <button data-tab="tasks" class="nav"><span class="nav-icon" aria-hidden="true">✅</span><span class="nav-label">Tarefas</span></button>
+        <div id="navWidgetLists" class="nav-widget-row" data-nav-widget="lists"><button data-tab="lists" class="nav"><span class="nav-icon" aria-hidden="true">📝</span><span class="nav-label">Listas</span></button></div>
+        <div id="navWidgetLibrary" class="nav-widget-row" data-nav-widget="library"><button data-tab="library" class="nav"><span class="nav-icon" aria-hidden="true">📚</span><span class="nav-label">Biblioteca</span></button></div>
+        <button data-tab="study" class="nav"><span class="nav-icon" aria-hidden="true">🎓</span><span class="nav-label">Estudos</span></button>
+        <button data-tab="vault" class="nav"><span class="nav-icon" aria-hidden="true">📔</span><span class="nav-label">Diário Pessoal</span></button>
+      </nav>
+      <div id="particularMenuToggle" class="sidebar-section-toggle particular-section-toggle" aria-label="Páginas particulares"><button id="particularMenuCollapse" class="particular-section-collapse" type="button" aria-expanded="true" aria-controls="userPagesNav"><span class="sidebar-section-title">PARTICULAR</span><span class="particular-section-chevron" aria-hidden="true">⌄</span></button><button id="addUserPage" class="particular-section-add" type="button" aria-label="Criar página" title="Criar página">＋</button></div>
+      <div id="userPagesNav" class="user-pages-nav"></div>
+    </div>
+
+    <div id="developerNavigation" class="dev-only" hidden>
+      <p class="eyebrow">SOFIA · DESENVOLVIMENTO</p>
+      <nav aria-label="Navegação técnica">
+        <button data-tab="panorama" class="nav">Panorama técnico <span>◈</span></button>
+        <button data-tab="chat" class="nav">Conversa <span>↗</span></button>
+        <button data-tab="tasks" class="nav">Fluxo Ativo <span>◉</span></button>
+        <button data-tab="memory" class="nav">Memória <span>⌘</span></button>
+        <button data-tab="study" class="nav">Estudos <span>◎</span></button>
+        <button data-tab="library" class="nav">Acervo <span>▦</span></button>
+        <button data-tab="vault" class="nav">Cofre / Diário <span>◇</span></button>
+        <button data-tab="connections" class="nav">Conexões <span>⇄</span></button>
+        <button data-tab="settings" class="nav">Configuração <span>⚙</span></button>
+      </nav>
+      <div class="conversation-heading"><p class="eyebrow">HISTÓRICO</p><button id="refreshHistory" class="icon-button" aria-label="Atualizar histórico">↻</button></div>
+      <div id="conversationList" class="conversation-list"></div><button id="moreConversations" class="text-button" hidden>Mais conversas</button>
+    </div>
+
+    <footer class="sidebar-footer"><div class="sidebar-status"><span class="dot"></span><span id="connectionLabel">Conectando…</span></div><label class="theme-control" for="themePreference"><span>Aparência</span><select id="themePreference" aria-label="Aparência da Sofia"><option value="system">Sistema</option><option value="light">Claro</option><option value="dark">Escuro</option></select></label><button id="modeToggle" class="text-button" type="button">Modo desenvolvedor</button><small>Core v125 · AVSORD Technology</small></footer>
+  </aside>
+
+  <main>
+    <div id="notice" class="notice" role="status" hidden></div>
+
+    <section id="tab-start" class="tab scroll-panel">
+      <header class="page-header start-header"><div><p class="eyebrow">SOFIA OS</p><h2>Início.</h2><p>Converse com a Sofia e veja o que está acontecendo no seu ecossistema.</p></div><div class="header-actions"><button id="customizeHome">Personalizar</button><div id="notificationsHoverShell" class="notification-hover-shell"><button id="startNotifications" class="notification-button" type="button" aria-label="Prévia de notificações" aria-haspopup="dialog" aria-controls="notificationsDialog" aria-expanded="false">🔔 <span id="startNoticeCount">0</span></button><aside id="notificationsDialog" class="notifications-mini-dialog" role="dialog" aria-label="Prévia de notificações" aria-hidden="true"><div class="notifications-mini-head"><strong>Notificações</strong><div class="notifications-mini-head-actions"><button class="notifications-mini-link" type="button">Ver todas</button><button class="icon-button notifications-mini-close" type="button" aria-label="Fechar notificações">×</button></div></div><div class="notifications-mini-list"><div class="notifications-empty-state">Você não tem notificações.</div></div></aside></div></div></header>
+      <article class="home-chat settings-card">
+        <div class="home-chat-title"><span class="orb" aria-hidden="true">S</span><div><strong>Sofia</strong><p>Conversa desta sessão. A memória da Sofia continua disponível sem manter mensagens antigas na tela.</p></div></div>
+        <div id="homeChatResult" class="home-thread" aria-live="polite"></div>
+        <form id="homeChatForm" class="composer home-composer"><label class="sr-only" for="homeMessageInput">Falar com a Sofia</label><textarea id="homeMessageInput" rows="4" maxlength="12000" placeholder="Mensagem para a Sofia…"></textarea><div id="homeImageTray" class="chat-image-tray" hidden></div><div id="homeVoiceBar" class="voice-recording-bar" hidden><span class="voice-live-dot"></span><strong id="homeVoiceTime">0:00</strong><span>Gravando mensagem de voz</span><button id="homeVoiceCancel" type="button" class="secondary">Cancelar</button><button id="homeVoiceSend" type="button" class="primary">Enviar áudio</button></div><div class="composer-footer"><div class="composer-left"><button id="homeVoiceButton" type="button" class="voice-button" aria-label="Gravar mensagem de voz" title="Mensagem de voz"><svg class="control-icon voice-icon-mic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z"/><path d="M5.5 10.5a6.5 6.5 0 0 0 13 0M12 17v4M8.5 21h7"/></svg><svg class="control-icon voice-icon-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg></button><button id="protectedModeToggle" type="button" class="protected-toggle" aria-pressed="false"><svg class="control-icon safe-chat-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 19 6v5c0 4.7-2.8 7.8-7 10-4.2-2.2-7-5.3-7-10V6l7-3Z"/><path d="M9.5 12 11 13.5l3.5-4"/></svg><span class="safe-chat-copy">Safe Chat</span></button><span id="protectedModeText">Enter envia · Shift + Enter quebra a linha</span></div><button id="homeSendButton" type="submit" class="primary send-button"><span>Enviar</span><svg class="control-icon send-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M7 10l5-5 5 5"/></svg></button></div></form>
+        <p id="homeStatus" class="status"></p>
+      </article>
+      <section id="homeSummary" class="home-summary"><div class="summary-heading"><div><p class="eyebrow">RESUMO</p><h3>O que merece sua atenção agora.</h3></div></div><div id="homeWidgets" class="home-widget-grid"></div></section>
+      <button id="startBackToTop" class="start-back-to-top" type="button" hidden aria-label="Voltar ao início">↑ <span>Topo</span></button>
+    </section>
+
+    <section id="tab-notifications" class="tab scroll-panel user-only" hidden>
+      <header class="page-header"><div><p class="eyebrow">SOFIA OS</p><h2>Notificações.</h2><p>Todas as notificações organizadas por área e origem.</p></div><div class="header-actions"><button id="notificationsBack" type="button">← Resumo</button><span id="notificationsPageCount" class="notifications-page-count"></span></div></header>
+      <div id="notificationsPageContent" class="notifications-page-content"></div>
+    </section>
+
+    <section id="tab-chat" class="tab dev-only" hidden>
+      <header class="page-header"><div><p class="eyebrow">HISTÓRICO E CONTEXTO</p><h2 id="chatTitle">Vamos continuar.</h2><p id="chatSubtitle">O que você conversa aqui pode ser retomado depois.</p></div><div class="header-actions"><button id="pauseButton">Pausar e salvar</button><button id="exportConversation" class="secondary">Exportar</button></div></header>
+      <div id="lessonBanner" class="checkpoint-banner" hidden></div><div id="checkpointBanner" class="checkpoint-banner" hidden></div>
+      <div class="chat-main"><button id="olderMessages" class="text-button" hidden>Carregar mensagens anteriores</button><div id="messages" class="messages" aria-live="polite"><div class="empty"><span class="orb large" aria-hidden="true">S</span><h3>Seu espaço para pensar.</h3><p>Converse, registre uma decisão ou retome uma ideia.</p></div></div></div>
+      <div class="route-bar"><button id="quickMenu" type="button">/. Menu</button><label>Roteamento técnico <select id="chatRoute"><option value="auto">Automático</option><option value="private">Filtro Privado</option><option value="shared">Filtro Compartilhado</option></select></label><button id="previewRoute" type="button">Conferir decisão</button></div><p id="routePreview" class="hint"></p>
+      <form id="chatForm" class="composer"><label for="messageInput" class="sr-only">Sua mensagem</label><textarea id="messageInput" rows="2" maxlength="12000" placeholder="Pode falar comigo…"></textarea><div id="chatImageTray" class="chat-image-tray" hidden></div><div id="chatVoiceBar" class="voice-recording-bar" hidden><span class="voice-live-dot"></span><strong id="chatVoiceTime">0:00</strong><span>Gravando mensagem de voz</span><button id="chatVoiceCancel" type="button" class="secondary">Cancelar</button><button id="chatVoiceSend" type="button" class="primary">Enviar áudio</button></div><div class="composer-footer"><div class="composer-left"><button id="chatVoiceButton" type="button" class="voice-button" aria-label="Gravar mensagem de voz" title="Mensagem de voz"><svg class="control-icon voice-icon-mic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z"/><path d="M5.5 10.5a6.5 6.5 0 0 0 13 0M12 17v4M8.5 21h7"/></svg><svg class="control-icon voice-icon-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg></button><span>Enter envia · Shift + Enter quebra a linha</span></div><button id="sendButton" type="submit" class="primary send-button"><span>Enviar</span><svg class="control-icon send-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M7 10l5-5 5 5"/></svg></button></div></form>
+      <p id="status" class="status">Preparando a Sofia…</p>
+    </section>
+
+    <section id="tab-tasks" class="tab scroll-panel" hidden>
+      <header class="page-header"><div><p id="flowEyebrow" class="eyebrow">ORGANIZAÇÃO EM MOVIMENTO</p><h2 id="flowTitle">Tarefas.</h2><p id="flowSubtitle">O que precisa de ação, sem transformar tudo em urgência.</p></div><button id="addTask" class="primary">＋ Nova tarefa</button></header>
+      <div id="flowControls" class="subnav dev-only"></div><div id="flowInfo" class="hint"></div><div id="taskViews" class="filter-row"></div><div id="flowList" class="card-grid" hidden></div><div id="taskList" class="card-grid"></div>
+    </section>
+
+    <section id="tab-commitments" class="tab scroll-panel agenda-tab" hidden>
+      <header class="page-header agenda-page-header"><div><p class="eyebrow">AGENDA</p><h2>Agenda.</h2><p>Seu calendário é interativo: crie, edite e reorganize eventos, compromissos, lembretes e tarefas com data.</p></div><div class="agenda-create-actions"><button id="addCommitment" class="primary">＋ Evento</button><button id="addReminder">＋ Lembrete</button><button id="addAgendaTask">＋ Tarefa</button></div></header>
+      <div class="agenda-layout">
+        <aside class="agenda-sidebar" aria-label="Filtros da agenda">
+          <button id="agendaToday" class="agenda-today" type="button">Hoje</button>
+          <div class="agenda-sidebar-section"><strong>Calendários</strong>
+            <label class="agenda-filter"><input type="checkbox" data-agenda-filter="event" checked><span class="agenda-filter-dot event"></span><span>Eventos</span></label>
+            <label class="agenda-filter"><input type="checkbox" data-agenda-filter="reminder" checked><span class="agenda-filter-dot reminder"></span><span>Lembretes</span></label>
+            <label class="agenda-filter"><input type="checkbox" data-agenda-filter="task" checked><span class="agenda-filter-dot task"></span><span>Tarefas</span></label>
+            <label class="agenda-filter"><input type="checkbox" data-agenda-filter="other" checked><span class="agenda-filter-dot other"></span><span>Outros com data</span></label>
+          </div>
+          <div class="agenda-sidebar-section agenda-summary"><strong>Visão</strong><span id="agendaVisibleCount">0 itens no período</span><small>Os itens mantêm a origem. Clique para editar ou arraste para mudar de dia.</small></div>
+        </aside>
+        <section class="agenda-viewer" aria-label="Calendário">
+          <div class="agenda-toolbar">
+            <div class="agenda-toolbar-nav"><button id="agendaPrev" class="icon-button" type="button" aria-label="Mês anterior">‹</button><button id="agendaNext" class="icon-button" type="button" aria-label="Próximo mês">›</button><strong id="agendaMonthLabel"></strong></div>
+            <div class="agenda-view-switch"><button id="agendaMonthView" type="button" class="active">Mês</button><button id="agendaListView" type="button">Programação</button></div>
+          </div>
+          <div id="agendaCalendar" class="agenda-calendar"></div>
+          <div id="commitmentList" class="agenda-schedule" hidden></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="tab-lists" class="tab scroll-panel" hidden>
+      <header class="page-header"><div><p class="eyebrow">LISTAS DO DIA A DIA</p><h2>Listas.</h2><p>Mercado e Farmácia ficam separados. Comprar, Black Friday e monitoramentos continuam conectados ao mesmo item.</p></div><button id="addListItem" class="primary">＋ Item</button></header><div id="listControls" class="subnav"></div><p id="listInfo" class="hint"></p><div id="listList" class="card-grid"></div>
+    </section>
+
+    <section id="tab-memory" class="tab scroll-panel dev-only" hidden>
+      <header class="page-header"><div><p class="eyebrow">BRUTO · RESUMO · CHECKPOINT · REGRAS</p><h2>Memória, com origem.</h2><p>Notas, versões, labels e linha do tempo. O contexto é montado só quando necessário.</p></div><div class="button-row"><button id="showArchives">Ver arquivadas</button><button id="addMemory" class="primary">＋ Nova memória</button></div></header>
+      <form id="searchForm" class="search-bar"><input id="searchInput" maxlength="300" placeholder="Buscar nas notas e no histórico completo…" aria-label="Busca de memória"><button type="submit">Buscar</button><button id="clearSearch" type="button" class="secondary">Limpar</button></form>
+      <p class="hint">Histórico é o registro bruto. Memória é o que fica guardado para lembrar. Contexto é o conjunto temporário selecionado para responder agora.</p>
+      <div class="button-row"><button id="openTimeline">Linha do tempo</button><button id="memoryKnowledge">Ideias, anotações e lições</button><button id="routingHistory">Roteamento</button></div><div id="knowledgeControls" hidden></div><div id="knowledgeList" class="card-grid" hidden></div><div id="searchResults"></div><div id="memoryList" class="card-grid"></div>
+    </section>
+
+    <section id="tab-study" class="tab scroll-panel" hidden><header class="page-header"><div><p class="eyebrow">APRENDER · PRATICAR · RETOMAR</p><h2>Estudos.</h2><p>A mesma Sofia, diferentes salas de aprendizagem. Progresso é registrado sem ser inventado.</p></div></header><div id="studyControls" class="subnav"></div><p id="studyInfo" class="hint"></p><div id="studyList" class="card-grid"></div></section>
+
+    <section id="tab-library" class="tab scroll-panel" hidden><header class="page-header"><div><p class="eyebrow">FILMES · MÚSICA · LEITURA · REFERÊNCIAS</p><h2 class="user-only">Biblioteca.</h2><h2 class="dev-only">Acervo.</h2><p>Conteúdos pessoais e referências, com suas observações e origem preservadas.</p></div></header><div id="libraryControls" class="subnav"></div><p id="libraryInfo" class="hint"></p><div id="libraryList" class="card-grid"></div></section>
+
+    <section id="tab-vault" class="tab scroll-panel" hidden>
+      <header class="page-header"><div><p class="eyebrow">CONTEÚDO ARMAZENADO DE FORMA CRIPTOGRAFADA</p><h2>Diário Pessoal.</h2><p>Reflexões, meditações e outros registros pessoais ficam protegidos aqui. O <span class="safe-chat-label">Safe Chat</span> é um modo do chat normal e não envia conteúdo automaticamente para o Diário.</p></div><button id="lockVault">Bloquear leitura</button></header>
+      <p id="vaultStatus" class="status"></p><div id="vaultControls" class="button-row"></div>
+      <details class="settings-card" open><summary>Novo registro protegido</summary><form id="vaultAddForm"><label>Título<input id="vaultTitle" maxlength="160" value="Diário Pessoal"></label><label>Conteúdo<textarea id="vaultContent" rows="6" maxlength="20000" required></textarea></label><button type="submit" class="primary">Guardar criptografado</button></form><p class="hint">A Sofia também pode sugerir este Diário a partir do chat normal quando perceber um relato pessoal. Ela pergunta antes de guardar.</p></details>
+      <div id="vaultList" class="card-grid"></div>
+    </section>
+
+    <section id="tab-connections" class="tab scroll-panel dev-only" hidden><header class="page-header"><div><p class="eyebrow">PESSOAS · CANAIS · PERMISSÕES</p><h2>Conexões.</h2><p>Um cadastro de integração não é uma conexão ativa. Veja o estado real de cada serviço.</p></div><button id="addContact" class="primary">＋ Contato</button></header><div id="connectionsList" class="card-grid"></div><h3>Contatos e escopos locais</h3><p class="hint">Bloqueado por padrão. Regras não alteram o aplicativo WhatsApp nem autorizam acesso fora desta instalação.</p><div id="contactList" class="card-grid"></div></section>
+
+    <section id="tab-settings" class="tab scroll-panel" hidden>
+      <header class="page-header"><div><p class="eyebrow">CONTROLE E TRANSPARÊNCIA</p><h2>Configuração.</h2><p>No uso normal, a Sofia escolhe o filtro automaticamente. Aqui ficam os controles técnicos.</p></div></header>
+      <article class="settings-card"><h3>Configuração dos filtros da IA</h3><p>No uso normal, a Sofia escolhe o filtro automaticamente. <strong>Compartilhado</strong> é o projeto que você autorizou para conteúdo geral e benefícios de compartilhamento. <strong>Privado</strong> é o projeto que ficou fora dessa seleção na OpenAI. As chaves são diferentes e nunca são exibidas depois de salvas.</p><div id="routingSetupStatus" class="setup-status"></div><p class="warning">A Sofia não consegue consultar sua configuração de Sharing na OpenAI. A confirmação abaixo é manual e deve refletir o que você acabou de configurar na Platform.</p></article>
+      <article class="settings-card"><h3>Chaves dos projetos</h3><p id="keyStatus" class="hint"></p><form id="credentialsForm" class="credential-grid"><label>Projeto<select id="credentialRoute"><option value="private">Filtro Privado · projeto fora do Sharing</option><option value="shared">Filtro Compartilhado · projeto selecionado no Sharing</option><option value="admin">Uso da OpenAI · chave Admin da organização</option></select></label><label>Chave secreta<input id="credentialKey" type="password" autocomplete="new-password" placeholder="Cole a chave do projeto selecionado" required></label><button type="submit" class="primary">Salvar e testar chave</button></form><p class="hint">Para Privado/Compartilhado, o teste consulta apenas o endpoint de modelos. Para Uso da OpenAI, a chave Admin é validada no endpoint oficial de Usage da organização. Nenhuma conversa, memória ou dado pessoal é enviado durante a validação. A chave Admin é necessária para sincronizar os números do painel da OpenAI; uma chave comum de projeto não tem acesso ao Usage da organização.</p></article>
+      <article class="settings-card"><h3>Filtros e limites</h3><form id="settingsForm"><label><input id="routingEnabled" type="checkbox"> Ativar roteamento automático da IA</label>
+        <details class="technical-details"><summary>Ajustes avançados</summary><div class="form-row"><label>Modo técnico padrão<select id="privacyMode"><option value="auto">Automático</option><option value="private">Forçar Filtro Privado</option><option value="shared">Forçar Filtro Compartilhado</option><option value="local">Local técnico (legado)</option></select></label><label>Usar a chave antiga da Sofia como<select id="legacyRoute"><option value="none">Não atribuir ainda</option><option value="private">Filtro Privado</option><option value="shared">Filtro Compartilhado</option></select></label></div></details>
+        <div class="profile-grid"><fieldset><legend>Filtro Privado</legend><label><input id="privateConfirmed" type="checkbox"> Confirmei na OpenAI que este projeto ficou fora de “Share inputs and outputs with OpenAI”</label><label>Modelo<input id="privateModel" maxlength="100"></label><label>Tarifa de entrada · USD / milhão <span class="optional">(opcional)</span><input id="privateInputPerMillion" type="number" min="0" step="0.001"></label><label>Tarifa de saída · USD / milhão <span class="optional">(opcional)</span><input id="privateOutputPerMillion" type="number" min="0" step="0.001"></label><div class="form-row"><label>Teto diário · USD <span class="optional">(opcional)</span><input id="privateDailyUSD" type="number" min="0" step="0.01"></label><label>Teto mensal · USD <span class="optional">(opcional)</span><input id="privateMonthlyUSD" type="number" min="0" step="0.01"></label></div><div class="form-row"><label>Crédito total do Privado · USD<input id="privateUsageTotalUSD" type="number" min="0.01" max="10000" step="0.01"></label><label>Alerta do Privado · %<input id="privateUsageAlertPercent" type="number" min="1" max="100" step="1"></label></div><p class="hint">Use aqui o total de créditos carregados no Privado (nesta instalação: US$ 5,00). O limite real da conta continua sendo definido na OpenAI Platform. Sem tarifas em USD, a Sofia mostra apenas o gasto que consegue rastrear localmente.</p></fieldset>
+        <fieldset><legend>Filtro Compartilhado</legend><label><input id="sharedConfirmed" type="checkbox"> Confirmei que este projeto está selecionado no Sharing da OpenAI para conteúdo geral autorizado</label><label><input id="sharedBillingAcknowledged" type="checkbox"> Entendo que tokens de cortesia/elegibilidade dependem da OpenAI e estes limites são locais</label><label>Modelo<input id="sharedModel" maxlength="100"></label><label>Tarifa normal de entrada · USD / milhão <span class="optional">(opcional)</span><input id="sharedInputPerMillion" type="number" min="0" step="0.001"></label><label>Tarifa normal de saída · USD / milhão <span class="optional">(opcional)</span><input id="sharedOutputPerMillion" type="number" min="0" step="0.001"></label><div class="form-row"><label>Teto diário · USD <span class="optional">(opcional)</span><input id="sharedDailyUSD" type="number" min="0" step="0.01"></label><label>Teto mensal · USD <span class="optional">(opcional)</span><input id="sharedMonthlyUSD" type="number" min="0" step="0.01"></label></div><div class="form-row"><label>Cota total fixa do Compartilhado · tokens<input id="sharedIncentiveDailyTokens" type="number" min="1" max="100000000" step="1"></label><label>Alerta do Compartilhado · %<input id="sharedUsageAlertPercent" type="number" min="1" max="100" step="1"></label></div><details class="technical-details"><summary>Compatibilidade de alerta antigo</summary><label>Alerta legado de tokens / dia UTC<input id="sharedDailyTokenCap" type="number" min="1" max="100000000"></label></details></fieldset></div>
+        <div class="form-row"><label>Alerta de chamadas por dia <span class="optional">(não bloqueia)</span><input id="dailyCallLimit" type="number" min="1" max="1000" required></label><label>Saída máxima por chamada<input id="maxOutputTokens" type="number" min="128" max="4000" required></label></div><button type="submit" class="primary">Salvar configurações e alertas</button>
+      </form></article>
+      <article class="settings-card"><h3>Consumo por filtro</h3><div id="routeUsage" class="metric-grid"></div></article><article class="settings-card"><h3>Uso desta instalação</h3><div id="usageCards" class="metric-grid"></div><p id="modelLabel" class="hint"></p></article>
+      <article class="settings-card"><h3>Backup e recuperação</h3><div class="button-row"><button id="backupNow">Criar backup local</button><button id="portableBackup">Baixar backup portátil com senha</button></div><p id="backupStatus" class="hint"></p><p class="warning">O histórico comum não é um cofre. Para conteúdo reservado, use <span class="safe-chat-label">Safe Chat</span>. O conteúdo do <span class="safe-chat-label">Safe Chat</span> é cifrado no armazenamento; metadados operacionais mínimos podem permanecer fora do texto cifrado.</p></article>
+      <article class="settings-card dev-only"><h3>Canais</h3><p>WhatsApp real ainda não está conectado a este Core.</p><form id="simulatorForm" class="search-bar"><input id="simulatorInput" maxlength="12000" placeholder="Mensagem de teste para o mesmo Core"><button type="submit">Simular WhatsApp</button></form></article>
+      <article class="settings-card dev-only"><h3>Diagnóstico sem segredos</h3><button id="diagnose">Atualizar diagnóstico</button><pre id="diagnostic"></pre></article>
+    </section>
+
+    <section id="tab-panorama" class="tab scroll-panel dev-only" hidden><header class="page-header"><div><p class="eyebrow">VISÃO INTERNA DA SOFIA</p><h2>Panorama técnico.</h2><p>Fluxos, memória, notificações e linha do tempo sem duplicar registros.</p></div><button id="openNotices">Notificações <span id="noticeCount">0</span></button></header><div class="hero-note"><div class="orb">S</div><div><strong>Panorama técnico</strong><p>A visão do sistema. O usuário final vê a página Início.</p></div></div><div id="panoramaMetrics" class="metric-grid"></div><div id="panoramaContent" class="dashboard-grid"></div></section>
+
+    <section id="tab-userpage" class="tab scroll-panel" hidden>
+      <header class="page-header user-page-header">
+        <div><nav id="userPageBreadcrumb" class="page-breadcrumb" aria-label="Caminho da página"><span>PARTICULAR</span></nav><h2 id="userPageTitle" class="sr-only">Página.</h2><p id="userPagePurpose" class="sr-only"></p></div>
+        <div id="userPageFloatingActions" class="user-page-floating-actions" hidden aria-label="Ações da página">
+          <button id="addSubPage" type="button" title="Criar subpágina" aria-label="Criar subpágina">＋</button><button id="editUserPage" type="button" title="Configurar página" aria-label="Configurar página">⚙</button><button id="deleteUserPage" type="button" title="Mais ações" aria-label="Mais ações">•••</button>
+        </div>
+      </header>
+      <div id="userPageBody" class="notion-page"></div>
+    </section>
+    <button id="miniSofiaButton" class="mini-sofia-button user-only" type="button" aria-label="Abrir mini chat da Sofia" title="Falar com a Sofia">S</button>
+    <aside id="miniSofiaPanel" class="mini-sofia-panel user-only" hidden aria-label="Mini chat da Sofia">
+      <header class="mini-sofia-head"><div><strong>Sofia</strong><span id="miniSofiaContext">Contexto global</span></div><button id="miniSofiaClose" class="icon-button" type="button" aria-label="Fechar mini chat">×</button></header>
+      <div id="miniSofiaThread" class="mini-sofia-thread" aria-live="polite"></div>
+      <form id="miniSofiaForm" class="mini-sofia-form"><textarea id="miniSofiaInput" rows="3" maxlength="12000" placeholder="Pergunte ou peça uma alteração…"></textarea><div id="miniImageTray" class="chat-image-tray mini-image-tray" hidden></div><div id="miniVoiceBar" class="voice-recording-bar" hidden><span class="voice-live-dot"></span><strong id="miniVoiceTime">0:00</strong><span>Gravando</span><button id="miniVoiceCancel" type="button" class="secondary">Cancelar</button><button id="miniVoiceSend" type="button" class="primary">Enviar</button></div><div class="mini-sofia-actions"><div class="mini-left-actions"><button id="miniVoiceButton" type="button" class="voice-button" aria-label="Gravar mensagem de voz" title="Mensagem de voz"><svg class="control-icon voice-icon-mic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z"/><path d="M5.5 10.5a6.5 6.5 0 0 0 13 0M12 17v4M8.5 21h7"/></svg><svg class="control-icon voice-icon-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg></button><button id="miniSofiaClearContext" type="button" class="secondary">Reduzir contexto</button></div><button type="submit" class="primary send-button"><span>Enviar</span><svg class="control-icon send-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M7 10l5-5 5 5"/></svg></button></div></form>
+    </aside>
+  </main>
+</div>
+<dialog id="editorDialog"><form id="editorForm"><div class="dialog-title"><h3 id="editorTitle"></h3><button type="button" id="closeEditor" class="icon-button" aria-label="Fechar">×</button></div><div id="editorFields"></div><p id="editorError" class="error-text" role="alert"></p><div class="button-row"><button type="submit" class="primary">Salvar</button><button type="button" id="cancelEditor">Cancelar</button></div></form></dialog>
+<dialog id="detailDialog"><div class="dialog-title"><h3 id="detailTitle"></h3><button id="closeDetail" class="icon-button" aria-label="Fechar">×</button></div><pre id="detailText"></pre></dialog>
+<dialog id="confirmDialog" class="sofia-confirm"><div class="dialog-title"><h3 id="confirmTitle">Confirmar ação</h3></div><p id="confirmText"></p><div class="button-row"><button id="confirmAccept" type="button" class="primary">Confirmar</button><button id="confirmCancel" type="button">Cancelar</button></div></dialog>
+</body></html>

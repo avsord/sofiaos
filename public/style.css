@@ -1,0 +1,2396 @@
+:root{color-scheme:dark;--bg:#0c0d13;--panel:#14161f;--muted:#989db1;--text:#eff0fa;--line:#292c3d;--accent:#ad9bff;--accent2:#7464e8;--danger:#ffb3bd;--green:#a4dcca;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:var(--bg)}*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0}button,input,textarea,select{font:inherit}button{border:1px solid var(--line);border-radius:11px;background:#202330;color:var(--text);padding:10px 14px;cursor:pointer;font-size:13px;transition:background .15s,border-color .15s}button:hover{background:#2d3043;border-color:#626081}button:disabled{opacity:.5;cursor:wait}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:3px}.primary{background:var(--accent);color:#1b1730;border-color:transparent;font-weight:650}.primary:hover{background:#c1b4ff}.secondary{background:transparent}.wide{width:100%}.shell{display:grid;grid-template-columns:260px minmax(0,1fr);height:100dvh;min-height:640px;max-width:1700px;margin:0 auto}.sidebar{display:flex;flex-direction:column;border-right:1px solid var(--line);padding:28px 18px 20px;background:linear-gradient(180deg,#171624,#10121a);overflow:hidden}.brand{display:flex;align-items:center;gap:12px;margin:0 8px 30px}.brand h1{font-size:25px;font-weight:550;letter-spacing:-1px;margin:0}.brand h1 span{font-size:12px;font-weight:450;color:var(--muted);letter-spacing:1px}.brand p{font-size:10px;color:var(--muted);margin:4px 0 0}.orb{display:grid;place-items:center;width:42px;height:42px;flex-shrink:0;border-radius:50%;background:radial-gradient(circle at 25% 25%,#f6e6ff,#afa0f5 35%,#6267bb 70%,#25213d);color:#fff;font-size:23px;font-style:italic;box-shadow:0 0 30px #9480ff35}.orb.large{width:62px;height:62px;font-size:32px;opacity:.85;margin:0 auto 24px}.eyebrow{color:#8e87ab;letter-spacing:1.7px;font-size:10px;font-weight:650;line-height:1.6}.sidebar>.eyebrow{margin:30px 10px 10px}.nav{width:100%;display:flex;justify-content:space-between;border:0;background:transparent;color:var(--muted);padding:12px 14px;margin-bottom:4px;text-align:left;font-size:14px}.nav span{font-size:10px;align-self:center;color:#73748c}.nav.active{background:#a48afe1c;color:#d8ccff}.nav.active span{color:#baadf7}.conversation-heading{display:flex;align-items:center;justify-content:space-between;margin:22px 10px 5px}.icon-button{border:0;background:transparent;padding:4px 9px;font-size:21px;font-weight:300}.conversation-list{min-height:80px;overflow-y:auto;flex:1}.conversation-item{display:block;text-align:left;width:100%;border:1px solid transparent;background:transparent;color:var(--muted);padding:11px 12px;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}.conversation-item.selected{border-color:#393346;color:#e4def8;background:#ffffff04}.conversation-item small{display:block;margin-top:5px;font-size:10px;opacity:.65}.sidebar-footer{display:flex;align-items:center;flex-wrap:wrap;gap:8px;border-top:1px solid var(--line);padding:18px 8px 0;font-size:12px;color:#c6c5d8;margin-top:20px}.sidebar-footer small{width:100%;font-size:10px;color:#787c93;margin-top:2px}.dot{width:6px;height:6px;border-radius:50%;background:var(--green)}main{min-width:0;position:relative;display:flex;flex-direction:column;overflow:hidden;background:radial-gradient(ellipse at 50% 0,#30224228,transparent 50%)}.tab{display:flex;flex-direction:column;min-height:0;flex:1;padding:32px 42px 20px}.page-header{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:20px}.page-header .eyebrow{margin:0 0 8px}.page-header h2{font-size:27px;font-weight:500;letter-spacing:-.8px;margin:0 0 8px;overflow-wrap:anywhere}.page-header p:not(.eyebrow){color:var(--muted);font-size:13px;margin:0;line-height:1.65}.header-actions{display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0}.chat-main{flex:1;overflow-y:auto;min-height:180px;padding-bottom:15px}.messages{display:flex;flex-direction:column;gap:24px;max-width:970px;margin:0 auto;padding:20px 0}.empty{text-align:center;margin:12vh auto 5vh}.empty h3{font-size:23px;font-weight:450;letter-spacing:-.5px}.empty p{font-size:14px;color:var(--muted);line-height:1.8}.message{width:100%;display:flex;flex-direction:column;gap:8px}.message-heading{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#b7a8dd}.message.user{align-self:flex-end;max-width:86%;width:auto}.message.user .message-heading{text-align:right;color:#8e8b9f}.message-body{font-size:15px;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere;color:#dfdfeb}.message.user .message-body{background:#272334;border:1px solid #3a3148;border-radius:16px 16px 4px 16px;padding:12px 18px}.message-actions{display:flex;gap:7px;flex-wrap:wrap;align-items:center}.message-actions button{font-size:10px;padding:4px 8px;color:var(--muted);background:transparent}.message-status{font-size:11px;color:var(--danger)}.composer{border:1px solid #403650;border-radius:18px;padding:12px 14px;background:#191820;box-shadow:0 8px 25px #0002}.composer textarea{width:100%;resize:vertical;min-height:50px;max-height:160px;border:0;background:none;color:var(--text);padding:5px;font-size:15px;line-height:1.5;outline:none}.composer-footer{display:flex;justify-content:space-between;align-items:center;gap:15px}.composer-footer span{font-size:10px;color:#747285}.composer-footer .primary{padding:9px 19px}.status{font-size:11px;color:var(--muted);margin:10px 4px 0;min-height:16px}.notice{padding:12px 24px;background:#352e46;color:#e4d7ff;font-size:13px;line-height:1.5;border-bottom:1px solid #615276}.notice.error{background:#38232b;color:var(--danger);border-color:#63404b}.checkpoint-banner{padding:11px 15px;border:1px solid #373442;background:#211e2b;border-radius:10px;font-size:12px;line-height:1.6;color:#bfb3dc;margin:0 0 10px}.scroll-panel{overflow-y:auto}.search-bar{display:flex;gap:9px;margin:14px 0 6px}input,textarea,select{background:#101119;color:var(--text);border:1px solid #383545;border-radius:9px;padding:11px 12px;width:100%;font-size:14px}select{line-height:1.5}.search-bar input{flex:1;min-width:0}.search-bar button{flex-shrink:0}.hint{color:var(--muted);font-size:12px;line-height:1.7;margin:10px 0 18px}.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;margin-top:14px}.data-card{border:1px solid var(--line);background:var(--panel);border-radius:15px;padding:20px;min-width:0}.data-card h3{font-size:16px;line-height:1.5;font-weight:550;margin:12px 0;overflow-wrap:anywhere}.data-card p{font-size:13px;color:#bdbed0;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}.tag{display:inline-block;font-size:10px;letter-spacing:.4px;padding:5px 8px;border-radius:6px;background:#9881d320;color:#c6b7ed;margin-right:6px}.tag.done{color:var(--green);background:#84c5b017}.data-card .button-row{margin-top:14px}.button-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.button-row button{font-size:12px}.settings-card{max-width:960px;background:var(--panel);border:1px solid var(--line);border-radius:17px;padding:25px;margin:0 0 18px}.settings-card h3{font-size:18px;font-weight:500;margin:0 0 12px}.settings-card>p{font-size:13px;line-height:1.8;color:var(--muted)}label{display:block;font-size:12px;color:#c7c5d7;margin:16px 0 8px}label>input,label>select{display:block;margin-top:7px}.form-row{display:grid;grid-template-columns:1fr 1fr;gap:18px}.metric-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}.metric{padding:14px 18px;background:#0f1119;border-radius:11px}.metric strong{display:block;font-size:25px;font-weight:500;margin-bottom:5px}.metric span{font-size:11px;color:var(--muted)}.warning{color:#d9bb91!important;font-size:12px!important;border-left:2px solid #b99565;padding-left:13px}.text-button{border:0;background:transparent;color:var(--accent);font-size:12px;padding:10px 6px}.error-text{color:var(--danger);font-size:12px;line-height:1.6}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}dialog{background:#191a24;border:1px solid #575066;border-radius:20px;color:var(--text);padding:26px;width:min(640px,92vw);max-height:85vh;overflow:auto;box-shadow:0 30px 100px #0009}dialog::backdrop{background:#070810bb;backdrop-filter:blur(5px)}.dialog-title{display:flex;justify-content:space-between;align-items:center;gap:10px}.dialog-title h3{margin:0;font-size:21px;font-weight:500}.dialog-title+div{margin-top:20px}dialog textarea{min-height:130px;resize:vertical}dialog .button-row{margin-top:22px}input[type=checkbox]{width:auto;margin-right:9px}pre{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere;color:#bfc5d8}.small-meta{font-size:10px!important;color:#7c8199!important}.search-result{margin:10px 0}.search-result p{margin:7px 0}.search-result .tag{margin-bottom:8px}@media(min-width:1500px){.tab{padding:42px 70px 25px}}@media(max-width:900px){.shell{grid-template-columns:210px minmax(0,1fr)}.sidebar{padding:22px 12px}.tab{padding:24px 22px 18px}.page-header{align-items:flex-start;flex-direction:column}.page-header h2{font-size:24px}.header-actions{width:100%}.form-row{grid-template-columns:1fr;gap:0}.metric-grid{gap:6px}.metric{padding:10px}.metric strong{font-size:20px}}@media(max-width:600px){.shell{height:auto;min-height:100dvh;display:flex;flex-direction:column}.sidebar{border:0;border-bottom:1px solid var(--line);padding:15px 16px;overflow:visible}.brand{margin:0 0 14px}.brand .orb{width:34px;height:34px}.brand h1{font-size:21px}.sidebar>.eyebrow,.conversation-heading,.conversation-list,.sidebar-footer,#moreConversations{display:none!important}.sidebar>button{position:absolute;right:16px;top:20px;width:auto;font-size:12px}.sidebar nav{display:flex;gap:3px}.nav{font-size:12px;padding:9px;justify-content:center;margin:0}.nav span{display:none}main{flex:1;min-height:76dvh;overflow:visible}.tab{padding:22px 16px 16px}.page-header h2{font-size:23px}.page-header{gap:12px}.chat-main{min-height:35dvh;max-height:50dvh}.empty{margin:7vh auto}.message-body{font-size:14px}.message.user{max-width:95%}.composer-footer span{font-size:9px}.scroll-panel{overflow:visible}.card-grid{grid-template-columns:1fr}.settings-card{padding:18px}.search-bar{flex-wrap:wrap}.search-bar input{min-width:60%;}.notice{padding:10px 16px}.metric strong{font-size:19px}.metric span{font-size:9px}}
+/* v45: readable, responsive operational workspace. No external fonts or scripts. */
+.sidebar{padding-top:22px;overflow-y:auto}.sidebar .brand{margin-bottom:20px}.sidebar>.eyebrow{margin-top:20px}.nav{padding:10px 13px;margin-bottom:2px}.conversation-list{min-height:80px;flex:1}.sidebar-footer{margin-top:18px}.scroll-panel{overflow-y:auto;max-height:100dvh}.page-header h2{font-size:34px;letter-spacing:-1.2px}.subnav{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 18px}.subnav button{padding:8px 11px;font-size:12px}.selected{background:#514277!important;border-color:#b3a3ed!important;color:#fff!important}.filter-row{display:flex;gap:9px;flex-wrap:wrap;margin:16px 0 20px}.filter-row input{flex:1;min-width:180px}.filter-row select{max-width:240px}.hero-note{display:flex;gap:20px;align-items:center;padding:22px 24px;border:1px solid #3d3751;border-radius:18px;background:linear-gradient(110deg,#282237,#161b28);margin-bottom:24px}.hero-note p{color:var(--muted);font-size:14px;line-height:1.6;margin:5px 0 0}.dashboard-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:22px}.dashboard-grid .settings-card{margin:0}.dashboard-link{display:block;width:100%;text-align:left;line-height:1.7;margin:8px 0;background:transparent;border:1px solid var(--line);font-size:13px}.timeline-item{padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;line-height:1.6;color:var(--muted)}.metric-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}.metric strong{font-size:30px}.metric span,.metric small{display:block;line-height:1.7}.route-bar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:8px 0 0}.route-bar label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}.route-bar select{max-width:310px;padding:8px;font-size:12px}.route-bar button{padding:8px 12px}.route-bar+.hint{margin:8px 0}.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:20px 0}.profile-grid fieldset{min-width:0;border:1px solid var(--line);border-radius:13px;padding:18px}.profile-grid legend{padding:0 8px;color:#c9bcf9;font-size:15px}input[type=checkbox]{width:auto;display:inline-block;vertical-align:middle;accent-color:var(--accent);margin-right:9px}.settings-card label{font-size:13px;line-height:1.7}.settings-card p{line-height:1.8}.empty-card{grid-column:1/-1;padding:35px;border:1px dashed #44465a;border-radius:16px;color:var(--muted);text-align:center;line-height:1.8}.record-details{display:grid;gap:12px;margin:20px 0}.record-field{padding-bottom:12px;border-bottom:1px solid var(--line)}.record-field strong{font-size:12px;color:var(--accent)}.record-field p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;margin:6px 0;font-size:14px}.text-link{color:var(--accent);text-decoration:none;font-size:12px}#recordDialog{width:min(760px,94vw);max-height:88dvh;overflow-y:auto;padding:25px}#recordDialog>.button-row{margin:20px 0}#recordDialog .data-card{margin-top:14px}.tags{display:flex;gap:5px;flex-wrap:wrap}.data-card p{overflow-wrap:anywhere}.setup-secret{border:1px solid var(--line);border-radius:10px;padding:16px;background:#17121f;word-break:break-all;white-space:pre-wrap}.form-row{min-width:0}.form-row label{min-width:0}.notice{line-height:1.6}.composer textarea{min-height:60px}#tab-chat{gap:0}#vaultList .data-card p{white-space:pre-wrap}.button-row{flex-wrap:wrap}.page-header{gap:18px}.hint{line-height:1.7}#editorDialog{max-height:90dvh;overflow-y:auto;width:min(720px,94vw)}#editorFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 18px}#editorFields label:has(textarea){grid-column:1/-1}#editorFields label:has(input[type=checkbox]){grid-column:1/-1}#editorFields textarea{min-height:110px}#knowledgeControls{margin-top:20px}
+@media(max-width:1050px){.shell{grid-template-columns:220px minmax(0,1fr)}.profile-grid{grid-template-columns:1fr}.dashboard-grid{grid-template-columns:1fr}.page-header{flex-wrap:wrap}.page-header h2{font-size:29px}}
+@media(max-width:740px){.shell{display:block;height:auto;min-height:100dvh}.sidebar{padding:15px;max-height:none;overflow:visible}.sidebar nav{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}.nav{padding:8px;font-size:12px}.sidebar .brand{margin:0 0 12px}.sidebar .eyebrow,.sidebar .conversation-heading,.sidebar .conversation-list,.sidebar #moreConversations{display:none}.sidebar-footer{margin:8px 0 0}.sidebar-footer small{display:none}.scroll-panel{max-height:none;min-height:65dvh}main{min-height:70dvh}.tab{padding:22px 16px!important}.card-grid{grid-template-columns:1fr}.profile-grid{grid-template-columns:1fr}.form-row{flex-wrap:wrap}#editorFields{grid-template-columns:1fr}.chat-main{height:45dvh;min-height:260px}.route-bar select{max-width:230px}.metric-grid{grid-template-columns:1fr 1fr}.metric strong{font-size:23px}.page-header h2{font-size:27px}.filter-row select{max-width:100%}.hero-note{padding:17px}.dashboard-grid{display:block}.dashboard-grid .settings-card{margin-bottom:16px}}
+
+/* v46 - interface dupla: usuário simples / desenvolvimento transparente */
+.mode-user .dev-only{display:none!important}.mode-developer .user-only{display:none!important}.mode-user .user-only,.mode-developer .dev-only{display:revert}.mode-user .sidebar{background:linear-gradient(180deg,#171624,#10121a)}.mode-user .technical-details{display:none}.mode-switch{margin-left:auto;display:flex;gap:6px}.mode-switch button{padding:6px 9px;font-size:11px}.user-pages-nav{display:flex;flex-direction:column;gap:2px;max-height:180px;overflow:auto}.mini-nav{display:flex;gap:7px;flex-wrap:wrap;margin:4px 0 16px}.home-chat{max-width:920px;margin:0 auto 24px;padding:18px 20px;border:1px solid var(--line);background:linear-gradient(135deg,#171827,#12131b);border-radius:17px}.home-chat-title{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:10px}.home-chat textarea{min-height:72px}.home-result{margin-top:12px;padding:14px;border:1px solid #34374a;border-radius:13px;background:#101119}.home-widget-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;align-items:stretch}.home-widget{min-height:215px;max-height:310px;overflow:auto;margin:0}.home-widget h3{margin-top:0}.widget-list{display:grid;gap:7px}.notification-button{position:relative;min-width:42px;padding:8px 11px}.notification-button span{display:inline-grid;place-items:center;min-width:18px;height:18px;margin-left:4px;border-radius:9px;background:var(--accent);color:#171323;font-size:10px;font-weight:700}.protected-chat-card{border-color:#544779;background:linear-gradient(135deg,#181525,#12131b)}.route-tag{opacity:.82}.dashboard-link{width:100%;text-align:left;background:#171923;padding:9px 10px}.dashboard-link:hover{background:#222535}.mode-user #tab-settings .technical-details{display:none}.mode-user #tab-settings .profile-grid,.mode-user #tab-settings #credentialsForm,.mode-user #tab-settings #routeUsage{opacity:.96}.mode-user #tab-start{padding-top:28px}.mode-user .page-header h2{font-size:31px}.mode-user .shell{grid-template-columns:235px minmax(0,1fr)}
+@media(max-width:760px){.shell,.mode-user .shell{grid-template-columns:1fr;height:auto;min-height:100dvh}.sidebar{position:sticky;top:0;z-index:10;max-height:none;padding:12px 12px 8px;border-right:0;border-bottom:1px solid var(--line)}.brand{margin:0 6px 10px}.sidebar>.eyebrow,.conversation-heading,.conversation-list{display:none}.sidebar nav{display:flex;gap:4px;overflow-x:auto}.nav{min-width:max-content;padding:8px 10px;margin:0}.sidebar-footer{margin-top:8px;padding-top:8px}.home-widget-grid{grid-template-columns:1fr}.home-widget{min-height:160px;max-height:none}.home-chat{margin:0 0 14px}.mode-switch{width:100%;justify-content:flex-end}}
+
+/* v47 - Safe Chat como modo do chat e Diário separado */
+.composer-left{display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap}.protected-toggle{padding:7px 10px;background:transparent;border-color:#4a4660;color:#c5c1d7;font-size:11px}.protected-toggle.active{background:#3a2f5f;border-color:#9e8cff;color:#fff;box-shadow:0 0 0 1px #9e8cff33,0 0 20px #7f67ff22}.protected-tag{background:#5f4aa833;color:#d9ceff}.diary-suggestion{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding:11px 12px;border:1px solid #3d3a4d;border-radius:10px;background:#171821;font-size:12px;color:#c5c3d2}.diary-suggestion span{line-height:1.6}.diary-suggestion button{flex-shrink:0}@media(max-width:600px){.composer-footer{align-items:flex-end}.composer-left{gap:6px}.protected-toggle{font-size:10px;padding:6px 8px}.diary-suggestion{align-items:flex-start;flex-direction:column}}
+
+/* v50 — IA Primeiro + interface estável */
+.mode-user #tab-start{overflow-y:auto;scroll-behavior:smooth}.home-chat{width:min(920px,100%);box-sizing:border-box;min-width:0}.home-chat-title{display:grid;grid-template-columns:auto minmax(0,1fr);justify-content:start;align-items:center;gap:12px;width:100%;min-width:0}.home-chat-title>div{min-width:0}.home-chat-title p{overflow-wrap:anywhere}.home-composer,.home-result{width:100%;min-width:0;box-sizing:border-box}.home-chat textarea{min-height:118px;resize:vertical;width:100%;box-sizing:border-box}.home-result{overflow:hidden}.home-result .message-body{max-width:100%;overflow-wrap:anywhere;white-space:pre-wrap}.clarification-box{display:grid;gap:10px;margin-top:12px;padding:14px;border:1px solid #45405b;border-radius:13px;background:#151620;max-width:100%;box-sizing:border-box}.clarification-question{margin:0;line-height:1.65;color:#f0edf9}.clarification-actions{display:flex;gap:8px;flex-wrap:wrap;max-width:100%}.clarification-actions button{white-space:normal;text-align:left;max-width:100%}.home-summary{scroll-margin-top:24px;margin:8px 0 0}.summary-heading{display:flex;align-items:end;justify-content:space-between;margin:0 0 14px;padding:0 2px}.summary-heading h3{margin:3px 0 0;font-size:19px}.mode-user #summaryJump{display:flex}.mode-developer #summaryJump{display:none!important}.subnav .primary{min-width:38px}.home-widget-grid{grid-auto-rows:minmax(215px,auto)}.home-widget{height:100%;box-sizing:border-box}.message-actions .route-tag{display:none}.mode-developer .message-actions .route-tag{display:inline-flex}
+@media(max-width:760px){.home-chat textarea{min-height:104px}.clarification-actions{display:grid;grid-template-columns:1fr}.clarification-actions button{width:100%}.summary-heading{align-items:flex-start}.home-summary{scroll-margin-top:120px}}
+
+/* v52 — agenda profissional, detalhes humanos e interface estável */
+.setup-status{display:grid;gap:10px;margin-top:14px}.setup-row{display:grid;grid-template-columns:minmax(150px,1fr) repeat(3,max-content);gap:10px;align-items:center;padding:12px 14px;border:1px solid var(--line,#30343b);border-radius:14px}.status-ok,.status-warn{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:12px;white-space:nowrap}.status-ok{background:rgba(67,160,71,.15)}.status-warn{background:rgba(255,167,38,.15)}.credential-grid{display:grid;grid-template-columns:minmax(180px,.8fr) minmax(260px,1.4fr) auto;gap:12px;align-items:end}.credential-grid label{display:grid;gap:6px}.optional{opacity:.65;font-size:.82em}@media(max-width:900px){.setup-row,.credential-grid{grid-template-columns:1fr}.setup-row .status-ok,.setup-row .status-warn{width:max-content}}
+
+/* v52 — agenda profissional, detalhes humanos e interface estável */
+.setup-status{display:grid;gap:10px;margin-top:14px}.setup-row{display:grid;grid-template-columns:minmax(150px,1fr) repeat(3,max-content);gap:10px;align-items:center;padding:12px 14px;border:1px solid var(--line,#30343b);border-radius:14px}.status-ok,.status-warn{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:12px;white-space:nowrap}.status-ok{background:rgba(67,160,71,.15)}.status-warn{background:rgba(255,167,38,.15)}.credential-grid{display:grid;grid-template-columns:minmax(180px,.8fr) minmax(260px,1.4fr) auto;gap:12px;align-items:end}.credential-grid label{display:grid;gap:6px}.optional{opacity:.65;font-size:.82em}@media(max-width:900px){.setup-row,.credential-grid{grid-template-columns:1fr}.setup-row .status-ok,.setup-row .status-warn{width:max-content}}
+
+
+/* v53 — conversa contínua, resposta imediata percebida e ações do usuário */
+.home-chat{display:flex;flex-direction:column;min-height:520px;max-height:min(78vh,760px)}
+.home-thread{flex:1;min-height:260px;max-height:48vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:12px 4px 18px;margin:2px 0 10px;scroll-behavior:smooth}
+.home-turn{display:flex;width:100%}
+.home-turn.user{justify-content:flex-end}
+.home-turn.assistant{justify-content:flex-start}
+.home-bubble{max-width:min(78%,680px);padding:12px 14px;border:1px solid #353849;border-radius:16px;background:#1a1b26;box-sizing:border-box}
+.home-turn.user .home-bubble{background:linear-gradient(135deg,#6f59e9,#8e73ff);border-color:#8d79ff;color:white;border-bottom-right-radius:6px}
+.home-turn.assistant .home-bubble{border-bottom-left-radius:6px}
+.home-speaker{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.62;margin-bottom:5px}
+.home-bubble-text{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65;font-size:14px}
+.home-clarification{align-self:flex-start;max-width:min(88%,760px);padding:13px 14px;border:1px solid #45405b;border-radius:14px;background:#151620}
+.home-open-target{align-self:flex-start}
+.typing-bubble{min-width:76px}
+.typing-dots{letter-spacing:5px;animation:sofiaPulse 1s ease-in-out infinite}
+@keyframes sofiaPulse{0%,100%{opacity:.35}50%{opacity:1}}
+.home-inline-error{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid #663c46;border-radius:12px;background:#2a171d;color:#ffd8df}
+.home-composer{margin-top:auto}
+.home-chat textarea{min-height:84px;max-height:180px}
+button.danger{border-color:#713d48;color:#ffc2cd;background:#2a171d}
+button.danger:hover{background:#3a1c25;border-color:#a85768}
+@media(max-width:760px){.home-chat{min-height:62vh;max-height:none}.home-thread{max-height:48vh}.home-bubble,.home-clarification{max-width:92%}}
+
+
+/* v54 — navegação Início/Resumo estável e rolagem fluida */
+.mode-user #tab-start{scrollbar-gutter:stable;overscroll-behavior-y:contain;overflow-anchor:none}
+.mode-user #tab-start>.page-header,.mode-user #tab-start>.home-chat,.mode-user #tab-start>.home-summary{width:min(100%,1180px);margin-left:auto;margin-right:auto;flex-shrink:0}
+.home-chat{max-height:none;overflow:visible}
+.home-summary{padding-bottom:28px;min-width:0}
+.home-widget-grid,.home-widget,.home-thread,.home-composer{min-width:0}
+.nav{transition:background .18s ease,color .18s ease,border-color .18s ease}
+#summaryJump.active{background:#a48afe1c;color:#d8ccff}
+#summaryJump.active span{color:#baadf7}
+.data-card>.button-row{margin-top:14px}
+button.danger{transition:background .15s,border-color .15s,color .15s}
+@media(max-width:760px){.mode-user #tab-start{scrollbar-gutter:auto}.mode-user #tab-start>.page-header,.mode-user #tab-start>.home-chat,.mode-user #tab-start>.home-summary{width:100%}.home-summary{padding-bottom:18px}}
+/* v54 — avisos não deslocam a tela */
+main>#notice.notice{position:absolute;z-index:40;bottom:18px;right:22px;width:min(560px,calc(100% - 44px));border:1px solid #615276;border-radius:13px;box-shadow:0 18px 55px #0008;padding:12px 16px;background:#352e46}
+main>#notice.notice.error{border-color:#7e4958;background:#38232b}
+@media(max-width:760px){main>#notice.notice{position:fixed;bottom:10px;top:auto;left:10px;right:10px;width:auto}}
+
+/* v58 — base fixa, espaços opt-in e transição orgânica Início ↔ Resumo */
+.user-pages-nav>.hint{margin:8px 12px 2px;line-height:1.55;font-size:11px;opacity:.78}
+@media(prefers-reduced-motion:reduce){.mode-user #tab-start{scroll-behavior:auto}}
+
+/* v60 — Conversa contínua, confirmações contextuais e ações pendentes seguras */
+html,body{height:100%;overflow:hidden}.shell{height:100dvh;min-height:0}main{height:100%;min-height:0}.mode-user #tab-start{min-height:0}.user-pages-nav{max-height:260px;overflow:auto;padding-right:2px}.space-tree-node{--page-depth:0}.space-tree-button{margin:1px 0;padding-left:calc(12px + var(--page-depth)*16px);min-height:34px;align-items:center}.space-tree-button .space-tree-kind{margin-left:auto;opacity:.55}.space-tree-node[style*="--page-depth: 1"] .space-tree-button,.space-tree-node[style*="--page-depth: 2"] .space-tree-button,.space-tree-node[style*="--page-depth: 3"] .space-tree-button{font-size:12px;color:#b9b5c9}.user-page-header{margin-bottom:4px;min-height:44px}.user-page-header .eyebrow{max-width:760px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.notion-page{width:min(920px,100%);margin:0 auto;padding:34px 54px 90px;background:transparent;border:0;min-height:calc(100dvh - 150px)}.notion-page-top{display:flex;align-items:flex-start;gap:16px;margin-bottom:24px}.notion-page-title{flex:1;margin:0;min-width:0;font-size:42px;line-height:1.18;font-weight:650;letter-spacing:-1.5px;outline:none;overflow-wrap:anywhere}.notion-page-title:empty:before,.block-editable:empty:before{content:attr(data-placeholder);color:#666a7d;pointer-events:none}.page-save-state{font-size:10px;color:#767b90;white-space:nowrap;margin-top:13px}.notion-subpages{display:grid;gap:5px;margin:0 0 22px;padding:12px 0;border-top:1px solid #212433;border-bottom:1px solid #212433}.notion-subpages>.eyebrow{margin:0 0 4px}.notion-subpage-link{display:flex;width:100%;justify-content:flex-start;border:0;background:transparent;padding:8px 6px;color:#d8d8e7;font-size:13px}.notion-subpage-link:hover{background:#ffffff08}.notion-editor{display:flex;flex-direction:column;gap:1px}.notion-block{position:relative;display:grid;grid-template-columns:42px minmax(0,1fr);align-items:flex-start;min-height:34px;border-radius:7px}.notion-block:hover{background:#ffffff03}.notion-block.drag-over{box-shadow:inset 0 2px 0 var(--accent)}.block-gutter{display:flex;gap:1px;opacity:0;transition:opacity .12s;padding-top:2px}.notion-block:hover .block-gutter,.notion-block:focus-within .block-gutter{opacity:1}.block-add,.block-grip{border:0;background:transparent;padding:4px 5px;min-width:18px;color:#76798d;font-size:12px}.block-add:hover,.block-grip:hover{background:#292b38;color:#d9d8e4}.block-grip{cursor:grab}.block-content{display:flex;align-items:flex-start;gap:8px;min-width:0;padding:5px 4px}.block-editable{min-width:0;flex:1;outline:none;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65;color:#e5e5ee}.notion-heading1 .block-editable{font-size:29px;font-weight:650;line-height:1.3;margin:10px 0 4px}.notion-heading2 .block-editable{font-size:22px;font-weight:600;line-height:1.35;margin:7px 0 3px}.notion-quote .block-content{border-left:3px solid #6f6a82;padding-left:14px;color:#cfcddd}.notion-todo .block-editable{text-decoration:none}.notion-todo input:checked+.block-editable{text-decoration:line-through;color:#777b8d}.block-prefix{width:18px;flex:0 0 18px;color:#bbb8ca;text-align:right;line-height:1.65}.notion-divider{border:0;border-top:1px solid #343746;width:100%;margin:15px 0}.notion-add-block{margin:18px 0 0 42px;border:0;background:transparent;color:#7f8294;padding:7px 8px}.notion-add-block:hover{background:#ffffff06;color:#d4d2e1}.block-command-menu{position:absolute;left:42px;top:34px;z-index:25;width:min(330px,calc(100vw - 80px));max-height:330px;overflow:auto;padding:7px;background:#1a1c27;border:1px solid #3b3e50;border-radius:12px;box-shadow:0 18px 50px #000a}.block-command{display:grid;grid-template-columns:1fr;width:100%;text-align:left;border:0;background:transparent;padding:9px 10px}.block-command strong{font-size:12px;font-weight:600}.block-command small{font-size:10px;color:#85899d;margin-top:2px}.block-command:hover{background:#292c3a}.danger{border-color:#623642!important;background:#321d24!important;color:#ffbdc6!important}
+@media(max-width:760px){html,body{height:auto;overflow:auto}.shell{height:auto;min-height:100dvh}.notion-page{padding:24px 12px 70px;min-height:0}.notion-page-title{font-size:32px}.notion-block{grid-template-columns:34px minmax(0,1fr)}.block-command-menu{left:34px}.user-pages-nav{max-height:none}}
+
+/* v62 — ciclo completo IA → backend → IA; backend sem voz conversacional. */
+
+/* v63 — editor avançado de páginas: blocos, rich text, mídia, tabela e vínculos. */
+/* v64 — escopo completo da Agenda: compromissos + lembretes em ações abrangentes. */
+.notion-page{width:min(980px,100%);padding-top:24px}.notion-page-meta{display:flex;gap:8px;align-items:center;margin:-12px 0 18px 42px;opacity:.72}.page-meta-action{border:0;background:transparent;padding:5px 7px;font-size:11px;color:#8c90a5}.page-meta-action:hover{background:#ffffff08;color:#dddbea}.notion-heading3 .block-editable{font-size:18px;font-weight:600;line-height:1.4;margin:5px 0 2px}.notion-heading4 .block-editable{font-size:15px;font-weight:650;line-height:1.45;margin:4px 0 1px}.notion-callout .block-content{margin:5px 0;padding:12px 14px;border:1px solid #36394a;border-radius:10px;background:#1a1b25}.callout-icon,.toggle-arrow{border:0;background:transparent;padding:1px 3px;min-width:23px;line-height:1.6}.toggle-arrow{color:#9c9daf}.toggle-details{grid-column:1/-1;margin:4px 0 6px 31px;padding:7px 10px;border-left:2px solid #343748;outline:none;white-space:pre-wrap;color:#b9bbca}.toggle-details:empty:before,.code-block-editor:empty:before,.equation-editor:empty:before,.table-cell:empty:before,.image-block figcaption:empty:before{content:attr(data-placeholder);color:#666a7d;pointer-events:none}.notion-code .block-content,.notion-equation .block-content,.notion-table .block-content,.notion-image .block-content,.notion-file .block-content,.notion-bookmark .block-content{display:block}.code-block-head{display:flex;justify-content:space-between;align-items:center;padding:7px 10px 0;background:#101119;border:1px solid #303344;border-bottom:0;border-radius:10px 10px 0 0}.code-language{width:auto;min-width:110px;padding:5px 7px;border:0;background:transparent;color:#8e92a5;font-size:10px}.code-copy{border:0;background:transparent;padding:5px 7px;font-size:10px}.code-block-editor{min-height:90px;margin:0;padding:14px 16px;background:#101119;border:1px solid #303344;border-top:0;border-radius:0 0 10px 10px;outline:none;white-space:pre-wrap;overflow:auto;font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;color:#dbdcea}.equation-prefix{display:inline-grid;place-items:center;min-width:34px;height:34px;border-radius:9px;background:#211f2d;color:#b8a6ff;font-family:Georgia,serif}.equation-editor{display:inline-block;min-width:min(540px,calc(100% - 48px));padding:5px 9px;outline:none;font:18px/1.5 Georgia,"Times New Roman",serif;color:#efedf8}.simple-table-wrap{overflow:auto;margin:6px 0}.simple-table{width:100%;border-collapse:collapse;table-layout:fixed}.simple-table td{border:1px solid #343748;min-width:120px;vertical-align:top}.table-cell{min-height:34px;padding:7px 9px;outline:none;white-space:pre-wrap;overflow-wrap:anywhere}.simple-table td:focus-within{box-shadow:inset 0 0 0 1px #9b87ff}.table-controls{display:flex;gap:5px;margin-top:7px}.table-controls button{padding:5px 8px;font-size:10px;border-color:#2c2f3e;background:#151720}.page-link-block,.file-block,.linked-record-block{display:flex;width:100%;align-items:center;gap:10px;text-align:left;padding:10px 12px;border:1px solid #2d3040;background:#151720;border-radius:9px;color:#dedee8}.page-link-block:hover,.file-block:hover,.linked-record-block:hover{background:#1d1f2b;border-color:#44485c}.page-link-block:before{content:'▤';opacity:.72}.file-icon{font-size:20px}.file-copy{display:grid;gap:2px;min-width:0}.file-copy strong,.file-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file-copy small{color:#85899b}.image-block{margin:6px 0}.image-block img{display:block;max-width:100%;max-height:620px;border-radius:10px;border:1px solid #2d3040;background:#0d0e14}.image-block figcaption{padding:7px 2px;outline:none;font-size:11px;color:#85899b}.bookmark-block{display:grid;gap:4px;padding:13px 15px;border:1px solid #343748;border-radius:10px;background:#151720;color:#e4e3ed;text-decoration:none}.bookmark-block:hover{background:#1d1f2a;border-color:#494d61}.bookmark-block small{color:#85899b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.date-block-input,.date-block-label{width:auto}.date-block-input{min-width:160px}.date-block-label{flex:1;min-width:180px}.linked-record-block{display:grid;grid-template-columns:auto 1fr;grid-template-areas:'kind title' 'kind meta';column-gap:12px}.linked-record-kind{grid-area:kind;align-self:center;padding:4px 7px;border-radius:999px;background:#27243b;color:#b8a7ff;font-size:9px;letter-spacing:.08em}.linked-record-block strong{grid-area:title}.linked-record-block small{grid-area:meta;color:#85899b}.sofia-block-action{margin:7px 0 3px 31px;border-color:#5d4da0;background:#211c35;color:#c9bdff;font-size:11px}.block-comments{margin:5px 0 2px auto;border:0;background:transparent;padding:3px 6px;color:#8b8fa2;font-size:10px}.block-editable code{padding:1px 4px;border-radius:4px;background:#292631;color:#efc7e9;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.block-editable mark{background:#6c5a242e;color:inherit;border-bottom:1px solid #d4b25e}.block-editable mark[data-comment-id]{background:#5f54a73b;border-bottom-color:#a996ff}.block-editable span[data-equation]{padding:1px 4px;border-radius:4px;background:#242532;font-family:Georgia,"Times New Roman",serif}.block-editable a{color:#a99aff;text-decoration:underline;text-underline-offset:2px}.block-command-menu{width:min(390px,calc(100vw - 80px));max-height:480px;padding:8px}.block-menu-group{margin:8px 9px 5px;color:#777b8d;font-size:9px;letter-spacing:.12em;text-transform:uppercase}.block-command{grid-template-columns:34px 1fr;align-items:center;gap:8px;border-radius:7px}.block-command-icon{display:grid;place-items:center;width:30px;height:30px;border:1px solid #313445;border-radius:6px;background:#14161f;color:#c8c8d6;font-size:11px}.block-command-copy{display:grid;gap:1px}.block-more-menu{position:absolute;left:42px;top:30px;z-index:27;width:205px;padding:7px;background:#1a1c27;border:1px solid #3b3e50;border-radius:11px;box-shadow:0 18px 50px #000a}.block-more-action{display:block;width:100%;border:0;background:transparent;text-align:left;padding:8px 9px;font-size:11px}.block-more-action:hover{background:#292c3a}.danger-text{color:#ffadb9!important}.page-inline-toolbar{position:fixed;z-index:90;display:flex;align-items:center;gap:3px;padding:5px;background:#20212b;border:1px solid #44475a;border-radius:9px;box-shadow:0 14px 42px #000c;overflow-x:auto}.page-inline-toolbar[hidden]{display:none!important}.inline-type-select{width:auto;max-width:132px;padding:5px 7px;border:0;background:#20212b;font-size:10px}.inline-tool{border:0;background:transparent;min-width:29px;height:28px;padding:4px 6px;font-size:10px}.inline-tool:hover{background:#313341}.inline-tool[title="Negrito"]{font-weight:800}.inline-tool[title="Itálico"]{font-style:italic}.inline-tool[title="Sublinhado"]{text-decoration:underline}.inline-tool[title="Tachado"]{text-decoration:line-through}.notion-block:focus-within{background:#ffffff025}.notion-block .block-content{flex-wrap:wrap}.notion-heading1,.notion-heading2,.notion-heading3,.notion-heading4{margin-top:2px}.notion-todo input[type=checkbox]{margin-top:5px}.notion-toggle .block-content{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:4px}.notion-toggle .toggle-details{grid-column:2}.notion-callout .block-content{display:flex}.notion-sofia .block-content{border-left:2px solid #7f6adb;padding-left:12px}.notion-bookmark .block-content,.notion-page_link .block-content,.notion-task_link .block-content,.notion-commitment_link .block-content{padding-top:4px;padding-bottom:4px}
+@media(max-width:760px){.notion-page-meta{margin-left:34px;flex-wrap:wrap}.page-inline-toolbar{max-width:calc(100vw - 16px)!important}.block-command-menu,.block-more-menu{left:34px}.date-block-label{min-width:120px}.equation-editor{min-width:calc(100% - 44px)}}
+
+/* v64 — escopos genéricos, Safe Chat, ações rápidas, templates e UX sem diálogos nativos. */
+.safe-chat-label{display:inline-flex;align-items:center;padding:1px 7px;margin:0 2px;border:1px solid #7563bd;border-radius:999px;background:#2b2444;color:#d4caff;font-size:.88em;font-weight:650;line-height:1.55;vertical-align:baseline;white-space:nowrap}
+.sofia-confirm{width:min(480px,92vw);padding:24px}.sofia-confirm p{color:var(--muted);line-height:1.65;white-space:pre-wrap}.sofia-confirm::backdrop,#detailDialog::backdrop,#editorDialog::backdrop,#recordDialog::backdrop{background:#05060ac7;backdrop-filter:blur(4px)}
+.quick-delete-card{position:relative;padding-right:48px}.quick-delete{position:absolute;right:13px;left:auto;top:13px;display:grid;place-items:center;width:24px;height:24px;padding:0;border:1px solid #3a3c4b;border-radius:7px;background:#171923;color:#85889a;font-size:15px;line-height:1;opacity:.62}.quick-delete:hover{opacity:1;border-color:#75424d;background:#351f25;color:#ffb2bd}
+.home-widget-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.home-widget-head h3{margin:0}.widget-hide{width:25px;height:25px;padding:0;border:0;background:transparent;color:#6f7283;font-size:15px}.widget-hide:hover{background:#ffffff08;color:#c5c5d1}.widget-row{position:relative;display:flex;gap:5px;align-items:stretch}.widget-row .dashboard-link{margin:4px 0;flex:1}.widget-row>.quick-delete{position:static;flex:0 0 24px;align-self:center;opacity:.5}.widget-row:hover>.quick-delete{opacity:.95}
+.purchase-group-controls{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0 18px}.purchase-group-controls button{padding:7px 10px;font-size:11px}
+.template-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:16px 0}.template-card{padding:15px;border:1px solid #343747;border-radius:12px;background:#151720}.template-card h3{margin:0 0 6px;font-size:14px}.template-card p{min-height:38px;margin:0 0 12px;color:#898c9d;font-size:11px;line-height:1.55}
+@media(max-width:700px){.template-grid{grid-template-columns:1fr}.quick-delete-card{padding-right:44px}}
+
+/* v64 — módulos do sistema podem ser ocultados apenas como widgets de navegação */
+.nav-widget-row{display:grid;grid-template-columns:minmax(0,1fr) 26px;align-items:center;gap:4px}
+.nav-widget-row>.nav{min-width:0;width:100%}
+.nav-widget-hide{opacity:0;border:0;background:transparent;color:var(--muted);font-size:16px;line-height:1;min-width:26px;height:26px;padding:0;border-radius:8px;transition:opacity .15s ease,background .15s ease,color .15s ease}
+.nav-widget-row:hover .nav-widget-hide,.nav-widget-hide:focus-visible{opacity:1}
+.nav-widget-hide:hover{background:rgba(255,255,255,.07);color:var(--text)}
+
+.purchase-draggable{cursor:grab}.purchase-draggable.dragging{opacity:.45}.purchase-group-controls button.drop-target{outline:2px solid var(--accent);outline-offset:2px;background:#3a3150}
+
+/* v66 — navegação alinhada, tema global, coleções e mini Sofia. */
+.nav{display:grid;grid-template-columns:minmax(0,1fr) 24px;align-items:center;column-gap:10px;justify-content:normal}
+.nav>span{display:block;width:24px;text-align:center;justify-self:end;align-self:center;line-height:1}
+.nav-widget-row{grid-template-columns:minmax(0,1fr)}
+.sidebar-status{display:flex;align-items:center;gap:8px;width:100%}
+.theme-control{width:100%;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px;margin:4px 0 0;color:var(--muted);font-size:10px}
+.theme-control select{margin:0;padding:6px 8px;border-radius:7px;font-size:10px}
+.page-breadcrumb{display:flex;align-items:center;gap:5px;min-height:26px;flex-wrap:wrap}
+.breadcrumb-link{border:0;background:transparent;padding:3px 5px;border-radius:6px;color:var(--muted);font-size:11px;font-weight:600}
+.breadcrumb-link:hover{background:color-mix(in srgb,var(--text) 7%,transparent);color:var(--text)}
+.breadcrumb-separator{color:var(--muted);font-size:11px;opacity:.65}
+
+.mini-sofia-button{position:absolute;z-index:55;right:24px;bottom:24px;width:48px;height:48px;border-radius:50%;padding:0;border:1px solid color-mix(in srgb,var(--accent) 55%,var(--line));background:radial-gradient(circle at 28% 25%,#efe8ff,#b4a7ff 38%,#7464e8 72%,#3f356f);color:#fff;font-size:21px;font-style:italic;box-shadow:0 12px 34px #0004}
+.mini-sofia-button:hover{transform:translateY(-1px);background:radial-gradient(circle at 28% 25%,#fff,#c5baff 38%,#806ff0 72%,#443777)}
+.mini-sofia-panel{position:absolute;z-index:54;right:24px;bottom:82px;width:min(390px,calc(100% - 48px));height:min(560px,calc(100% - 130px));display:grid;grid-template-rows:auto minmax(0,1fr) auto;border:1px solid var(--line);border-radius:18px;background:var(--panel);box-shadow:0 22px 70px #0008;overflow:hidden}
+.mini-sofia-panel[hidden],.mini-sofia-button[hidden]{display:none!important}
+.mini-sofia-head{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:14px 15px;border-bottom:1px solid var(--line)}
+.mini-sofia-head>div{display:grid;gap:3px;min-width:0}.mini-sofia-head strong{font-size:14px}.mini-sofia-head span{color:var(--muted);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-sofia-thread{overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.mini-turn{max-width:88%;padding:9px 11px;border:1px solid var(--line);border-radius:12px;font-size:12px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}.mini-turn strong{display:block;margin-bottom:3px;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.mini-turn.user{align-self:flex-end;background:color-mix(in srgb,var(--accent) 16%,var(--panel))}.mini-turn.assistant{align-self:flex-start;background:var(--surface-soft,var(--panel))}
+.mini-sofia-form{padding:12px;border-top:1px solid var(--line)}.mini-sofia-form textarea{min-height:76px;max-height:150px;resize:vertical}.mini-sofia-actions{display:flex;justify-content:space-between;gap:8px;margin-top:8px}.mini-sofia-actions button{padding:7px 10px;font-size:10px}
+
+.collection-block{margin:8px 0 16px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px 0 8px;min-width:0}
+.collection-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:7px}.collection-title{font-size:14px}.collection-actions{display:flex;gap:5px;flex-wrap:wrap}.collection-action{padding:6px 8px;font-size:10px;background:transparent;border-color:transparent}.collection-action:hover{border-color:var(--line)}
+.collection-views{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:9px}.collection-view{padding:6px 9px;border:0;background:transparent;color:var(--muted);font-size:10px;border-radius:7px}.collection-view.active{background:color-mix(in srgb,var(--text) 7%,transparent);color:var(--text)}
+.collection-body{overflow:auto}.collection-table{width:100%;border-collapse:collapse;table-layout:auto;font-size:11px}.collection-table th{padding:7px 8px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--line);white-space:nowrap}.collection-table td{border-bottom:1px solid var(--line);padding:0;min-width:120px}.collection-cell-input{width:100%;border:0!important;border-radius:0!important;background:transparent!important;padding:8px!important;font-size:11px!important;outline:none!important}.collection-cell-input:focus{box-shadow:inset 0 0 0 1px var(--accent)}.collection-row-actions{width:34px!important;min-width:34px!important}.collection-delete-row{border:0;background:transparent;padding:5px 8px;color:var(--muted)}.collection-delete-row:hover{color:var(--danger);background:transparent}
+.collection-board{display:flex;align-items:flex-start;gap:10px;overflow:auto;padding:3px 0 10px}.collection-board-column{flex:0 0 238px;min-height:120px;padding:7px;border-radius:10px;background:color-mix(in srgb,var(--text) 4%,transparent);border:1px solid transparent}.collection-board-column.drop-target{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}.collection-board-title{padding:4px 5px 8px;font-size:10px;color:var(--muted);font-weight:600}.collection-board-card{display:grid;gap:4px;margin:5px 0;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:grab}.collection-board-card strong{font-size:11px}.collection-board-card small{font-size:9px;color:var(--muted)}.collection-card-edit,.collection-add-card{border:0;background:transparent;text-align:left;padding:4px 2px;font-size:9px;color:var(--muted)}
+.collection-list{display:grid}.collection-list-row{display:flex;gap:12px;align-items:center;padding:8px;border-bottom:1px solid var(--line);cursor:pointer}.collection-list-row strong{min-width:180px;font-size:11px}.collection-list-row small{color:var(--muted);font-size:9px}.collection-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:9px}.collection-gallery-card{display:grid;gap:6px;padding:12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;background:var(--panel)}.collection-gallery-card strong{font-size:12px}.collection-gallery-card small{font-size:9px;color:var(--muted)}.collection-count{text-align:center;padding:10px 0 2px;color:var(--muted);font-size:8px;letter-spacing:.14em}
+.notion-collection .block-content{display:block;min-width:0;width:100%}
+
+:root[data-theme="dark"]{color-scheme:dark}
+:root[data-theme="light"]{color-scheme:light;--bg:#ffffff;--panel:#ffffff;--surface-soft:#f7f7f5;--muted:#787774;--text:#37352f;--line:#e9e9e7;--accent:#2383e2;--accent2:#1b6fc2;--danger:#d44c47;--green:#2f8f68;background:#fff;color:#37352f}
+:root[data-theme="light"] body{background:#fff;color:#37352f}
+:root[data-theme="light"] .shell{background:#fff}
+:root[data-theme="light"] .sidebar{background:#f7f7f5;border-right-color:#e7e7e5}
+:root[data-theme="light"] main{background:#fff}
+:root[data-theme="light"] button{background:#f7f7f5;color:#37352f;border-color:#e6e6e4}
+:root[data-theme="light"] button:hover{background:#efefed;border-color:#d9d9d6}
+:root[data-theme="light"] .primary{background:#2383e2;color:#fff;border-color:#2383e2}
+:root[data-theme="light"] .primary:hover{background:#1b6fc2}
+:root[data-theme="light"] .secondary,.breadcrumb-link,.collection-action,.collection-view,.icon-button,.text-button,.widget-hide{background:transparent}
+:root[data-theme="light"] .nav{color:#6f6e69}
+:root[data-theme="light"] .nav.active{background:#e9e9e7;color:#37352f}
+:root[data-theme="light"] .nav.active span{color:#575650}
+:root[data-theme="light"] .conversation-item.selected{background:#ededeb;border-color:#dfdfdc;color:#37352f}
+:root[data-theme="light"] .sidebar-footer{color:#55544f;border-top-color:#e5e5e2}
+:root[data-theme="light"] input,:root[data-theme="light"] textarea,:root[data-theme="light"] select{background:#fff;color:#37352f;border-color:#dededb}
+:root[data-theme="light"] .settings-card,:root[data-theme="light"] .data-card{background:#fff;border-color:#e7e7e5}
+:root[data-theme="light"] .settings-card>p,:root[data-theme="light"] .data-card p{color:#6f6e69}
+:root[data-theme="light"] .metric{background:#f7f7f5}
+:root[data-theme="light"] .composer{background:#fff;border-color:#dededb;box-shadow:0 4px 18px #0000000c}
+:root[data-theme="light"] .message-body{color:#37352f}
+:root[data-theme="light"] .message.user .message-body{background:#f1f1ef;border-color:#e7e7e5;color:#37352f}
+:root[data-theme="light"] .home-bubble{background:#fff;border-color:#e7e7e5}
+:root[data-theme="light"] .home-turn.user .home-bubble{background:#f1f1ef;border-color:#e7e7e5}
+:root[data-theme="light"] .notice{background:#f7f7f5;color:#37352f;border-color:#e7e7e5;box-shadow:0 10px 28px #00000012}
+:root[data-theme="light"] .notice.error{background:#fff0ef;color:#9f312d;border-color:#f2cfcc}
+:root[data-theme="light"] dialog{background:#fff;color:#37352f;border-color:#dfdfdc;box-shadow:0 24px 80px #00000028}
+:root[data-theme="light"] dialog::backdrop,:root[data-theme="light"] .sofia-confirm::backdrop,:root[data-theme="light"] #detailDialog::backdrop,:root[data-theme="light"] #editorDialog::backdrop,:root[data-theme="light"] #recordDialog::backdrop{background:#0000002e;backdrop-filter:blur(2px)}
+:root[data-theme="light"] pre{color:#44433f}
+:root[data-theme="light"] .tag{background:#f1f1ef;color:#55544f}
+:root[data-theme="light"] .quick-delete{background:#fff;color:#9b9a94;border-color:#e5e5e2}
+:root[data-theme="light"] .quick-delete:hover{background:#fff1f0;color:#c23d38;border-color:#efc6c3}
+:root[data-theme="light"] .template-card{background:#fff;border-color:#e7e7e5}
+:root[data-theme="light"] .template-card p{color:#787774}
+:root[data-theme="light"] .block-command-menu,:root[data-theme="light"] .block-more-menu,:root[data-theme="light"] .page-inline-toolbar{background:#fff;border-color:#dededb;box-shadow:0 12px 36px #00000020}
+:root[data-theme="light"] .block-command-icon{background:#f7f7f5;border-color:#e6e6e3;color:#4c4b46}
+:root[data-theme="light"] .block-more-action:hover,:root[data-theme="light"] .inline-tool:hover{background:#f2f2f0}
+:root[data-theme="light"] .inline-type-select{background:#fff;color:#37352f}
+:root[data-theme="light"] .code-block-head,:root[data-theme="light"] .code-block-editor{background:#f7f7f5;border-color:#e4e4e1;color:#37352f}
+:root[data-theme="light"] .equation-prefix{background:#eef6fd;color:#1f6fb2}
+:root[data-theme="light"] .simple-table td{border-color:#e5e5e2}
+:root[data-theme="light"] .page-link-block,:root[data-theme="light"] .file-block,:root[data-theme="light"] .linked-record-block,:root[data-theme="light"] .bookmark-block{background:#fff;border-color:#e5e5e2;color:#37352f}
+:root[data-theme="light"] .page-link-block:hover,:root[data-theme="light"] .file-block:hover,:root[data-theme="light"] .linked-record-block:hover,:root[data-theme="light"] .bookmark-block:hover{background:#f7f7f5;border-color:#dcdcd8}
+:root[data-theme="light"] .safe-chat-label{background:#eef6fd;border-color:#cfe5f7;color:#1f6fb2}
+:root[data-theme="light"] .mini-sofia-panel{box-shadow:0 18px 60px #00000020}
+:root[data-theme="light"] .collection-board-column{background:#f7f7f5}
+:root[data-theme="light"] .collection-board-card,:root[data-theme="light"] .collection-gallery-card{background:#fff}
+:root[data-theme="light"] .block-editable code{background:#f2f2f0;color:#a33a72}
+:root[data-theme="light"] .block-editable mark{background:#fff2b8;border-bottom-color:#e0c560}
+:root[data-theme="light"] .notion-block:focus-within{background:#fbfbfa}
+
+@media(max-width:760px){.mini-sofia-button{right:14px;bottom:14px}.mini-sofia-panel{right:10px;bottom:68px;width:calc(100% - 20px);height:min(540px,calc(100% - 90px))}.collection-board-column{flex-basis:210px}}
+
+/* v67 — contraste Notion refinado, páginas com capa/ícone e navegação visual consistente. */
+.nav{display:block;position:relative;padding-right:50px!important}
+.nav>.nav-icon{position:absolute!important;right:14px!important;top:50%!important;transform:translateY(-50%);width:24px!important;text-align:center!important;line-height:1!important;margin:0!important}
+
+.notion-visual-actions{display:flex;gap:6px;align-items:center;margin:0 0 8px 42px;min-height:26px}
+.notion-page-cover{position:relative;width:100%;height:180px;margin:-24px 0 18px;border-radius:0 0 12px 12px;background-size:cover!important;background-position:center!important;overflow:hidden}
+.notion-page-cover.image-cover{background-repeat:no-repeat}
+.notion-cover-action{position:absolute;right:12px;bottom:12px;opacity:0;transition:opacity .15s;background:color-mix(in srgb,var(--panel) 88%,transparent);backdrop-filter:blur(8px)}
+.notion-page-cover:hover .notion-cover-action{opacity:1}
+.notion-page-icon{display:grid;place-items:center;width:66px;height:66px;margin:-2px 0 8px 38px;padding:0;border:1px solid var(--line);border-radius:16px;background:var(--panel);font-size:36px;line-height:1;box-shadow:0 6px 18px #0002}
+.notion-page-icon:hover{transform:translateY(-1px)}
+.page-icon-tabs{display:flex;gap:6px;margin:12px 0 10px}.page-icon-tab{padding:7px 10px}.page-icon-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.page-icon-grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;max-height:330px;overflow:auto;padding:4px;margin-bottom:14px}
+.page-icon-option{display:grid;place-items:center;min-width:0;height:42px;padding:0;font-size:21px;border-radius:9px}
+.page-cover-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0 18px}.page-cover-option{height:78px;padding:0;border-radius:10px;border:1px solid var(--line)}
+
+:root[data-theme="light"]{--panel:#f7f7f5;--surface-soft:#f1f1ef;--surface-strong:#e9e9e7;--muted:#787774;--text:#37352f;--line:#e3e3e0;--danger:#d44c47}
+:root[data-theme="light"] body,:root[data-theme="light"] main,:root[data-theme="light"] .shell{background:#fff;color:#37352f}
+:root[data-theme="light"] .sidebar{background:#f7f7f5;border-right-color:#e3e3e0}
+:root[data-theme="light"] button{background:#e9e9e7;color:#37352f;border-color:#dededb}
+:root[data-theme="light"] button:hover{background:#dfdfdc;border-color:#d3d3cf}
+:root[data-theme="light"] .primary{background:#2383e2;color:#fff;border-color:#2383e2}
+:root[data-theme="light"] .secondary,:root[data-theme="light"] .breadcrumb-link,:root[data-theme="light"] .collection-action,:root[data-theme="light"] .collection-view,:root[data-theme="light"] .icon-button,:root[data-theme="light"] .text-button,:root[data-theme="light"] .widget-hide{background:transparent}
+:root[data-theme="light"] .settings-card,:root[data-theme="light"] .data-card,:root[data-theme="light"] .home-chat{background:#f7f7f5;border-color:#e3e3e0}
+:root[data-theme="light"] .composer{background:#f1f1ef;border-color:#dededb;box-shadow:0 4px 16px #0000000c}
+:root[data-theme="light"] .composer textarea{color:#37352f}
+:root[data-theme="light"] .home-bubble,:root[data-theme="light"] .mini-turn.assistant{background:#f1f1ef;border-color:#dfdfdc;color:#37352f}
+:root[data-theme="light"] .home-turn.user .home-bubble,:root[data-theme="light"] .mini-turn.user{background:#e9e9e7;border-color:#d9d9d5;color:#37352f}
+:root[data-theme="light"] .widget-row .dashboard-link,:root[data-theme="light"] .data-card .button-row button,:root[data-theme="light"] .settings-card .button-row button{background:#e9e9e7;border-color:#dcdcd8}
+:root[data-theme="light"] .widget-row .dashboard-link:hover,:root[data-theme="light"] .data-card .button-row button:hover,:root[data-theme="light"] .settings-card .button-row button:hover{background:#dfdfdc}
+:root[data-theme="light"] .orb{background:radial-gradient(circle at 28% 22%,#ffffff 0%,#c7baff 20%,#8f7df1 48%,#6554c7 76%,#463a8d 100%);border:1px solid #7565d7;box-shadow:0 7px 22px #6554c735;color:#fff}
+:root[data-theme="light"] .mini-sofia-button{background:radial-gradient(circle at 28% 22%,#d9d0ff 0%,#9584f1 36%,#6956cc 70%,#463a8d 100%);border-color:#6655c8;color:#fff;box-shadow:0 12px 32px #443a8d35}
+:root[data-theme="light"] .mini-sofia-button:hover{background:radial-gradient(circle at 28% 22%,#e8e2ff 0%,#a08ff7 36%,#715ed8 70%,#4a3b99 100%)}
+:root[data-theme="light"] .mini-sofia-panel{background:#f7f7f5;border-color:#dcdcd8;box-shadow:0 20px 65px #0000002b}
+:root[data-theme="light"] .mini-sofia-head{background:#f1f1ef;border-bottom-color:#dededb}
+:root[data-theme="light"] .mini-sofia-thread{background:#fbfbfa}
+:root[data-theme="light"] .mini-sofia-form{background:#f1f1ef;border-top-color:#dededb}
+:root[data-theme="light"] .mini-sofia-form textarea{background:#fff;color:#37352f;border-color:#d8d8d5}
+:root[data-theme="light"] .mini-sofia-actions .secondary{background:#e9e9e7;border-color:#dcdcd8}
+
+:root[data-theme="light"] .notion-page,:root[data-theme="light"] .notion-editor,:root[data-theme="light"] .block-content{color:#37352f}
+:root[data-theme="light"] .notion-page-title,:root[data-theme="light"] .block-editable,:root[data-theme="light"] .notion-heading1 .block-editable,:root[data-theme="light"] .notion-heading2 .block-editable,:root[data-theme="light"] .notion-heading3 .block-editable,:root[data-theme="light"] .notion-heading4 .block-editable,:root[data-theme="light"] .table-cell,:root[data-theme="light"] .toggle-details,:root[data-theme="light"] .equation-editor{color:#37352f!important}
+:root[data-theme="light"] .notion-page-title:empty:before,:root[data-theme="light"] .block-editable:empty:before,:root[data-theme="light"] .toggle-details:empty:before,:root[data-theme="light"] .code-block-editor:empty:before,:root[data-theme="light"] .equation-editor:empty:before,:root[data-theme="light"] .table-cell:empty:before{color:#9b9a97!important}
+:root[data-theme="light"] .block-prefix,:root[data-theme="light"] .page-save-state,:root[data-theme="light"] .block-menu-group,:root[data-theme="light"] .block-command small{color:#787774!important}
+:root[data-theme="light"] .notion-block{background:transparent}
+:root[data-theme="light"] .notion-block:focus-within,:root[data-theme="light"] .notion-block:hover{background:#f7f7f5}
+:root[data-theme="light"] .notion-callout .block-content{background:#f1f1ef;border-color:#dededb;color:#37352f}
+:root[data-theme="light"] .block-command-menu,:root[data-theme="light"] .block-more-menu,:root[data-theme="light"] .page-inline-toolbar{background:#fff;border-color:#d8d8d5;box-shadow:0 12px 36px #00000020}
+:root[data-theme="light"] .block-command,:root[data-theme="light"] .block-more-action,:root[data-theme="light"] .inline-tool{color:#37352f}
+:root[data-theme="light"] .block-command:hover,:root[data-theme="light"] .block-more-action:hover,:root[data-theme="light"] .inline-tool:hover{background:#efefed}
+:root[data-theme="light"] .danger-text{color:#d44c47!important;opacity:1!important}
+:root[data-theme="light"] .block-more-action.danger-text{background:#fff5f4}
+:root[data-theme="light"] .block-more-action.danger-text:hover{background:#fde8e6;color:#b8322d!important}
+:root[data-theme="light"] .danger{background:#fbeceb!important;border-color:#ecc7c4!important;color:#b8322d!important}
+:root[data-theme="light"] .danger:hover{background:#f7d9d6!important;border-color:#e4aaa6!important;color:#912824!important}
+:root[data-theme="light"] .notion-subpage-link{color:#37352f}
+:root[data-theme="light"] .notion-subpage-link:hover{background:#f1f1ef}
+:root[data-theme="light"] .notion-page-icon{background:#f7f7f5;border-color:#dededb;box-shadow:0 6px 18px #00000012}
+:root[data-theme="light"] .notion-cover-action{background:#fffffff0;border-color:#dededb;color:#37352f}
+
+@media(max-width:760px){.page-icon-grid{grid-template-columns:repeat(6,minmax(0,1fr))}.page-cover-grid{grid-template-columns:repeat(2,1fr)}.notion-page-cover{height:140px;margin-top:-16px}.notion-page-icon{margin-left:28px}}
+
+/* v68 — IA edita páginas existentes, formulários legíveis e chat/feedback fluidos. */
+#summaryJump.active{background:#a48afe1c;color:#d8ccff}
+#summaryJump.active span{color:#baadf7}
+:root[data-theme="light"] #summaryJump.active{background:#e9e9e7!important;color:#37352f!important;opacity:1!important}
+:root[data-theme="light"] #summaryJump.active span{color:#575650!important;opacity:1!important}
+
+/* Toasts compactos: nunca viram uma faixa atravessando a interface. */
+main>#notice.notice{position:fixed;z-index:80;right:24px;bottom:86px;left:auto;top:auto;width:max-content;max-width:min(420px,calc(100vw - 48px));padding:11px 14px;border-radius:11px;box-shadow:0 14px 38px #0005;white-space:normal;overflow-wrap:anywhere}
+@media(max-width:760px){main>#notice.notice{right:12px;left:auto;bottom:76px;width:max-content;max-width:calc(100vw - 24px)}}
+
+/* O mini-chat tem três regiões estáveis: cabeçalho, histórico rolável e composer. */
+.mini-sofia-panel{height:min(560px,calc(100dvh - 150px));max-height:calc(100dvh - 110px);min-height:320px;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden}
+.mini-sofia-thread{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-bottom:18px}
+.mini-sofia-form{min-height:0;flex:none}
+.mini-sofia-form textarea{min-height:72px;max-height:118px;resize:vertical}
+.mini-turn{flex:0 0 auto;overflow-wrap:anywhere}
+.home-chat{overflow:hidden}
+.home-thread{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+
+/* Seletor visual de ícone dentro dos formulários de Espaço/Página. */
+.editor-icon-picker{display:grid;gap:8px;margin-top:7px}
+.editor-icon-current{display:flex;align-items:center;justify-content:flex-start;gap:10px;width:100%;text-align:left}
+.editor-icon-preview{display:grid;place-items:center;width:30px;height:30px;border-radius:7px;background:var(--surface-soft,var(--panel));font-size:19px;flex:0 0 auto}
+.editor-icon-panel{padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--panel);box-shadow:0 12px 34px #0003}
+.editor-icon-panel .page-icon-grid{max-height:220px}
+.notion-page-icon.default-icon{font-size:29px;color:var(--muted)}
+
+/* Hierarquia de superfície no claro: página > card > campo > botão. */
+:root[data-theme="light"] input,:root[data-theme="light"] textarea,:root[data-theme="light"] select{background:#f7f7f5!important;color:#37352f!important;border-color:#dcdcd8!important}
+:root[data-theme="light"] input::placeholder,:root[data-theme="light"] textarea::placeholder{color:#9b9a97!important;opacity:1}
+:root[data-theme="light"] dialog input,:root[data-theme="light"] dialog textarea,:root[data-theme="light"] dialog select{background:#f7f7f5!important}
+:root[data-theme="light"] .editor-icon-panel{background:#fff;border-color:#dcdcd8;box-shadow:0 12px 34px #0000001f}
+:root[data-theme="light"] .editor-icon-current{background:#f1f1ef;border-color:#dcdcd8}
+:root[data-theme="light"] .editor-icon-preview{background:#e9e9e7;color:#37352f}
+:root[data-theme="light"] .notion-editor .notion-block{background:#fbfbfa;border-radius:7px}
+:root[data-theme="light"] .notion-editor .notion-block:hover,:root[data-theme="light"] .notion-editor .notion-block:focus-within{background:#f7f7f5}
+:root[data-theme="light"] .block-editable,:root[data-theme="light"] [contenteditable="true"]{caret-color:#37352f}
+:root[data-theme="light"] .mini-sofia-panel{background:#f1f1ef!important}
+:root[data-theme="light"] .mini-sofia-thread{background:#f7f7f5!important}
+:root[data-theme="light"] .mini-sofia-form{background:#e9e9e7!important}
+:root[data-theme="light"] .mini-sofia-form textarea{background:#fff!important}
+
+/* v69 — Terra, voz nativa, uso sem bloqueio e páginas com hierarquia visual tipo documento. */
+.voice-button{display:inline-grid;place-items:center;width:34px;height:34px;padding:0;border-radius:50%;font-size:16px}.voice-button.recording{background:#c93b46!important;color:#fff!important;border-color:#c93b46!important}.voice-recording-bar{display:flex;align-items:center;gap:9px;margin:8px 0 2px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:color-mix(in srgb,var(--panel) 88%,var(--bg));font-size:11px}.voice-recording-bar>span:nth-of-type(2){flex:1;color:var(--muted)}.voice-recording-bar button{padding:6px 9px;font-size:10px}.voice-live-dot{width:8px;height:8px;border-radius:50%;background:#e04450;animation:voicePulse 1.1s ease-in-out infinite}@keyframes voicePulse{50%{opacity:.32;transform:scale(.82)}}
+.voice-message{display:grid;grid-template-columns:34px 32px minmax(100px,1fr) auto auto;align-items:center;gap:8px;min-width:min(360px,100%);max-width:100%;padding:8px 10px;border-radius:16px;background:color-mix(in srgb,var(--accent) 9%,var(--panel));border:1px solid color-mix(in srgb,var(--accent) 24%,var(--line))}.voice-play,.voice-speed{border:0;background:transparent;padding:0;color:inherit}.voice-play{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px}.voice-speed{font-size:10px;min-width:27px}.voice-wave{height:22px;border-radius:4px;background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--accent) 65%,transparent) 0 2px,transparent 2px 5px);mask:linear-gradient(180deg,transparent 0 18%,#000 18% 82%,transparent 82%)}.voice-progress{width:100%;min-width:80px;padding:0;border:0;background:transparent;accent-color:var(--accent)}.voice-duration{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}.voice-transcript-toggle{grid-column:1/-1;justify-self:start;padding:2px 0;border:0;background:transparent;color:var(--muted);font-size:9px}.voice-transcript{grid-column:1/-1;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,var(--panel) 70%,var(--bg));font-size:11px;line-height:1.55;color:var(--muted)}
+.usage-status-card{grid-column:1/-1;min-width:0;padding:14px 16px;border:1px solid var(--line);border-radius:13px;background:var(--panel)}.usage-status-top{display:flex;align-items:center;justify-content:space-between;gap:16px}.usage-percent{font-weight:750;font-variant-numeric:tabular-nums}.usage-bar{height:12px;margin:10px 0 8px;border-radius:999px;background:color-mix(in srgb,var(--panel) 70%,var(--line));overflow:hidden}.usage-bar-fill{height:100%;min-width:2px;border-radius:inherit;background:linear-gradient(90deg,#2f9e62 0%,#79b74a 35%,#e1b342 65%,#d95c4d 100%);transition:width .25s ease}.usage-stats{font-size:12px;margin-bottom:4px}.usage-status-card small{color:var(--muted)}
+/* Mini Sofia nasce compacta: só cresce com a conversa e depois rola internamente. */
+.mini-sofia-panel{height:auto!important;min-height:0!important;max-height:min(560px,calc(100dvh - 110px));display:flex!important;flex-direction:column}.mini-sofia-panel[hidden]{display:none!important}.mini-sofia-thread{flex:0 1 auto;min-height:0;max-height:330px;overflow-y:auto}.mini-sofia-form{flex:0 0 auto}.mini-left-actions{display:flex;align-items:center;gap:6px}
+/* Página como documento: capa estrutural full-width e conteúdo central, seguindo a hierarquia do Notion. */
+#tab-userpage{padding:0!important}.user-page-header{position:absolute;z-index:18;top:18px;left:22px;right:22px;pointer-events:none;background:transparent;border:0;margin:0}.user-page-header>div:first-child{pointer-events:auto}.user-page-header .header-actions{pointer-events:auto;margin-left:auto;gap:4px}.user-page-header .header-actions button{width:30px;height:30px;min-width:30px;padding:0;border:0;background:color-mix(in srgb,var(--panel) 90%,transparent);box-shadow:none;font-size:13px}.user-page-header .header-actions .danger{background:transparent!important;color:var(--muted)!important;border:0!important}.user-page-header .header-actions button:hover{background:color-mix(in srgb,var(--panel) 75%,var(--line))}.notion-page{width:100%!important;max-width:none!important;margin:0!important;padding:0 0 100px!important;min-height:100%;background:transparent}.notion-page-cover{width:100%!important;height:230px!important;margin:0 0 0!important;border-radius:0!important;background-size:cover!important;background-position:center!important}.notion-cover-action{right:24px!important;bottom:12px!important}.notion-visual-actions,.notion-page-icon,.notion-page-top,.notion-page-meta,.notion-subpages,.notion-editor,.notion-add-block{width:min(900px,calc(100% - 96px));margin-left:auto!important;margin-right:auto!important}.notion-visual-actions{padding-top:54px}.notion-page-cover+.notion-page-icon{position:relative;margin-top:-42px!important}.notion-page-icon{display:flex!important;justify-content:flex-start!important;align-items:center!important;width:min(900px,calc(100% - 96px))!important;height:84px!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;font-size:62px!important;line-height:1!important;text-align:left}.notion-page-icon.default-icon{font-size:42px!important;color:var(--muted)}.notion-page-top{margin-top:0!important;margin-bottom:5px!important}.notion-page-title{font-size:44px}.notion-page-meta{margin-top:0!important;margin-bottom:24px!important;padding-left:0!important;opacity:.72}.notion-subpages{margin-bottom:22px!important}.notion-editor{padding-top:4px}.notion-add-block{display:block;margin-top:16px!important;text-align:left}.page-breadcrumb{font-size:11px;background:color-mix(in srgb,var(--bg) 76%,transparent);border-radius:7px;padding:5px 7px;max-width:max-content}.page-icon-option{box-shadow:none!important}.page-icon-option:hover{box-shadow:none!important}.page-icon-grid{grid-template-columns:repeat(10,minmax(0,1fr));max-height:360px}
+:root[data-theme="light"] .voice-message{background:#f1f1ef;border-color:#dededb}:root[data-theme="light"] .voice-transcript{background:#e9e9e7;color:#595854}:root[data-theme="light"] .usage-status-card{background:#f7f7f5}:root[data-theme="light"] .mini-sofia-panel{background:#f1f1ef!important}:root[data-theme="light"] .notion-page{background:#fff}:root[data-theme="light"] .user-page-header .header-actions button{background:#f1f1ef;color:#37352f}:root[data-theme="light"] .page-breadcrumb{background:#ffffffd9;color:#595854}
+@media(max-width:760px){.notion-page-cover{height:170px!important}.notion-visual-actions,.notion-page-icon,.notion-page-top,.notion-page-meta,.notion-subpages,.notion-editor,.notion-add-block{width:calc(100% - 32px)!important}.notion-page-icon{height:66px!important;font-size:50px!important}.notion-page-title{font-size:34px}.user-page-header{top:8px;left:8px;right:8px}.voice-message{min-width:0;grid-template-columns:32px 24px minmax(80px,1fr) auto}.voice-speed{display:none}.page-icon-grid{grid-template-columns:repeat(7,minmax(0,1fr))}}
+
+/* v70 — navegação coerente, feedback silencioso e escala de página revisada. */
+.sidebar-section-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;margin:22px 0 7px;padding:8px 10px;border:0;border-radius:8px;background:transparent;color:var(--muted);text-align:left;box-shadow:none}
+.sidebar-section-toggle:hover{background:color-mix(in srgb,var(--text) 6%,transparent);border-color:transparent}
+.sidebar-section-title{font-size:10px;line-height:1.4;font-weight:750;letter-spacing:1.55px}
+.section-chevron{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;font-size:16px;line-height:1;color:var(--muted);transition:transform .22s ease,background .18s ease,color .18s ease}
+.sidebar-section-toggle[aria-expanded="false"] .section-chevron{transform:rotate(0deg)}
+.apps-menu{max-height:430px;opacity:1;transform:translateY(0);overflow:hidden;transition:max-height .28s cubic-bezier(.22,.8,.24,1),opacity .18s ease,transform .28s cubic-bezier(.22,.8,.24,1)}
+.apps-menu.is-collapsed{max-height:0;opacity:0;transform:translateY(-5px);pointer-events:none}
+.mode-user #userNavigation>.eyebrow{display:none!important}
+
+.mode-user #appsMenu .nav{display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:center;gap:10px;min-height:46px;padding:7px 9px 7px 12px;margin-bottom:2px;border-radius:9px;font-size:14px}
+.mode-user #appsMenu .nav>.nav-icon{display:grid;place-items:center;position:static!important;right:auto!important;top:auto!important;width:30px!important;height:30px!important;margin:0!important;border-radius:9px;background:color-mix(in srgb,var(--text) 5%,transparent);font-size:18px!important;line-height:1;opacity:.96;filter:saturate(.9);transition:transform .16s ease,background .16s ease,opacity .16s ease}
+.mode-user #appsMenu .nav:hover>.nav-icon{transform:scale(1.05);background:color-mix(in srgb,var(--text) 9%,transparent);opacity:1}
+.mode-user #appsMenu .nav.active>.nav-icon{transform:scale(1.05);background:color-mix(in srgb,var(--accent) 22%,transparent);opacity:1}
+.mode-user #startJump.active,.mode-user #summaryJump.active{background:#a48afe1c;color:#d8ccff}
+:root[data-theme="light"] .mode-user #startJump.active,:root[data-theme="light"] .mode-user #summaryJump.active{background:#e9e9e7!important;color:#37352f!important}
+:root[data-theme="light"] .mode-user #appsMenu .nav>.nav-icon{background:#ececea}
+:root[data-theme="light"] .mode-user #appsMenu .nav.active>.nav-icon{background:#deddda}
+
+/* Início e Resumo compartilham o mesmo painel; só a animação controla scrollTop. */
+#tab-start{scroll-behavior:auto;overscroll-behavior-y:contain}
+#tab-start.start-scrolling{scroll-snap-type:none}
+
+/* Feedback comum não vira mais uma faixa lateral. Erros continuam visíveis. */
+main>#notice.notice{position:fixed;z-index:80;left:50%;right:auto;top:auto;bottom:22px;transform:translateX(-50%);width:auto;max-width:min(460px,calc(100vw - 40px));padding:8px 12px;border-radius:999px;font-size:11.5px;line-height:1.35;box-shadow:0 10px 28px #0004;text-align:center}
+main>#notice.notice.error{max-width:min(540px,calc(100vw - 40px));padding:10px 14px;border-radius:12px;text-align:left}
+@media(max-width:760px){main>#notice.notice,main>#notice.notice.error{left:50%;right:auto;bottom:12px;transform:translateX(-50%);width:max-content;max-width:calc(100vw - 24px)}}
+
+/* Página: escala e respiro próximos de um documento em 100%, sem aspecto miniaturizado. */
+#tab-userpage{overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain;scrollbar-gutter:stable}
+.notion-page{min-width:0!important;padding-bottom:120px!important}
+.notion-visual-actions,.notion-page-icon,.notion-page-top,.notion-page-meta,.notion-subpages,.notion-editor,.notion-add-block{width:min(980px,calc(100% - 104px))!important}
+.notion-page-cover{height:250px!important}
+.notion-page-icon{height:94px!important;font-size:68px!important}
+.notion-page-icon.default-icon{font-size:48px!important}
+.notion-page-title{font-size:48px!important;line-height:1.14!important;letter-spacing:-1.65px!important}
+.notion-page-meta{font-size:12.5px!important;margin-bottom:30px!important}
+.notion-editor{min-width:0;padding-top:7px!important}
+.notion-block{grid-template-columns:40px minmax(0,1fr)!important;min-height:40px!important}
+.notion-block .block-content{min-width:0!important}
+.block-editable{font-size:16px;line-height:1.62}
+.notion-heading1 .block-editable{font-size:32px!important;line-height:1.25!important;margin:14px 0 6px!important}
+.notion-heading2 .block-editable{font-size:25px!important;line-height:1.3!important;margin:11px 0 5px!important}
+.notion-heading3 .block-editable{font-size:20px!important;line-height:1.38!important;margin:8px 0 4px!important}
+.notion-heading4 .block-editable{font-size:17px!important;line-height:1.42!important;margin:6px 0 3px!important}
+.block-gutter{min-height:38px!important}
+.block-gutter button{min-width:28px!important;min-height:28px!important;font-size:15px!important}
+.notion-add-block{font-size:13px!important;padding:9px 10px!important;margin-top:22px!important}
+.notion-subpages{font-size:14px!important}
+.page-breadcrumb{font-size:12px!important;padding:6px 8px!important}
+.breadcrumb-link,.breadcrumb-separator{font-size:12px!important}
+.user-page-header .header-actions button{width:34px!important;height:34px!important;min-width:34px!important;font-size:14px!important}
+
+.collection-block{width:100%;margin:14px 0 22px;padding:13px 0 10px}
+.collection-head{margin-bottom:10px}
+.collection-title{font-size:16px;font-weight:600}
+.collection-action,.collection-view{font-size:12px;padding:7px 10px}
+.collection-table{font-size:13.5px}
+.collection-table th{padding:10px 11px;font-size:12.5px}
+.collection-table td{min-width:145px}
+.collection-cell-input{padding:11px!important;font-size:13.5px!important;min-height:40px}
+.collection-board{gap:12px;padding-bottom:13px}
+.collection-board-column{flex-basis:265px;padding:9px}
+.collection-board-title{font-size:12px;padding:5px 6px 9px}
+.collection-board-card{padding:12px;gap:6px}
+.collection-board-card strong{font-size:13px}
+.collection-board-card small{font-size:11px}
+.collection-card-edit,.collection-add-card{font-size:11px;padding:6px 3px}
+.collection-list-row{padding:11px 10px;gap:14px}
+.collection-list-row strong{font-size:13.5px}
+.collection-list-row small{font-size:11px}
+.collection-gallery{grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:12px}
+.collection-gallery-card{padding:14px;gap:8px}
+.collection-gallery-card strong{font-size:14px}
+.collection-gallery-card small{font-size:11px}
+.collection-count{font-size:10px;padding-top:12px}
+
+@media(max-width:760px){
+  .sidebar-section-toggle{margin:0;padding:7px 8px}
+  .apps-menu{max-height:360px}
+  .mode-user #appsMenu{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px}
+  .mode-user #appsMenu .nav{grid-template-columns:1fr;justify-items:center;gap:3px;min-height:50px;padding:5px 3px;font-size:10px;text-align:center}
+  .mode-user #appsMenu .nav>.nav-icon{width:28px!important;height:28px!important;font-size:16px!important;grid-row:1}
+  .notion-visual-actions,.notion-page-icon,.notion-page-top,.notion-page-meta,.notion-subpages,.notion-editor,.notion-add-block{width:calc(100% - 38px)!important}
+  .notion-page-cover{height:180px!important}
+  .notion-page-icon{height:74px!important;font-size:54px!important}
+  .notion-page-title{font-size:36px!important}
+  .block-editable{font-size:15px}
+  .collection-table{font-size:12.5px}
+  .collection-cell-input{font-size:12.5px!important}
+}
+/* v70 — voz responsiva: o áudio aparece imediatamente enquanto a Sofia processa. */
+.voice-message .voice-send-status{grid-column:1/-1;display:inline-flex;align-items:center;gap:6px;width:max-content;max-width:100%;font-size:10px;line-height:1.2;color:var(--muted)}
+.voice-message .voice-send-status::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent);animation:voicePulse 1.1s ease-in-out infinite}
+.optimistic-voice .voice-message{opacity:.92}
+
+
+/* v71 WIP — sidebar estável, ícones compactos à esquerda e controles sem deslocamento no hover. */
+.mode-user .sidebar{overflow:hidden!important}
+.mode-user #userNavigation{display:flex;flex-direction:column;min-width:0;width:100%;min-height:0;flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;padding-right:2px}
+.mode-user #appsMenuToggle,.mode-user #newConversation,.mode-user .brand,.mode-user .conversation-heading,.mode-user #userPagesNav{transform:none!important}
+.mode-user #appsMenu .nav{display:grid;grid-template-columns:26px minmax(0,1fr);justify-content:initial;align-items:center;gap:8px;min-height:41px;padding:5px 10px 5px 8px;text-align:left}
+.mode-user #appsMenu .nav>.nav-icon{grid-column:1;grid-row:1;display:grid;place-items:center;position:static!important;right:auto!important;top:auto!important;width:24px!important;height:24px!important;margin:0!important;border-radius:7px;background:color-mix(in srgb,var(--text) 5%,transparent);font-size:14px!important;line-height:1;opacity:.96;filter:saturate(.9);transform:none!important;transition:background .16s ease,opacity .16s ease!important}
+.mode-user #appsMenu .nav>.nav-label{grid-column:2;grid-row:1;position:static!important;right:auto!important;top:auto!important;width:auto!important;min-width:0;margin:0!important;font-size:13.5px!important;line-height:1.3;color:inherit!important;text-align:left;white-space:normal;transform:none!important;transition:none!important}
+.mode-user #appsMenu .nav:hover>.nav-icon,.mode-user #appsMenu .nav.active>.nav-icon{transform:none!important;opacity:1}
+.mode-user #appsMenu .nav:hover>.nav-icon{background:color-mix(in srgb,var(--text) 9%,transparent)}
+.mode-user #appsMenu .nav.active>.nav-icon{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+
+/* Chat segue a mesma régua visual dos aplicativos, sem mexer ao abrir/fechar a seção. */
+.mode-user #newConversation.chat-nav{display:grid;grid-template-columns:26px minmax(0,1fr);align-items:center;gap:8px;min-height:39px;padding:5px 10px 5px 8px;text-align:left}
+.mode-user #newConversation.chat-nav>.nav-icon{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:#ffffff18;font-size:14px;line-height:1;transform:none!important}
+.mode-user #newConversation.chat-nav>.nav-label{position:static!important;width:auto!important;margin:0!important;font-size:13.5px;font-weight:650;text-align:left;transform:none!important}
+
+/* Ícones de chat: mesma espessura, caixa e alinhamento; nenhum pula no hover. */
+.control-icon{display:block;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.voice-button{width:34px;height:34px;min-width:34px;padding:0!important;border-radius:10px!important;transform:none!important;transition:background .15s ease,border-color .15s ease,color .15s ease!important}
+.voice-button:hover,.voice-button:active,.voice-button:focus-visible{transform:none!important}
+.voice-icon-stop{display:none}.voice-button.recording .voice-icon-mic{display:none}.voice-button.recording .voice-icon-stop{display:block;fill:currentColor;stroke:none}
+.send-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;transform:none!important}.send-button:hover,.send-button:active{transform:none!important}.send-button .send-icon{width:15px;height:15px}
+.icon-button,.mini-sofia-button,.notion-page-icon,.page-icon-option,.notification-button{transform:none!important}.icon-button:hover,.icon-button:active,.mini-sofia-button:hover,.mini-sofia-button:active,.notion-page-icon:hover,.notion-page-icon:active,.page-icon-option:hover,.page-icon-option:active,.notification-button:hover,.notification-button:active{transform:none!important}
+
+@media(max-width:760px){
+  .mode-user #appsMenu .nav{grid-template-columns:26px minmax(0,1fr)!important;justify-items:stretch!important;gap:7px!important;text-align:left!important;min-height:41px!important;padding:5px 7px!important}
+  .mode-user #appsMenu .nav>.nav-icon{grid-column:1!important;grid-row:1!important;width:24px!important;height:24px!important;font-size:14px!important}
+  .mode-user #appsMenu .nav>.nav-label{grid-column:2!important;grid-row:1!important;font-size:12px!important}
+  .mode-user #newConversation.chat-nav{grid-template-columns:26px minmax(0,1fr);gap:7px;padding:5px 7px}.mode-user #newConversation.chat-nav>.nav-icon{width:24px;height:24px;font-size:14px}
+}
+/* Abrir/fechar a seção não desloca horizontalmente nem aplica salto no conjunto da lateral. */
+.mode-user .apps-menu{transform:none!important;transition:max-height .24s cubic-bezier(.22,.8,.24,1),opacity .16s ease!important}
+.mode-user .apps-menu.is-collapsed{transform:none!important}
+
+/* v71 — refinamento final: sidebar imóvel, microcontroles limpos e ícones consistentes. */
+.mode-user .sidebar{overflow:hidden!important;contain:layout paint}
+.mode-user #userNavigation{overflow-y:scroll!important;overflow-x:hidden!important;scrollbar-gutter:stable!important;min-height:0;overscroll-behavior:contain}
+.mode-user #userNavigation::-webkit-scrollbar{width:6px}
+.mode-user #userNavigation::-webkit-scrollbar-track{background:transparent}
+.mode-user #userNavigation::-webkit-scrollbar-thumb{background:transparent;border-radius:999px}
+.mode-user #userNavigation:hover::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--muted) 34%,transparent)}
+.mode-user #newConversation,.mode-user #appsMenuToggle{width:100%;min-width:0;flex:0 0 auto;box-sizing:border-box}
+.mode-user #appsMenu{width:100%;min-width:0;transform:none!important;will-change:max-height,opacity}
+.mode-user #appsMenu .nav,.mode-user #newConversation.chat-nav{transform:none!important;transition:background .15s ease,border-color .15s ease,color .15s ease!important}
+.mode-user #appsMenu .nav:hover,.mode-user #appsMenu .nav:active,.mode-user #newConversation.chat-nav:hover,.mode-user #newConversation.chat-nav:active{transform:none!important}
+.mode-user #appsMenu .nav>.nav-icon,.mode-user #newConversation.chat-nav>.nav-icon{width:24px!important;height:24px!important;min-width:24px!important;font-size:14px!important;transform:none!important;transition:background .15s ease,opacity .15s ease!important}
+.mode-user #appsMenu .nav>.nav-label,.mode-user #newConversation.chat-nav>.nav-label{transform:none!important;transition:none!important}
+
+/* Composer: ícones têm a mesma régua visual e nunca mudam de geometria no hover. */
+.protected-toggle{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:34px;transform:none!important;transition:background .15s ease,border-color .15s ease,color .15s ease!important}
+.protected-toggle:hover,.protected-toggle:active,.protected-toggle:focus-visible{transform:none!important}
+.protected-toggle .safe-chat-icon{width:15px;height:15px;flex:0 0 15px}
+.send-button,.voice-button,.protected-toggle,.icon-button,.notification-button,.page-meta-action,.notion-add-block,.block-add,.block-grip,.block-comments,.toggle-arrow,.callout-icon,.code-copy,.inline-tool{box-shadow:none;transform:none!important}
+.send-button:hover,.voice-button:hover,.protected-toggle:hover,.icon-button:hover,.notification-button:hover,.page-meta-action:hover,.notion-add-block:hover,.block-add:hover,.block-grip:hover,.block-comments:hover,.toggle-arrow:hover,.callout-icon:hover,.code-copy:hover,.inline-tool:hover{transform:none!important}
+
+/* Editor de página: o gutter comporta + e alça sem invadir o texto. */
+.notion-block{grid-template-columns:54px minmax(0,1fr)!important}
+.block-gutter{width:54px;display:grid!important;grid-template-columns:24px 24px;justify-content:end;align-items:start;gap:2px!important;padding:6px 2px 0 0!important;min-height:36px!important}
+.block-gutter .block-add,.block-gutter .block-grip{display:grid;place-items:center;width:24px!important;height:24px!important;min-width:24px!important;min-height:24px!important;padding:0!important;border:0!important;border-radius:6px!important;font-size:13px!important;line-height:1!important;background:transparent!important}
+.block-content{padding-left:6px!important}
+.block-command-menu{left:54px!important}
+.notion-editor{gap:2px!important}
+.notion-page-meta{display:flex!important;align-items:center!important;gap:4px!important;flex-wrap:wrap!important}
+.page-meta-action{display:inline-flex;align-items:center;min-height:28px;padding:4px 7px!important;border:0!important;border-radius:6px!important;background:transparent!important;white-space:nowrap}
+.notion-add-block{border:0!important;background:transparent!important;border-radius:6px!important;box-shadow:none!important}
+.block-comments,.toggle-arrow,.callout-icon,.code-copy{background:transparent!important;border-color:transparent!important}
+
+/* No tema claro, controles utilitários não herdam a pílula cinza do botão comum. */
+:root[data-theme="light"] .block-add,
+:root[data-theme="light"] .block-grip,
+:root[data-theme="light"] .page-meta-action,
+:root[data-theme="light"] .notion-add-block,
+:root[data-theme="light"] .block-comments,
+:root[data-theme="light"] .toggle-arrow,
+:root[data-theme="light"] .callout-icon,
+:root[data-theme="light"] .code-copy,
+:root[data-theme="light"] .inline-tool{background:transparent!important;border-color:transparent!important;box-shadow:none!important}
+:root[data-theme="light"] .block-add:hover,
+:root[data-theme="light"] .block-grip:hover,
+:root[data-theme="light"] .page-meta-action:hover,
+:root[data-theme="light"] .notion-add-block:hover,
+:root[data-theme="light"] .block-comments:hover,
+:root[data-theme="light"] .toggle-arrow:hover,
+:root[data-theme="light"] .callout-icon:hover,
+:root[data-theme="light"] .code-copy:hover,
+:root[data-theme="light"] .inline-tool:hover{background:#efefed!important;border-color:transparent!important}
+
+@media(max-width:760px){
+  .notion-block{grid-template-columns:48px minmax(0,1fr)!important}
+  .block-gutter{width:48px;grid-template-columns:22px 22px;gap:2px!important;padding-right:0!important}
+  .block-gutter .block-add,.block-gutter .block-grip{width:22px!important;height:22px!important;min-width:22px!important;min-height:22px!important;font-size:12px!important}
+  .block-command-menu{left:48px!important}
+}
+
+/* v72 — lateral sem cortes, alinhamento estável e uso compartilhado atualizável. */
+.mode-user .sidebar{
+  overflow-y:scroll!important;
+  overflow-x:hidden!important;
+  scrollbar-gutter:stable!important;
+  contain:none!important;
+}
+.mode-user .sidebar::-webkit-scrollbar{width:6px}
+.mode-user .sidebar::-webkit-scrollbar-track{background:transparent}
+.mode-user .sidebar::-webkit-scrollbar-thumb{background:transparent;border-radius:999px}
+.mode-user .sidebar:hover::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--muted) 34%,transparent)}
+.mode-user #userNavigation{
+  display:flex!important;
+  flex:0 0 auto!important;
+  flex-direction:column;
+  width:100%;
+  min-width:0;
+  min-height:0;
+  overflow:visible!important;
+  padding-right:0!important;
+  scrollbar-gutter:auto!important;
+}
+.mode-user #userPagesNav{
+  max-height:none!important;
+  overflow:visible!important;
+  padding-right:0!important;
+}
+.mode-user .sidebar-footer{flex:0 0 auto}
+.mode-user #appsMenu{overflow:visible!important}
+.mode-user #appsMenu.is-collapsed{overflow:hidden!important}
+
+/* Chat: ícone permanece à esquerda e o nome fica realmente centralizado no botão. */
+.mode-user #newConversation.chat-nav{
+  position:relative!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:39px;
+  padding:5px 40px!important;
+  text-align:center!important;
+}
+.mode-user #newConversation.chat-nav>.nav-icon{
+  position:absolute!important;
+  left:8px!important;
+  top:50%!important;
+  translate:0 -50%;
+  width:24px!important;
+  height:24px!important;
+  min-width:24px!important;
+  margin:0!important;
+}
+.mode-user #newConversation.chat-nav>.nav-label{
+  width:100%!important;
+  min-width:0!important;
+  text-align:center!important;
+  margin:0!important;
+}
+
+/* O título da seção começa na mesma régua horizontal de PARTICULAR. */
+.mode-user #appsMenuToggle{
+  width:calc(100% - 20px)!important;
+  margin:22px 10px 7px!important;
+  padding:8px 0!important;
+  text-align:left!important;
+}
+.mode-user #appsMenuToggle .sidebar-section-title{
+  flex:1 1 auto;
+  min-width:0;
+  text-align:left!important;
+}
+.mode-user #appsMenuToggle .section-chevron{flex:0 0 22px}
+
+/* O gradiente mantém a escala inteira da barra: em 50%, só metade do gradiente fica visível. */
+.usage-status-card{position:relative}
+.usage-status-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.usage-close{
+  display:grid;
+  place-items:center;
+  width:24px;
+  height:24px;
+  min-width:24px;
+  padding:0!important;
+  border:0!important;
+  border-radius:7px!important;
+  background:transparent!important;
+  color:var(--muted)!important;
+  font-size:16px!important;
+  line-height:1!important;
+  box-shadow:none!important;
+  transform:none!important;
+}
+.usage-close:hover,.usage-close:active{background:color-mix(in srgb,var(--text) 7%,transparent)!important;color:var(--text)!important;transform:none!important}
+.usage-bar-fill{
+  background:linear-gradient(90deg,#2f9e62 0%,#79b74a 35%,#e1b342 65%,#d95c4d 100%)!important;
+  background-position:left center!important;
+  background-repeat:no-repeat!important;
+  transition:width .25s ease,background-size .25s ease!important;
+}
+
+@media(max-width:760px){
+  .mode-user .sidebar{overflow:visible!important;scrollbar-gutter:auto!important}
+  .mode-user #userNavigation{overflow:visible!important}
+  .mode-user #newConversation.chat-nav{padding-left:40px!important;padding-right:40px!important}
+  .mode-user #appsMenuToggle{width:100%!important;margin:0!important;padding:7px 8px!important}
+}
+
+/* v73 — uso por filtros, cabeçalhos sticky e cards de chat estáveis. */
+.home-clarification{
+  background:var(--panel)!important;
+  color:var(--text)!important;
+  border-color:var(--line)!important;
+}
+:root[data-theme="light"] .home-clarification{
+  background:#fff!important;
+  color:#37352f!important;
+  border-color:#e7e7e5!important;
+}
+:root[data-theme="light"] .home-clarification .hint{color:#787774!important}
+
+/* Cards do Resumo com rolagem interna preservam o título como referência visual. */
+.home-widget-head{
+  position:sticky;
+  top:0;
+  z-index:4;
+  margin:-2px -2px 0;
+  padding:2px 2px 8px;
+  background:var(--panel);
+}
+:root[data-theme="light"] .home-widget-head{background:#fff}
+
+/* Uso da Sofia — Compartilhado/Privado usam a mesma linguagem visual. */
+.usage-card-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.usage-filter-tabs{display:inline-flex;align-items:center;gap:3px;padding:3px;border-radius:10px;background:color-mix(in srgb,var(--text) 5%,transparent)}
+.usage-filter-tab{min-height:28px;padding:5px 9px!important;border:0!important;border-radius:8px!important;background:transparent!important;color:var(--muted)!important;font-size:10px!important;box-shadow:none!important;transform:none!important}
+.usage-filter-tab:hover{background:color-mix(in srgb,var(--text) 6%,transparent)!important;color:var(--text)!important;transform:none!important}
+.usage-filter-tab.active{background:var(--panel)!important;color:var(--text)!important;box-shadow:0 1px 4px #0002!important}
+:root[data-theme="light"] .usage-filter-tab.active{background:#fff!important;box-shadow:0 1px 4px #00000014!important}
+.usage-bar{position:relative;overflow:visible!important}
+.usage-bar-fill{overflow:hidden}
+.usage-alert-marker{position:absolute;z-index:3;top:-3px;width:2px;height:18px;border-radius:2px;background:var(--text);opacity:.68;transform:translateX(-1px);pointer-events:none}
+.usage-alert-marker::after{content:"";position:absolute;left:50%;top:-3px;width:6px;height:6px;border-radius:50%;background:var(--text);transform:translate(-50%,-50%)}
+.usage-status-card .usage-status-top{margin-top:1px}
+.usage-status-card .usage-stats{margin-top:9px}
+
+/* v74 — menu lateral alinhado e widgets reordenáveis. */
+.mode-user #newConversation.chat-nav,
+.mode-user #appsMenu .nav,
+.mode-user #appsMenuToggle{
+  width:100%!important;
+  min-height:40px!important;
+  border-radius:12px!important;
+}
+
+.mode-user #newConversation.chat-nav{
+  position:relative!important;
+  display:grid!important;
+  grid-template-columns:24px minmax(0,1fr)!important;
+  align-items:center!important;
+  justify-content:start!important;
+  gap:10px!important;
+  padding:8px 12px!important;
+  text-align:left!important;
+}
+.mode-user #newConversation.chat-nav>.nav-icon{
+  position:static!important;
+  translate:none!important;
+  left:auto!important;
+  top:auto!important;
+  display:grid!important;
+  place-items:center!important;
+  width:24px!important;
+  height:24px!important;
+  min-width:24px!important;
+  border-radius:8px!important;
+}
+.mode-user #newConversation.chat-nav>.nav-label{
+  width:auto!important;
+  text-align:left!important;
+  font-weight:650!important;
+}
+
+.mode-user #appsMenuToggle{
+  margin:14px 0 8px!important;
+  padding:8px 12px!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 22px!important;
+  align-items:center!important;
+  background:color-mix(in srgb,var(--text) 4%,transparent)!important;
+}
+.mode-user #appsMenuToggle:hover{
+  background:color-mix(in srgb,var(--text) 7%,transparent)!important;
+}
+.mode-user #appsMenuToggle .sidebar-section-title{
+  display:block;
+  text-align:left!important;
+}
+.mode-user #appsMenuToggle .section-chevron{
+  justify-self:end;
+}
+
+.mode-user #appsMenu .nav{
+  display:grid!important;
+  grid-template-columns:24px minmax(0,1fr)!important;
+  align-items:center!important;
+  justify-content:start!important;
+  gap:10px!important;
+  padding:8px 12px!important;
+  text-align:left!important;
+}
+.mode-user #appsMenu .nav>.nav-icon{
+  grid-column:1!important;
+  grid-row:1!important;
+  width:24px!important;
+  height:24px!important;
+  min-width:24px!important;
+  border-radius:8px!important;
+  font-size:14px!important;
+}
+.mode-user #appsMenu .nav>.nav-label{
+  grid-column:2!important;
+  grid-row:1!important;
+  display:block!important;
+  width:auto!important;
+  min-width:0!important;
+  text-align:left!important;
+  justify-self:start!important;
+}
+
+.conversation-heading{padding:0 12px 0 12px}
+.user-pages-nav .space-tree-button{padding-right:12px!important}
+
+.home-widget-grid{align-items:stretch}
+.home-widget{
+  position:relative;
+  cursor:grab;
+}
+.home-widget.dragging{
+  opacity:.52;
+}
+.home-widget.drag-over{
+  outline:2px dashed var(--accent);
+  outline-offset:2px;
+}
+.home-widget-title-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+}
+.widget-drag-handle{
+  display:grid;
+  place-items:center;
+  width:24px;
+  height:24px;
+  min-width:24px;
+  padding:0!important;
+  border:0!important;
+  border-radius:8px!important;
+  background:transparent!important;
+  color:var(--muted)!important;
+  cursor:grab;
+}
+.widget-drag-handle:hover{background:color-mix(in srgb,var(--text) 7%,transparent)!important;color:var(--text)!important}
+.home-widget.dragging .widget-drag-handle,
+.home-widget:active .widget-drag-handle{cursor:grabbing}
+
+@media(max-width:760px){
+  .mode-user #newConversation.chat-nav,
+  .mode-user #appsMenu .nav,
+  .mode-user #appsMenuToggle{min-height:38px!important}
+}
+
+/* v77 — refinamentos acumulados de navegação, drag e templates. */
+.mode-user #appsMenuToggle .sidebar-section-title{
+  white-space:nowrap!important;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  font-size:9.6px!important;
+  letter-spacing:1.25px!important;
+}
+
+/* Páginas em PARTICULAR usam a mesma régua vertical dos outros itens, sem alterar o cabeçalho PARTICULAR. */
+.mode-user #userPagesNav .space-tree-button{
+  width:100%!important;
+  min-height:40px!important;
+  margin:2px 0!important;
+  padding:8px 12px!important;
+  border-radius:12px!important;
+  display:flex!important;
+  align-items:center!important;
+  line-height:1.3!important;
+  transform:none!important;
+}
+.mode-user #userPagesNav .space-tree-button:hover{transform:none!important}
+
+/* O botão Enviar mantém texto e seta brancos em todos os estados. */
+.send-button,
+.send-button:hover,
+.send-button:active,
+.send-button:focus-visible,
+.send-button:disabled{
+  color:#fff!important;
+}
+.send-button .send-icon{stroke:#fff!important}
+.send-button:disabled{opacity:.62}
+
+/* Drag dos widgets não movimenta o painel verticalmente. */
+#tab-start.widget-reordering{
+  overflow-y:hidden!important;
+  scroll-behavior:auto!important;
+  overscroll-behavior:none!important;
+}
+.home-widget{cursor:default!important}
+.widget-drag-handle{touch-action:none;user-select:none}
+.home-widget.drag-before{box-shadow:inset 0 3px 0 var(--accent)!important}
+.home-widget.drag-after{box-shadow:inset 0 -3px 0 var(--accent)!important}
+.home-widget.drag-over{outline:none!important}
+
+/* Database totalmente configurável: título, propriedades e views. */
+.collection-title[contenteditable="true"]{
+  min-width:80px;
+  outline:none;
+  border-radius:6px;
+  padding:3px 5px;
+}
+.collection-title[contenteditable="true"]:focus{background:color-mix(in srgb,var(--text) 6%,transparent)}
+.collection-title[contenteditable="true"]:empty::before{content:attr(data-placeholder);color:var(--muted)}
+.collection-property-header{
+  width:100%;
+  min-height:28px;
+  padding:4px 6px!important;
+  border:0!important;
+  border-radius:5px!important;
+  background:transparent!important;
+  color:inherit!important;
+  text-align:left!important;
+  font-size:inherit!important;
+  font-weight:inherit!important;
+  box-shadow:none!important;
+}
+.collection-property-header:hover{background:color-mix(in srgb,var(--text) 6%,transparent)!important}
+.collection-view-item{display:inline-flex;align-items:center;gap:1px;margin-right:4px}
+.collection-view-config{
+  min-width:24px!important;
+  width:24px!important;
+  height:28px!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  color:var(--muted)!important;
+  border-radius:6px!important;
+  box-shadow:none!important;
+}
+.collection-view-config:hover{background:color-mix(in srgb,var(--text) 6%,transparent)!important;color:var(--text)!important}
+
+/* v78 — medidor de uso com gradiente integral e leitura estável em qualquer porcentagem. */
+.inline-usage-card.usage-status-card{
+  width:100%!important;
+  max-width:none!important;
+  min-width:0!important;
+  align-self:stretch!important;
+}
+.usage-bar{
+  position:relative!important;
+  width:100%!important;
+  height:16px!important;
+  min-height:16px!important;
+  margin:11px 0 9px!important;
+  overflow:hidden!important;
+  border:1px solid color-mix(in srgb,var(--line) 78%,transparent)!important;
+  border-radius:999px!important;
+  background:transparent!important;
+  isolation:isolate;
+}
+.usage-bar-spectrum{
+  position:absolute;
+  inset:0;
+  z-index:0;
+  border-radius:inherit;
+  background:linear-gradient(90deg,
+    #259653 0%,
+    #45a85b 24%,
+    #8cba45 42%,
+    #dfb83d 62%,
+    #e68a36 80%,
+    #d9554b 100%)!important;
+}
+.usage-bar-fill{
+  position:absolute!important;
+  left:0!important;
+  top:0!important;
+  bottom:0!important;
+  z-index:2!important;
+  height:auto!important;
+  min-width:0!important;
+  border-radius:999px 0 0 999px!important;
+  background:transparent!important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)!important;
+  transition:width .25s ease!important;
+}
+.usage-bar-remainder{
+  position:absolute;
+  z-index:1;
+  top:0;
+  right:0;
+  bottom:0;
+  border-radius:0 999px 999px 0;
+  background:color-mix(in srgb,var(--panel) 74%,transparent);
+  transition:left .25s ease;
+  pointer-events:none;
+}
+.usage-current-marker{
+  position:absolute;
+  z-index:4;
+  top:1px;
+  bottom:1px;
+  width:3px;
+  border-radius:999px;
+  background:#fff;
+  box-shadow:0 0 0 1px rgba(0,0,0,.22);
+  transform:translateX(-1.5px);
+  pointer-events:none;
+}
+.usage-alert-marker{
+  z-index:5!important;
+  top:1px!important;
+  width:2px!important;
+  height:14px!important;
+  background:color-mix(in srgb,var(--text) 80%,transparent)!important;
+  transform:translateX(-1px)!important;
+}
+.usage-alert-marker::after{display:none!important}
+:root[data-theme="light"] .usage-bar-remainder{background:rgba(247,247,245,.72)}
+:root[data-theme="dark"] .usage-bar-remainder{background:rgba(20,22,31,.70)}
+@media(max-width:760px){.usage-bar{height:15px!important;min-height:15px!important}.usage-alert-marker{height:13px!important}}
+
+/* v79 — estabilidade visual, CENTRAL e largura de página refinada. */
+.mode-user #appsMenuToggle .sidebar-section-title{
+  white-space:nowrap!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+}
+
+/* Respiro simétrico entre CENTRAL, PARTICULAR e a primeira página. */
+.mode-user .conversation-heading{
+  min-height:24px!important;
+  margin:14px 0!important;
+  padding:0 12px!important;
+}
+.mode-user #userPagesNav{
+  margin-top:0!important;
+}
+.mode-user #userPagesNav .space-tree-node:first-child .space-tree-button{
+  margin-top:0!important;
+}
+
+/* Página um pouco mais ampla sem perder margens de leitura. */
+.notion-visual-actions,
+.notion-page-icon,
+.notion-page-top,
+.notion-page-meta,
+.notion-subpages,
+.notion-editor,
+.notion-add-block{
+  width:min(1080px,calc(100% - 64px))!important;
+  max-width:calc(100% - 64px)!important;
+  min-width:0!important;
+}
+
+/* Nenhum banco/tabela pode alargar a página inteira: o overflow fica local. */
+.notion-editor,
+.notion-block,
+.block-content,
+.collection-block,
+.collection-body{
+  min-width:0!important;
+  max-width:100%!important;
+  box-sizing:border-box!important;
+}
+.collection-block{
+  overflow:hidden!important;
+}
+.collection-body{
+  width:100%!important;
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+  overscroll-behavior-x:contain!important;
+  scrollbar-gutter:stable both-edges!important;
+  padding:0 8px 7px!important;
+}
+.collection-table{
+  width:max-content!important;
+  min-width:100%!important;
+  max-width:none!important;
+}
+.collection-board,
+.collection-gallery,
+.collection-list{
+  max-width:100%!important;
+}
+
+/* Ações do banco permanecem dentro da largura útil e quebram linha se necessário. */
+.collection-head,
+.collection-actions,
+.collection-views{
+  min-width:0!important;
+  max-width:100%!important;
+}
+.collection-actions,
+.collection-views{
+  flex-wrap:wrap!important;
+}
+
+/* Exclusões bem-sucedidas são silenciosas; a faixa global fica reservada a erros/avisos reais. */
+main>#notice.notice:empty{display:none!important}
+
+@media(max-width:760px){
+  .notion-visual-actions,
+  .notion-page-icon,
+  .notion-page-top,
+  .notion-page-meta,
+  .notion-subpages,
+  .notion-editor,
+  .notion-add-block{
+    width:calc(100% - 28px)!important;
+    max-width:calc(100% - 28px)!important;
+  }
+  .collection-body{padding-inline:4px!important}
+}
+
+/* v80 — navegação: Início/Resumo fixos, APPS recolhível e estabilidade do Resumo. */
+.mode-user #primaryUserNav{
+  display:grid!important;
+  grid-template-columns:1fr!important;
+  gap:2px!important;
+  margin:10px 0 0!important;
+  overflow:visible!important;
+}
+.mode-user #primaryUserNav .nav,
+.mode-user #appsMenu .nav{
+  width:100%!important;
+  min-height:40px!important;
+  display:grid!important;
+  grid-template-columns:24px minmax(0,1fr)!important;
+  align-items:center!important;
+  justify-content:start!important;
+  gap:10px!important;
+  padding:8px 12px!important;
+  border-radius:12px!important;
+  text-align:left!important;
+  transform:none!important;
+}
+.mode-user #primaryUserNav .nav>.nav-icon,
+.mode-user #appsMenu .nav>.nav-icon{
+  position:static!important;
+  grid-column:1!important;
+  grid-row:1!important;
+  display:grid!important;
+  place-items:center!important;
+  width:24px!important;
+  height:24px!important;
+  min-width:24px!important;
+  margin:0!important;
+  border-radius:8px!important;
+  font-size:14px!important;
+  transform:none!important;
+}
+.mode-user #primaryUserNav .nav>.nav-label,
+.mode-user #appsMenu .nav>.nav-label{
+  position:static!important;
+  grid-column:2!important;
+  grid-row:1!important;
+  width:auto!important;
+  min-width:0!important;
+  margin:0!important;
+  text-align:left!important;
+  justify-self:start!important;
+  transform:none!important;
+}
+.mode-user #primaryUserNav .nav.active{background:#a48afe1c;color:#d8ccff}
+:root[data-theme="light"] .mode-user #primaryUserNav .nav.active{background:#e9e9e7!important;color:#37352f!important}
+
+/* APPS é uma seção independente abaixo de Início/Resumo. */
+.mode-user #appsMenuToggle{
+  width:100%!important;
+  min-height:40px!important;
+  margin:8px 0 0!important;
+  padding:8px 12px!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 22px!important;
+  align-items:center!important;
+  border-radius:12px!important;
+  text-align:left!important;
+}
+.mode-user #appsMenuToggle .sidebar-section-title{
+  display:block!important;
+  white-space:nowrap!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  text-align:left!important;
+}
+.mode-user #appsMenuToggle .section-chevron{justify-self:end!important}
+
+/* PARTICULAR fica geometricamente no meio entre o bloco anterior e a primeira página. */
+.mode-user #appsMenu + .conversation-heading{
+  min-height:24px!important;
+  margin:12px 0!important;
+  padding:0 12px!important;
+  display:flex!important;
+  align-items:center!important;
+}
+.mode-user #appsMenu + .conversation-heading .eyebrow{margin:0!important}
+.mode-user #userPagesNav .space-tree-node:first-child .space-tree-button{margin-top:0!important}
+
+/* Chat: ícone preservado à esquerda; palavra centralizada no botão. */
+.mode-user #newConversation.chat-nav{
+  position:relative!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:40px!important;
+  padding:8px 40px!important;
+  text-align:center!important;
+}
+.mode-user #newConversation.chat-nav>.nav-icon{
+  position:absolute!important;
+  left:8px!important;
+  top:50%!important;
+  transform:translateY(-50%)!important;
+  width:24px!important;
+  height:24px!important;
+  min-width:24px!important;
+  margin:0!important;
+}
+.mode-user #newConversation.chat-nav>.nav-label{
+  width:100%!important;
+  margin:0!important;
+  text-align:center!important;
+}
+
+/* Enviar nunca perde branco por causa do estado disabled global. */
+.send-button,
+.send-button:hover,
+.send-button:active,
+.send-button:focus-visible,
+.send-button:disabled{
+  color:#fff!important;
+}
+.send-button span{color:#fff!important;opacity:1!important}
+.send-button .send-icon{stroke:#fff!important;opacity:1!important}
+.send-button:disabled{opacity:1!important}
+.send-button:disabled span,.send-button:disabled .send-icon{opacity:1!important}
+
+/* Durante mutações do Resumo, o browser não tenta compensar o layout sozinho. */
+#tab-start,
+#homeSummary,
+.home-chat,
+.home-widget-grid,
+.home-widget{overflow-anchor:none!important}
+#tab-start.viewport-stabilizing{scroll-behavior:auto!important;overscroll-behavior:none!important}
+#tab-start.viewport-stabilizing *{scroll-behavior:auto!important}
+
+/* Geometria estável dos widgets no desktop: a lista interna rola, o card não cresce/encolhe. */
+@media(min-width:761px){
+  .home-widget-grid{grid-auto-rows:310px!important;align-items:stretch!important}
+  .home-widget{height:310px!important;min-height:310px!important;max-height:310px!important;overflow:hidden!important;display:flex!important;flex-direction:column!important}
+  .home-widget>.widget-list{flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain!important;scrollbar-gutter:stable!important}
+  .home-widget>.home-widget-head,.home-widget>p{flex:0 0 auto!important}
+}
+
+@media(max-width:760px){
+  .mode-user #primaryUserNav{display:flex!important;gap:4px!important;margin-top:6px!important}
+  .mode-user #primaryUserNav .nav{min-width:max-content!important;width:auto!important}
+  .mode-user #appsMenuToggle{margin-top:4px!important}
+}
+
+/* v82 — Home realmente estável, Agenda compacta e páginas na escala do Notion. */
+
+/* Uma lista com um único compromisso nunca estica o item para ocupar o card inteiro. */
+.home-widget>.widget-list{
+  align-content:start!important;
+  grid-auto-rows:max-content!important;
+}
+.home-widget .widget-row{
+  align-items:center!important;
+  min-height:0!important;
+}
+.home-widget .widget-row .dashboard-link{
+  align-self:start!important;
+  height:auto!important;
+  min-height:44px!important;
+  max-height:none!important;
+  padding:10px 12px!important;
+  margin:3px 0!important;
+  line-height:1.45!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+}
+.home-widget .widget-row>.quick-delete{
+  align-self:center!important;
+}
+
+/* Texto da IA legível: markdown básico vira tipografia, não caracteres crus. */
+.home-bubble-text,.message-body{
+  color:var(--text)!important;
+  font-size:14px;
+  line-height:1.62;
+}
+.home-bubble-text .chat-strong,.message-body .chat-strong{font-weight:700;color:inherit}
+.home-bubble-text .chat-list-mark,.message-body .chat-list-mark{font-weight:650;color:var(--muted)}
+.home-bubble-text .chat-code,.message-body .chat-code{
+  display:inline-block;
+  padding:1px 5px;
+  border-radius:5px;
+  background:color-mix(in srgb,var(--text) 7%,transparent);
+  color:inherit;
+  font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+  font-size:.92em;
+}
+:root[data-theme="light"] .home-bubble-text,
+:root[data-theme="light"] .message-body{color:#37352f!important}
+:root[data-theme="light"] .home-bubble-text .chat-list-mark,
+:root[data-theme="light"] .message-body .chat-list-mark{color:#787774!important}
+
+/* Escala de página inspirada na diagramação padrão do Notion. */
+.notion-visual-actions,
+.notion-page-icon,
+.notion-page-top,
+.notion-page-meta,
+.notion-subpages,
+.notion-editor,
+.notion-add-block{
+  width:min(1100px,calc(100% - 88px))!important;
+  max-width:calc(100% - 88px)!important;
+}
+.notion-page-cover{height:220px!important}
+.notion-page-cover+.notion-page-icon{margin-top:-34px!important}
+.notion-page-icon{
+  height:74px!important;
+  font-size:56px!important;
+  margin-bottom:2px!important;
+}
+.notion-page-icon.default-icon{font-size:38px!important}
+.notion-page-top{
+  align-items:flex-start!important;
+  margin-top:0!important;
+  margin-bottom:6px!important;
+}
+.notion-page-title{
+  font-size:40px!important;
+  line-height:1.18!important;
+  font-weight:700!important;
+  letter-spacing:-1.2px!important;
+  margin:0!important;
+}
+.notion-page-meta{
+  min-height:28px!important;
+  margin:0 auto 24px!important;
+  gap:6px!important;
+  font-size:12px!important;
+  opacity:.78!important;
+}
+.page-meta-action{
+  min-height:26px!important;
+  padding:3px 6px!important;
+  font-size:11.5px!important;
+}
+.notion-editor{
+  padding-top:2px!important;
+}
+.notion-block{
+  min-height:34px!important;
+}
+.block-editable{
+  font-size:15.5px!important;
+  line-height:1.6!important;
+}
+.notion-heading1 .block-editable{font-size:30px!important;line-height:1.25!important;margin:12px 0 5px!important}
+.notion-heading2 .block-editable{font-size:24px!important;line-height:1.3!important;margin:9px 0 4px!important}
+.notion-heading3 .block-editable{font-size:20px!important;line-height:1.35!important;margin:7px 0 3px!important}
+.notion-heading4 .block-editable{font-size:17px!important;line-height:1.4!important;margin:5px 0 2px!important}
+.notion-add-block{font-size:12.5px!important;margin-top:16px!important}
+.collection-title{font-size:15.5px!important}
+.collection-action,.collection-view{font-size:11.5px!important;padding:6px 9px!important}
+.collection-table{font-size:13px!important}
+.collection-table th{font-size:12px!important;padding:9px 10px!important}
+.collection-cell-input{font-size:13px!important;padding:9px 10px!important}
+
+/* Enquanto o usuário está no Resumo, não animamos superfícies acima dele. */
+#tab-start.viewport-stabilizing .home-chat,
+#tab-start.viewport-stabilizing .home-widget-grid,
+#tab-start.viewport-stabilizing .home-widget,
+#tab-start.viewport-stabilizing .widget-list{
+  transition:none!important;
+  animation:none!important;
+}
+
+@media(max-width:760px){
+  .notion-visual-actions,
+  .notion-page-icon,
+  .notion-page-top,
+  .notion-page-meta,
+  .notion-subpages,
+  .notion-editor,
+  .notion-add-block{
+    width:calc(100% - 32px)!important;
+    max-width:calc(100% - 32px)!important;
+  }
+  .notion-page-cover{height:170px!important}
+  .notion-page-icon{height:62px!important;font-size:48px!important}
+  .notion-page-title{font-size:34px!important;letter-spacing:-.8px!important}
+}
+
+/* v82 — nenhuma ação comum pode criar a barra global inferior. */
+main>#notice.notice:not(.error){display:none!important}
+main>#notice.notice.error{display:block}
+
+/* v82 — cards do Resumo: todos os itens usam altura normal e nunca esticam verticalmente. */
+.home-widget>.widget-list{display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;gap:7px!important}
+.home-widget .widget-row{display:flex!important;flex:0 0 auto!important;min-height:0!important;align-items:center!important}
+.home-widget .widget-row .dashboard-link{flex:1 1 auto!important;min-height:42px!important;height:auto!important;max-height:76px!important;padding:9px 11px!important;margin:0!important;display:flex!important;align-items:center!important}
+.home-widget .widget-row>.quick-delete{flex:0 0 26px!important;width:26px!important;height:26px!important;min-width:26px!important;min-height:26px!important;padding:0!important}
+
+/* Título de Notificações abre a visão completa sem parecer outro botão pesado. */
+.home-widget-title-link{border:0!important;background:transparent!important;padding:0!important;margin:0!important;color:inherit!important;font-size:18px!important;font-weight:600!important;line-height:1.3!important;text-align:left!important;box-shadow:none!important}
+.home-widget-title-link:hover{text-decoration:underline;background:transparent!important}
+
+/* Mini janela de notificações. */
+.notifications-mini-dialog{width:min(440px,calc(100vw - 32px));max-height:min(520px,calc(100vh - 80px));padding:18px!important;overflow:hidden!important}
+.notifications-mini-dialog .dialog-title{margin-bottom:12px}
+.notifications-dialog-title{border:0!important;background:transparent!important;padding:0!important;color:var(--text)!important;font-size:18px!important;font-weight:650!important;text-align:left!important}
+.notifications-dialog-title:hover{text-decoration:underline;background:transparent!important}
+.notifications-mini-list{display:flex;flex-direction:column;gap:7px;max-height:390px;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:3px}
+.notification-mini-item{display:grid;grid-template-columns:8px minmax(0,1fr) 30px;align-items:start;gap:9px;padding:10px;border:1px solid var(--line);border-radius:11px;background:var(--panel)}
+.notification-dot{width:7px;height:7px;border-radius:50%;margin-top:6px;background:var(--muted)}
+.notification-dot.unread{background:var(--accent)}
+.notification-mini-copy{min-width:0}.notification-mini-copy strong{display:block;font-size:12.5px;margin-bottom:3px}.notification-mini-copy p{margin:0 0 4px;font-size:11.5px;line-height:1.45;color:var(--text)}.notification-mini-copy small{font-size:10px;color:var(--muted)}
+.notification-read{width:28px;height:28px;min-width:28px;padding:0!important;border:0!important;background:transparent!important;color:var(--muted)!important}
+.notification-read:hover{background:color-mix(in srgb,var(--text) 7%,transparent)!important;color:var(--text)!important}
+
+/* Página completa de notificações agrupadas por área. */
+.notifications-page-content{display:grid;gap:18px;max-width:1050px;width:100%;margin:0 auto 60px}
+.notifications-page-count{font-size:11px;color:var(--muted);align-self:center}
+.notifications-area{border-top:1px solid var(--line);padding-top:14px}
+.notifications-area:first-child{border-top:0;padding-top:0}
+.notifications-area-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}.notifications-area-head h3{margin:0;font-size:17px}.notifications-area-head span{font-size:10px;color:var(--muted)}
+.notifications-page-list{display:grid;gap:8px}
+.notification-page-item{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:13px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.notification-page-copy{min-width:0}.notification-page-title-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.notification-page-title-row strong{font-size:13px}.notification-page-copy p{margin:7px 0;font-size:12px;line-height:1.55}.notification-page-copy small{font-size:10px;color:var(--muted)}
+.notification-page-actions{display:flex;gap:6px;flex-wrap:wrap;flex:0 0 auto}.notification-page-actions button{padding:6px 9px;font-size:10px}
+
+/* Contraste consistente de formulários no site inteiro. */
+#editorDialog label,#recordDialog label,.settings-card label{color:var(--text)!important;opacity:1!important}
+#editorDialog label,#recordDialog label{font-weight:450!important}
+#editorDialog .hint,#recordDialog .hint{color:var(--muted)!important;opacity:1!important}
+:root[data-theme="light"] #editorDialog label,:root[data-theme="light"] #recordDialog label,:root[data-theme="light"] .settings-card label{color:#4f4e49!important}
+:root[data-theme="light"] #editorDialog .hint,:root[data-theme="light"] #recordDialog .hint{color:#787774!important}
+
+/* Nada recebe stroke azul do navegador. O foco permanece perceptível em tom neutro. */
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,[contenteditable="true"]:focus-visible{outline:none!important;box-shadow:0 0 0 1px color-mix(in srgb,var(--text) 28%,transparent)!important}
+:root[data-theme="light"] button:focus-visible,:root[data-theme="light"] input:focus-visible,:root[data-theme="light"] textarea:focus-visible,:root[data-theme="light"] select:focus-visible,:root[data-theme="light"] [contenteditable="true"]:focus-visible{box-shadow:0 0 0 1px #b8b7b3!important}
+.selected:focus-visible,.nav.active:focus-visible{outline:none!important}
+
+@media(max-width:760px){.notification-page-item{flex-direction:column}.notification-page-actions{width:100%}.notifications-mini-dialog{width:calc(100vw - 20px)}}
+
+/* v82 — detalhes visuais das tarefas. */
+.task-card{position:relative;overflow:hidden}.task-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:transparent}.task-card[data-task-color="gray"]:before{background:#9b9b98}.task-card[data-task-color="blue"]:before{background:#4f8bdc}.task-card[data-task-color="green"]:before{background:#4b9d73}.task-card[data-task-color="yellow"]:before{background:#c8a83e}.task-card[data-task-color="orange"]:before{background:#d58a3d}.task-card[data-task-color="red"]:before{background:#c95d56}.task-card[data-task-color="purple"]:before{background:#8a6fca}.task-card[data-task-color="pink"]:before{background:#c86d9e}.task-card-description{margin:5px 0 8px!important;color:var(--text)!important}
+
+/* v83 — Notificações: o card abre a prévia; o nome abre a página completa. */
+.notifications-widget{cursor:pointer}
+.notifications-widget .home-widget-title-link{cursor:pointer}
+.notifications-widget:focus-visible{outline:none!important;box-shadow:0 0 0 1px color-mix(in srgb,var(--text) 22%,transparent)!important}
+.notifications-widget .widget-list{overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+
+/* v83 follow-up — APPS usa a mesma régua vertical e o Resumo devolve o scroll ao painel pai. */
+.mode-user #appsMenuToggle{margin-top:4px!important}
+.mode-user #tab-start{scroll-behavior:auto!important}
+.home-widget>.widget-list{overscroll-behavior-y:auto!important}
+
+/* v83 final — correções acumuladas de legibilidade, hitbox e estabilidade. */
+.clarification-question{color:var(--text)!important;opacity:1!important}
+:root[data-theme="light"] .clarification-question{color:#37352f!important}
+.home-clarification,.home-clarification *{text-shadow:none!important}
+
+/* APPS usa a mesma distância vertical dos botões vizinhos. */
+.mode-user #appsMenuToggle{margin:4px 0 4px!important}
+.mode-user #primaryUserNav{display:flex;flex-direction:column;gap:4px}
+.mode-user #appsMenu{margin-top:0!important}
+
+/* O ícone da página tem somente a área clicável do próprio ícone. */
+.notion-page-icon-row{
+  width:min(1100px,calc(100% - 72px))!important;
+  max-width:min(1100px,calc(100% - 72px))!important;
+  margin-left:auto!important;
+  margin-right:auto!important;
+  height:72px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  pointer-events:none!important;
+}
+.notion-page-cover+.notion-page-icon-row{position:relative;margin-top:-36px!important}
+.notion-page-icon-row .notion-page-icon{
+  pointer-events:auto!important;
+  display:grid!important;
+  place-items:center!important;
+  width:64px!important;
+  min-width:64px!important;
+  max-width:64px!important;
+  height:64px!important;
+  min-height:64px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:12px!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  font-size:48px!important;
+  line-height:1!important;
+  cursor:pointer!important;
+}
+.notion-page-icon-row .notion-page-icon.default-icon{font-size:38px!important}
+
+/* Controles da página permanecem visíveis enquanto a página rola. */
+.user-page-header .header-actions{
+  position:fixed!important;
+  top:22px!important;
+  right:22px!important;
+  z-index:90!important;
+  pointer-events:auto!important;
+}
+
+/* Nomes próprios e títulos não exibem decoração do corretor. */
+.notion-page-title{-webkit-text-decoration-skip:objects;text-decoration:none!important}
+
+@media(max-width:760px){
+  .notion-page-icon-row{width:calc(100% - 32px)!important;max-width:calc(100% - 32px)!important;height:58px!important}
+  .notion-page-icon-row .notion-page-icon{width:52px!important;min-width:52px!important;max-width:52px!important;height:52px!important;min-height:52px!important;font-size:42px!important}
+  .user-page-header .header-actions{top:8px!important;right:8px!important}
+}
+
+/* v84 — notificações como popover, retorno rápido ao topo e imagens multimodais. */
+.notifications-mini-dialog{
+  position:fixed!important;
+  inset:auto!important;
+  margin:0!important;
+  z-index:180!important;
+  width:min(400px,calc(100vw - 24px))!important;
+  max-height:min(540px,calc(100vh - 24px))!important;
+  padding:14px!important;
+  overflow:hidden!important;
+  border-radius:14px!important;
+  box-shadow:0 18px 55px #0005!important;
+}
+.notifications-mini-dialog::backdrop{display:none!important}
+.notifications-mini-head{margin-bottom:10px!important;padding:0 2px}
+.notifications-mini-head>strong{font-size:15px;font-weight:650}
+.notifications-mini-list{max-height:min(390px,calc(100vh - 170px))!important}
+.notifications-mini-footer{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
+.notifications-view-all{width:100%;min-height:38px;padding:8px 12px!important;font-size:11px!important;font-weight:600}
+
+.start-back-to-top{
+  position:fixed!important;
+  right:24px!important;
+  bottom:24px!important;
+  z-index:115!important;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  min-height:40px;
+  padding:9px 13px!important;
+  border-radius:999px!important;
+  background:var(--panel)!important;
+  color:var(--text)!important;
+  box-shadow:0 8px 26px #0003;
+}
+.start-back-to-top[hidden]{display:none!important}
+.start-back-to-top span{font-size:11px;font-weight:600}
+
+.chat-image-tray{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 4px;max-width:100%}
+.chat-image-tray[hidden]{display:none!important}
+.chat-image-item{display:grid;grid-template-columns:58px minmax(0,1fr) auto;align-items:center;gap:9px;min-width:min(100%,300px);max-width:440px;padding:7px;border:1px solid var(--line);border-radius:11px;background:color-mix(in srgb,var(--panel) 92%,transparent)}
+.chat-image-preview{display:block;width:58px;height:58px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:var(--panel)}
+.chat-image-copy{min-width:0;display:flex;flex-direction:column;gap:3px}
+.chat-image-copy strong{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-image-copy small{font-size:9px;color:var(--muted)}
+.chat-image-actions{display:flex;align-items:center;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.chat-image-actions button{padding:5px 7px!important;font-size:9px!important;min-height:28px;border-radius:8px!important}
+.chat-image-remove{width:28px;min-width:28px;padding:0!important}
+
+.resizable-image-block{position:relative;max-width:100%!important;margin-top:6px;margin-bottom:8px;box-sizing:border-box;outline:none}
+.image-resize-frame{position:relative;width:100%;max-width:100%;line-height:0}
+.resizable-image-block img{display:block;width:100%!important;height:auto!important;max-width:100%!important;max-height:none!important;object-fit:contain;border-radius:7px;cursor:grab;user-select:none;-webkit-user-drag:none;touch-action:pan-y}
+.resizable-image-block.moving img{cursor:grabbing}
+.resizable-image-block figcaption{width:100%;min-height:22px;margin-top:6px;color:var(--muted);font-size:10px;line-height:1.45;outline:none}
+.resizable-image-block figcaption:empty:before{content:attr(data-placeholder);opacity:.65}
+.image-resize-handle{position:absolute!important;z-index:5;width:14px!important;height:14px!important;min-width:14px!important;min-height:14px!important;padding:0!important;border:2px solid var(--panel)!important;border-radius:50%!important;background:var(--text)!important;opacity:0;transition:opacity .12s;touch-action:none}
+.resizable-image-block:hover .image-resize-handle,.resizable-image-block.selected .image-resize-handle,.resizable-image-block:focus .image-resize-handle{opacity:1}
+.image-resize-nw{left:-7px;top:-7px;cursor:nwse-resize}.image-resize-ne{right:-7px;top:-7px;cursor:nesw-resize}.image-resize-sw{left:-7px;bottom:-7px;cursor:nesw-resize}.image-resize-se{right:-7px;bottom:-7px;cursor:nwse-resize}
+.resizable-image-block.selected .image-resize-frame{box-shadow:0 0 0 1px color-mix(in srgb,var(--text) 34%,transparent)}
+
+@media(max-width:760px){
+  .notifications-mini-dialog{width:calc(100vw - 20px)!important;max-height:calc(100vh - 20px)!important}
+  .start-back-to-top{right:12px!important;bottom:14px!important}
+  .chat-image-item{grid-template-columns:52px minmax(0,1fr);width:100%;max-width:none}
+  .chat-image-preview{width:52px;height:52px}.chat-image-actions{grid-column:1/-1;justify-content:flex-start}
+  .image-resize-handle{width:18px!important;height:18px!important;min-width:18px!important;min-height:18px!important}
+  .image-resize-nw{left:-9px;top:-9px}.image-resize-ne{right:-9px;top:-9px}.image-resize-sw{left:-9px;bottom:-9px}.image-resize-se{right:-9px;bottom:-9px}
+}
+
+/* Sofia OS v85 — correções acumuladas 21/09/2026 */
+
+/* O chat principal permanece realmente centralizado no espaço útil. */
+.mode-user #tab-start .home-chat{
+  width:min(920px,calc(100% - 48px))!important;
+  max-width:920px!important;
+  margin-left:auto!important;
+  margin-right:auto!important;
+  align-self:center!important;
+  box-sizing:border-box!important;
+}
+.mode-user #tab-start .home-chat>*{min-width:0}
+
+/* Hierarquia de páginas + botão de subpágina ao lado de cada página. */
+.mode-user #userPagesNav .space-tree-node{width:100%;margin:1px 0!important}
+.mode-user #userPagesNav .space-tree-controls{
+  display:grid!important;
+  grid-template-columns:20px minmax(0,1fr) 28px!important;
+  align-items:center!important;
+  gap:2px!important;
+  padding-left:calc(var(--page-depth,0) * 14px)!important;
+}
+.mode-user #userPagesNav .space-tree-expander,
+.mode-user #userPagesNav .space-tree-add{
+  display:grid!important;place-items:center!important;width:26px!important;height:28px!important;min-width:26px!important;padding:0!important;
+  border:0!important;background:transparent!important;color:var(--muted)!important;border-radius:6px!important;font-size:14px!important;
+}
+.mode-user #userPagesNav .space-tree-expander:disabled{opacity:.22!important;cursor:default!important}
+.mode-user #userPagesNav .space-tree-add{opacity:0!important;transition:opacity .1s ease,background .1s ease!important}
+.mode-user #userPagesNav .space-tree-controls:hover .space-tree-add,
+.mode-user #userPagesNav .space-tree-controls:focus-within .space-tree-add{opacity:1!important}
+.mode-user #userPagesNav .space-tree-add:hover{background:color-mix(in srgb,var(--text) 8%,transparent)!important;color:var(--text)!important}
+.mode-user #userPagesNav .space-tree-button{min-width:0!important;padding-left:5px!important;padding-right:4px!important}
+.space-tree-page-icon{font-family:"Segoe UI Symbol","Noto Sans Symbols 2",sans-serif!important;font-size:15px!important;opacity:.72!important;flex:0 0 auto!important}
+.space-tree-page-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* O X é um único controle, sem aparência de botão dentro de botão. */
+.quick-delete{
+  border:0!important;background:transparent!important;box-shadow:none!important;border-radius:7px!important;
+  width:28px!important;height:28px!important;min-width:28px!important;min-height:28px!important;
+  color:var(--muted)!important;opacity:.58!important;
+}
+.quick-delete:hover,.quick-delete:focus-visible{background:color-mix(in srgb,#d94b55 12%,transparent)!important;color:#c63c48!important;opacity:1!important}
+:root[data-theme="light"] .quick-delete{background:transparent!important;border:0!important;color:#8d8c87!important}
+:root[data-theme="light"] .quick-delete:hover{background:#f8e7e7!important;color:#b83d43!important}
+
+/* Imagem: controles aparecem somente durante a seleção. */
+.resizable-image-block{padding-top:0!important}
+.resizable-image-block .image-resize-handle{
+  opacity:0!important;pointer-events:none!important;
+}
+.resizable-image-block.selected .image-resize-handle,
+.resizable-image-block.resizing .image-resize-handle,
+.resizable-image-block.moving .image-resize-handle{
+  opacity:1!important;pointer-events:auto!important;
+}
+.resizable-image-block:not(.selected) figcaption:empty{display:none!important}
+.resizable-image-block:not(.selected) figcaption:empty:before{content:none!important}
+.image-context-toolbar{
+  display:none;align-items:center;flex-wrap:wrap;gap:5px;margin:0 0 7px;padding:5px;
+  width:max-content;max-width:100%;border:1px solid var(--line);border-radius:9px;background:var(--panel);box-shadow:0 5px 18px #00000010;
+}
+.resizable-image-block.selected .image-context-toolbar{display:flex}
+.image-context-action{min-height:28px!important;padding:4px 8px!important;border:0!important;border-radius:6px!important;background:transparent!important;font-size:10px!important;color:var(--text)!important}
+.image-context-action:hover{background:color-mix(in srgb,var(--text) 7%,transparent)!important}
+.image-context-comment{display:none;margin-top:7px;padding:9px 11px;border-left:2px solid var(--accent);background:color-mix(in srgb,var(--accent) 5%,transparent);border-radius:0 7px 7px 0;font-size:11px}
+.image-context-comment strong{display:block;margin-bottom:4px;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.image-context-comment p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.resizable-image-block.selected .image-context-comment:not(.empty-comment){display:block}
+
+/* Kanban compacto no padrão visual do Notion. */
+.collection-board.notion-board{gap:12px!important;padding:3px 0 12px!important;align-items:flex-start!important}
+.collection-board.notion-board .collection-board-column{
+  flex:0 0 236px!important;min-height:92px!important;padding:7px 8px 8px!important;border-radius:9px!important;border:0!important;background:color-mix(in srgb,var(--text) 3.5%,transparent)!important;
+}
+.collection-board.notion-board .collection-board-column.status-priority{background:color-mix(in srgb,#e45c66 6%,transparent)!important}
+.collection-board.notion-board .collection-board-column.status-done{background:color-mix(in srgb,#46a16b 7%,transparent)!important}
+.collection-board.notion-board .collection-board-title{display:flex!important;align-items:center!important;gap:6px!important;padding:2px 1px 8px!important;font-size:11px!important}
+.collection-status-chip{display:inline-flex;align-items:center;min-height:20px;padding:2px 7px;border-radius:999px;font-weight:550;line-height:1.15;background:color-mix(in srgb,var(--text) 8%,transparent);color:var(--muted)}
+.collection-status-chip.status-priority{background:color-mix(in srgb,#e45c66 15%,transparent);color:#ba3d48}
+.collection-status-chip.status-done{background:color-mix(in srgb,#46a16b 17%,transparent);color:#34835a}
+.collection-status-count{font-size:10px;color:var(--muted)}
+.collection-board.notion-board .collection-board-card{
+  margin:4px 0!important;padding:9px 10px!important;gap:3px!important;border:1px solid var(--line)!important;border-radius:7px!important;background:var(--panel)!important;box-shadow:none!important;cursor:pointer!important;
+}
+.collection-board.notion-board .collection-board-card:hover{background:color-mix(in srgb,var(--text) 2%,var(--panel))!important}
+.collection-board.notion-board .collection-board-card strong{font-size:11px!important;font-weight:500!important}
+.collection-board.notion-board .collection-board-card small{font-size:9px!important}
+.collection-board.notion-board .collection-add-card{display:block;width:100%;padding:6px 5px!important;margin-top:2px!important;border:0!important;background:transparent!important;border-radius:6px!important;color:var(--muted)!important;font-size:10px!important}
+.collection-board.notion-board .collection-add-card:hover{background:color-mix(in srgb,var(--text) 5%,transparent)!important;color:var(--text)!important}
+:root[data-theme="light"] .collection-board.notion-board .collection-board-column{background:#f7f7f5!important}
+:root[data-theme="light"] .collection-board.notion-board .collection-board-column.status-priority{background:#fff6f5!important}
+:root[data-theme="light"] .collection-board.notion-board .collection-board-column.status-done{background:#f3faf5!important}
+:root[data-theme="light"] .collection-status-chip.status-priority{background:#fde6e4;color:#b83d43}
+:root[data-theme="light"] .collection-status-chip.status-done{background:#dff2e5;color:#28764d}
+
+/* Template de páginas/lista e página interna em modal. */
+.collection-pages-list{display:flex;flex-direction:column;gap:1px;width:100%;padding:3px 0 8px}
+.collection-page-row{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:16px!important;width:100%!important;min-height:30px!important;padding:5px 7px!important;border:0!important;border-radius:5px!important;background:transparent!important;text-align:left!important;color:var(--text)!important}
+.collection-page-row:hover{background:color-mix(in srgb,var(--text) 5%,transparent)!important}
+.collection-page-row-title{display:flex;align-items:center;gap:7px;min-width:0}
+.collection-page-row-title>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.collection-page-row-icon,.collection-page-doc{font-family:"Segoe UI Symbol","Noto Sans Symbols 2",sans-serif;color:var(--muted)}
+.collection-page-row-date{flex:0 0 auto;font-size:9px;color:var(--muted)}
+.collection-page-new{display:block!important;width:max-content!important;margin-top:2px!important;padding:5px 7px!important;border:0!important;background:transparent!important;color:var(--muted)!important;font-size:10px!important}
+.collection-page-new:hover{background:color-mix(in srgb,var(--text) 5%,transparent)!important;color:var(--text)!important}
+.collection-cell-checkbox{width:16px!important;height:16px!important;min-width:16px!important;margin:4px!important}
+.collection-page-dialog{width:min(880px,calc(100vw - 48px))!important;max-width:880px!important;height:min(650px,calc(100vh - 72px))!important;max-height:calc(100vh - 72px)!important;padding:0 0 52px!important;overflow-y:auto!important;overflow-x:hidden!important;border:1px solid var(--line)!important;border-radius:12px!important;background:var(--panel)!important;color:var(--text)!important}
+.collection-page-dialog::backdrop{background:#0008!important}
+.collection-page-top{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:color-mix(in srgb,var(--panel) 94%,transparent);backdrop-filter:blur(8px)}
+.collection-page-doc{font-size:16px}
+.collection-page-close{margin-left:auto}
+.collection-page-title{margin:20px 10% 12px!important;min-height:52px;outline:0;font-size:36px;line-height:1.2;font-weight:650;letter-spacing:-1px;overflow-wrap:anywhere}
+.collection-page-title:empty:before,.collection-page-content:empty:before{content:attr(data-placeholder);color:var(--muted);opacity:.68;pointer-events:none}
+.collection-page-properties{display:grid;gap:5px;margin:0 10% 24px}
+.collection-page-property{display:grid;grid-template-columns:135px minmax(0,1fr);align-items:center;gap:12px;min-height:32px}
+.collection-page-property-label{font-size:10px;color:var(--muted)}
+.collection-page-property .collection-cell-input{border:0!important;background:transparent!important;padding:5px 3px!important;min-height:28px!important}
+.collection-page-divider{height:1px;margin:0 10% 18px;background:var(--line)}
+.collection-page-content{min-height:240px;margin:0 10%;padding:8px 2px;outline:0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65;font-size:13px}
+
+/* Agenda: origem/status da tarefa e prioridade são labels independentes. */
+.agenda-task-origin{background:#e7f0ff!important;color:#2b64ad!important;border-color:#cadcff!important}
+.task-priority-tag.priority-important{background:#fde8e7!important;color:#b53e46!important;border-color:#f2c8c7!important}
+.task-priority-tag.priority-medium{background:#e7f0ff!important;color:#2b64ad!important;border-color:#cadcff!important}
+.task-priority-tag.priority-light{background:#e6f4ea!important;color:#30784e!important;border-color:#c7e6d0!important}
+:root[data-theme="dark"] .agenda-task-origin,:root[data-theme="dark"] .task-priority-tag.priority-medium{background:#20334d!important;color:#a9c9f3!important;border-color:#2f4d73!important}
+:root[data-theme="dark"] .task-priority-tag.priority-important{background:#4b252b!important;color:#f0adb3!important;border-color:#6a323b!important}
+:root[data-theme="dark"] .task-priority-tag.priority-light{background:#203c2d!important;color:#a8d8b9!important;border-color:#2d5740!important}
+.notifications-empty-state{display:grid;place-items:center;min-height:110px;color:var(--muted);font-size:12px;text-align:center}
+
+@media(max-width:760px){
+  .mode-user #tab-start .home-chat{width:calc(100% - 20px)!important}
+  .collection-page-dialog{width:calc(100vw - 18px)!important;height:calc(100vh - 36px)!important;max-height:calc(100vh - 36px)!important}
+  .collection-page-title,.collection-page-properties,.collection-page-divider,.collection-page-content{margin-left:7%!important;margin-right:7%!important}
+  .collection-page-property{grid-template-columns:105px minmax(0,1fr)}
+  .mode-user #userPagesNav .space-tree-add{opacity:1!important}
+}
+
+/* Sofia OS v86 — correções pós-v85: árvore Particular, imagens estáveis e ações realmente fixas. */
+
+/* A barra de ações fica fora do painel rolável: o scroll da página não a desloca. */
+.user-page-floating-actions{
+  position:absolute!important;
+  top:22px!important;
+  right:22px!important;
+  z-index:140!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:4px!important;
+  pointer-events:auto!important;
+}
+.user-page-floating-actions[hidden]{display:none!important}
+.user-page-floating-actions button{
+  width:34px!important;height:34px!important;min-width:34px!important;min-height:34px!important;
+  display:grid!important;place-items:center!important;padding:0!important;border:0!important;border-radius:11px!important;
+  background:color-mix(in srgb,var(--panel) 90%,transparent)!important;color:var(--text)!important;
+  box-shadow:none!important;font-size:14px!important;
+}
+.user-page-floating-actions button:hover{background:color-mix(in srgb,var(--panel) 72%,var(--line))!important}
+:root[data-theme="light"] .user-page-floating-actions button{background:#f1f1ef!important;color:#37352f!important}
+:root[data-theme="light"] .user-page-floating-actions button:hover{background:#e8e8e5!important}
+/* A regra antiga fica neutralizada porque os botões não moram mais no header. */
+.user-page-header .header-actions{position:static!important}
+
+/* Botão da página no menu: evita o .selected global pintar o nó inteiro e esmagar o texto. */
+.mode-user #userPagesNav .space-tree-node,
+.mode-user #userPagesNav .space-tree-node.selected{
+  width:100%!important;margin:1px 0!important;padding:0!important;background:transparent!important;border:0!important;color:inherit!important;
+}
+.mode-user #userPagesNav .space-tree-controls{
+  width:100%!important;max-width:100%!important;min-width:0!important;
+  grid-template-columns:28px minmax(0,1fr) 28px!important;
+  gap:2px!important;padding-left:calc(var(--page-depth,0) * 14px)!important;
+  background:transparent!important;border:0!important;overflow:hidden!important;
+}
+.mode-user #userPagesNav .space-tree-expander,
+.mode-user #userPagesNav .space-tree-add{width:28px!important;min-width:28px!important;height:36px!important;min-height:36px!important}
+.mode-user #userPagesNav .space-tree-button{
+  width:100%!important;max-width:100%!important;min-width:0!important;min-height:38px!important;
+  display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:8px!important;
+  margin:0!important;padding:8px 9px!important;border:0!important;border-radius:11px!important;
+  background:transparent!important;color:var(--muted)!important;overflow:hidden!important;box-shadow:none!important;
+}
+.mode-user #userPagesNav .space-tree-button.active{
+  background:color-mix(in srgb,var(--text) 7%,transparent)!important;
+  color:var(--text)!important;border:0!important;
+}
+.mode-user #userPagesNav .space-tree-button.active .space-tree-page-title,
+.mode-user #userPagesNav .space-tree-button.active .space-tree-page-icon{color:inherit!important}
+:root[data-theme="light"] .mode-user #userPagesNav .space-tree-button.active{background:#e9e9e7!important;color:#37352f!important}
+.space-tree-page-title{flex:1 1 auto!important;min-width:0!important;max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;text-align:left!important}
+
+/* Selecionar uma imagem não muda o fluxo da página: elimina salto/flicker e faixas escuras. */
+.notion-image,
+.notion-image:hover,
+.notion-image:focus-within,
+.notion-image .block-content,
+.resizable-image-block,
+.image-resize-frame{background:transparent!important}
+.resizable-image-block{isolation:isolate!important;contain:layout style!important}
+.resizable-image-block figcaption:empty{display:none!important}
+.resizable-image-block figcaption:empty:before{content:none!important}
+.image-resize-handle{transition:none!important}
+.resizable-image-block.selected .image-resize-frame{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 58%,transparent)!important}
+.image-context-toolbar{
+  position:absolute!important;z-index:24!important;top:8px!important;left:8px!important;
+  display:none!important;grid-template-columns:max-content max-content!important;grid-auto-rows:minmax(28px,auto)!important;
+  align-items:center!important;gap:4px!important;
+  width:max-content!important;max-width:calc(100% - 16px)!important;
+  margin:0!important;padding:5px!important;border:1px solid color-mix(in srgb,var(--line) 82%,transparent)!important;
+  border-radius:10px!important;background:color-mix(in srgb,var(--panel) 94%,transparent)!important;
+  box-shadow:0 8px 24px #0002!important;backdrop-filter:blur(10px)!important;
+  -webkit-backdrop-filter:blur(10px)!important;overflow:hidden!important;
+}
+.resizable-image-block.selected .image-context-toolbar{display:grid!important}
+.image-context-action{white-space:nowrap!important;margin:0!important}
+:root[data-theme="light"] .image-context-toolbar{background:#fffffff2!important;border-color:#dededb!important;box-shadow:0 8px 22px #00000014!important}
+
+@media(max-width:760px){
+  .user-page-floating-actions{top:8px!important;right:8px!important}
+  .image-context-toolbar{grid-template-columns:max-content max-content!important;max-width:calc(100% - 12px)!important;top:6px!important;left:6px!important}
+}
+.usage-sync-source{display:block!important;margin-top:5px!important;color:var(--muted)!important;opacity:.82}
+
+/* Sofia OS v87 — correções de estabilidade e acabamento solicitadas em 21/09/2026. */
+
+/* PARTICULAR segue a mesma linguagem visual de APPS. */
+.mode-user #appsMenu + .conversation-heading{
+  width:100%!important;
+  min-height:40px!important;
+  margin:4px 0 4px!important;
+  padding:8px 12px!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 22px!important;
+  align-items:center!important;
+  gap:10px!important;
+  border-radius:12px!important;
+  background:color-mix(in srgb,var(--text) 4%,transparent)!important;
+}
+.mode-user #appsMenu + .conversation-heading:hover{background:color-mix(in srgb,var(--text) 7%,transparent)!important}
+.mode-user #appsMenu + .conversation-heading .eyebrow{
+  margin:0!important;
+  min-width:0!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.mode-user #appsMenu + .conversation-heading #addUserPage{
+  justify-self:end!important;
+  width:22px!important;
+  min-width:22px!important;
+  height:22px!important;
+  min-height:22px!important;
+  padding:0!important;
+  display:grid!important;
+  place-items:center!important;
+  border-radius:6px!important;
+  font-size:17px!important;
+}
+
+/* O posicionamento das ações da página é definido no bloco final da v88. */
+
+/* Toolbar da imagem: uma única linha, flutuando abaixo do bloco em vez de cobrir a foto. */
+.image-context-toolbar{
+  top:calc(100% + 7px)!important;
+  left:0!important;
+  right:auto!important;
+  display:none!important;
+  flex-direction:row!important;
+  flex-wrap:nowrap!important;
+  align-items:center!important;
+  gap:4px!important;
+  width:max-content!important;
+  max-width:min(680px,calc(100vw - 48px))!important;
+  padding:5px!important;
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+  white-space:nowrap!important;
+  scrollbar-width:thin;
+}
+.resizable-image-block.selected .image-context-toolbar{display:flex!important}
+.image-context-toolbar .image-context-action{flex:0 0 auto!important}
+
+/* Notificações: janela independente com rolagem própria e página detalhada por área/app. */
+.notifications-mini-list{
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  overscroll-behavior:contain!important;
+}
+.notifications-empty-state{min-height:116px!important;padding:18px!important}
+.notifications-area-title{display:grid;gap:2px;min-width:0}
+.notifications-area-kicker{font-size:8px;letter-spacing:.12em;color:var(--muted);font-weight:700}
+.notification-page-meta{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.notification-page-item.unread{border-color:color-mix(in srgb,var(--accent) 28%,var(--line))}
+
+/* Trocar Compartilhado/Privado atualiza só o cartão de Uso; o chat não é remontado. */
+.usage-status-card{contain:layout style}
+
+@media(max-width:760px){
+  .image-context-toolbar{top:calc(100% + 6px)!important;left:0!important;max-width:calc(100vw - 24px)!important}
+}
+
+
+/* Sofia OS v88 — revisão final das correções pedidas em 21/09/2026. */
+
+/* Ações no lugar original: canto superior direito, agora fixas na viewport. */
+.user-page-floating-actions{
+  position:fixed!important;
+  top:22px!important;
+  right:max(22px,calc((100vw - 1700px)/2 + 22px))!important;
+  left:auto!important;
+  transform:none!important;
+  z-index:190!important;
+}
+
+/* PARTICULAR usa a mesma régua visual de APPS, inclusive nas páginas internas. */
+.mode-user #appsMenu + .conversation-heading{
+  width:100%!important;min-height:40px!important;margin:4px 0!important;padding:8px 12px!important;display:grid!important;grid-template-columns:minmax(0,1fr) 22px!important;align-items:center!important;gap:10px!important;border-radius:12px!important;background:color-mix(in srgb,var(--text) 4%,transparent)!important;
+}
+.mode-user #appsMenu + .conversation-heading:hover{background:color-mix(in srgb,var(--text) 7%,transparent)!important}
+.mode-user #userPagesNav{display:flex!important;flex-direction:column!important;gap:4px!important;margin-top:0!important;max-height:180px!important;overflow:auto!important}
+.mode-user #userPagesNav .space-tree-node{width:100%!important;margin:0!important;padding:0!important}
+.mode-user #userPagesNav .space-tree-controls{position:relative!important;display:block!important;width:100%!important;max-width:100%!important;min-width:0!important;padding-left:calc(var(--page-depth,0) * 14px)!important;overflow:visible!important}
+.mode-user #userPagesNav .space-tree-button{
+  width:100%!important;min-width:0!important;min-height:40px!important;margin:0!important;padding:8px 66px 8px 12px!important;display:grid!important;grid-template-columns:24px minmax(0,1fr)!important;align-items:center!important;justify-content:start!important;gap:10px!important;border:0!important;border-radius:12px!important;background:color-mix(in srgb,var(--text) 4%,transparent)!important;color:var(--muted)!important;text-align:left!important;box-shadow:none!important;transform:none!important;
+}
+.mode-user #userPagesNav .space-tree-button:hover{background:color-mix(in srgb,var(--text) 7%,transparent)!important;color:var(--text)!important}
+.mode-user #userPagesNav .space-tree-button.active{background:color-mix(in srgb,var(--text) 9%,transparent)!important;color:var(--text)!important}
+.mode-user #userPagesNav .space-tree-page-icon{grid-column:1!important;grid-row:1!important;display:grid!important;place-items:center!important;width:24px!important;height:24px!important;min-width:24px!important;margin:0!important;border-radius:8px!important;background:color-mix(in srgb,var(--text) 5%,transparent)!important;font-size:14px!important;line-height:1!important}
+.mode-user #userPagesNav .space-tree-page-title{grid-column:2!important;grid-row:1!important;display:block!important;width:auto!important;min-width:0!important;margin:0!important;text-align:left!important;font-size:13.5px!important;line-height:1.3!important}
+.mode-user #userPagesNav .space-tree-expander,.mode-user #userPagesNav .space-tree-add{position:absolute!important;z-index:3!important;top:50%!important;transform:translateY(-50%)!important;width:26px!important;min-width:26px!important;height:30px!important;min-height:30px!important;margin:0!important;padding:0!important;border:0!important;border-radius:8px!important;background:transparent!important;color:var(--muted)!important}
+.mode-user #userPagesNav .space-tree-expander{right:34px!important}
+.mode-user #userPagesNav .space-tree-expander:disabled{display:none!important}
+.mode-user #userPagesNav .space-tree-add{right:4px!important;opacity:0!important}
+.mode-user #userPagesNav .space-tree-controls:hover .space-tree-add,.mode-user #userPagesNav .space-tree-controls:focus-within .space-tree-add{opacity:1!important}
+.mode-user #userPagesNav .space-tree-expander:hover,.mode-user #userPagesNav .space-tree-add:hover{background:color-mix(in srgb,var(--text) 8%,transparent)!important;color:var(--text)!important}
+
+/* Preview do sino: pequeno, flutuante e com rolagem interna. */
+.notifications-mini-dialog{width:min(360px,calc(100vw - 24px))!important;max-height:min(420px,calc(100vh - 24px))!important;padding:12px!important;border-radius:13px!important}
+.notifications-mini-list{max-height:min(270px,calc(100vh - 150px))!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain!important;scrollbar-gutter:stable!important}
+.notifications-empty-state{min-height:92px!important;display:grid!important;place-items:center!important;text-align:center!important;color:var(--muted)!important;padding:14px!important}
+.notifications-mini-footer{margin-top:8px!important;padding-top:8px!important}
+.notifications-view-all{min-height:34px!important;padding:7px 2px!important;border:0!important;background:transparent!important;box-shadow:none!important;color:var(--muted)!important;text-align:left!important;justify-content:flex-start!important;font-weight:600!important}
+.notifications-view-all:hover{background:transparent!important;color:var(--text)!important;text-decoration:underline!important}
+
+/* Overview completo por origem/área. */
+.notifications-page-content{gap:22px!important}
+.notifications-area{padding:16px!important;border:1px solid var(--line)!important;border-radius:14px!important;background:color-mix(in srgb,var(--panel) 72%,transparent)!important}
+.notifications-area:first-child{border-top:1px solid var(--line)!important;padding-top:16px!important}
+.notifications-area-title{display:grid!important;gap:2px!important}
+.notifications-area-title h3{margin:0!important}
+.notifications-area-subtitle{font-size:10px!important;color:var(--muted)!important}
+.notifications-area-count{white-space:nowrap!important}
+.notification-page-meta{display:flex!important;align-items:center!important;gap:8px 12px!important;flex-wrap:wrap!important}
+.notification-page-meta small{padding-right:12px!important;border-right:1px solid var(--line)!important}
+.notification-page-meta small:last-child{border-right:0!important;padding-right:0!important}
+
+/* Troca Compartilhado/Privado preserva o thread e sua posição. */
+.usage-status-card{contain:layout style!important}
+
+@media(max-width:760px){
+  .user-page-floating-actions{top:8px!important;right:8px!important;left:auto!important;transform:none!important}
+  .mode-user #userPagesNav .space-tree-button{min-height:38px!important;padding-right:62px!important}
+  .mode-user #userPagesNav .space-tree-page-title{font-size:12px!important}
+  .mode-user #userPagesNav .space-tree-add{opacity:1!important}
+  .notifications-mini-dialog{width:calc(100vw - 20px)!important;max-height:calc(100vh - 20px)!important}
+}
+
+/* Sofia OS v89 — correção definitiva: ações da página ancoradas ao main, Particular idêntico a Apps e preview real no hover. */
+
+/* Os três controles continuam exatamente no canto superior direito original,
+   mas são ancorados ao <main> (que não rola), não à viewport inteira. */
+.user-page-floating-actions{
+  position:absolute!important;
+  top:22px!important;
+  right:22px!important;
+  left:auto!important;
+  transform:none!important;
+  z-index:190!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:4px!important;
+  pointer-events:auto!important;
+}
+.user-page-floating-actions[hidden]{display:none!important}
+
+/* APPS e PARTICULAR compartilham o MESMO componente visual. */
+.mode-user #appsMenuToggle,
+.mode-user #particularMenuToggle{
+  width:100%!important;
+  min-height:40px!important;
+  margin:4px 0!important;
+  padding:8px 12px!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 22px!important;
+  align-items:center!important;
+  gap:10px!important;
+  border:0!important;
+  border-radius:12px!important;
+  background:color-mix(in srgb,var(--text) 4%,transparent)!important;
+  color:var(--text)!important;
+  text-align:left!important;
+  box-shadow:none!important;
+}
+.mode-user #appsMenuToggle:hover,
+.mode-user #particularMenuToggle:hover{
+  background:color-mix(in srgb,var(--text) 7%,transparent)!important;
+}
+.mode-user #appsMenuToggle .sidebar-section-title,
+.mode-user #particularMenuToggle .sidebar-section-title{
+  display:block!important;
+  min-width:0!important;
+  margin:0!important;
+  padding:0!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  text-align:left!important;
+  font-size:9.6px!important;
+  line-height:1.4!important;
+  font-weight:750!important;
+  letter-spacing:1.25px!important;
+  color:inherit!important;
+}
+.mode-user #particularMenuToggle .particular-section-add{
+  justify-self:end!important;
+  display:grid!important;
+  place-items:center!important;
+  width:22px!important;
+  min-width:22px!important;
+  height:22px!important;
+  min-height:22px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:6px!important;
+  background:transparent!important;
+  color:var(--muted)!important;
+  box-shadow:none!important;
+  font-size:17px!important;
+  line-height:1!important;
+}
+.mode-user #particularMenuToggle .particular-section-add:hover{
+  background:color-mix(in srgb,var(--text) 8%,transparent)!important;
+  color:var(--text)!important;
+}
+
+/* As páginas dentro de PARTICULAR reutilizam a mesma régua dos itens dentro de APPS. */
+.mode-user #userPagesNav{
+  display:flex!important;
+  flex-direction:column!important;
+  gap:4px!important;
+  margin-top:0!important;
+  max-height:180px!important;
+  overflow:auto!important;
+  padding-right:0!important;
+}
+.mode-user #userPagesNav .space-tree-node,
+.mode-user #userPagesNav .space-tree-node.selected{
+  width:100%!important;
+  margin:0!important;
+  padding:0!important;
+  background:transparent!important;
+  border:0!important;
+}
+.mode-user #userPagesNav .space-tree-controls{
+  position:relative!important;
+  display:block!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  padding-left:calc(var(--page-depth,0) * 14px)!important;
+  overflow:visible!important;
+}
+.mode-user #appsMenu .nav,
+.mode-user #userPagesNav .space-tree-button{
+  width:100%!important;
+  min-width:0!important;
+  min-height:40px!important;
+  margin:0!important;
+  padding:8px 12px!important;
+  display:grid!important;
+  grid-template-columns:24px minmax(0,1fr)!important;
+  align-items:center!important;
+  justify-content:start!important;
+  gap:10px!important;
+  border:0!important;
+  border-radius:12px!important;
+  background:transparent!important;
+  color:var(--muted)!important;
+  text-align:left!important;
+  box-shadow:none!important;
+  transform:none!important;
+  overflow:hidden!important;
+}
+.mode-user #appsMenu .nav:hover,
+.mode-user #userPagesNav .space-tree-button:hover{
+  background:color-mix(in srgb,var(--text) 7%,transparent)!important;
+  color:var(--text)!important;
+}
+.mode-user #userPagesNav .space-tree-button.active{
+  background:color-mix(in srgb,var(--text) 9%,transparent)!important;
+  color:var(--text)!important;
+}
+.mode-user #appsMenu .nav>.nav-icon,
+.mode-user #userPagesNav .space-tree-button>.nav-icon{
+  position:static!important;
+  grid-column:1!important;
+  grid-row:1!important;
+  display:grid!important;
+  place-items:center!important;
+  width:24px!important;
+  height:24px!important;
+  min-width:24px!important;
+  margin:0!important;
+  border-radius:8px!important;
+  font-size:14px!important;
+  line-height:1!important;
+  transform:none!important;
+  opacity:1!important;
+}
+.mode-user #appsMenu .nav>.nav-label,
+.mode-user #userPagesNav .space-tree-button>.nav-label{
+  position:static!important;
+  grid-column:2!important;
+  grid-row:1!important;
+  display:block!important;
+  width:auto!important;
+  min-width:0!important;
+  margin:0!important;
+  text-align:left!important;
+  justify-self:start!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  font-size:inherit!important;
+  line-height:1.3!important;
+  color:inherit!important;
+  transform:none!important;
+}
+/* Controles extras não mudam a largura/altura do botão; aparecem por cima, à direita. */
+.mode-user #userPagesNav .space-tree-expander,
+.mode-user #userPagesNav .space-tree-add{
+  position:absolute!important;
+  z-index:4!important;
+  top:50%!important;
+  transform:translateY(-50%)!important;
+  display:grid!important;
+  place-items:center!important;
+  width:26px!important;
+  min-width:26px!important;
+  height:28px!important;
+  min-height:28px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:7px!important;
+  background:color-mix(in srgb,var(--bg) 90%,transparent)!important;
+  color:var(--muted)!important;
+  box-shadow:none!important;
+  opacity:0!important;
+}
+.mode-user #userPagesNav .space-tree-expander{right:32px!important}
+.mode-user #userPagesNav .space-tree-add{right:4px!important}
+.mode-user #userPagesNav .space-tree-expander:disabled{display:none!important}
+.mode-user #userPagesNav .space-tree-controls:hover .space-tree-expander,
+.mode-user #userPagesNav .space-tree-controls:hover .space-tree-add,
+.mode-user #userPagesNav .space-tree-controls:focus-within .space-tree-expander,
+.mode-user #userPagesNav .space-tree-controls:focus-within .space-tree-add{opacity:1!important}
+.mode-user #userPagesNav .space-tree-expander:hover,
+.mode-user #userPagesNav .space-tree-add:hover{
+  background:color-mix(in srgb,var(--text) 9%,var(--bg))!important;
+  color:var(--text)!important;
+}
+
+/* O preview do sino é um popover comum, não um <dialog> nativo: hover fica estável. */
+.notifications-mini-dialog{
+  position:fixed!important;
+  inset:auto!important;
+  z-index:260!important;
+  width:min(360px,calc(100vw - 24px))!important;
+  max-height:min(420px,calc(100vh - 24px))!important;
+  margin:0!important;
+  padding:12px!important;
+  overflow:hidden!important;
+  border:1px solid var(--line)!important;
+  border-radius:13px!important;
+  background:var(--panel)!important;
+  color:var(--text)!important;
+  box-shadow:0 18px 55px #0005!important;
+  pointer-events:auto!important;
+}
+.notifications-mini-dialog[hidden]{display:none!important}
+.notifications-mini-head{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:10px!important;
+  margin:0 0 8px!important;
+  padding:0 2px 7px!important;
+  border-bottom:1px solid var(--line)!important;
+}
+.notifications-mini-head>strong{font-size:14px!important;font-weight:650!important}
+.notifications-mini-close{
+  width:28px!important;height:28px!important;min-width:28px!important;min-height:28px!important;
+  display:grid!important;place-items:center!important;margin:0!important;padding:0!important;
+  border:0!important;border-radius:8px!important;background:transparent!important;color:var(--muted)!important;font-size:18px!important;
+}
+.notifications-mini-close:hover{background:color-mix(in srgb,var(--text) 7%,transparent)!important;color:var(--text)!important}
+.notifications-mini-list{
+  display:flex!important;
+  flex-direction:column!important;
+  gap:7px!important;
+  max-height:min(270px,calc(100vh - 150px))!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  overscroll-behavior:contain!important;
+  scrollbar-gutter:stable!important;
+  padding-right:2px!important;
+}
+.notifications-empty-state{
+  min-height:92px!important;
+  display:grid!important;
+  place-items:center!important;
+  margin:0!important;
+  padding:14px!important;
+  color:var(--muted)!important;
+  text-align:center!important;
+  font-size:12px!important;
+}
+.notifications-mini-footer{margin-top:8px!important;padding-top:8px!important;border-top:1px solid var(--line)!important}
+.notifications-view-all{
+  width:100%!important;
+  min-height:32px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  margin:0!important;
+  padding:6px 2px!important;
+  border:0!important;
+  border-radius:6px!important;
+  background:transparent!important;
+  color:var(--muted)!important;
+  box-shadow:none!important;
+  text-align:left!important;
+  font-size:11px!important;
+  font-weight:600!important;
+}
+.notifications-view-all:hover{background:transparent!important;color:var(--text)!important;text-decoration:underline!important}
+
+@media(max-width:760px){
+  .user-page-floating-actions{top:8px!important;right:8px!important}
+  .mode-user #appsMenuToggle,.mode-user #particularMenuToggle{min-height:38px!important}
+  .mode-user #appsMenu .nav,.mode-user #userPagesNav .space-tree-button{min-height:38px!important}
+  .mode-user #userPagesNav .space-tree-expander,.mode-user #userPagesNav .space-tree-add{opacity:1!important}
+  .notifications-mini-dialog{width:calc(100vw - 20px)!important;max-height:calc(100vh - 20px)!important}
+}
+
+
+/* Sofia OS v90 — ações da página realmente fixas na tela.
+   A v89 terminou com position:absolute; esta regra final volta para fixed,
+   mantendo o alinhamento no canto direito do shell e ignorando qualquer scroll do conteúdo. */
+.user-page-floating-actions{
+  position:fixed!important;
+  top:22px!important;
+  right:max(22px,calc((100vw - 1700px)/2 + 22px))!important;
+  left:auto!important;
+  transform:none!important;
+  z-index:190!important;
+}
+@media(max-width:760px){
+  .user-page-floating-actions{
+    top:8px!important;
+    right:8px!important;
+    left:auto!important;
+    transform:none!important;
+  }
+}
+
+/* Sofia OS v91 — ações da página em camada de viewport real.
+   O container agora é filho direto do <body>; assim nenhum scroll, overflow ou
+   containing block interno do shell/main pode deslocar +, engrenagem e … . */
+body > .user-page-floating-actions{
+  position:fixed!important;
+  top:22px!important;
+  right:max(22px,calc((100vw - 1700px)/2 + 22px))!important;
+  bottom:auto!important;
+  left:auto!important;
+  transform:none!important;
+  margin:0!important;
+  z-index:1000!important;
+  pointer-events:auto!important;
+}
+
+/* Sofia OS v92 — trava final dos controles no quadro visível.
+   Esta regra é deliberadamente a última e mais específica do arquivo para que
+   nenhum bloco legado volte a transformar a barra em conteúdo rolável. */
+html body > #userPageFloatingActions.user-page-floating-actions{
+  position:fixed!important;
+  inset:22px max(22px,calc((100vw - 1700px)/2 + 22px)) auto auto!important;
+  width:max-content!important;
+  height:34px!important;
+  margin:0!important;
+  translate:none!important;
+  transform:none!important;
+  z-index:2147483000!important;
+  contain:layout style!important;
+}
+html body > #userPageFloatingActions.user-page-floating-actions[hidden]{display:none!important}
+@media(max-width:760px){
+  html body > #userPageFloatingActions.user-page-floating-actions{
+    inset:8px 8px auto auto!important;
+  }
+}
+body > .user-page-floating-actions[hidden]{display:none!important}
+@media(max-width:760px){
+  body > .user-page-floating-actions{
+    top:8px!important;
+    right:8px!important;
+    bottom:auto!important;
+    left:auto!important;
+    transform:none!important;
+  }
+}
+
+/* Sofia OS v93 — controles presos ao topo da própria página.
+   Eles pertencem ao cabeçalho rolável e desaparecem naturalmente quando o
+   usuário desce; não permanecem flutuando sobre o conteúdo. */
+#tab-userpage > .user-page-header{
+  position:relative!important;
+  flex:0 0 auto!important;
+}
+#tab-userpage > .user-page-header > #userPageFloatingActions.user-page-floating-actions{
+  position:absolute!important;
+  inset:0 0 auto auto!important;
+  width:max-content!important;
+  height:34px!important;
+  margin:0!important;
+  translate:none!important;
+  transform:none!important;
+  z-index:20!important;
+  contain:layout style!important;
+}
+#tab-userpage > .user-page-header > #userPageFloatingActions.user-page-floating-actions[hidden]{display:none!important}
+@media(max-width:760px){
+  #tab-userpage > .user-page-header > #userPageFloatingActions.user-page-floating-actions{
+    inset:0 0 auto auto!important;
+  }
+}
+
+/* Sofia OS v94 — o cabeçalho não reserva altura acima da capa.
+   Continua dentro do painel rolável, portanto sai da tela junto com o topo. */
+#tab-userpage{position:relative!important}
+#tab-userpage > .user-page-header{
+  position:absolute!important;
+  inset:18px 22px auto 22px!important;
+  min-height:34px!important;
+  height:34px!important;
+  margin:0!important;
+  z-index:22!important;
+  pointer-events:none!important;
+}
+#tab-userpage > .user-page-header > :first-child,
+#tab-userpage > .user-page-header > #userPageFloatingActions{pointer-events:auto!important}
+#tab-userpage > .user-page-header > #userPageFloatingActions.user-page-floating-actions{
+  position:absolute!important;
+  inset:0 0 auto auto!important;
+}
+
+/* PARTICULAR: apenas título/seta e +, com a mesma superfície dos menus acima. */
+.mode-user #particularMenuToggle{
+  grid-template-columns:minmax(0,1fr) 22px!important;
+  gap:6px!important;
+}
+.mode-user #particularMenuToggle .particular-section-collapse{
+  min-width:0!important;height:22px!important;margin:0!important;padding:0!important;border:0!important;
+  display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:5px!important;
+  background:transparent!important;color:inherit!important;box-shadow:none!important;text-align:left!important;
+}
+.mode-user #particularMenuToggle .particular-section-chevron{
+  display:grid!important;place-items:center!important;width:14px!important;height:18px!important;
+  color:var(--muted)!important;font-size:13px!important;line-height:1!important;
+}
+.mode-user #particularMenuToggle .particular-section-collapse:hover{background:transparent!important}
+.mode-user #userPagesNav[hidden]{display:none!important}
+.mode-user #userPagesNav .space-tree-button,
+.mode-user #userPagesNav .space-tree-button.active{
+  background:transparent!important;
+  color:var(--muted)!important;
+}
+.mode-user #userPagesNav .space-tree-button:hover{
+  background:color-mix(in srgb,var(--text) 7%,transparent)!important;
+  color:var(--text)!important;
+}
+:root[data-theme="light"] .mode-user #userPagesNav .space-tree-button,
+:root[data-theme="light"] .mode-user #userPagesNav .space-tree-button.active{
+  background:transparent!important;
+  color:#6f6e69!important;
+}
+@media(max-width:760px){
+  #tab-userpage > .user-page-header{inset:8px 8px auto 8px!important}
+}
+
+/* Sofia OS v95 — acabamento do Particular e reset default confirmado. */
+.mode-user #userPagesNav .space-tree-page-icon,
+:root[data-theme="light"] .mode-user #userPagesNav .space-tree-page-icon{
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+}
+.mode-user #particularMenuToggle .particular-section-collapse{
+  display:grid!important;
+  grid-template-columns:max-content 16px!important;
+  align-items:center!important;
+  justify-content:start!important;
+  column-gap:5px!important;
+}
+.mode-user #particularMenuToggle .particular-section-chevron{
+  position:relative!important;
+  display:block!important;
+  width:16px!important;
+  height:16px!important;
+  margin:0!important;
+  font-size:0!important;
+  line-height:0!important;
+}
+.mode-user #particularMenuToggle .particular-section-chevron::before{
+  content:''!important;
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  width:5px!important;
+  height:5px!important;
+  border-right:1px solid currentColor!important;
+  border-bottom:1px solid currentColor!important;
+  transform:translate(-50%,-65%) rotate(45deg)!important;
+  transform-origin:center!important;
+}
+.mode-user #particularMenuToggle .particular-section-chevron.is-collapsed::before{
+  transform:translate(-65%,-50%) rotate(-45deg)!important;
+}
+
+
+/* Sofia OS v96 — ícones das páginas PARTICULARES usam emoji colorido como os demais itens do app.
+   Símbolos manuais continuam no conjunto monocromático para não alterar a escolha do usuário. */
+.mode-user #userPagesNav .space-tree-page-icon.page-icon-mode-default,
+.mode-user #userPagesNav .space-tree-page-icon.page-icon-mode-emoji{
+  font-family:"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif!important;
+  font-variant-emoji:emoji!important;
+  filter:none!important;
+  opacity:1!important;
+}
+.mode-user #userPagesNav .space-tree-page-icon.page-icon-mode-icon{
+  font-family:"Segoe UI Symbol","Noto Sans Symbols 2",sans-serif!important;
+  font-variant-emoji:text!important;
+  filter:none!important;
+  opacity:1!important;
+}
+
+
+/* Sofia OS v101 — preview do sino no hover e central detalhada por área. */
+.notifications-mini-head-actions{display:flex!important;align-items:center!important;gap:5px!important;margin-left:auto!important}
+.notifications-mini-link{min-height:28px!important;margin:0!important;padding:4px 7px!important;border:0!important;background:transparent!important;box-shadow:none!important;color:var(--muted)!important;font-size:10.5px!important;font-weight:600!important}
+.notifications-mini-link:hover,.notifications-mini-link:focus-visible{background:transparent!important;color:var(--text)!important;text-decoration:underline!important;box-shadow:none!important}
+.notifications-empty-state{min-height:118px!important;font-size:12px!important}
+.notifications-page-empty{min-height:180px!important;display:grid!important;place-items:center!important;text-align:center!important;color:var(--muted)!important}
+.notifications-area-kicker{font-size:8px!important;letter-spacing:.12em!important;color:var(--muted)!important;font-weight:700!important}
+
+
+/* Sofia OS v102 — preview do sino aplicado no master e central detalhada por área + origem. */
+.notifications-mini-dialog{transform-origin:top right!important}
+.notifications-mini-head-actions{display:flex!important;align-items:center!important;gap:5px!important;margin-left:auto!important}
+.notifications-mini-link{white-space:nowrap!important}
+.notifications-empty-state{min-height:126px!important;padding:20px 14px!important}
+.notifications-source-group{display:grid!important;gap:8px!important;margin-top:14px!important}
+.notifications-source-group:first-of-type{margin-top:10px!important}
+.notifications-source-head{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;padding:0 2px 5px!important;border-bottom:1px solid color-mix(in srgb,var(--line) 75%,transparent)!important}
+.notifications-source-head strong{font-size:11px!important;font-weight:650!important;color:var(--text)!important}
+.notifications-source-head span{font-size:9px!important;color:var(--muted)!important}
+.notifications-source-group .notifications-page-list{gap:7px!important}
+
+
+/* Sofia OS v103 — hover do sino reforçado e Início/Resumo no mesmo tamanho dos demais menus. */
+.mode-user #primaryUserNav .nav>.nav-label{
+  font-size:13.5px!important;
+  line-height:1.3!important;
+  font-weight:400!important;
+}
+.mode-user #startJump,.mode-user #summaryJump{
+  min-height:46px!important;
+}
+/* O pointerenter é ligado cedo no JS; este estado visual confirma a área de hover do sino. */
+.mode-user #startNotifications{pointer-events:auto!important}
+@media(max-width:760px){
+  .mode-user #primaryUserNav .nav>.nav-label{font-size:12px!important}
+}

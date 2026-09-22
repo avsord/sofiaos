@@ -1,0 +1,49 @@
+'use strict';
+const {now,normalize}=require('../core/util');
+const {readFeed,field}=require('./safe-feed');
+function localParts(date){return Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(date).map(p=>[p.type,p.value]));}
+function localISO(date){const p=localParts(date);return p.year+'-'+p.month+'-'+p.day;}
+function zoned(date,time){const naive=Date.parse(date+'T'+time+':00Z');let stamp=naive;for(let i=0;i<3;i++){const p=localParts(new Date(stamp));const mapped=Date.parse(p.year+'-'+p.month+'-'+p.day+'T'+p.hour+':'+p.minute+':'+p.second+'Z');stamp+=naive-mapped;}return new Date(stamp).toISOString();}
+function nextRoutine(e,after=new Date()){
+ const d=e.data,base=localISO(after);for(let i=0;i<370;i++){
+  const date=new Date(base+'T12:00:00Z');date.setUTCDate(date.getUTCDate()+i);const iso=date.toISOString().slice(0,10);
+  if(iso<d.starts_on)continue;if(d.ends_on&&iso>d.ends_on)return null;
+  if(d.frequency==='weekly'&&date.getUTCDay()!==d.weekday)continue;
+  if(d.frequency==='monthly'&&date.getUTCDate()!==Math.min(d.monthday,new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,0)).getUTCDate()))continue;
+  const at=zoned(iso,d.time);if(Date.parse(at)>after.getTime())return at;
+ }return null;
+}
+class Scheduler{
+ constructor(workspace,{fetcher=readFeed,clock=()=>new Date()}={}){this.w=workspace;this.fetcher=fetcher;this.clock=clock;this.busy=false;this.controller=null;this.stopped=false;}
+ async tick(){if(this.busy||this.stopped)return;this.busy=true;this.controller=new AbortController();try{
+  const stamp=this.clock().toISOString();const due=this.w.db.prepare("SELECT * FROM jobs WHERE state='active' AND next_at<=? ORDER BY next_at LIMIT 10").all(stamp);
+  for(const j of due){if(this.stopped)break;const e=this.w.get(j.entity_id);if(e.state!=='active')continue;try{
+    if(j.kind==='monitor')await this.monitor(e,j,stamp);else this.routine(e,j,stamp);
+  }catch(err){this.w.db.prepare('UPDATE jobs SET last_at=?,last_error=?,next_at=?,run_count=run_count+1 WHERE id=?').run(stamp,err.code||'JOB_ERROR',new Date(Date.parse(stamp)+Math.max(j.interval_minutes,15)*60000).toISOString(),j.id);this.w.notify('automation','Não foi possível consultar '+e.title,'A execução falhou: '+(err.code||'JOB_ERROR')+'. Nenhum resultado externo foi presumido.',e.id,'warning',j.id+':error:'+stamp.slice(0,10));}}
+  const reminders=this.w.list({kind:'reminder',limit:500}).filter(e=>e.state==='active'&&e.data.remind_at&&Date.parse(e.data.remind_at)<=Date.parse(stamp));
+  for(const e of reminders){
+    const dedup='reminder:'+e.id+':'+e.data.remind_at;
+    this.w.notify('reminder',e.title,e.data.message||'Lembrete da Sofia.',e.id,'info',dedup);
+    this.w.changeState(e.id,'done',e.revision);
+  }
+ }finally{this.busy=false;this.controller=null;}}
+ async monitor(e,j,stamp){const d=e.data;if(d.method!=='json'||!d.consent)return;const json=await this.fetcher(d.feed_url,{signal:this.controller?.signal});this.w.observe(e.id,{price:field(json,d.price_path),shipping:d.shipping_path?field(json,d.shipping_path):0,variant:field(json,d.variant_path),currency:field(json,d.currency_path),source:d.feed_url,source_key:j.id+':'+stamp,observed_at:stamp});this.w.db.prepare('UPDATE jobs SET last_at=?,last_error=NULL,next_at=?,run_count=run_count+1 WHERE id=?').run(stamp,new Date(Date.parse(stamp)+j.interval_minutes*60000).toISOString(),j.id);}
+ routine(e,j,stamp){
+  const next=nextRoutine(e,new Date(Date.parse(stamp)-60000));
+  // First run schedules ahead, never floods missed historical occurrences.
+  if(!j.last_at&&next&&Date.parse(next)>Date.parse(stamp)){this.w.db.prepare('UPDATE jobs SET next_at=?,last_at=? WHERE id=?').run(next,stamp,j.id);return;}
+  const occurrence=j.last_at?j.next_at:next;if(!occurrence){this.w.db.prepare("UPDATE jobs SET state='paused',next_at=NULL WHERE id=?").run(j.id);return;}
+  if(Date.parse(occurrence)>Date.parse(stamp))return;
+  const dedup=e.id+':'+localISO(new Date(occurrence))+':'+e.data.time;
+  this.w.s.tx(()=>{
+   if(!this.w.db.prepare('SELECT id FROM notifications WHERE dedup=?').get(dedup)){
+    if(e.data.delivery==='task')this.w.s.saveTask({title:e.title,area:e.area,state:'scheduled',due_at:occurrence,privacy:e.privacy});
+    this.w.notify('routine',e.title,e.data.instruction||'Ocorrência local da rotina. Conclusão ainda não confirmada.',e.id,'info',dedup);
+   }
+   const following=nextRoutine(e,new Date(stamp));this.w.db.prepare('UPDATE jobs SET last_at=?,last_error=NULL,next_at=?,state=?,run_count=run_count+1 WHERE id=?').run(stamp,following,following?'active':'paused',j.id);
+  });
+ }
+ start(){this.timer=setInterval(()=>this.tick().catch(()=>{}),60000);this.timer.unref();this.tick().catch(()=>{});}
+ async stop(){this.stopped=true;clearInterval(this.timer);this.controller?.abort();const end=Date.now()+12000;while(this.busy&&Date.now()<end)await new Promise(r=>setTimeout(r,30));}
+}
+module.exports={Scheduler,nextRoutine,localISO,zoned};

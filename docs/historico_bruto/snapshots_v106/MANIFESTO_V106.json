@@ -1,0 +1,951 @@
+{
+  "version": 106,
+  "name": "Sofia OS v106 - Master com documentacao bruta",
+  "created_at": "2026-09-21T22:19:41.632713Z",
+  "files": [
+    {
+      "path": "Comando atual.md",
+      "sha256": "4413a858d085ecbd9759a131231157bc082a98b4cbf2620e4bca817572f16aeb"
+    },
+    {
+      "path": "DIAGNOSTICO_SOFIA.cmd",
+      "sha256": "d9b78f7c43742715d5c57756030aa1138d0150e1faa0e4e7261b1d60e9e2a333"
+    },
+    {
+      "path": "EXPORTAR_CODIGO.cmd",
+      "sha256": "bf7f620510a9e2152625f0d2d5bae286b2c2df1c9993bfe5d9594454e9c7dc12"
+    },
+    {
+      "path": "INICIAR_SOFIA.cmd",
+      "sha256": "c98fce6e3e74c92e807a86fce8be5af21ac967f07aa5726199d8750728d8785c"
+    },
+    {
+      "path": "LIMPAR_PROJETO.cmd",
+      "sha256": "99669baee64ef8bde8cfd636325226e9983f02629b67f89ef42f980531264dcc"
+    },
+    {
+      "path": "PROMPT_CONTINUAR_SOFIA.md",
+      "sha256": "215e799fa978dfe28ba4d40023cb8ddccf0bc1ebe1e31ebab13e6a56b672c00a"
+    },
+    {
+      "path": "REPARAR_CHAVE_SOFIA.cmd",
+      "sha256": "d45f852b118f05232dc9824ba177627d5f837154067f0819548ba8c14b3867dd"
+    },
+    {
+      "path": "RESTAURAR_MEMORIA.cmd",
+      "sha256": "abee2f2576edddaca9087a583789bec899d29d028eb66c6d18d99e2638abff31"
+    },
+    {
+      "path": "TESTAR_SOFIA.cmd",
+      "sha256": "db51d845a0d9164fbb86162ddf5b629babe4a75c19cfb77ef57754eb85ac613b"
+    },
+    {
+      "path": "docs/CONTEXTO_NOVO_CHAT.md",
+      "sha256": "a5d549dc88d681d9ae7faa6759538a7785807c56d912763010c00eefd192a21f"
+    },
+    {
+      "path": "docs/GUIA_MASTER_COMPLETO.md",
+      "sha256": "a38e9f5f1b1611998cf4bf72b9b264a6711a5b94557f4af49a1709be0113bcee"
+    },
+    {
+      "path": "docs/MASTER.md",
+      "sha256": "4ffca09b2efe0ef3c5c17e911ffece0c518711a1c36eaec363cc758eea4d7b8c"
+    },
+    {
+      "path": "docs/UI_MAP.md",
+      "sha256": "582879efcf00ef5e01c1dbd27abdfdfb6acb3eddcecd5eac5ef639fd96b8a25e"
+    },
+    {
+      "path": "docs/historico_bruto/README.md",
+      "sha256": "8aa1dc25ee75c31cfc69d9ab475eed2c40fc9dc0d37f933f96fcbfbb3c87e2e7"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/01_COMECE_AQUI.md",
+      "sha256": "043fc20fad09fae33a237099dbdabf6bfe90778704639181e3de999f91ee02d6"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/02_ARQUITETURA_E_ESCOPO.md",
+      "sha256": "436e93c5119a70771dd4822c1175c7371010d5bf0d185fd6665e11e2022de874"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/03_PRIVACIDADE_E_CUSTOS.md",
+      "sha256": "27008deeed501c185639295fe52e570bb7ec21cc1fe4b8d6717c1fb8b34f1413"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/04_BACKUP_E_RESTAURACAO.md",
+      "sha256": "7141b0cbe47708f329495eceacfc63dfc20cacdaee37d0e9b1bc6c836ba97589"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/05_META_E_CANAIS.md",
+      "sha256": "86bb5c253411f08c1f1a65f3af5cd5a7dece37ba96aea74fc1e1cfaf98bb7b52"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/06_CHECKPOINT_V44.md",
+      "sha256": "74c557e04c22c641e3cd243bce2ae916b489e9b43ea2cc2e2275a5f9254c1c30"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/07_VALIDACAO_E_LIMITES.md",
+      "sha256": "997f5e78d45fa98b760ff1d50347592bb8301a304e994d244efbd71ee8a3d4cc"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/08_CHECKPOINT_V45.md",
+      "sha256": "38197a76a30ddd1bf035e36f2b7fb2f50cb7031e84e1dd60891e2496622818b4"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/09_MONITORAMENTOS_E_COMPRAS.md",
+      "sha256": "5d931662158545c3796f2024b8c6a76eb4c2764dec7898beafafefe8dc45bd50"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/10_ESTUDOS_ACERVO_PROJETOS.md",
+      "sha256": "cf51a542c4942442c23cc8975943409b3ecd49e3f7a2e820a838016576d9bfbe"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/11_MATRIZ_DE_COBERTURA.md",
+      "sha256": "22dec21784a2f379aed3815d0e90564f47961832a9ca2f4398d5ff2252de9877"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/12_CHECKPOINT_V46.md",
+      "sha256": "0372d3ef47012ece703d12ffe943a8ca1ba3a9a0b96e4025efd84357a735d52f"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/13_INTERFACE_E_FLUXO_ATIVO.md",
+      "sha256": "f2d8cf927a212be50736feefdd9ee4ef6acef4fc6ab39b18ae4c6e0a900aa803"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/14_FILTROS_CONTEXTO_CHAT_PROTEGIDO.md",
+      "sha256": "170cd70e0e495c4ed75ecd72a3227074f9a6a6396bbf20a3bb0497c38fec8873"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/15_CORRECOES_V47.md",
+      "sha256": "f0f5056848a0160552da465449f3e91119db871a22dfbcefa96a11954467f542"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/16_CORRECOES_V48.md",
+      "sha256": "a19ac7a1be43a7cae0ba12332b39315054e8782c29f3515234b0a25e88ca639d"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/17_MOTOR_DE_INTENCAO_V49.md",
+      "sha256": "baf144b314c474a1473d6c8523adad058c31754954d72ed61cd6f90f962ef4d0"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/18_IA_PRIMEIRO_V50.md",
+      "sha256": "3c1bba5c1b4676ff454b45bc32cd677651e77fbb03e5390a8183956f821a0f65"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/19_FILTROS_PROFISSIONAIS_V51.md",
+      "sha256": "c2199eb99009593486e7db1e7c041d333fab04a054d9bae46ad740bbbd6f750c"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/20_AGENDA_E_DETALHES_V52.md",
+      "sha256": "d4534f37716a343ca401ee088f6dc36415149d43987bd0eb1e337271021d1e5b"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/21_CHAT_CONTINUO_V53.md",
+      "sha256": "d54736feda486b4baa4b52b0c5982cc729339615c53fe1d2a03a2753d2fcde89"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/22_NAVEGACAO_FLUIDA_V54.md",
+      "sha256": "6fde948d66608ed185635a065b73a28b917925105bd8491cce23e406730c8fdf"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/23_CHAT_SEM_DUPLICACAO_V55.md",
+      "sha256": "9306b954ecab17118285a0cf43f14abc53f585eecf6758ceaffc94b063503ead"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/24_CONTINUIDADE_LEMBRETES_V56.md",
+      "sha256": "67fb397bf8b91b5ce16d8a3c530cf9da3b440dc6f327c9548cfb424792273ff8"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/25_ENTENDIMENTO_NATURAL_V57.md",
+      "sha256": "27a7815307baa3e696ce9cdb9daedff1aeccff96cd46e95af7589971fb7593a2"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/26_BASE_FIXA_CHAT_LIMPO_V58.md",
+      "sha256": "61a5acba6f2ff9dfe43ea86acc67973b0a5d0ba570faaf270db8afd26efb034e"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/27_ESPACOS_E_EDITOR_V59.md",
+      "sha256": "a1c0305f1ec287f8d29ac7891c3533035ca045da46c9d31911f31857be1676c6"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/28_CONVERSA_CONTINUA_V60.md",
+      "sha256": "58f329c7ead81db0e72f70d369f50fbb85a5fc5e1c04fa864e202f0da144397b"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/29_IA_AUTORIDADE_GLOBAL_V61.md",
+      "sha256": "0918b94ff6d6307e785b20ba0a8be172c2359aaee3177ae6284d39dc81e485c8"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/30_CICLO_IA_COMPLETO_V62.md",
+      "sha256": "25d8fa11c61ce0ed5abe597cb99eb3813f4771f0e08178b007207973f56cd30c"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/31_EDITOR_AVANCADO_V63.md",
+      "sha256": "1e52fce329549169d646cc687da52ec54b909b7c03e870ed4e138c63e111b4b1"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/32_AGENDA_COMPLETA_V64.md",
+      "sha256": "5e648e909a616d0d1717241400a7892219c4607466a3cfc6b2930c33b03cf7e2"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/33_LISTAS_FIXAS_GRUPOS_FLUIDOS_V65.md",
+      "sha256": "fc3b6d59edf16c43798ba97f78a8f0599adf9e476445da381a0f8be26d43e39e"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/34_TEMA_TEMPLATES_CONTEXTO_V66.md",
+      "sha256": "51d37d757a51ab2f2f62ccee73b1128afd1c251ddfd6ffcb210e8e19d5310bf1"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/35_PAGINAS_VISUAIS_CONTRASTE_V67.md",
+      "sha256": "cbe98bc08a667cfeb28b5ecf604c9a1746742b1a1d9fde6384a79f5891d71e79"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/36_IA_PAGINAS_CHAT_FLUIDO_V68.md",
+      "sha256": "d43fc8eaff1779c2edee8c91aabb9128f96bb24123a1011657bc7c547aaa8d7a"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/37_TERRA_VOZ_USO_PAGINAS_V69.md",
+      "sha256": "1d19db2a2464d4e3ef6ecf61253cccc36b9ef456a9d728d937764a78f37a44cd"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/38_NAVEGACAO_ESCALA_FEEDBACK_V70.md",
+      "sha256": "4585c3a7a1dd2367b997ec1c11e076f1dbde25fcbaa6084988883e2eb6834fb9"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/39_CONTEXTO_AGENDA_INTERFACE_V71.md",
+      "sha256": "b3d24aede4edbcccadc5ed853258796f90fe059ca26cd6c3c1e1cdf05213866f"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/40_SIDEBAR_USO_INTERFACE_V72.md",
+      "sha256": "cebfdcc3b11cd5d6de66897b9d2d13ac5f13f4f2df48d7799278ac25c9056b63"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/41_USO_FILTROS_CHAT_AGENDA_V73.md",
+      "sha256": "4a314a867aef80f6b46afed8f617a3bb08fed5f4e5fcb6dccd0f28dd301ba79f"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/42_INSTALADOR_MANIFESTO_V76.md",
+      "sha256": "48a0476e15cd1053ad2143a00def1791e567fc5ccddc1f146a3378c190406b09"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/42_TEMPLATES_DRAG_RESUMO_V77.md",
+      "sha256": "c73679813c70314c1fec5bb4365cfca1457db6cebb57d7f4495bb4b35e7fa521"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/43_USO_PRIVADO_GRADIENTE_V78.md",
+      "sha256": "c2a3cf77d02e77a622ddc9d501b609aed3618b731e513aea185895f4ac5c7200"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/44_NAVEGACAO_APPS_ESTABILIDADE_V80.md",
+      "sha256": "26f136755dbdbbb1817b22a0dc142f7c3618fb9df16130af25fa893dc1240c00"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/45_RECUPERACAO_CONVERSACIONAL_V81.md",
+      "sha256": "75343f8d61340e616ca4318a4224eee7009c0de18d3cfc68a382ca1632744fbe"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/46_CORRECOES_ACUMULADAS_V83.md",
+      "sha256": "9a3a07719c38712ade4404a63011970e3ac3fcede1e05d18cce58caf93f92f7d"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/47_IMAGENS_NOTIFICACOES_USO_V84.md",
+      "sha256": "7de1035bfad0d1b8694f9398254b327478ddad08dfaec9011c6e7c4595fe925b"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/48_CORRECOES_ACUMULADAS_V85.md",
+      "sha256": "e1b6dea25f32d98be79710f084f98460b6d38a8378662cd1a367d1e0cf778308"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/49_CORRECOES_POS_V85_V86.md",
+      "sha256": "0102f1b51788e715cb3268b403f5f4aad6f6139c7bda9ba56e2f3c693d2458e2"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/50_CORRECOES_ACUMULADAS_V87.md",
+      "sha256": "04852ddad7a66742e918ccd6131b4a620604003320646a1b8bdeaeeef578c0f6"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/51_CORRECOES_ACUMULADAS_V88.md",
+      "sha256": "06e6f2d753e24127a99a1355af2598aacab337f60bcb3f893f66f5036b70e993"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/52_CORRECOES_ACUMULADAS_V89.md",
+      "sha256": "e1b25c2b8c7d2a58e0e39318dbab62f94e894c87a15a55f4c47676206acda971"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/53_ICONES_FIXOS_V90.md",
+      "sha256": "296ef28a242550bc615d98dba0e22601e8c9c24cc2c027b4ee48e0be5b8e5361"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/54_ICONES_VIEWPORT_V91.md",
+      "sha256": "b3000469ed683b00c5255aab92363cca3e16b1e26153d016494dac48dd8bba93"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/55_NOTIFICACOES_HOVER_V102.md",
+      "sha256": "ee16a325b2cc39ec4f5d08a76b1c925ee58f124b827cc7e3ca40949390e60fff"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_projeto_v103/56_NOTIFICACOES_HOVER_MENU_V103.md",
+      "sha256": "15457fe7f6718a31dfebf0f588c67404161973643f1823b48881838b24a96164"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/Comando atual.md",
+      "sha256": "05195c419b39dd2be4cc4069d515521339899aa712b305a78b52ad038cdbdf1f"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/Comando%20atual.md",
+      "sha256": "05195c419b39dd2be4cc4069d515521339899aa712b305a78b52ad038cdbdf1f"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_PRIMEIRO.md",
+      "sha256": "aeabeab21d323e879dba849bc83385d377894d7af71aaca5171a0efa9009ab49"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V100.md",
+      "sha256": "ca2801e2c3d044544598121fc83ab1c1db3121c97c2dabef840e291aa73deb3d"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V101.md",
+      "sha256": "2dc6d82cf61e957fff9574a31aff685217492e602d0bdc3db1f77f3484663a28"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V102.md",
+      "sha256": "32376c03c83f93750774d5c2a219c04de9b8bbf3c333ca5e95b942840d541893"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V103.md",
+      "sha256": "59265d4b164a898e93a7689c855319ae45c6073cad626e2581c6cdbe7217b755"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V74.md",
+      "sha256": "470b32db32ffcfaec1c7f72c2c24e8cf9b2a036d14679b0fc8395c0b86a22ad5"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V75.md",
+      "sha256": "2b36d0eb424bd12b844d3d941d7d530d15bdeb470675cbec7989ef39836e2726"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V76.md",
+      "sha256": "eeeeb3dc7df749700e02439e46c31522d04739fc14aaa67b2881a9c409185ac7"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V78.md",
+      "sha256": "1f761e2b26d86475ec4900b2271559dc5fc826c6aa5c9fbd330e841d5cd80e22"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V79.md",
+      "sha256": "1fdb8f8270050c16625ae137cf9180400d2c8b4b3054fecf78d5a7dace2c78a5"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V80.md",
+      "sha256": "7ea96063afef217e49c5daa14aca36832201e4409317012244bdf4415c8f29b4"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V81.md",
+      "sha256": "04f85c19db0acf6ab0d94c42c36fa1516899e41a83ef115979e31242924aa2bd"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V82.md",
+      "sha256": "9523d757d3aa59a0bef1fe08a68ed3509efba69ea3790f861ff1c7ef3bb833a8"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V83.md",
+      "sha256": "a3ed406e521f81fc19874a7f88b90533f3d4daf9f1d603e3b6e0ff0fed1e88f8"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V84.md",
+      "sha256": "c954a98e7006a4dc1d022b284621afd788126c289749b62965192ce774fbc7a6"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V85.md",
+      "sha256": "e1b6dea25f32d98be79710f084f98460b6d38a8378662cd1a367d1e0cf778308"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V86.md",
+      "sha256": "be80f86df68a2facbbe5054df3c0c3e89be4ced70418333dfc0c31fbb4bd95f3"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V87.md",
+      "sha256": "bf219b16679349945abd3ce5267fce22505c950e4ec2eebe0502673556185cd8"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V88.md",
+      "sha256": "b2648f4cccca8b5c3950e0f32014b1475452af23e3e109c2d5d4c06e61ee39ab"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V89.md",
+      "sha256": "e1b25c2b8c7d2a58e0e39318dbab62f94e894c87a15a55f4c47676206acda971"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V90.md",
+      "sha256": "296ef28a242550bc615d98dba0e22601e8c9c24cc2c027b4ee48e0be5b8e5361"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V91.md",
+      "sha256": "b421b030ac4dd0866e4cddbffb8b494198d25e204c56020b8e34579b190a82a8"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V92.md",
+      "sha256": "03200c23be7de59ab25a4e8f5afa4defde03de5ab9d189133f20f9eea3f37985"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V93.md",
+      "sha256": "e84c812dd8ad07097d98087e6e6a9e45c0ceba96562c0dc6036c7cfc772da5d0"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V94.md",
+      "sha256": "1034e74f77dfbf9c13798997ab9918df5d482031552bc7466acc5c1275bcc385"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V95.md",
+      "sha256": "a37af343a24e51ccd91124f37a63a468503f06cbee63b3ee03f4ce8700103a44"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V96.md",
+      "sha256": "0615c9001fffff7972c913b1c14e70f7de61532129cd9292befab306f3cfb3f9"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V97.md",
+      "sha256": "a61f3ea85309ffa9f2d5c7414ddbb740f9cf576f3dc05527839c2a33db5378ee"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V98.md",
+      "sha256": "c74b8f9fc49c5ecca97c719ae6c679c4354e1a322a6a9e1a8ceea5bd3decb9d8"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/LEIA_V99.md",
+      "sha256": "76ba7e9aa0bc9f4575f981c2c42b33a22531f77ba048f5649222501437c379da"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/PROMPT_CONTINUAR_SOFIA.md",
+      "sha256": "215e799fa978dfe28ba4d40023cb8ddccf0bc1ebe1e31ebab13e6a56b672c00a"
+    },
+    {
+      "path": "docs/historico_bruto/documentacao_raiz_v103/PROMPT_CONTINUAR_SOFIA_V85.pdf",
+      "sha256": "31f53b5a5e557398ed375e6fe30cb9a84d5f40e9640111edb1df8cfcc6d5eaaa"
+    },
+    {
+      "path": "docs/historico_bruto/snapshots_v104/LEIA_PRIMEIRO.md",
+      "sha256": "d47a155916563e238fe688b72c083b972d209b4eac4cbc2823a943ff836bf055"
+    },
+    {
+      "path": "docs/historico_bruto/snapshots_v104/MASTER.md",
+      "sha256": "096c257e554ed4b41f2086387e373db33288b252971717af35078b373e830e14"
+    },
+    {
+      "path": "docs/historico_bruto/snapshots_v104/UI_MAP.md",
+      "sha256": "85d564d3a61af31ae9d21f19cc679a2f79c108a7a2dc929b6a6c1b1a32ff9bcf"
+    },
+    {
+      "path": "docs/historico_bruto/snapshots_v105/LEIA_PRIMEIRO.md",
+      "sha256": "e4469c66387457953423820767473ae88add82dfb721bc87bc77b3dca6d97476"
+    },
+    {
+      "path": "docs/historico_bruto/snapshots_v105/MASTER.md",
+      "sha256": "3ecbfc4e1863ff9af2d23effc5c0e39b4988d88b218c824f24af75de609c8d49"
+    },
+    {
+      "path": "docs/historico_bruto/snapshots_v105/UI_MAP.md",
+      "sha256": "d5dfe0461ebf4d49fc429259202218416301422adfb3a3071d4b781e69f8fc4c"
+    },
+    {
+      "path": "docs/historico_bruto/snapshots_v106/CONTEXTO_NOVO_CHAT.md",
+      "sha256": "a5d549dc88d681d9ae7faa6759538a7785807c56d912763010c00eefd192a21f"
+    },
+    {
+      "path": "docs/historico_bruto/snapshots_v106/GUIA_MASTER_COMPLETO.md",
+      "sha256": "a38e9f5f1b1611998cf4bf72b9b264a6711a5b94557f4af49a1709be0113bcee"
+    },
+    {
+      "path": "docs/historico_bruto/snapshots_v106/LEIA_PRIMEIRO.md",
+      "sha256": "b463804dc55ef498e0f957c9d2b291162f29aba81481cccb8461a3f0c0cd042e"
+    },
+    {
+      "path": "docs/historico_bruto/snapshots_v106/LEIA_V106.md",
+      "sha256": "ba67be321b15d2d41924a6d821a2aceec63abff5f3c2d962a82b922dd986835b"
+    },
+    {
+      "path": "docs/historico_bruto/snapshots_v106/MASTER.md",
+      "sha256": "4ffca09b2efe0ef3c5c17e911ffece0c518711a1c36eaec363cc758eea4d7b8c"
+    },
+    {
+      "path": "docs/historico_bruto/snapshots_v106/UI_MAP.md",
+      "sha256": "582879efcf00ef5e01c1dbd27abdfdfb6acb3eddcecd5eac5ef639fd96b8a25e"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v100.test.cjs",
+      "sha256": "c3cbb137b0303baefc67ae0fb6d3c96474881ceb551b41890a8fd8ac7c129674"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v101.test.cjs",
+      "sha256": "c3eaa2b7879864685afdfedbbeef1e684b8e7a7eb3aa229cc8e501899ba0ca6a"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v102.test.cjs",
+      "sha256": "b865f202b4b203f20b06cd92d1528a7a0d6f3b9d55d31bfe8dec5e2e5ed2475b"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v103.test.cjs",
+      "sha256": "81ca0433e7951c4f05a56fd8c4e574cea6f1b96ed4b4266e17e088ba8fadcf50"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v45.test.cjs",
+      "sha256": "559bfd45f0c6d1011a4637f91d3d87c6e9bb689c2d7481d1f6994fc031d073e0"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v46.test.cjs",
+      "sha256": "82d353dc23d7252563c18d52ccf8fa0ec495f08bbbfdf60b303e5f2a4fcbbcc8"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v47.test.cjs",
+      "sha256": "58c3a2e4882d0c9015e49ff6ed052957e14abdc2da62fa7006e5e4d59148797e"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v48.test.cjs",
+      "sha256": "7636ab39d2075a45334f897cee8028007270d2572a60c64dc44df1e5f5a4200a"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v49.test.cjs",
+      "sha256": "11887d2744289590414e0d218618761f0513489ba291ae7696c1bfc191569158"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v50.test.cjs",
+      "sha256": "8c240bc383244d81db353adf2fe129c04e4b7f48909b79bc53755eb64a123b0d"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v51.test.cjs",
+      "sha256": "178a8507643544168a967eb9dc3ef70541b42913e03097e723d6c08822698b85"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v52.test.cjs",
+      "sha256": "93e7724894d598484bc6e52bba64bd79ccf257d9b37300f3ba9f70382db53cfb"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v53.test.cjs",
+      "sha256": "d70c24fda6cee22e7cb3142cd98d7a45529f835ed4f4d9ad3575fcd04a436335"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v54.test.cjs",
+      "sha256": "20533da3cecebd0ad9e2f682dae9e6d0af317bb21f5970cc2b4e610e46b3a836"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v55.test.cjs",
+      "sha256": "1f6da327326300f982fa01e6327f71653f477a2587db7d219e36b678d26fa415"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v56.test.cjs",
+      "sha256": "30774f0b0e4e9ef97e1d527d38289efb6bb39d3b5f74c06978c375161eba0108"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v57.test.cjs",
+      "sha256": "b3c03403c8f1ed7947bfcd8bca0371d6ee35b6dd3fc44ccd01ea90be2746b329"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v58.test.cjs",
+      "sha256": "9fbb8220ef87c362d49bb8af835e5e87f993a0f1f11e4fa6f542869178b35137"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v59.test.cjs",
+      "sha256": "da841b71b577dd6c07706070a1c5485f4c4c250061d8ade69133b2ddc49f6437"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v60.test.cjs",
+      "sha256": "e42d7adfd4a75062b2135b74e88dddea7e4dddc8a44bffec70cccedcc15bc152"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v61.test.cjs",
+      "sha256": "c13b1bd8ed71b987fcf8fee1cd4e5c4a956e010117daea5d30233ac5f9f88f6a"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v62.test.cjs",
+      "sha256": "a5ea6642133856b74532dfc7619fc656347a12fb49661b5bc6bc58da1b7e6ad2"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v63.test.cjs",
+      "sha256": "0bf11cbf34befe80e11ca0b55d75e9e3c00a6e7fd29dc9eb0eb36a07f32b69b7"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v64.test.cjs",
+      "sha256": "788fc7a76b4d0be5207a414b5cdd3db2fb534dc6253a83e788eb7386be90e791"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v65.test.cjs",
+      "sha256": "7c19f3b3b05608f89c1bd12c6b68c6142ef2a8a63092a3de4ba504bfb3cffbe7"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v66.test.cjs",
+      "sha256": "2b3f3fabd3b40b2f0be02117e6a2e0b19332c68d7f9559a51a0c5391187310f0"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v67.test.cjs",
+      "sha256": "d4887e5f514690d6a140547f68dd6e9b40e2749a4b7bee8e2065ddaf52d4af5f"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v68.test.cjs",
+      "sha256": "1986c870c148168c35b13904a7a62a22a5451110a98de71cea35d7145a756df6"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v69.test.cjs",
+      "sha256": "71cdd03b6b4da9390b9381b63fb1411c9cd00643d77e7100bdbc1022513722c3"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v70.test.cjs",
+      "sha256": "600fd46023f6b282eff1ab95d82134f865a7ee1ea8c67af600be6bf97b8ab175"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v71.test.cjs",
+      "sha256": "bb300aaa7783599a480277db2a46d507a96a7cf4a4b87dad0e10cb74c245c48e"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v72.test.cjs",
+      "sha256": "1210c836d4e1c75924f869a64ecd444f3e7aa6a8ff4d7c0ab8be7651e89f2063"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v73.test.cjs",
+      "sha256": "68cf6e6737f900d5abadd8d5837ba6fa20f278b2493d5fce963c0d7fc8ec99a2"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v77.test.cjs",
+      "sha256": "08af2ef613b376e1cd21d1414389115cfe8d32aae2cdd98df93ecd7683d55dff"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v78.test.cjs",
+      "sha256": "89e81d096d772f74ed0e86958a20fa239669af6e63bee6b7ca4f7b8fb8428a2c"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v79.test.cjs",
+      "sha256": "997fd5fe8c255bbad46ec9ca63871f29f1c45add98c9699d9b18833d64cc0e77"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v80.test.cjs",
+      "sha256": "82faaf92207e00f610ece6bc62bfdb6b85481253aa5ec0b4ea9cbaf8fb781d30"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v81.test.cjs",
+      "sha256": "7d5ee5451a00fb1648a060f6b4526835422f81ce611ac368f5cc081070cb4302"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v82.test.cjs",
+      "sha256": "8259f0e3679c917bd668f80b9f67aba2dfb03b5da9bb7125c5739f8cb7cdf43b"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v83.test.cjs",
+      "sha256": "1bb3a0bd049ada4595692c506a9055a1f7a3ec3bdce690323b32c91035b932df"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v84.test.cjs",
+      "sha256": "e173f3590a90664a7c6a45dc94e27414df267c2e1f4a22dda4d8f41f2a415a7f"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v85.test.cjs",
+      "sha256": "666120455102136b6d151f265703dbde50c22bc855bb1bc4c34dc926fdd712bc"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v86.test.cjs",
+      "sha256": "6895e6871e4946d7de52be1ffe812e2917400f0064a09d68d19a56778fb2eb1c"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v87.test.cjs",
+      "sha256": "405b4d7ed072862b48b76aa5a26dc4af7a61e3cbe53fcd7b1f9014fcd568c713"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v88.test.cjs",
+      "sha256": "826944c527a9d5bb0b44035a9b75731c271cbe9ed890caa359b06efc6679069d"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v89.test.cjs",
+      "sha256": "7487b938711626da94b5e1a0169d19f8b8073dc74a4af7b508deab6034fd3559"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v90.test.cjs",
+      "sha256": "64996abc89dcbe3bd85aa724a1443c0c12f61f7658321f438f64cb4414e2d415"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v91.test.cjs",
+      "sha256": "d06ba98e45c1938f9edf6fd910ed753253d3df58dbc19a741bed2acd06f98656"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v92.test.cjs",
+      "sha256": "170380f1f3a35f530c5003e2387d34dc7ec807e5c32e804dec6f8d76c1a3f479"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v94.test.cjs",
+      "sha256": "729d6e701eaa84934ffc115958465fff515d7f0af974128dbacd539a07d4593a"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v95.test.cjs",
+      "sha256": "ac459fd39ad048ab6f774cf6a15bae82e27a5858e9aafd5ae962e77d00948322"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v96.test.cjs",
+      "sha256": "149db72fe6f882957718d5ad8ff73d6fb3937d85695912898cfbbc337744db84"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v97.test.cjs",
+      "sha256": "5d14ff2c25e29169c50db0a7c28230d8a5e2410b9dee0f7bab945def788788a3"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v98.test.cjs",
+      "sha256": "98004ba1b2863200b7953909ec9570e460f2ca4667705406652973959581d666"
+    },
+    {
+      "path": "docs/historico_bruto/testes_legados_v103/v99.test.cjs",
+      "sha256": "46ce648eb87121f59cf089a5be10ed620d2589bf2209f55c060b7cc18010617b"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "fdde31869ea47c25374ef0217dc51102757f732998607cf1c8e2d244ed08c6f8"
+    },
+    {
+      "path": "package.json",
+      "sha256": "e405d5d5d8ff89039da9d0f7a6e0f5863ba27d864c3c308475b9b301e142f510"
+    },
+    {
+      "path": "public/app.js",
+      "sha256": "3e64221a467730dbb49323e8486da985777ca20d595dde682a9a5c7cd46adad6"
+    },
+    {
+      "path": "public/index.html",
+      "sha256": "fcf0492eda1be2c14cd7a1947a2c10f3e30853925ddb194ba8e650ad460d82a7"
+    },
+    {
+      "path": "public/style.css",
+      "sha256": "8b43ef986da1bd26f8a2bcd6c6408fed9ae9b0b8ff1f3232f5a032778cceec3a"
+    },
+    {
+      "path": "public/ui-current.css",
+      "sha256": "33c1b79d8ba816bb16a07c4c948d7032ffd1bf50fee46c1b20bffbfdc2bf88ee"
+    },
+    {
+      "path": "server.js",
+      "sha256": "784de68a340c9baad806c1235936dc9c9728da4baf7a7f7f6f38aa092030808d"
+    },
+    {
+      "path": "src/app.js",
+      "sha256": "303841202123f9afb539ee64c07bb00a108ca6780e981e553d2d3f112f94c3e8"
+    },
+    {
+      "path": "src/channels/whatsapp.js",
+      "sha256": "b53a1583ad1b5413ed68f91fa40545f96c94a0e0383c4561357a7460502efd25"
+    },
+    {
+      "path": "src/config/runtime.js",
+      "sha256": "42e72ddd793cf8e75102e4f650fb725f84ca25e74628434055c34d1f2721095f"
+    },
+    {
+      "path": "src/config/sofia.js",
+      "sha256": "edb0075721dac33708078d0046e6dbdbfbab1e3423a3354d43fa3eed08653b70"
+    },
+    {
+      "path": "src/core/api45.js",
+      "sha256": "fed29e9313d01fba16ec5524ae4e816dffa90f0f4ad9527913ebe2fd6164fea1"
+    },
+    {
+      "path": "src/core/catalog.js",
+      "sha256": "5f57503790949059e3406dad43c20c26f70889a3577435d4048b5a5883d9dd1a"
+    },
+    {
+      "path": "src/core/http-handler.js",
+      "sha256": "10a4b46a9e47094cbea5cabc64e316f1c6adfe51825bfa576b6db3e7bd1ffff9"
+    },
+    {
+      "path": "src/core/lock.js",
+      "sha256": "4913c04bd3fec5d167fb6212937a8344fc46f9d7b3cd1862eddac7266e55f6de"
+    },
+    {
+      "path": "src/core/runtime.js",
+      "sha256": "aff757d3ebe135b68bf19e9a465646beba168426653c4531b740a7f423c2234b"
+    },
+    {
+      "path": "src/core/seed.js",
+      "sha256": "0f28680841807f40fb9a853d1b6aac322f11ed95152b0541b867b2c45f8f3bf0"
+    },
+    {
+      "path": "src/core/seed45.js",
+      "sha256": "b5bdd8dcbe96ca8d42839304e42b3029d62a3069f83c8c83736ce0e33cae6f56"
+    },
+    {
+      "path": "src/core/seed46.js",
+      "sha256": "330540a2f0b50ca4d61da30fa12aebc408c8c6e59ab604a8fe1baa8d3ac9b9ae"
+    },
+    {
+      "path": "src/core/seed47.js",
+      "sha256": "9ee19f5fc3e6d7ab288f64498d3918cae472daa5a309108125ab3a55b75cd468"
+    },
+    {
+      "path": "src/core/seed48.js",
+      "sha256": "3f38aec78a38e81e1d44594cdd58fd9d79c95c640a4a2c8b56428f1ffb098a89"
+    },
+    {
+      "path": "src/core/seed52.js",
+      "sha256": "d05daec36c5fb5c790daef2cfdcdf41fac7f2c5d7d8037f819bac4e09fbb000f"
+    },
+    {
+      "path": "src/core/seed58.js",
+      "sha256": "4708ca640f2fdd7ffb7ee49b197271073973ae2c112c1bb0f90eadbc15dce1a2"
+    },
+    {
+      "path": "src/core/seed59.js",
+      "sha256": "a26ecab5c767f4b43e92606945fe3a955e4539543c2d424f18a9cccf7cbddfa4"
+    },
+    {
+      "path": "src/core/seed61.js",
+      "sha256": "712b6f51ec49fb535daa73a41c64828f21bb2d43959634d9cd16877057611795"
+    },
+    {
+      "path": "src/core/semantic-authority.js",
+      "sha256": "ac3d8d9e72ae85c87a70768c75f7274feb7a2cf2170f4dfa1fac734cb862cd83"
+    },
+    {
+      "path": "src/core/sofia-core.js",
+      "sha256": "5fd832688f00ccbb8f490d87f8725136a9000683b8834b644633c130991294ce"
+    },
+    {
+      "path": "src/core/util.js",
+      "sha256": "c4a4aaa93da1edbffdcc471a3955836718d0a72f0981ff6df7a4bdc470d19599"
+    },
+    {
+      "path": "src/core/workspace.js",
+      "sha256": "a0a7c8394ed9cc17334fb160a04b31bd621c31a7d4acc5719027a013dd8c2d4a"
+    },
+    {
+      "path": "src/memory/migration45.js",
+      "sha256": "309ed839031e04568460cf15b98ce85ae9c11afe74053ece248f5b6fbdb3cdab"
+    },
+    {
+      "path": "src/memory/migration46.js",
+      "sha256": "7174056d873b8d3f9a832b69011c7b38b2c77c4f4443514cb70d535c6d5a1486"
+    },
+    {
+      "path": "src/memory/migration47.js",
+      "sha256": "f9d5362b56e3879eea2c38cd088a024a3f8046e0a5e87ec518d62444b3d70c1c"
+    },
+    {
+      "path": "src/memory/migration49.js",
+      "sha256": "988625bf9035eb3899cec87b5ef2f0b3d3ec9070a9014e3344fadd4793b33c98"
+    },
+    {
+      "path": "src/memory/migration82.js",
+      "sha256": "84a69a90015580f5cc8359e7898d01b1e15727d8e94bcaae8cd1fa97598a06d8"
+    },
+    {
+      "path": "src/memory/migration85.js",
+      "sha256": "9d82649fae21ea7826d280d08db9e684954ab57ee11d9dc07f7801c29c6615d4"
+    },
+    {
+      "path": "src/memory/schema.js",
+      "sha256": "14e6e8af0723df89817ef14da819070f659885f2cdb89d2bce875fd10451f3ce"
+    },
+    {
+      "path": "src/memory/store.js",
+      "sha256": "95bc9290d24944dab4e65daf87e6447ea4839be492e82336bbaa6c5f3f3aa4d0"
+    },
+    {
+      "path": "src/server.js",
+      "sha256": "857acc6aded173961feef357d5a061a5045bf9466d54f7bcfbe35f4cdb7e463e"
+    },
+    {
+      "path": "src/services/audio.js",
+      "sha256": "c1abd1f658945506ab8dc6850baebd7cb9fa128a92289791574655fdc1d93af1"
+    },
+    {
+      "path": "src/services/backup.js",
+      "sha256": "0d0d2bb80edfab94dc9a38209f208e15696ee5f91a4e2af02fd16ee6e8a9e8f1"
+    },
+    {
+      "path": "src/services/credentials.js",
+      "sha256": "cfb9075a303e5c869461d55eeca401389c656b46316b88d3eb198caace7ae474"
+    },
+    {
+      "path": "src/services/http-client.js",
+      "sha256": "833737bda319654830f944dcfc913506237059151a34c55f4c5cc4a33ae4bf18"
+    },
+    {
+      "path": "src/services/intent-engine.js",
+      "sha256": "fa595715d0bfbe8dca6867c0d156bdc84c9b934cec17a956f94646699a8f8875"
+    },
+    {
+      "path": "src/services/openai.js",
+      "sha256": "39295f86bfcbdf991e1e06703e8e79ff643a8931595c9fb7adca494f70e1dd14"
+    },
+    {
+      "path": "src/services/privacy.js",
+      "sha256": "284d4ef5ba19ace22bd9f738ec8a44f8ef9b03bb087c8c1b3ec1dbefaebd4793"
+    },
+    {
+      "path": "src/services/routing.js",
+      "sha256": "5e32581612cf6d48f260eb5acfcd475d82dcea5b618b19853e236f5698f860e7"
+    },
+    {
+      "path": "src/services/safe-feed.js",
+      "sha256": "13f9dc923bca174c31d7aa38c0fb905e7e1c1a6fad87a7d80d0e2fc2db4851e6"
+    },
+    {
+      "path": "src/services/scheduler.js",
+      "sha256": "d007d40d865a88319149136410d84b5d1ad091efdf0eecb3f30beae2786756c2"
+    },
+    {
+      "path": "src/services/usage.js",
+      "sha256": "4adcd1c2a41436d5dce7c84dbd9e6fd81abde763aa6dfe5d986c04a2d3f75564"
+    },
+    {
+      "path": "src/services/vault.js",
+      "sha256": "7c29b03a10770e14426994880db2e35d55c0bb5646a34139b516c87fb760949a"
+    },
+    {
+      "path": "tests/backup.test.cjs",
+      "sha256": "30f731a422e89409a84840ee945bd750f9e42158971b66fc5ef53e7851e30280"
+    },
+    {
+      "path": "tests/current-ui.test.cjs",
+      "sha256": "bb64e228d9c35de8c35bbf191e70ba1f0e56d2621494f8b84f48e3f8a23059cd"
+    },
+    {
+      "path": "tests/helpers.cjs",
+      "sha256": "9b4777522d34219b240b03118b0bcdee636b7070ac39ec24c0d13b0ffaa65720"
+    },
+    {
+      "path": "tests/http.test.cjs",
+      "sha256": "bec00be7716f6d55563cd53222d5c7d65f773d4085dbdb45b5a19a45595a4314"
+    },
+    {
+      "path": "tests/installer.test.cjs",
+      "sha256": "51d96ba37c9d0d9e53a3940325681ee322dda724a4fa889cffb4c1ed5a46bbf1"
+    },
+    {
+      "path": "tests/lifecycle.test.cjs",
+      "sha256": "508142f2c802b40c682226c1b666f5aa3cea90a5c7c313e276f000ed1f9bd34d"
+    },
+    {
+      "path": "tests/memory.test.cjs",
+      "sha256": "e69b65237bea22a7ec64a72b9f80ad8fe378e514e468783be78967af78cb6c46"
+    },
+    {
+      "path": "tests/provider-channels.test.cjs",
+      "sha256": "f0c0bcaf3f60f0b8ccf6040b547fbc0683915bd725402de2a5c77209bdbb595b"
+    },
+    {
+      "path": "tools/diagnostico.cjs",
+      "sha256": "1d52774e9782d2bb430c98c28a05aa80f7d1f90dc2ba1a4475e6d44d33d5a947"
+    },
+    {
+      "path": "tools/export-code.cjs",
+      "sha256": "15cfddb845ddac4ee3dd11f8a6beb93be0ee956cb5b089b860e08a720b68cfae"
+    },
+    {
+      "path": "tools/restore-backup.cjs",
+      "sha256": "fb715f66099afc77802c5f5812a1851cf3a6029487a3c6577381f4006b56cd46"
+    },
+    {
+      "path": "tools/simplify-project.cjs",
+      "sha256": "70de6f0eb1b59df0c33f2f9f3d53d438511446a7616977f255df9bc712fe05c8"
+    },
+    {
+      "path": "tools/update-library.cjs",
+      "sha256": "ff7d5e1ca5007a3c87cab5f1a42eff92f51d55aca72c0bccfbc5aed4e0641eb1"
+    },
+    {
+      "path": "tools/zip.cjs",
+      "sha256": "81ac36f09884dc3802cfe3debc4fbe60292bfe41f06b024d2460692e8dad18a5"
+    }
+  ]
+}
