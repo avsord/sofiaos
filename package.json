@@ -1,7 +1,7 @@
 {
   "name": "sofia-os",
-  "version": "1.80.0",
-  "description": "Sofia OS — v130 adiciona login obrigatório no painel online com sessão segura e redirecionamento para a raiz",
+  "version": "1.81.0",
+  "description": "Sofia OS — v131 completa a experiência de conta: sair, estado de sessão, expiração e login mais amigável",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

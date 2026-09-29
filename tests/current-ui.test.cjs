@@ -6,14 +6,14 @@ const path=require('node:path');
 const root=path.join(__dirname,'..');
 const read=rel=>fs.readFileSync(path.join(root,rel),'utf8');
 
-test('v130: identidade e cache atuais estão alinhados',()=>{
+test('v131: identidade e cache atuais estão alinhados',()=>{
   const cfg=read('src/config/sofia.js'),html=read('public/index.html'),pkg=JSON.parse(read('package.json'));
-  assert.ok(cfg.includes("const VERSION = '130.0.0'"));
-  assert.ok(html.includes('Sofia OS · v130'));
-  assert.ok(html.includes('/ui-current.css?v=130'));
-  assert.ok(html.includes('/app.js?v=130'));
-  assert.ok(html.includes('Core v130 · AVSORD Technology'));
-  assert.equal(pkg.version,'1.80.0');
+  assert.ok(cfg.includes("const VERSION = '131.0.0'"));
+  assert.ok(html.includes('Sofia OS · v131'));
+  assert.ok(html.includes('/ui-current.css?v=131'));
+  assert.ok(html.includes('/app.js?v=131'));
+  assert.ok(html.includes('Core v131 · AVSORD Technology'));
+  assert.equal(pkg.version,'1.81.0');
 });
 
 test('v119: subpáginas continuam fechadas ao iniciar',()=>{
@@ -166,4 +166,17 @@ test('v129: site público da Meta descreve serviço, responsável e políticas s
   assert.ok(handler.includes("'/site':['site.html'"));
   assert.ok(handler.includes("'/terms':['terms.html'"));
   assert.ok(handler.includes("'/data-deletion':['data-deletion.html'"));
+});
+
+
+test('v131: interface possui convenções de conta, logout e sessão',()=>{
+  const html=read('public/index.html'),app=read('public/app.js'),handler=read('src/core/http-handler.js'),login=read('public/login.js');
+  assert.ok(html.includes('accountLogoutButton'));
+  assert.ok(html.includes('Sair deste dispositivo'));
+  assert.ok(html.includes('Encerrar todas as sessões'));
+  assert.ok(handler.includes("'/login?logout=1'"));
+  assert.ok(handler.includes("p==='/api/auth/logout-all'"));
+  assert.ok(app.includes("location.replace('/login?expired=1')"));
+  assert.ok(login.includes('togglePassword'));
+  assert.ok(login.includes("getModifierState('CapsLock')"));
 });

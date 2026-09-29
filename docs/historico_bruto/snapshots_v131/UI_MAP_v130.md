@@ -104,9 +104,3 @@ Ao criar uma nova versão, atualizar:
 - `/login`, `/auth/login` e `/logout` ficam no handler; a raiz `/` no Railway exige sessão.
 - senha: `SOFIA_LOGIN_PASSWORD` em `src/config/runtime.js` (somente variável de ambiente; nunca hardcoded).
 - `public/site.html` possui o botão **Entrar na Sofia OS** para `/login`.
-
-## v131 — conta e sessão
-- `public/index.html` → menu **Proprietário** no rodapé da sidebar e card **Conta e sessão** em Configuração.
-- `public/app.js` → sair do dispositivo, encerrar todas as sessões e redirecionar ao login quando a sessão expira.
-- `src/core/http-handler.js` → estados do login, sessão atual no bootstrap, logout atual e logout global.
-- `public/login.js` → mostrar/ocultar senha, aviso de Caps Lock e estado de envio do formulário.

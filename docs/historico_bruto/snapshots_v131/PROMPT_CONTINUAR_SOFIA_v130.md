@@ -379,5 +379,3 @@ O App Review já foi enviado. A Verificação do acesso pediu um site público c
 - `SOFIA_LOGIN_PASSWORD` é segredo de ambiente e nunca deve ser salvo em arquivos versionados.
 - As rotas públicas da Meta/WhatsApp permanecem públicas, mas painel, assets privados e APIs exigem sessão no Railway.
 - O login v130 é single-owner/admin. Não apresentar isso como suporte a contas de clientes; multiusuário exige isolamento de dados real.
-
-V131: preservar o menu de conta e o botão Sair dentro da interface. Sessões online são single-owner, 12h, em memória e expiram em deploy. O frontend deve redirecionar a /login quando receber AUTH_REQUIRED. Não criar cadastro público, recuperação por e-mail ou múltiplos usuários até o backend ter isolamento real de contas.
