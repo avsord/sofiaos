@@ -839,3 +839,8 @@
 .course-editor-danger-zone>strong{font-size:13px!important}
 .course-editor-danger-zone>.editor-field-hint{margin:0!important;color:var(--muted)!important}
 .course-editor-danger-zone>.course-editor-delete{justify-self:start!important}
+
+
+/* v126 — conexão oficial do WhatsApp Business por Embedded Signup/coexistência. */
+#tab-connections #connectionsList .data-card .button-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#tab-connections #connectionsList .data-card .button-row .primary{min-width:220px}

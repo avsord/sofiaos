@@ -3,7 +3,7 @@ const {CATALOG}=require('./catalog');const {AREAS}=require('./workspace');
 const {AppError,cleanText,validId,rejectSecrets,id,now}=require('./util');const {saveCredentialValidated}=require('../services/credentials');
 const INTEGRATIONS=[
  {name:'OpenAI',key:'openai',status:'configurable',description:'Chaves e rotas configuradas localmente. Compartilhamento e faturamento são definidos no painel do provedor.'},
- {name:'WhatsApp / Meta',key:'whatsapp',status:'not-connected',description:'Verificação empresarial relatada como aprovada em 19/09/2026. Embedded Signup e o número real ainda não estão conectados a este Core; simulador local disponível.'},
+ {name:'WhatsApp / Meta',key:'whatsapp',status:'ready-to-connect',description:'Webhook público e Cadastro Incorporado preparados. Use o modo de coexistência para conectar um número já ativo no WhatsApp Business sem iniciar a migração normal.'},
  {name:'Google Calendar',key:'calendar',status:'not-connected',description:'Compromissos e lembretes estão preparados para sincronização. OAuth e sincronização bidirecional serão conectados numa etapa posterior.'},
  {name:'Google Drive / Sofia Storage',key:'drive',status:'not-connected',description:'Catálogo de referências e originais locais. Upload, cotas e transbordo entre contas dependem de integração futura.'},
  {name:'Gmail / e-mail',key:'gmail',status:'not-connected',description:'Permissões e rascunhos locais. Não lê caixa de entrada nem envia e-mails.'},
@@ -53,7 +53,7 @@ function makeApi45(runtime,{bodyJson,json}){const {store,workspace:w,routing,vau
  match=p.match(/^\/api\/notifications\/([\w-]+)\/read$/);if(m==='POST'&&match){await body();return send(w.markRead(validId(match[1])));}
  if(m==='GET'&&p==='/api/jobs')return send({items:store.db.prepare('SELECT * FROM jobs ORDER BY next_at').all(),execution:'Enquanto a Sofia está ligada neste computador.'});
  if(m==='POST'&&p==='/api/jobs/tick'){await body();await scheduler.tick();return send({checked:true});}
- if(m==='GET'&&p==='/api/integrations')return send({items:INTEGRATIONS});
+ if(m==='GET'&&p==='/api/integrations'){const base=String(config.publicBaseUrl||'').replace(/\/$/,'');return send({items:INTEGRATIONS.map(item=>item.key==='whatsapp'?{...item,connect_url:base+'/whatsapp/connect'}:item)});} 
  if(m==='POST'&&p==='/api/privacy/preview'){await body();return send({route:'ai-first',reason:'A prévia semântica por palavras-chave foi desativada na v50. A IA interpreta a mensagem primeiro; depois o backend registra e valida a rota recomendada. Consulte o log de decisões após o envio.'});}
  if(m==='GET'&&p==='/api/routing/decisions')return send({items:store.db.prepare('SELECT * FROM route_decisions ORDER BY created_at DESC,rowid DESC LIMIT 300').all().map(r=>({...r,context_refs:JSON.parse(r.context_refs)}))});
  if(m==='POST'&&p==='/api/privacy/feedback'){const b=await body();if(!['private','shared'].includes(b.route))throw new AppError('BAD_ROUTE','Use Filtro Privado ou Compartilhado.');const scope=b.scope||'keyword';if(scope!=='keyword')throw new AppError('BAD_SCOPE','Somente regras por palavra-chave nesta versão.');const value=cleanText(b.value,'Palavra-chave',120);rejectSecrets(value);const stamp=now(),key=id();store.db.prepare('INSERT INTO privacy_rules VALUES(?,?,?,?,?,?,?) ON CONFLICT(scope,value) DO UPDATE SET route=excluded.route,source=excluded.source,updated_at=excluded.updated_at').run(key,scope,value,b.route,'manual',stamp,stamp);return send({saved:true,route:b.route,value});}

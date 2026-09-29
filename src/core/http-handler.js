@@ -5,8 +5,10 @@ const fs=require('node:fs');
 const path=require('node:path');
 const crypto=require('node:crypto');
 const {VERSION,IDENTITY_VERSION}=require('../config/sofia');
-const {AppError,cleanText,validId,publicError}=require('./util');
+const {AppError,cleanText,validId,publicError,atomicWrite}=require('./util');
+const {verifySignature,normalizeWebhook}=require('../channels/whatsapp');
 const STATIC={'/':['index.html','text/html; charset=utf-8'],'/index.html':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8'],'/ui-current.css':['ui-current.css','text/css; charset=utf-8']};
+const PUBLIC_STATIC={'/whatsapp/connect':['whatsapp-connect.html','text/html; charset=utf-8'],'/whatsapp-connect.js':['whatsapp-connect.js','text/javascript; charset=utf-8'],'/whatsapp-connect.css':['whatsapp-connect.css','text/css; charset=utf-8']};
 function bodyJson(req,limitBytes=65536) {
   if(!/^application\/json(?:;|$)/i.test(req.headers['content-type'] || ''))return Promise.reject(new AppError('CONTENT_TYPE','Use JSON nesta operação.',415));
   return new Promise((resolve,reject)=>{
@@ -16,40 +18,17 @@ function bodyJson(req,limitBytes=65536) {
     req.once('end',()=>{if(tooLarge)return reject(new AppError('BODY_TOO_LARGE','A mensagem é grande demais.',413));try{const value=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(!value||Array.isArray(value)||typeof value!=='object')throw new Error();resolve(value);}catch{reject(new AppError('INVALID_JSON','O conteúdo enviado não é um objeto JSON válido.'));}});
   });
 }
-
-function checkLocalRequest(req) {
-  // RAILWAY_PUBLIC_META_V116
-  const railwayEnvV116 = Boolean(
-    process.env.RAILWAY_ENVIRONMENT ||
-    process.env.RAILWAY_ENVIRONMENT_ID ||
-    process.env.RAILWAY_PROJECT_ID ||
-    process.env.RAILWAY_SERVICE_ID
-  );
-  if (railwayEnvV116) {
-    try {
-      const pathnameV116 = new URL(req.url, 'http://localhost').pathname;
-      if (pathnameV116 === '/health' || pathnameV116 === '/webhook') return;
-    } catch (_) {}
-  }
-// RAILWAY_HEALTH_PUBLIC_V114
-const railwayEnv = Boolean(
-process.env.RAILWAY_ENVIRONMENT ||
-process.env.RAILWAY_ENVIRONMENT_ID ||
-process.env.RAILWAY_PROJECT_ID ||
-process.env.RAILWAY_SERVICE_ID
-);
-
-let railwayHealth = false;
-if (railwayEnv) {
-try {
-railwayHealth = new URL(req.url, 'http://localhost').pathname === '/health';
-} catch (_) {}
+function bodyBuffer(req,limitBytes=1024*1024) {
+  return new Promise((resolve,reject)=>{let size=0,tooLarge=false;const chunks=[];req.on('data',part=>{size+=part.length;if(size>limitBytes){tooLarge=true;chunks.length=0;}else if(!tooLarge)chunks.push(part);});req.once('error',()=>reject(new AppError('REQUEST_ERROR','A requisição foi interrompida.')));req.once('end',()=>tooLarge?reject(new AppError('BODY_TOO_LARGE','A mensagem é grande demais.',413)):resolve(Buffer.concat(chunks)));});
 }
-
-// No Railway, somente /health pode atravessar os bloqueios LOCAL_ONLY/HOST_BLOCKED/PROXY_BLOCKED.
-// Todas as demais rotas continuam protegidas pelas regras locais já existentes abaixo.
-if (railwayHealth) return;
-  if(process.env.RAILWAY_PUBLIC_DOMAIN)return;
+function plain(res,status,text,type='text/plain; charset=utf-8'){res.statusCode=status;res.setHeader('Content-Type',type);res.end(String(text));}
+function railwayEnv(){return Boolean(process.env.RAILWAY_ENVIRONMENT||process.env.RAILWAY_PROJECT_ID||process.env.RAILWAY_SERVICE_ID);}
+function publicRoute(p,m){return (m==='GET'&&['/health','/privacy','/webhook','/whatsapp/connect','/whatsapp-connect.js','/whatsapp-connect.css','/whatsapp/onboarding-config'].includes(p))||(m==='POST'&&['/webhook','/whatsapp/onboarding-result'].includes(p));}
+function publicHeaders(res,p){res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('Cache-Control','no-store');if(p==='/whatsapp/connect'){res.setHeader('X-Frame-Options','SAMEORIGIN');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' https://connect.facebook.net; style-src 'self'; img-src 'self' data: https://*.fbcdn.net; connect-src 'self' https://graph.facebook.com https://www.facebook.com; frame-src https://www.facebook.com https://web.facebook.com; base-uri 'none'; form-action 'self'; frame-ancestors 'self'");}else{res.setHeader('X-Frame-Options','DENY');res.setHeader('Content-Security-Policy',"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'");}}
+function safeExternalId(value){const v=String(value||'').trim();return /^[A-Za-z0-9._:-]{1,160}$/.test(v)?v:'';}
+function privacyPage(){return `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Política de Privacidade · Sofia OS</title><style>body{font:16px/1.65 system-ui,sans-serif;max-width:820px;margin:0 auto;padding:48px 24px;color:#222}h1,h2{line-height:1.2}small{color:#666}</style><h1>Política de Privacidade · Sofia OS</h1><p><small>AVSORD Technology · atualização 23/09/2026</small></p><p>A Sofia OS é uma assistente pessoal em desenvolvimento. Dados recebidos por integrações autorizadas são tratados apenas para prestar as funcionalidades solicitadas pelo usuário, manter continuidade, segurança e operação do serviço.</p><h2>WhatsApp Business</h2><p>Quando o usuário conecta voluntariamente uma conta do WhatsApp Business, a Sofia pode receber eventos e mensagens autorizados pela API oficial da Meta. A conexão pode ser revogada pelo usuário. Credenciais, tokens e segredos não são publicados nesta página.</p><h2>Armazenamento e provedores</h2><p>A arquitetura pode usar serviços de infraestrutura em nuvem para processamento. Dados e arquivos são separados conforme a finalidade e devem seguir minimização, controle de acesso e as regras aplicáveis dos provedores.</p><h2>Contato e exclusão</h2><p>O usuário pode solicitar a desconexão de integrações e a exclusão dos dados sob controle da Sofia OS. Esta política será atualizada conforme novas integrações entrarem em produção.</p></html>`;}
+async function exchangeMetaCode(config,code){if(!code||!config.metaAppSecret)return {exchanged:false};const url=new URL('https://graph.facebook.com/'+encodeURIComponent(config.metaGraphVersion)+'/oauth/access_token');url.searchParams.set('client_id',config.metaAppId);url.searchParams.set('client_secret',config.metaAppSecret);url.searchParams.set('code',code);let response;try{response=await fetch(url,{method:'GET',headers:{Accept:'application/json'},signal:AbortSignal.timeout(15000)});}catch{throw new AppError('META_EXCHANGE_NETWORK','A Meta concluiu o cadastro, mas a troca do código não respondeu agora.',503);}const data=await response.json().catch(()=>({}));if(!response.ok||!data.access_token)throw new AppError('META_EXCHANGE_FAILED','A Meta não aceitou a troca do código do cadastro incorporado.',502);return {exchanged:true};}
+function checkLocalRequest(req) {
   const remote=req.socket.remoteAddress;
   if(!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(remote))throw new AppError('LOCAL_ONLY','Este painel é apenas local.',403);
   const host=req.headers.host || '';
@@ -77,14 +56,20 @@ function createHandler(runtime) {
   const extra=require('./api45').makeApi45(runtime,{bodyJson,json});
   const token=crypto.randomBytes(32).toString('hex');
   return async function handler(req,res) {
-    headers(res);
+    const url=new URL(req.url,'http://localhost');const p=url.pathname,m=req.method;
+    if(publicRoute(p,m))publicHeaders(res,p);else headers(res);
     try {
-      checkLocalRequest(req);
-      const url=new URL(req.url,'http://localhost');const p=url.pathname,m=req.method;
       if(req.url.length>4096)throw new AppError('URL_TOO_LONG','Endereço grande demais.',414);
       if(!['GET','POST','PATCH','DELETE'].includes(m))throw new AppError('METHOD','Método não suportado.',405);
+      if(m==='GET'&&p==='/health')return json(res,200,{ok:true,name:'Sofia OS',version:VERSION,storage:'sqlite-local'});
+      if(m==='GET'&&p==='/privacy')return plain(res,200,privacyPage(),'text/html; charset=utf-8');
+      if(m==='GET'&&PUBLIC_STATIC[p]){const [file,type]=PUBLIC_STATIC[p];res.setHeader('Content-Type',type);res.end(fs.readFileSync(path.join(config.root,'public',file)));return;}
+      if(m==='GET'&&p==='/whatsapp/onboarding-config'){if(!config.metaAppId||!config.metaLoginConfigId)throw new AppError('META_CONFIG_MISSING','Configure META_APP_ID e META_LOGIN_CONFIG_ID no servidor.',503);return json(res,200,{ok:true,appId:config.metaAppId,configId:config.metaLoginConfigId,graphVersion:config.metaGraphVersion,featureType:'whatsapp_business_app_onboarding',sessionInfoVersion:'3'});}
+      if(m==='GET'&&p==='/webhook'){const mode=url.searchParams.get('hub.mode'),verify=url.searchParams.get('hub.verify_token'),challenge=url.searchParams.get('hub.challenge');if(!config.whatsappVerifyToken)throw new AppError('WHATSAPP_VERIFY_TOKEN_NOT_CONFIGURED','Token de verificação do WhatsApp não configurado.',503);if(mode==='subscribe'&&verify===config.whatsappVerifyToken&&challenge)return plain(res,200,challenge);throw new AppError('WEBHOOK_VERIFY_FAILED','Token de verificação do webhook recusado.',403);}
+      if(m==='POST'&&p==='/webhook'){const raw=await bodyBuffer(req,2*1024*1024),signature=String(req.headers['x-hub-signature-256']||'');if(config.metaAppSecret&&!verifySignature(raw,signature,config.metaAppSecret))throw new AppError('WEBHOOK_SIGNATURE','Assinatura do webhook inválida.',403);let payload;try{payload=JSON.parse(raw.toString('utf8'));}catch{throw new AppError('INVALID_JSON','Webhook inválido.',400);}let events=[];try{events=normalizeWebhook(payload);}catch(error){if(error.code!=='WRONG_WEBHOOK')throw error;}console.log('[Sofia] Webhook WhatsApp recebido:',events.length,'eventos normalizados.');return json(res,200,{ok:true});}
+      if(m==='POST'&&p==='/whatsapp/onboarding-result'){const b=await bodyJson(req,16384),session=b.session&&typeof b.session==='object'?b.session:{};const event=String(b.event||'').slice(0,120),safe={event,waba_id:safeExternalId(session.waba_id),phone_number_id:safeExternalId(session.phone_number_id),updated_at:new Date().toISOString()};const exchange=await exchangeMetaCode(config,String(b.code||''));fs.mkdirSync(config.dataDir,{recursive:true});atomicWrite(path.join(config.dataDir,'whatsapp-onboarding.json'),Buffer.from(JSON.stringify({...safe,token_exchanged:exchange.exchanged},null,2)+'\n'));return json(res,200,{ok:true,exchanged:exchange.exchanged,event:safe.event,session:{waba_id:safe.waba_id,phone_number_id:safe.phone_number_id}});}
+      checkLocalRequest(req);
       if(m!=='GET' && req.headers['x-sofia-token']!==token)throw new AppError('CSRF','Reabra a página para atualizar a sessão local.',403);
-      if(m==='GET' && p==='/health')return json(res,200,{ok:true,name:'Sofia OS',version:VERSION,storage:'sqlite-local'});
       if(m==='GET' && p==='/api/bootstrap')return json(res,200,{ok:true,token,version:VERSION,identity_version:IDENTITY_VERSION,model:config.model,key_present:Boolean(config.apiKey),settings:store.settings(),usage:store.usage(),stats:store.stats(),backup_warning:backups.lastError});
       if(m==='GET' && p==='/api/usage-status')return json(res,200,{ok:true,usage:await usageService.status()});
       if(m==='GET' && STATIC[p]) {const [f,type]=STATIC[p];res.setHeader('Content-Type',type);res.end(fs.readFileSync(path.join(config.root,'public',f)));return;}

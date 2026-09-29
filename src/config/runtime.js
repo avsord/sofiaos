@@ -11,6 +11,13 @@ function makeConfig(overrides = {}) {
     apiKey: process.env.OPENAI_API_KEY?.trim() || '',
     adminApiKey: process.env.OPENAI_ADMIN_KEY?.trim() || '',
     transcriptionModel: process.env.OPENAI_TRANSCRIPTION_MODEL?.trim() || 'gpt-transcribe',
+    // IDs públicos do app/configuração da Meta. Podem ser sobrescritos por variáveis do Railway.
+    metaAppId: process.env.META_APP_ID?.trim() || '1617872666710770',
+    metaLoginConfigId: process.env.META_LOGIN_CONFIG_ID?.trim() || process.env.WHATSAPP_EMBEDDED_CONFIG_ID?.trim() || '1590251151959449',
+    metaGraphVersion: process.env.META_GRAPH_VERSION?.trim() || 'v26.0',
+    metaAppSecret: process.env.META_APP_SECRET?.trim() || '',
+    whatsappVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN?.trim() || '',
+    publicBaseUrl: process.env.PUBLIC_BASE_URL?.trim() || (process.env.RAILWAY_PUBLIC_DOMAIN ? 'https://'+process.env.RAILWAY_PUBLIC_DOMAIN : 'https://sofiaos.up.railway.app'),
     privateApiKey: process.env.OPENAI_PRIVATE_API_KEY?.trim() || '', sharedApiKey: process.env.OPENAI_SHARED_API_KEY?.trim() || '',
     apiTimeoutMs: 90000, turnTimeoutMs: 120000, maxMessageChars: 12000, maxContextChars: 20000,
     ...overrides

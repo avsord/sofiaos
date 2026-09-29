@@ -359,6 +359,72 @@ A versão atual é 73.0.0. O pacote deve preservar `.env`, dados, memória, pág
 - Cache do front usa `?v=103`.
 - Atualizador usa `MANIFESTO_V103.json` e preserva `.env`, dados e backups.
 
+---
 
-## CHECKPOINT v126 — WhatsApp coexistência
-Ao continuar: não voltar ao cadastro normal do número. O número já está no WhatsApp Business. A v126 implementa `/whatsapp/connect` com Embedded Signup e `featureType: whatsapp_business_app_onboarding`. Depois de completar e gravar esse fluxo, retomar imediatamente o App Review da permissão `whatsapp_business_management`.
+# Adendo permanente v106 — preservação do histórico
+
+A simplificação do projeto serve apenas para reduzir a superfície ativa de edição e teste. Ela não autoriza apagar documentação, decisões, checkpoints ou contexto acumulado.
+
+Regras adicionais:
+- manter a documentação bruta dentro do ZIP/master;
+- nunca mover documentação histórica para fora do projeto como parte de uma atualização;
+- se testes antigos forem retirados da suíte ativa, preservar cópias dentro de `docs/historico_bruto/`;
+- manter `docs/CONTEXTO_NOVO_CHAT.md`, `docs/MASTER.md` e `docs/UI_MAP.md` atualizados;
+- quando houver conflito entre um resumo atual e o histórico, investigar os documentos brutos antes de concluir que uma regra antiga deixou de valer;
+- ao criar uma nova versão, preservar o histórico existente e apenas acrescentar o novo contexto.
+
+
+# Adendo v107 — preview do sino
+
+O preview de notificações deve abrir abaixo do sino e para a esquerda, permanecendo totalmente visível no viewport. A camada atual de posicionamento fica em `public/ui-current.css`; o histórico acumulado de estilos permanece em `public/style.css`.
+
+
+# Adendo v109 — páginas limpas
+
+A partir da v109, a Sofia reduz controles redundantes nas páginas. A regra é: a superfície principal deve parecer uma página/documento, e não um painel administrativo.
+
+- trocar ícone: clicar no ícone;
+- trocar capa: clicar na própria capa;
+- ações secundárias: menu `•••`;
+- templates: continuam existindo, mas não ocupam espaço visual fixo sob o título;
+- subpáginas: devem parecer links/cartões limpos e não uma seção pesada com divisórias.
+
+
+# Adendo v110 — hover das entradas vazias
+
+Linhas vazias de texto não devem ficar chamando atenção permanentemente. O placeholder aparece somente quando o mouse passa sobre a linha. A ação de adicionar bloco segue a mesma lógica. A capa permanece encostada no topo e os ícones usam o visual anterior.
+
+
+# Adendo v111 — espaçamento de blocos
+
+Os controles `+` e arrastar devem ter coluna própria e não podem encostar no texto do bloco. O placeholder continua invisível fora do hover.
+
+
+# Adendo v117
+- subpáginas da sidebar devem iniciar fechadas em cada nova carga do app;
+- o estado expandido não deve persistir entre recarregamentos.
+
+
+# Adendo v118 — Agenda como viewer
+- A Agenda é uma visão de calendário, não uma grade de cards.
+- Deve consolidar compromissos/eventos, lembretes, tarefas datadas e outros registros datados sem perder a origem.
+- A interface deve priorizar leitura temporal, navegação por mês e programação cronológica.
+
+
+# Adendo v119 — Agenda como superfície unificada
+
+A Agenda não deve criar cópias independentes. Ela visualiza e edita Tarefas, Eventos, Lembretes e outros registros datados nas respectivas fontes. A futura integração com Google Calendar deve usar IDs externos e estado de sincronização, preservando a entidade local como registro vinculado e tratando conflitos explicitamente.
+
+
+## v120 — correção da tela Tarefas
+A v119 removeu acidentalmente `loadTaskCards()` e os helpers de prioridade. A v120 restaura essas funções e adiciona teste de regressão para evitar o erro `loadTaskCards is not defined`.
+
+
+## v121 — navegação Início/Resumo
+- `Início` deve sempre abrir no topo, independentemente da última posição do Resumo antes de sair para Agenda/Tarefas/etc.
+- `Resumo` só deve ser aberto quando o usuário clicar explicitamente em Resumo.
+
+
+# Adendo v122 — scroll lateral
+
+A barra de rolagem da sidebar é um elemento visual persistente no desktop. Não deve ficar transparente fora do hover nem sumir ao abrir subpáginas. O padrão visual é fino, arredondado e discreto, inspirado no Notion.

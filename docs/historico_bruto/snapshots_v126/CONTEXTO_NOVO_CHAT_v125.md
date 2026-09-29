@@ -59,14 +59,3 @@ A v119 removeu acidentalmente `loadTaskCards()` e os helpers de prioridade. A v1
 
 ## v122
 A barra de scroll dos menus laterais deve permanecer visível no desktop e seguir um estilo fino/discreto semelhante ao Notion, inclusive ao entrar em subpáginas.
-
-
-## Atualização v126 — checkpoint Meta/Railway
-- Repositório GitHub oficial: `avsord/sofiaos` (branch `main`).
-- Backend publicado no Railway; `/health` validado publicamente.
-- Política de privacidade pública em `/privacy`.
-- Webhook Meta validado com `WHATSAPP_VERIFY_TOKEN` e campo `messages` assinado.
-- Empresa Meta verificada; permissões `whatsapp_business_messaging` e `whatsapp_business_management` estão no fluxo de App Review.
-- O número escolhido já está no WhatsApp Business; NÃO desconectar nem migrar pelo cadastro normal. Usar coexistência via Embedded Signup.
-- v126 adiciona a página `/whatsapp/connect` e botão na Sofia que lança o fluxo com `whatsapp_business_app_onboarding`.
-- Depois de validar a coexistência, voltar diretamente ao App Review e anexar a gravação real do fluxo para `whatsapp_business_management`.

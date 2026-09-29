@@ -6,14 +6,14 @@ const path=require('node:path');
 const root=path.join(__dirname,'..');
 const read=rel=>fs.readFileSync(path.join(root,rel),'utf8');
 
-test('v125: identidade e cache atuais estão alinhados',()=>{
+test('v126: identidade e cache atuais estão alinhados',()=>{
   const cfg=read('src/config/sofia.js'),html=read('public/index.html'),pkg=JSON.parse(read('package.json'));
-  assert.ok(cfg.includes("const VERSION = '125.0.0'"));
-  assert.ok(html.includes('Sofia OS · v125'));
-  assert.ok(html.includes('/ui-current.css?v=125'));
-  assert.ok(html.includes('/app.js?v=125'));
-  assert.ok(html.includes('Core v125 · AVSORD Technology'));
-  assert.equal(pkg.version,'1.75.0');
+  assert.ok(cfg.includes("const VERSION = '126.0.0'"));
+  assert.ok(html.includes('Sofia OS · v126'));
+  assert.ok(html.includes('/ui-current.css?v=126'));
+  assert.ok(html.includes('/app.js?v=126'));
+  assert.ok(html.includes('Core v126 · AVSORD Technology'));
+  assert.equal(pkg.version,'1.76.0');
 });
 
 test('v119: subpáginas continuam fechadas ao iniciar',()=>{
@@ -116,4 +116,33 @@ test('v125: curso só pode ser excluído dentro de Editar',()=>{
   assert.match(app,/course-editor-danger-zone/);
   assert.match(app,/Esta opção fica somente dentro de Editar/);
   assert.match(app,/Excluir curso/);
+});
+
+
+test('v126: Conexões oferece botão real de coexistência do WhatsApp Business',()=>{
+  const app=read('public/app.js'),api=read('src/core/api45.js');
+  assert.ok(app.includes('Conectar WhatsApp Business'));
+  assert.ok(app.includes("r.status==='ready-to-connect'?'Pronto para conectar'"));
+  assert.ok(api.includes("status:'ready-to-connect'"));
+  assert.ok(api.includes("connect_url:base+'/whatsapp/connect'"));
+});
+
+test('v126: Embedded Signup abre o fluxo de coexistência e não o cadastro normal',()=>{
+  const js=read('public/whatsapp-connect.js'),html=read('public/whatsapp-connect.html');
+  assert.ok(html.includes('Conectar WhatsApp Business'));
+  assert.ok(js.includes("featureType:'whatsapp_business_app_onboarding'"));
+  assert.ok(js.includes("sessionInfoVersion:'3'"));
+  assert.ok(js.includes("config_id:state.config.configId"));
+  assert.ok(js.includes("override_default_response_type:true"));
+});
+
+test('v126: infraestrutura Railway mantém health, privacy e webhook públicos sem abrir o painel privado',()=>{
+  const handler=read('src/core/http-handler.js'),server=read('src/server.js');
+  assert.ok(handler.includes("p==='/health'"));
+  assert.ok(handler.includes("p==='/privacy'"));
+  assert.ok(handler.includes("p==='/webhook'"));
+  assert.ok(handler.includes("p==='/whatsapp/connect'"));
+  assert.ok(handler.includes('checkLocalRequest(req);'));
+  assert.ok(server.includes("?'0.0.0.0':config.host"));
+  assert.ok(server.includes('process.env.PORT'));
 });

@@ -428,3 +428,13 @@ A v119 removeu acidentalmente `loadTaskCards()` e os helpers de prioridade. A v1
 # Adendo v122 — scroll lateral
 
 A barra de rolagem da sidebar é um elemento visual persistente no desktop. Não deve ficar transparente fora do hover nem sumir ao abrir subpáginas. O padrão visual é fino, arredondado e discreto, inspirado no Notion.
+
+
+## Infraestrutura acordada em setembro de 2026
+- GitHub: código/versionamento e origem do deploy.
+- Railway: hospedagem contínua do servidor Node; não é a IA e não decide ações.
+- OpenAI: camada de inteligência; o backend valida e executa.
+- Supabase: futuro banco/índice estruturado de memória e relações, evitando usar storage caro para arquivos brutos.
+- Google Drive: arquivos brutos/pesados; Supabase mantém referências/resumos quando necessário.
+- Next.js + Vercel: direção futura para a interface web; não bloquear a integração WhatsApp atual por uma reescrita prematura.
+- Segredos: somente `.env`/variáveis seguras do provedor; nunca GitHub, documentação, logs ou frontend.

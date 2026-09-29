@@ -76,9 +76,3 @@ Ao criar uma nova versão, atualizar:
 ## v122 — scrollbar da sidebar
 - regra final: `public/ui-current.css`, bloco v122;
 - a área rolável principal é `.sidebar`, com fallback visual para `#userNavigation`.
-
-
-## v126 — WhatsApp Business
-- `public/app.js` → `loadConnections()` adiciona o botão **Conectar WhatsApp Business** no card WhatsApp/Meta.
-- `public/whatsapp-connect.html` + `.js` + `.css` → tela pública mínima para Embedded Signup/coexistência.
-- `src/core/http-handler.js` → rotas públicas mínimas de health, privacy, webhook e onboarding; restante do painel continua local/privado.
