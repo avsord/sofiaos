@@ -1,7 +1,7 @@
 {
   "name": "sofia-os",
-  "version": "1.79.0",
-  "description": "Sofia OS — v129 adiciona site público institucional, termos e exclusão de dados para verificação de acesso da Meta",
+  "version": "1.80.0",
+  "description": "Sofia OS — v130 adiciona login obrigatório no painel online com sessão segura e redirecionamento para a raiz",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

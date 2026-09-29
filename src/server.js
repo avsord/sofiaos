@@ -29,7 +29,7 @@ async function startServer(options={}) {
     timer=setInterval(()=>{if(!runtime.core.busy)runtime.backups.daily();},60000);timer.unref();
     const address=server.address(),port=address&&typeof address==='object'?address.port:PORT;
     console.log('Sofia OS online em http://'+HOST+':'+port);
-    console.log('Core v129 | Memória em data/sofia.sqlite | painel privado + endpoints públicos mínimos.');
+    console.log('Core v130 | Memória em data/sofia.sqlite | painel online protegido por login + endpoints públicos controlados.');
     console.log('Início normal: chave preservada, sem nova colagem. Ctrl+C encerra com segurança.');
     if(!runtime.store.settings().routingEnabled)console.log('Memória e módulos locais disponíveis. A IA ainda não está conectada aos filtros.');
     if(runtime.backups.lastError)console.error('[Sofia] '+runtime.backups.lastError);

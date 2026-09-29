@@ -373,9 +373,3 @@ A v127 chegou ao Railway e removeu os erros CSP. O Console passou a mostrar some
 
 ## CHECKPOINT v129 — Verificação de acesso da Meta
 O App Review já foi enviado. A Verificação do acesso pediu um site público completo. A v129 publica `/site`, `/terms` e `/data-deletion` e atualiza `/privacy`, mantendo o painel privado. Depois do deploy, usar `https://sofiaos.up.railway.app/site` no campo **Provide a link to your website** e enviar a verificação de acesso.
-
-## Estado adicional a partir da v130
-- O painel no Railway exige sessão autenticada por senha; sem sessão a raiz redireciona para `/login`.
-- `SOFIA_LOGIN_PASSWORD` é segredo de ambiente e nunca deve ser salvo em arquivos versionados.
-- As rotas públicas da Meta/WhatsApp permanecem públicas, mas painel, assets privados e APIs exigem sessão no Railway.
-- O login v130 é single-owner/admin. Não apresentar isso como suporte a contas de clientes; multiusuário exige isolamento de dados real.

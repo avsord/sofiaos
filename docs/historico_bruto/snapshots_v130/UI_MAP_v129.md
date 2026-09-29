@@ -98,9 +98,3 @@ Ao criar uma nova versão, atualizar:
 - termos: `public/terms.html` → `/terms`;
 - exclusão de dados: `public/data-deletion.html` → `/data-deletion`;
 - rotas e cabeçalhos públicos: `src/core/http-handler.js`.
-
-## v130 — login do painel online
-- página de login é renderizada pelo backend em `src/core/http-handler.js` (`loginPage`).
-- `/login`, `/auth/login` e `/logout` ficam no handler; a raiz `/` no Railway exige sessão.
-- senha: `SOFIA_LOGIN_PASSWORD` em `src/config/runtime.js` (somente variável de ambiente; nunca hardcoded).
-- `public/site.html` possui o botão **Entrar na Sofia OS** para `/login`.

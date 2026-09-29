@@ -6,14 +6,14 @@ const path=require('node:path');
 const root=path.join(__dirname,'..');
 const read=rel=>fs.readFileSync(path.join(root,rel),'utf8');
 
-test('v129: identidade e cache atuais estão alinhados',()=>{
+test('v130: identidade e cache atuais estão alinhados',()=>{
   const cfg=read('src/config/sofia.js'),html=read('public/index.html'),pkg=JSON.parse(read('package.json'));
-  assert.ok(cfg.includes("const VERSION = '129.0.0'"));
-  assert.ok(html.includes('Sofia OS · v129'));
-  assert.ok(html.includes('/ui-current.css?v=129'));
-  assert.ok(html.includes('/app.js?v=129'));
-  assert.ok(html.includes('Core v129 · AVSORD Technology'));
-  assert.equal(pkg.version,'1.79.0');
+  assert.ok(cfg.includes("const VERSION = '130.0.0'"));
+  assert.ok(html.includes('Sofia OS · v130'));
+  assert.ok(html.includes('/ui-current.css?v=130'));
+  assert.ok(html.includes('/app.js?v=130'));
+  assert.ok(html.includes('Core v130 · AVSORD Technology'));
+  assert.equal(pkg.version,'1.80.0');
 });
 
 test('v119: subpáginas continuam fechadas ao iniciar',()=>{
@@ -136,13 +136,16 @@ test('v127: Embedded Signup abre o fluxo de coexistência e não o cadastro norm
   assert.ok(js.includes("override_default_response_type:true"));
 });
 
-test('v127: infraestrutura Railway mantém health, privacy e webhook públicos sem abrir o painel privado',()=>{
+test('v130: infraestrutura Railway mantém endpoints públicos e protege o painel online com login',()=>{
   const handler=read('src/core/http-handler.js'),server=read('src/server.js');
   assert.ok(handler.includes("p==='/health'"));
   assert.ok(handler.includes("p==='/privacy'"));
   assert.ok(handler.includes("p==='/webhook'"));
   assert.ok(handler.includes("p==='/whatsapp/connect'"));
-  assert.ok(handler.includes('checkLocalRequest(req);'));
+  assert.ok(handler.includes("p==='/login'"));
+  assert.ok(handler.includes("p==='/auth/login'"));
+  assert.ok(handler.includes('validSession(req)'));
+  assert.ok(handler.includes('checkLocalRequest(req)'));
   assert.ok(server.includes("?'0.0.0.0':config.host"));
   assert.ok(server.includes('process.env.PORT'));
 });
@@ -153,6 +156,8 @@ test('v129: site público da Meta descreve serviço, responsável e políticas s
   assert.ok(site.includes('Automação e atendimento'));
   assert.ok(site.includes('Pedro Henrique Silva'));
   assert.ok(site.includes('sofiaos.core@gmail.com'));
+  assert.ok(site.includes('/login'));
+  assert.ok(site.includes('Entrar na Sofia OS'));
   assert.ok(site.includes('/privacy'));
   assert.ok(site.includes('/terms'));
   assert.ok(site.includes('/data-deletion'));

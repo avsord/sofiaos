@@ -18,6 +18,8 @@ function makeConfig(overrides = {}) {
     metaAppSecret: process.env.META_APP_SECRET?.trim() || '',
     whatsappVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN?.trim() || '',
     publicBaseUrl: process.env.PUBLIC_BASE_URL?.trim() || (process.env.RAILWAY_PUBLIC_DOMAIN ? 'https://'+process.env.RAILWAY_PUBLIC_DOMAIN : 'https://sofiaos.up.railway.app'),
+    // Senha do painel online. Nunca entra no pacote/Git; configure como variável secreta no Railway ou .env.
+    loginPassword: process.env.SOFIA_LOGIN_PASSWORD || '',
     privateApiKey: process.env.OPENAI_PRIVATE_API_KEY?.trim() || '', sharedApiKey: process.env.OPENAI_SHARED_API_KEY?.trim() || '',
     apiTimeoutMs: 90000, turnTimeoutMs: 120000, maxMessageChars: 12000, maxContextChars: 20000,
     ...overrides
