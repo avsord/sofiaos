@@ -1,7 +1,7 @@
 {
   "name": "sofia-os",
-  "version": "1.78.0",
-  "description": "Sofia OS — v128 corrige o callback do FB.login para o Embedded Signup de coexistência do WhatsApp Business",
+  "version": "1.79.0",
+  "description": "Sofia OS — v129 adiciona site público institucional, termos e exclusão de dados para verificação de acesso da Meta",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

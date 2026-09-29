@@ -82,9 +82,3 @@ A barra de scroll dos menus laterais deve permanecer visível no desktop e segui
 - Restou no SDK da Meta: `Expression is of type asyncfunction, not function`.
 - v128 troca o callback direto `async` do `FB.login` por callback `Function` normal com uma rotina assíncrona interna.
 - Próximo teste: publicar v128, abrir `/whatsapp/connect` e clicar em **Conectar WhatsApp Business** com o Console aberto.
-
-
-## Atualização v129 — site institucional para Meta
-- A verificação de acesso da Meta está sendo preenchida como Plataforma de SaaS.
-- `/site` é a página pública institucional para o campo de website da Meta; `/terms` e `/data-deletion` completam as informações públicas.
-- App Review de `whatsapp_business_messaging`, `whatsapp_business_management` e `public_profile` já foi enviado e está em análise.

@@ -6,14 +6,14 @@ const path=require('node:path');
 const root=path.join(__dirname,'..');
 const read=rel=>fs.readFileSync(path.join(root,rel),'utf8');
 
-test('v128: identidade e cache atuais estão alinhados',()=>{
+test('v129: identidade e cache atuais estão alinhados',()=>{
   const cfg=read('src/config/sofia.js'),html=read('public/index.html'),pkg=JSON.parse(read('package.json'));
-  assert.ok(cfg.includes("const VERSION = '128.0.0'"));
-  assert.ok(html.includes('Sofia OS · v128'));
-  assert.ok(html.includes('/ui-current.css?v=128'));
-  assert.ok(html.includes('/app.js?v=128'));
-  assert.ok(html.includes('Core v128 · AVSORD Technology'));
-  assert.equal(pkg.version,'1.78.0');
+  assert.ok(cfg.includes("const VERSION = '129.0.0'"));
+  assert.ok(html.includes('Sofia OS · v129'));
+  assert.ok(html.includes('/ui-current.css?v=129'));
+  assert.ok(html.includes('/app.js?v=129'));
+  assert.ok(html.includes('Core v129 · AVSORD Technology'));
+  assert.equal(pkg.version,'1.79.0');
 });
 
 test('v119: subpáginas continuam fechadas ao iniciar',()=>{
@@ -145,4 +145,20 @@ test('v127: infraestrutura Railway mantém health, privacy e webhook públicos s
   assert.ok(handler.includes('checkLocalRequest(req);'));
   assert.ok(server.includes("?'0.0.0.0':config.host"));
   assert.ok(server.includes('process.env.PORT'));
+});
+
+
+test('v129: site público da Meta descreve serviço, responsável e políticas sem abrir o painel',()=>{
+  const site=read('public/site.html'),terms=read('public/terms.html'),deletion=read('public/data-deletion.html'),handler=read('src/core/http-handler.js');
+  assert.ok(site.includes('Automação e atendimento'));
+  assert.ok(site.includes('Pedro Henrique Silva'));
+  assert.ok(site.includes('sofiaos.core@gmail.com'));
+  assert.ok(site.includes('/privacy'));
+  assert.ok(site.includes('/terms'));
+  assert.ok(site.includes('/data-deletion'));
+  assert.ok(terms.includes('Termos de Serviço'));
+  assert.ok(deletion.includes('Solicitação de exclusão de dados'));
+  assert.ok(handler.includes("'/site':['site.html'"));
+  assert.ok(handler.includes("'/terms':['terms.html'"));
+  assert.ok(handler.includes("'/data-deletion':['data-deletion.html'"));
 });

@@ -18,10 +18,13 @@ function runtimeFixture(t){
   return new Promise(resolve=>server.listen(0,'127.0.0.1',()=>resolve({runtime,server,base:'http://127.0.0.1:'+server.address().port})));
 }
 
-test('v128: endpoints públicos mínimos funcionam sem liberar o painel',async t=>{
+test('v129: endpoints públicos e institucionais funcionam sem liberar o painel',async t=>{
   const f=await runtimeFixture(t);
   const health=await fetch(f.base+'/health');assert.equal(health.status,200);
   const privacy=await fetch(f.base+'/privacy');assert.equal(privacy.status,200);assert.match(await privacy.text(),/Política de Privacidade/);
+  const site=await fetch(f.base+'/site');assert.equal(site.status,200);assert.match(await site.text(),/Plataforma SaaS/);
+  const terms=await fetch(f.base+'/terms');assert.equal(terms.status,200);assert.match(await terms.text(),/Termos de Serviço/);
+  const deletion=await fetch(f.base+'/data-deletion');assert.equal(deletion.status,200);assert.match(await deletion.text(),/Exclusão de dados/);
   const connect=await fetch(f.base+'/whatsapp/connect');assert.equal(connect.status,200);assert.match(await connect.text(),/Conectar WhatsApp Business/);
   const csp=connect.headers.get('content-security-policy')||'';assert.match(csp,/connect-src[^;]*https:\/\/connect\.facebook\.net/);assert.match(csp,/style-src[^;]*'unsafe-inline'/);
   const cfg=await fetch(f.base+'/whatsapp/onboarding-config').then(r=>r.json());assert.equal(cfg.configId,'1590251151959449');assert.equal(cfg.featureType,'whatsapp_business_app_onboarding');
@@ -29,12 +32,12 @@ test('v128: endpoints públicos mínimos funcionam sem liberar o painel',async t
   const blocked=await new Promise((resolve,reject)=>{const u=new URL(f.base+'/api/bootstrap');const req=http.get({hostname:u.hostname,port:u.port,path:u.pathname,headers:{Host:'evil.example'}},res=>{res.resume();resolve(res.statusCode);});req.on('error',reject);});assert.equal(blocked,403);
 });
 
-test('v128: FB.login recebe callback Function normal e mantém finalização assíncrona internamente',()=>{
+test('v129: FB.login recebe callback Function normal e mantém finalização assíncrona internamente',()=>{
   const js=fs.readFileSync(path.join(__dirname,'..','public','whatsapp-connect.js'),'utf8');
   assert.ok(js.includes('window.FB.login(response=>{void (async()=>{'));
   const html=fs.readFileSync(path.join(__dirname,'..','public','whatsapp-connect.html'),'utf8');
-  assert.ok(html.includes('/whatsapp-connect.js?v=128'));
-  assert.ok(html.includes('/whatsapp-connect.css?v=128'));
+  assert.ok(html.includes('/whatsapp-connect.js?v=129'));
+  assert.ok(html.includes('/whatsapp-connect.css?v=129'));
   assert.ok(!js.includes('window.FB.login(async response=>'));
   assert.ok(js.includes("featureType:'whatsapp_business_app_onboarding'"));
 });

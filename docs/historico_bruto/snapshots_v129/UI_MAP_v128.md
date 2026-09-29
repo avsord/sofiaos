@@ -91,10 +91,3 @@ Ao criar uma nova versão, atualizar:
 ## v128 — WhatsApp Business / callback Meta
 - `public/whatsapp-connect.js` → `FB.login` recebe callback síncrono compatível com o SDK; a troca do código continua assíncrona dentro do callback.
 - Mantém coexistência por `whatsapp_business_app_onboarding` e não altera o painel privado.
-
-
-## v129 — site público / Meta
-- página institucional: `public/site.html` → `/site`;
-- termos: `public/terms.html` → `/terms`;
-- exclusão de dados: `public/data-deletion.html` → `/data-deletion`;
-- rotas e cabeçalhos públicos: `src/core/http-handler.js`.

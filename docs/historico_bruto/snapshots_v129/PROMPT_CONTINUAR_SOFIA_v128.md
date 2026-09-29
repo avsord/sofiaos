@@ -369,7 +369,3 @@ A v126 chegou ao Railway, mas o Edge mostrou `Content Security Policy` bloqueand
 
 ## CHECKPOINT v128 — callback do FB.login corrigido
 A v127 chegou ao Railway e removeu os erros CSP. O Console passou a mostrar somente `Expression is of type asyncfunction, not function` (além do favicon 403 irrelevante). A v128 corrige `FB.login(async response => ...)` para callback normal e mantém a finalização assíncrona internamente. Próximo passo: instalar, fazer push, esperar Railway e testar `/whatsapp/connect` novamente.
-
-
-## CHECKPOINT v129 — Verificação de acesso da Meta
-O App Review já foi enviado. A Verificação do acesso pediu um site público completo. A v129 publica `/site`, `/terms` e `/data-deletion` e atualiza `/privacy`, mantendo o painel privado. Depois do deploy, usar `https://sofiaos.up.railway.app/site` no campo **Provide a link to your website** e enviar a verificação de acesso.
