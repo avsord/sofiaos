@@ -61,11 +61,8 @@ https://sofiaos.up.railway.app/site
 ## Regra do número
 Se a Meta pedir para desconectar/migrar o número para fora do WhatsApp Business, não confirmar.
 
-### v132 — conta e login
+### v131 — conta e login
 - painel online deve ter menu de conta no rodapé, botão **Sair**, card de sessão e opção de encerrar todas as sessões;
 - ao expirar a sessão, o painel volta ao login automaticamente;
 - login deve seguir convenções normais de UX: mostrar/ocultar senha, Caps Lock, erro claro, logout/expiração confirmados e links legais;
 - não transformar o login single-owner em cadastro multiusuário fictício antes de existir isolamento real de contas/dados.
-
-
-[v132] Perfil de usuário do proprietário: Pedro Silva, e-mail editável, menu de conta convencional e fechamento ao clicar fora/Esc.

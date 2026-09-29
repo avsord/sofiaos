@@ -381,6 +381,3 @@ O App Review já foi enviado. A Verificação do acesso pediu um site público c
 - O login v130 é single-owner/admin. Não apresentar isso como suporte a contas de clientes; multiusuário exige isolamento de dados real.
 
 V131: preservar o menu de conta e o botão Sair dentro da interface. Sessões online são single-owner, 12h, em memória e expiram em deploy. O frontend deve redirecionar a /login quando receber AUTH_REQUIRED. Não criar cadastro público, recuperação por e-mail ou múltiplos usuários até o backend ter isolamento real de contas.
-
-
-Estado v132: a Sofia possui perfil editável do proprietário e menu de conta que fecha corretamente ao clicar fora/Esc. Preservar esse comportamento.

@@ -8,7 +8,7 @@ const {createRuntime}=require('../src/core/runtime');
 
 function cookieFrom(setCookie){return String(setCookie||'').split(';')[0];}
 
-test('v131: Railway redireciona raiz para login e libera painel somente após senha correta',async t=>{
+test('v132: Railway redireciona raiz para login e libera painel somente após senha correta',async t=>{
   const old=process.env.RAILWAY_ENVIRONMENT;process.env.RAILWAY_ENVIRONMENT='test';
   t.after(()=>{if(old===undefined)delete process.env.RAILWAY_ENVIRONMENT;else process.env.RAILWAY_ENVIRONMENT=old;});
   const f=fixture(t);f.config.loginPassword='senha-segura-de-teste-131';
@@ -26,11 +26,11 @@ test('v131: Railway redireciona raiz para login e libera painel somente após se
 
   r=await fetch(base+'/auth/login',{method:'POST',redirect:'manual',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({password:f.config.loginPassword})});
   assert.equal(r.status,303);assert.equal(r.headers.get('location'),'/');const cookie=cookieFrom(r.headers.get('set-cookie'));assert.match(cookie,/^sofia_session=/);
-  r=await fetch(base+'/',{headers:{Cookie:cookie}});assert.equal(r.status,200);assert.match(await r.text(),/Sofia OS · v131/);
-  r=await fetch(base+'/api/bootstrap',{headers:{Cookie:cookie}});assert.equal(r.status,200);assert.equal((await r.json()).version,'131.0.0');
+  r=await fetch(base+'/',{headers:{Cookie:cookie}});assert.equal(r.status,200);assert.match(await r.text(),/Sofia OS · v132/);
+  r=await fetch(base+'/api/bootstrap',{headers:{Cookie:cookie}});assert.equal(r.status,200);assert.equal((await r.json()).version,'132.0.0');
 });
 
-test('v131: páginas Meta continuam públicas sem sessão',async t=>{
+test('v132: páginas Meta continuam públicas sem sessão',async t=>{
   const old=process.env.RAILWAY_ENVIRONMENT;process.env.RAILWAY_ENVIRONMENT='test';
   t.after(()=>{if(old===undefined)delete process.env.RAILWAY_ENVIRONMENT;else process.env.RAILWAY_ENVIRONMENT=old;});
   const f=fixture(t);f.config.loginPassword='senha-segura-de-teste-131';
@@ -42,7 +42,7 @@ test('v131: páginas Meta continuam públicas sem sessão',async t=>{
 });
 
 
-test('v131: sair limpa a sessão e encerrar todas invalida sessões abertas',async t=>{
+test('v132: sair limpa a sessão e encerrar todas invalida sessões abertas',async t=>{
   const old=process.env.RAILWAY_ENVIRONMENT;process.env.RAILWAY_ENVIRONMENT='test';
   t.after(()=>{if(old===undefined)delete process.env.RAILWAY_ENVIRONMENT;else process.env.RAILWAY_ENVIRONMENT=old;});
   const f=fixture(t);f.config.loginPassword='senha-segura-de-teste-131';

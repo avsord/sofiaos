@@ -6,14 +6,14 @@ const path=require('node:path');
 const root=path.join(__dirname,'..');
 const read=rel=>fs.readFileSync(path.join(root,rel),'utf8');
 
-test('v131: identidade e cache atuais estão alinhados',()=>{
+test('v132: identidade e cache atuais estão alinhados',()=>{
   const cfg=read('src/config/sofia.js'),html=read('public/index.html'),pkg=JSON.parse(read('package.json'));
-  assert.ok(cfg.includes("const VERSION = '131.0.0'"));
-  assert.ok(html.includes('Sofia OS · v131'));
-  assert.ok(html.includes('/ui-current.css?v=131'));
-  assert.ok(html.includes('/app.js?v=131'));
-  assert.ok(html.includes('Core v131 · AVSORD Technology'));
-  assert.equal(pkg.version,'1.81.0');
+  assert.ok(cfg.includes("const VERSION = '132.0.0'"));
+  assert.ok(html.includes('Sofia OS · v132'));
+  assert.ok(html.includes('/ui-current.css?v=132'));
+  assert.ok(html.includes('/app.js?v=132'));
+  assert.ok(html.includes('Core v132 · AVSORD Technology'));
+  assert.equal(pkg.version,'1.82.0');
 });
 
 test('v119: subpáginas continuam fechadas ao iniciar',()=>{
@@ -179,4 +179,19 @@ test('v131: interface possui convenções de conta, logout e sessão',()=>{
   assert.ok(app.includes("location.replace('/login?expired=1')"));
   assert.ok(login.includes('togglePassword'));
   assert.ok(login.includes("getModifierState('CapsLock')"));
+});
+
+
+test('v132: menu de usuário fecha fora e perfil do proprietário é editável',()=>{
+  const html=read('public/index.html'),app=read('public/app.js'),store=read('src/memory/store.js');
+  assert.ok(html.includes('id="accountMenu"'));
+  assert.ok(html.includes('id="accountProfileButton"'));
+  assert.ok(html.includes('id="profileForm"'));
+  assert.ok(html.includes('Pedro Silva'));
+  assert.ok(app.includes("document.addEventListener('pointerdown'"));
+  assert.ok(app.includes('!accountMenu.contains(event.target)'));
+  assert.ok(app.includes("event.key==='Escape'"));
+  assert.ok(app.includes("body:{profileName,profileEmail}"));
+  assert.ok(store.includes("profileName: 'Pedro Silva'"));
+  assert.ok(store.includes("profileEmail: 'sofiaos.core@gmail.com'"));
 });

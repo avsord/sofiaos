@@ -103,7 +103,3 @@ A barra de scroll dos menus laterais deve permanecer visível no desktop e segui
 - Sessão expirada redireciona automaticamente ao login.
 - Login possui mostrar/ocultar senha, Caps Lock, mensagens de logout/expiração e links legais.
 - Permanece uma instalação single-owner; cadastro público, reset por e-mail e múltiplos usuários não devem ser simulados sem backend de contas e isolamento de dados.
-
-
-### v132
-Perfil do proprietário adicionado. O menu da conta deve fechar ao clicar fora. Nome/e-mail são editáveis e persistidos nas configurações locais; senha continua no Railway/.env.

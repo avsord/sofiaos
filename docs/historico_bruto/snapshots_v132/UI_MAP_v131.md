@@ -110,7 +110,3 @@ Ao criar uma nova versão, atualizar:
 - `public/app.js` → sair do dispositivo, encerrar todas as sessões e redirecionar ao login quando a sessão expira.
 - `src/core/http-handler.js` → estados do login, sessão atual no bootstrap, logout atual e logout global.
 - `public/login.js` → mostrar/ocultar senha, aviso de Caps Lock e estado de envio do formulário.
-
-
-### Conta do usuário — v132
-Rodapé da sidebar: avatar/iniciais + nome do proprietário. Menu: Meu perfil, Conta e configurações, Site público, Sair. Clique fora/Esc fecha o menu. Configuração contém Meu perfil e Segurança e sessão.
