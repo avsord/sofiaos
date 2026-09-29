@@ -114,10 +114,3 @@ Ao criar uma nova versão, atualizar:
 
 ### Conta do usuário — v132
 Rodapé da sidebar: avatar/iniciais + nome do proprietário. Menu: Meu perfil, Conta e configurações, Site público, Sair. Clique fora/Esc fecha o menu. Configuração contém Meu perfil e Segurança e sessão.
-
-### Autenticação — v133
-- `/login`: campos **E-mail** e **Senha**, mostrar/ocultar senha, Caps Lock e link **Esqueceu a senha?**.
-- `/forgot-password`: solicita o e-mail; resposta é neutra para não revelar existência de contas.
-- `/reset-password?token=...`: permite definir e confirmar nova senha quando o token é válido.
-- Configuração > Meu perfil: **E-mail de login e recuperação**.
-- Configuração > Segurança e sessão: **Alterar senha**, status da recuperação por e-mail, sair deste dispositivo e encerrar todas as sessões.

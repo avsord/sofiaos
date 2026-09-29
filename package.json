@@ -1,7 +1,7 @@
 {
   "name": "sofia-os",
-  "version": "1.82.0",
-  "description": "Sofia OS — v132 corrige o menu de usuário e adiciona perfil editável do proprietário",
+  "version": "1.83.0",
+  "description": "Sofia OS — v133 usa e-mail como login e adiciona recuperação segura de senha por e-mail",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

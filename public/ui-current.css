@@ -866,3 +866,8 @@
 .account-menu:not([open]) .account-popover{display:none}
 .profile-card-head{display:flex;align-items:center;gap:14px;position:relative}.profile-avatar{display:grid;place-items:center;width:52px;height:52px;flex:0 0 52px;border-radius:50%;background:#7258e8;color:#fff;font-weight:850;font-size:14px;letter-spacing:.3px}.profile-card-head>div{min-width:0;flex:1}.profile-card-head h3{margin:2px 0 4px}.profile-card-head p{margin:0}.profile-role-badge{padding:6px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted);font-size:11px;font-weight:750}.profile-account-form{margin-top:18px}.profile-readonly-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:14px 0}.profile-readonly-grid>div{display:grid;gap:3px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:color-mix(in srgb,var(--panel) 90%,var(--text) 2%)}.profile-readonly-grid span{font-size:10.5px;color:var(--muted)}.profile-readonly-grid strong{font-size:12.5px}.account-profile-card:target{outline:2px solid color-mix(in srgb,#7258e8 70%,transparent);outline-offset:2px}
 @media(max-width:700px){.profile-card-head{align-items:flex-start;flex-wrap:wrap}.profile-role-badge{margin-left:66px}.profile-readonly-grid{grid-template-columns:1fr}}
+
+/* v133 · e-mail como login e recuperação de senha */
+.password-change-form{display:grid;gap:12px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.password-change-form>label{max-width:520px}.password-change-form .button-row{margin-top:2px}
+@media(max-width:700px){.password-change-form .form-row{grid-template-columns:1fr}.password-change-form .button-row button{width:100%}}

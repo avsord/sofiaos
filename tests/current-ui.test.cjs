@@ -6,14 +6,14 @@ const path=require('node:path');
 const root=path.join(__dirname,'..');
 const read=rel=>fs.readFileSync(path.join(root,rel),'utf8');
 
-test('v132: identidade e cache atuais estão alinhados',()=>{
+test('v133: identidade e cache atuais estão alinhados',()=>{
   const cfg=read('src/config/sofia.js'),html=read('public/index.html'),pkg=JSON.parse(read('package.json'));
-  assert.ok(cfg.includes("const VERSION = '132.0.0'"));
-  assert.ok(html.includes('Sofia OS · v132'));
-  assert.ok(html.includes('/ui-current.css?v=132'));
-  assert.ok(html.includes('/app.js?v=132'));
-  assert.ok(html.includes('Core v132 · AVSORD Technology'));
-  assert.equal(pkg.version,'1.82.0');
+  assert.ok(cfg.includes("const VERSION = '133.0.0'"));
+  assert.ok(html.includes('Sofia OS · v133'));
+  assert.ok(html.includes('/ui-current.css?v=133'));
+  assert.ok(html.includes('/app.js?v=133'));
+  assert.ok(html.includes('Core v133 · AVSORD Technology'));
+  assert.equal(pkg.version,'1.83.0');
 });
 
 test('v119: subpáginas continuam fechadas ao iniciar',()=>{
@@ -182,7 +182,7 @@ test('v131: interface possui convenções de conta, logout e sessão',()=>{
 });
 
 
-test('v132: menu de usuário fecha fora e perfil do proprietário é editável',()=>{
+test('v133: menu de usuário fecha fora e perfil do proprietário é editável',()=>{
   const html=read('public/index.html'),app=read('public/app.js'),store=read('src/memory/store.js');
   assert.ok(html.includes('id="accountMenu"'));
   assert.ok(html.includes('id="accountProfileButton"'));
@@ -194,4 +194,23 @@ test('v132: menu de usuário fecha fora e perfil do proprietário é editável',
   assert.ok(app.includes("body:{profileName,profileEmail}"));
   assert.ok(store.includes("profileName: 'Pedro Silva'"));
   assert.ok(store.includes("profileEmail: 'sofiaos.core@gmail.com'"));
+});
+
+
+test('v133: login usa e-mail, recuperação e troca de senha estão presentes',()=>{
+  const html=read('public/index.html'),app=read('public/app.js'),handler=read('src/core/http-handler.js'),login=read('public/login.js'),runtime=read('src/config/runtime.js');
+  assert.ok(handler.includes('name=\"email\"'));
+  assert.ok(handler.includes('/forgot-password'));
+  assert.ok(handler.includes('/auth/forgot-password'));
+  assert.ok(handler.includes('/reset-password'));
+  assert.ok(handler.includes('/auth/reset-password'));
+  assert.ok(handler.includes("p==='/api/auth/change-password'"));
+  assert.ok(handler.includes('ownerAuth.verifyLogin(email,password)'));
+  assert.ok(html.includes('E-mail de login e recuperação'));
+  assert.ok(html.includes('id=\"passwordChangeForm\"'));
+  assert.ok(app.includes("'/api/auth/change-password'"));
+  assert.ok(runtime.includes('SOFIA_LOGIN_EMAIL'));
+  assert.ok(runtime.includes('SOFIA_SMTP_USER'));
+  assert.ok(runtime.includes('SOFIA_SMTP_PASS'));
+  assert.ok(login.includes('resetPasswordForm'));
 });

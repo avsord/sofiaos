@@ -18,8 +18,17 @@ function makeConfig(overrides = {}) {
     metaAppSecret: process.env.META_APP_SECRET?.trim() || '',
     whatsappVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN?.trim() || '',
     publicBaseUrl: process.env.PUBLIC_BASE_URL?.trim() || (process.env.RAILWAY_PUBLIC_DOMAIN ? 'https://'+process.env.RAILWAY_PUBLIC_DOMAIN : 'https://sofiaos.up.railway.app'),
-    // Senha do painel online. Nunca entra no pacote/Git; configure como variável secreta no Railway ou .env.
+    // Credencial inicial do painel online. A senha pode depois ser redefinida por e-mail; o valor em claro nunca é gravado no banco.
     loginPassword: process.env.SOFIA_LOGIN_PASSWORD || '',
+    // E-mail inicial do proprietário. Fica em variável de ambiente para não publicar endereço pessoal no Git/ZIP.
+    loginEmail: process.env.SOFIA_LOGIN_EMAIL?.trim() || '',
+    // SMTP seguro para recuperação de senha. Para Gmail use smtp.gmail.com:465 e uma senha de app em SOFIA_SMTP_PASS.
+    smtpHost: process.env.SOFIA_SMTP_HOST?.trim() || 'smtp.gmail.com',
+    smtpPort: Number(process.env.SOFIA_SMTP_PORT || 465),
+    smtpSecure: String(process.env.SOFIA_SMTP_SECURE || 'true').toLowerCase() !== 'false',
+    smtpUser: process.env.SOFIA_SMTP_USER?.trim() || '',
+    smtpPass: process.env.SOFIA_SMTP_PASS || '',
+    smtpFrom: process.env.SOFIA_SMTP_FROM?.trim() || process.env.SOFIA_SMTP_USER?.trim() || '',
     privateApiKey: process.env.OPENAI_PRIVATE_API_KEY?.trim() || '', sharedApiKey: process.env.OPENAI_SHARED_API_KEY?.trim() || '',
     apiTimeoutMs: 90000, turnTimeoutMs: 120000, maxMessageChars: 12000, maxContextChars: 20000,
     ...overrides

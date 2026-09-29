@@ -3,7 +3,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {Store}=require('../src/memory/store');
 
-test('v132: perfil padrão do proprietário existe e pode ser editado',()=>{
+test('v133: perfil padrão do proprietário existe e pode ser editado',()=>{
   const store=new Store(':memory:');
   try{
     assert.equal(store.settings().profileName,'Pedro Silva');
@@ -14,7 +14,7 @@ test('v132: perfil padrão do proprietário existe e pode ser editado',()=>{
   }finally{store.close();}
 });
 
-test('v132: perfil rejeita email inválido',()=>{
+test('v133: perfil rejeita email inválido',()=>{
   const store=new Store(':memory:');
   try{assert.throws(()=>store.updateSettings({profileEmail:'email-invalido'}),/e-mail válido/i);}finally{store.close();}
 });

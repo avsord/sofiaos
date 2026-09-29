@@ -384,6 +384,3 @@ V131: preservar o menu de conta e o botão Sair dentro da interface. Sessões on
 
 
 Estado v132: a Sofia possui perfil editável do proprietário e menu de conta que fecha corretamente ao clicar fora/Esc. Preservar esse comportamento.
-
-## CHECKPOINT v133 — conta do proprietário
-Preservar login por **e-mail + senha**. O e-mail do perfil é o nome de login e também o destino de recuperação. O e-mail inicial deve vir de `SOFIA_LOGIN_EMAIL`, sem hardcode de endereço pessoal. `/forgot-password` envia link de uso único por SMTP seguro; token expira em 30 minutos e é armazenado apenas como hash. Senha redefinida fica como hash scrypt em `data/owner-auth.json`. Troca/redefinição encerra todas as sessões. Não voltar ao login só por senha e não criar cadastro multiusuário fictício.

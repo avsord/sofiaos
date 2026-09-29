@@ -107,12 +107,3 @@ A barra de scroll dos menus laterais deve permanecer visível no desktop e segui
 
 ### v132
 Perfil do proprietário adicionado. O menu da conta deve fechar ao clicar fora. Nome/e-mail são editáveis e persistidos nas configurações locais; senha continua no Railway/.env.
-
-## Atualização v133 — login por e-mail e recuperação
-- Login online exige o e-mail cadastrado no perfil + senha.
-- Proprietário padrão desta instalação: Pedro Silva. O e-mail de login/recuperação vem de `SOFIA_LOGIN_EMAIL` e não deve ser hardcoded no repositório.
-- `Esqueceu a senha?` abre `/forgot-password`; um link de uso único com validade de 30 minutos é enviado somente ao e-mail cadastrado.
-- Nova senha fica como hash scrypt em `data/owner-auth.json`; nunca salvar senha em texto claro no projeto.
-- Recuperação exige SMTP seguro no Railway: `SOFIA_SMTP_USER` + `SOFIA_SMTP_PASS` (host padrão Gmail `smtp.gmail.com`, porta 465).
-- Alterar o e-mail em Meu perfil também altera o nome de login e o destino futuro da recuperação.
-- Trocar/redefinir senha encerra todas as sessões online.
