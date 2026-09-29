@@ -160,9 +160,3 @@ A v119 removeu acidentalmente `loadTaskCards()` e os helpers de prioridade. A v1
 - Em `/whatsapp/connect`, `connect-src` agora permite `https://connect.facebook.net` e `https://web.facebook.com`; `style-src` permite apenas CSS inline, sem liberar script inline.
 - Mantido `featureType: whatsapp_business_app_onboarding`, sem trocar para o fluxo normal de migração.
 - Teste de regressão valida explicitamente essas diretivas CSP.
-
-## v128 — callback compatível com o SDK da Meta
-- Após a v127 remover os bloqueios CSP, o Console do Edge expôs o erro do SDK `Expression is of type asyncfunction, not function`.
-- A causa era `FB.login(async response => ...)`: o SDK valida o callback como `Function` normal e rejeita `AsyncFunction` antes de abrir o popup.
-- v128 passa uma função normal ao `FB.login` e executa a finalização assíncrona dentro dela, preservando `response_type: code`, `config_id` e `featureType: whatsapp_business_app_onboarding`.
-- O `403` de `/favicon.ico` não participa do fluxo do WhatsApp e pode ser tratado separadamente.

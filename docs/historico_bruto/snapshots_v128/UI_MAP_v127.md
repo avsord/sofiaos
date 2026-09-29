@@ -87,7 +87,3 @@ Ao criar uma nova versão, atualizar:
 ## v127 — WhatsApp Business / CSP
 - `/whatsapp/connect` mantém o mesmo visual e fluxo da v126.
 - A política de conteúdo da rota permite os requests do SDK oficial da Meta necessários ao Embedded Signup sem abrir scripts inline.
-
-## v128 — WhatsApp Business / callback Meta
-- `public/whatsapp-connect.js` → `FB.login` recebe callback síncrono compatível com o SDK; a troca do código continua assíncrona dentro do callback.
-- Mantém coexistência por `whatsapp_business_app_onboarding` e não altera o painel privado.

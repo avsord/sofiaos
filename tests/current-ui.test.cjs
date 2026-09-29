@@ -6,14 +6,14 @@ const path=require('node:path');
 const root=path.join(__dirname,'..');
 const read=rel=>fs.readFileSync(path.join(root,rel),'utf8');
 
-test('v127: identidade e cache atuais estão alinhados',()=>{
+test('v128: identidade e cache atuais estão alinhados',()=>{
   const cfg=read('src/config/sofia.js'),html=read('public/index.html'),pkg=JSON.parse(read('package.json'));
-  assert.ok(cfg.includes("const VERSION = '127.0.0'"));
-  assert.ok(html.includes('Sofia OS · v127'));
-  assert.ok(html.includes('/ui-current.css?v=127'));
-  assert.ok(html.includes('/app.js?v=127'));
-  assert.ok(html.includes('Core v127 · AVSORD Technology'));
-  assert.equal(pkg.version,'1.77.0');
+  assert.ok(cfg.includes("const VERSION = '128.0.0'"));
+  assert.ok(html.includes('Sofia OS · v128'));
+  assert.ok(html.includes('/ui-current.css?v=128'));
+  assert.ok(html.includes('/app.js?v=128'));
+  assert.ok(html.includes('Core v128 · AVSORD Technology'));
+  assert.equal(pkg.version,'1.78.0');
 });
 
 test('v119: subpáginas continuam fechadas ao iniciar',()=>{

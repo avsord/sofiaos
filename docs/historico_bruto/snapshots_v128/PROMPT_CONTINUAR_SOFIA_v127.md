@@ -366,6 +366,3 @@ Ao continuar: não voltar ao cadastro normal do número. O número já está no 
 
 ## CHECKPOINT v127 — CSP Meta corrigida
 A v126 chegou ao Railway, mas o Edge mostrou `Content Security Policy` bloqueando `connect.facebook.net/app_config/json/...` e estilo inline do SDK. A v127 corrige somente as permissões CSP necessárias ao Embedded Signup, preservando o modo de coexistência `whatsapp_business_app_onboarding`. Próximo passo: instalar, fazer push, esperar o Railway e testar novamente o botão público.
-
-## CHECKPOINT v128 — callback do FB.login corrigido
-A v127 chegou ao Railway e removeu os erros CSP. O Console passou a mostrar somente `Expression is of type asyncfunction, not function` (além do favicon 403 irrelevante). A v128 corrige `FB.login(async response => ...)` para callback normal e mantém a finalização assíncrona internamente. Próximo passo: instalar, fazer push, esperar Railway e testar `/whatsapp/connect` novamente.

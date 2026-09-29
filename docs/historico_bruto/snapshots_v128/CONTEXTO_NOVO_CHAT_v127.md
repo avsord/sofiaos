@@ -76,9 +76,3 @@ A barra de scroll dos menus laterais deve permanecer visível no desktop e segui
 - O console do Edge mostrou que a v126 era bloqueada pela própria Content Security Policy ao tentar acessar `connect.facebook.net/app_config/json/...`.
 - v127 libera somente as origens necessárias ao SDK da Meta na página pública de conexão e mantém o painel privado.
 - Próximo teste: publicar v127 no Railway e clicar novamente em Conectar WhatsApp Business.
-
-## Atualização v128 — callback do Embedded Signup
-- v127 foi publicada no Railway e os erros CSP desapareceram.
-- Restou no SDK da Meta: `Expression is of type asyncfunction, not function`.
-- v128 troca o callback direto `async` do `FB.login` por callback `Function` normal com uma rotina assíncrona interna.
-- Próximo teste: publicar v128, abrir `/whatsapp/connect` e clicar em **Conectar WhatsApp Business** com o Console aberto.
