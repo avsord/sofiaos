@@ -82,8 +82,3 @@ Ao criar uma nova versão, atualizar:
 - `public/app.js` → `loadConnections()` adiciona o botão **Conectar WhatsApp Business** no card WhatsApp/Meta.
 - `public/whatsapp-connect.html` + `.js` + `.css` → tela pública mínima para Embedded Signup/coexistência.
 - `src/core/http-handler.js` → rotas públicas mínimas de health, privacy, webhook e onboarding; restante do painel continua local/privado.
-
-
-## v127 — WhatsApp Business / CSP
-- `/whatsapp/connect` mantém o mesmo visual e fluxo da v126.
-- A política de conteúdo da rota permite os requests do SDK oficial da Meta necessários ao Embedded Signup sem abrir scripts inline.

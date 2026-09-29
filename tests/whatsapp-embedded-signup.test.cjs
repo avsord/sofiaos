@@ -18,11 +18,12 @@ function runtimeFixture(t){
   return new Promise(resolve=>server.listen(0,'127.0.0.1',()=>resolve({runtime,server,base:'http://127.0.0.1:'+server.address().port})));
 }
 
-test('v126: endpoints públicos mínimos funcionam sem liberar o painel',async t=>{
+test('v127: endpoints públicos mínimos funcionam sem liberar o painel',async t=>{
   const f=await runtimeFixture(t);
   const health=await fetch(f.base+'/health');assert.equal(health.status,200);
   const privacy=await fetch(f.base+'/privacy');assert.equal(privacy.status,200);assert.match(await privacy.text(),/Política de Privacidade/);
   const connect=await fetch(f.base+'/whatsapp/connect');assert.equal(connect.status,200);assert.match(await connect.text(),/Conectar WhatsApp Business/);
+  const csp=connect.headers.get('content-security-policy')||'';assert.match(csp,/connect-src[^;]*https:\/\/connect\.facebook\.net/);assert.match(csp,/style-src[^;]*'unsafe-inline'/);
   const cfg=await fetch(f.base+'/whatsapp/onboarding-config').then(r=>r.json());assert.equal(cfg.configId,'1590251151959449');assert.equal(cfg.featureType,'whatsapp_business_app_onboarding');
   const challenge=await fetch(f.base+'/webhook?hub.mode=subscribe&hub.verify_token=sofia_webhook_2026&hub.challenge=12345');assert.equal(challenge.status,200);assert.equal(await challenge.text(),'12345');
   const blocked=await new Promise((resolve,reject)=>{const u=new URL(f.base+'/api/bootstrap');const req=http.get({hostname:u.hostname,port:u.port,path:u.pathname,headers:{Host:'evil.example'}},res=>{res.resume();resolve(res.statusCode);});req.on('error',reject);});assert.equal(blocked,403);

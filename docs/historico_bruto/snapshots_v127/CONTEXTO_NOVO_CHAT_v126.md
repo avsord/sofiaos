@@ -70,9 +70,3 @@ A barra de scroll dos menus laterais deve permanecer visível no desktop e segui
 - O número escolhido já está no WhatsApp Business; NÃO desconectar nem migrar pelo cadastro normal. Usar coexistência via Embedded Signup.
 - v126 adiciona a página `/whatsapp/connect` e botão na Sofia que lança o fluxo com `whatsapp_business_app_onboarding`.
 - Depois de validar a coexistência, voltar diretamente ao App Review e anexar a gravação real do fluxo para `whatsapp_business_management`.
-
-
-## Atualização v127 — CSP do fluxo Meta
-- O console do Edge mostrou que a v126 era bloqueada pela própria Content Security Policy ao tentar acessar `connect.facebook.net/app_config/json/...`.
-- v127 libera somente as origens necessárias ao SDK da Meta na página pública de conexão e mantém o painel privado.
-- Próximo teste: publicar v127 no Railway e clicar novamente em Conectar WhatsApp Business.

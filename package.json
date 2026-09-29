@@ -1,7 +1,7 @@
 {
   "name": "sofia-os",
-  "version": "1.76.0",
-  "description": "Sofia OS — v126 conecta WhatsApp Business por Embedded Signup em modo de coexistência e consolida a base Railway/Meta",
+  "version": "1.77.0",
+  "description": "Sofia OS — v127 corrige a CSP do Embedded Signup da Meta para permitir o fluxo de coexistência do WhatsApp Business",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

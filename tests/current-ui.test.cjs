@@ -6,14 +6,14 @@ const path=require('node:path');
 const root=path.join(__dirname,'..');
 const read=rel=>fs.readFileSync(path.join(root,rel),'utf8');
 
-test('v126: identidade e cache atuais estão alinhados',()=>{
+test('v127: identidade e cache atuais estão alinhados',()=>{
   const cfg=read('src/config/sofia.js'),html=read('public/index.html'),pkg=JSON.parse(read('package.json'));
-  assert.ok(cfg.includes("const VERSION = '126.0.0'"));
-  assert.ok(html.includes('Sofia OS · v126'));
-  assert.ok(html.includes('/ui-current.css?v=126'));
-  assert.ok(html.includes('/app.js?v=126'));
-  assert.ok(html.includes('Core v126 · AVSORD Technology'));
-  assert.equal(pkg.version,'1.76.0');
+  assert.ok(cfg.includes("const VERSION = '127.0.0'"));
+  assert.ok(html.includes('Sofia OS · v127'));
+  assert.ok(html.includes('/ui-current.css?v=127'));
+  assert.ok(html.includes('/app.js?v=127'));
+  assert.ok(html.includes('Core v127 · AVSORD Technology'));
+  assert.equal(pkg.version,'1.77.0');
 });
 
 test('v119: subpáginas continuam fechadas ao iniciar',()=>{
@@ -119,7 +119,7 @@ test('v125: curso só pode ser excluído dentro de Editar',()=>{
 });
 
 
-test('v126: Conexões oferece botão real de coexistência do WhatsApp Business',()=>{
+test('v127: Conexões oferece botão real de coexistência do WhatsApp Business',()=>{
   const app=read('public/app.js'),api=read('src/core/api45.js');
   assert.ok(app.includes('Conectar WhatsApp Business'));
   assert.ok(app.includes("r.status==='ready-to-connect'?'Pronto para conectar'"));
@@ -127,7 +127,7 @@ test('v126: Conexões oferece botão real de coexistência do WhatsApp Business'
   assert.ok(api.includes("connect_url:base+'/whatsapp/connect'"));
 });
 
-test('v126: Embedded Signup abre o fluxo de coexistência e não o cadastro normal',()=>{
+test('v127: Embedded Signup abre o fluxo de coexistência e não o cadastro normal',()=>{
   const js=read('public/whatsapp-connect.js'),html=read('public/whatsapp-connect.html');
   assert.ok(html.includes('Conectar WhatsApp Business'));
   assert.ok(js.includes("featureType:'whatsapp_business_app_onboarding'"));
@@ -136,7 +136,7 @@ test('v126: Embedded Signup abre o fluxo de coexistência e não o cadastro norm
   assert.ok(js.includes("override_default_response_type:true"));
 });
 
-test('v126: infraestrutura Railway mantém health, privacy e webhook públicos sem abrir o painel privado',()=>{
+test('v127: infraestrutura Railway mantém health, privacy e webhook públicos sem abrir o painel privado',()=>{
   const handler=read('src/core/http-handler.js'),server=read('src/server.js');
   assert.ok(handler.includes("p==='/health'"));
   assert.ok(handler.includes("p==='/privacy'"));

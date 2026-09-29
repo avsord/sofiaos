@@ -1,4 +1,4 @@
-# Comando atual — Sofia OS v127
+# Comando atual — Sofia OS v126
 
 ## Estado
 - Backend Railway online e `/health` público.
@@ -14,7 +14,7 @@ npm.cmd start
 
 ## Depois de atualizar código e enviar ao GitHub
 ```powershell
-git add .; git commit -m "Sofia OS v127 - corrige CSP Meta"; git push
+git add .; git commit -m "Sofia OS v126 - WhatsApp coexistencia"; git push
 ```
 
 ## Variáveis públicas/configuráveis no Railway
@@ -37,7 +37,3 @@ WHATSAPP_PHONE_NUMBER_ID=<somente Railway/.env>
 ```text
 https://sofiaos.up.railway.app/whatsapp/connect
 ```
-
-
-## v127
-Correção direta do bloqueio CSP observado no Console do Edge. Depois da atualização: `git add` apenas os arquivos versionados da v127, commit/push e testar `/whatsapp/connect` no Railway.

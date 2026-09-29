@@ -362,7 +362,3 @@ A versão atual é 73.0.0. O pacote deve preservar `.env`, dados, memória, pág
 
 ## CHECKPOINT v126 — WhatsApp coexistência
 Ao continuar: não voltar ao cadastro normal do número. O número já está no WhatsApp Business. A v126 implementa `/whatsapp/connect` com Embedded Signup e `featureType: whatsapp_business_app_onboarding`. Depois de completar e gravar esse fluxo, retomar imediatamente o App Review da permissão `whatsapp_business_management`.
-
-
-## CHECKPOINT v127 — CSP Meta corrigida
-A v126 chegou ao Railway, mas o Edge mostrou `Content Security Policy` bloqueando `connect.facebook.net/app_config/json/...` e estilo inline do SDK. A v127 corrige somente as permissões CSP necessárias ao Embedded Signup, preservando o modo de coexistência `whatsapp_business_app_onboarding`. Próximo passo: instalar, fazer push, esperar o Railway e testar novamente o botão público.
