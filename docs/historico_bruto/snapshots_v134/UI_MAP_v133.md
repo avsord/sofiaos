@@ -121,7 +121,3 @@ Rodapé da sidebar: avatar/iniciais + nome do proprietário. Menu: Meu perfil, C
 - `/reset-password?token=...`: permite definir e confirmar nova senha quando o token é válido.
 - Configuração > Meu perfil: **E-mail de login e recuperação**.
 - Configuração > Segurança e sessão: **Alterar senha**, status da recuperação por e-mail, sair deste dispositivo e encerrar todas as sessões.
-
-### Sidebar / conta — v134
-- `public/ui-current.css` → card `.account-summary` ocupa somente a largura útil da sidebar; `.account-copy small` permite quebra do e-mail; `.account-popover` é overlay `position: fixed`.
-- `public/app.js` → `positionAccountPopover()` ancora o menu ao card do usuário sem depender do overflow da sidebar; scroll lateral fecha o menu.

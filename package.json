@@ -1,7 +1,7 @@
 {
   "name": "sofia-os",
-  "version": "1.83.0",
-  "description": "Sofia OS — v133 usa e-mail como login e adiciona recuperação segura de senha por e-mail",
+  "version": "1.84.0",
+  "description": "Sofia OS — v134 corrige o perfil da sidebar e transforma o menu da conta em overlay sem recortes",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

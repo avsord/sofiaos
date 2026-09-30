@@ -86,9 +86,3 @@ Opcional: `SOFIA_SMTP_FROM`.
 - Senhas redefinidas ficam somente como hash scrypt em `data/owner-auth.json`; o arquivo é preservado por atualização.
 - Alterar o e-mail em Meu perfil muda o nome de login e o destino das próximas recuperações.
 - Alterar ou redefinir senha encerra todas as sessões.
-
-## v134 — correção do rodapé da sidebar
-- Card de perfil não pode invadir/cair sob a scrollbar lateral.
-- Nome permanece compacto; e-mail deve ficar legível sem corte abrupto.
-- Menu da conta deve abrir como overlay acima da interface, sem clipping pelo container rolável.
-- Clique fora, `Esc`, scroll da sidebar ou seleção de item fecham o menu.

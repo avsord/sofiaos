@@ -387,6 +387,3 @@ Estado v132: a Sofia possui perfil editável do proprietário e menu de conta qu
 
 ## CHECKPOINT v133 — conta do proprietário
 Preservar login por **e-mail + senha**. O e-mail do perfil é o nome de login e também o destino de recuperação. O e-mail inicial deve vir de `SOFIA_LOGIN_EMAIL`, sem hardcode de endereço pessoal. `/forgot-password` envia link de uso único por SMTP seguro; token expira em 30 minutos e é armazenado apenas como hash. Senha redefinida fica como hash scrypt em `data/owner-auth.json`. Troca/redefinição encerra todas as sessões. Não voltar ao login só por senha e não criar cadastro multiusuário fictício.
-
-## CHECKPOINT v134 — perfil/sidebar
-Preservar a correção visual do rodapé: o card Pedro Silva/e-mail respeita a largura útil e o e-mail não é cortado pela scrollbar. O menu da conta é overlay fixo ancorado ao card e não pode voltar a ficar preso pelo `overflow` da sidebar.

@@ -116,9 +116,3 @@ Perfil do proprietário adicionado. O menu da conta deve fechar ao clicar fora. 
 - Recuperação exige SMTP seguro no Railway: `SOFIA_SMTP_USER` + `SOFIA_SMTP_PASS` (host padrão Gmail `smtp.gmail.com`, porta 465).
 - Alterar o e-mail em Meu perfil também altera o nome de login e o destino futuro da recuperação.
 - Trocar/redefinir senha encerra todas as sessões online.
-
-## Atualização v134 — sidebar / perfil
-- Corrigido o recorte visual do card Pedro Silva/e-mail no rodapé da sidebar.
-- O e-mail quebra de linha em vez de desaparecer sob a scrollbar.
-- O menu Meu perfil / Conta e configurações / Site público / Sair abre em overlay de viewport e não é mais clipado pelo scroll lateral.
-- Preservar fechamento por clique fora, `Esc` e ações do menu.

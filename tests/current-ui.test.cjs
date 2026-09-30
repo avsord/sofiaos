@@ -6,14 +6,14 @@ const path=require('node:path');
 const root=path.join(__dirname,'..');
 const read=rel=>fs.readFileSync(path.join(root,rel),'utf8');
 
-test('v133: identidade e cache atuais estão alinhados',()=>{
+test('v134: identidade e cache atuais estão alinhados',()=>{
   const cfg=read('src/config/sofia.js'),html=read('public/index.html'),pkg=JSON.parse(read('package.json'));
-  assert.ok(cfg.includes("const VERSION = '133.0.0'"));
-  assert.ok(html.includes('Sofia OS · v133'));
-  assert.ok(html.includes('/ui-current.css?v=133'));
-  assert.ok(html.includes('/app.js?v=133'));
-  assert.ok(html.includes('Core v133 · AVSORD Technology'));
-  assert.equal(pkg.version,'1.83.0');
+  assert.ok(cfg.includes("const VERSION = '134.0.0'"));
+  assert.ok(html.includes('Sofia OS · v134'));
+  assert.ok(html.includes('/ui-current.css?v=134'));
+  assert.ok(html.includes('/app.js?v=134'));
+  assert.ok(html.includes('Core v134 · AVSORD Technology'));
+  assert.equal(pkg.version,'1.84.0');
 });
 
 test('v119: subpáginas continuam fechadas ao iniciar',()=>{
@@ -213,4 +213,16 @@ test('v133: login usa e-mail, recuperação e troca de senha estão presentes',(
   assert.ok(runtime.includes('SOFIA_SMTP_USER'));
   assert.ok(runtime.includes('SOFIA_SMTP_PASS'));
   assert.ok(login.includes('resetPasswordForm'));
+});
+
+
+test('v134: perfil da sidebar não corta conteúdo e menu da conta usa overlay de viewport',()=>{
+  const css=read('public/ui-current.css'),app=read('public/app.js');
+  assert.ok(css.includes('v134 — perfil da sidebar sem recorte'));
+  assert.ok(css.includes('.mode-user .account-popover{'));
+  assert.ok(css.includes('position:fixed!important'));
+  assert.ok(css.includes('overflow-wrap:anywhere!important'));
+  assert.ok(app.includes('function positionAccountPopover()'));
+  assert.ok(app.includes("accountMenu?.addEventListener('toggle'"));
+  assert.ok(app.includes("accountSessionLabel').title=email"));
 });
