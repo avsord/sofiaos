@@ -26,8 +26,8 @@ test('v133: Railway redireciona raiz para login e libera painel somente após se
 
   r=await fetch(base+'/auth/login',{method:'POST',redirect:'manual',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({email:'owner@example.com',password:f.config.loginPassword})});
   assert.equal(r.status,303);assert.equal(r.headers.get('location'),'/');const cookie=cookieFrom(r.headers.get('set-cookie'));assert.match(cookie,/^sofia_session=/);
-  r=await fetch(base+'/',{headers:{Cookie:cookie}});assert.equal(r.status,200);assert.match(await r.text(),/Sofia OS · v134/);
-  r=await fetch(base+'/api/bootstrap',{headers:{Cookie:cookie}});assert.equal(r.status,200);assert.equal((await r.json()).version,'134.0.0');
+  r=await fetch(base+'/',{headers:{Cookie:cookie}});assert.equal(r.status,200);assert.match(await r.text(),/Sofia OS · v138/);
+  r=await fetch(base+'/api/bootstrap',{headers:{Cookie:cookie}});assert.equal(r.status,200);assert.equal((await r.json()).version,'138.0.0');
 });
 
 test('v133: páginas Meta continuam públicas sem sessão',async t=>{

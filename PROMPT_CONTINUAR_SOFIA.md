@@ -390,3 +390,10 @@ Preservar login por **e-mail + senha**. O e-mail do perfil é o nome de login e 
 
 ## CHECKPOINT v134 — perfil/sidebar
 Preservar a correção visual do rodapé: o card Pedro Silva/e-mail respeita a largura útil e o e-mail não é cortado pela scrollbar. O menu da conta é overlay fixo ancorado ao card e não pode voltar a ficar preso pelo `overflow` da sidebar.
+
+
+## v138 — aplicativo Android e mesma base
+
+Login nativo por e-mail e senha, sessão Bearer com hash e expiração, mensagens e áudios no mesmo SofiaCore. A API do app expõe somente operações de usuário autenticadas, reutilizando o catálogo e as mesmas operações do site. Sessões web e nativas são revogadas juntas ao trocar a senha ou sair de todos os dispositivos. O diário mantém autenticação adicional e criptografia, separado da memória comum. Nenhuma dependência da aprovação Meta para conversar no app. Não significa que o WhatsApp esteja ativado ou que as conversas de outros contatos possam usar a memória privada do proprietário.
+
+Base desta integração no GitHub: v134; documentos anteriores preservados em snapshots_v138. Não altera .env, senhas, diretórios existentes de dados ou backups. Publicar em produção somente depois dos testes e da conferência de persistência/backup. APK compilado não comprova a credencial real da IA nem equivalência a todos os gestos avançados do editor desktop.

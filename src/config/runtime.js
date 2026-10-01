@@ -6,7 +6,7 @@ function makeConfig(overrides = {}) {
   const port = Number(process.env.PORT || 3000);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new AppError('BAD_PORT', 'PORT precisa ser um número entre 1 e 65535.');
   return {
-    root, port, host: '127.0.0.1', dataDir: path.join(root, 'data'), backupDir: path.join(root, 'backups'),
+    root, port, host: '127.0.0.1', dataDir: process.env.SOFIA_DATA_DIR ? path.resolve(root, process.env.SOFIA_DATA_DIR) : path.join(root, 'data'), backupDir: process.env.SOFIA_BACKUP_DIR ? path.resolve(root, process.env.SOFIA_BACKUP_DIR) : path.join(root, 'backups'),
     model: process.env.OPENAI_MODEL?.trim() || 'gpt-5.6-terra',
     apiKey: process.env.OPENAI_API_KEY?.trim() || '',
     adminApiKey: process.env.OPENAI_ADMIN_KEY?.trim() || '',

@@ -359,89 +359,34 @@ A versão atual é 73.0.0. O pacote deve preservar `.env`, dados, memória, pág
 - Cache do front usa `?v=103`.
 - Atualizador usa `MANIFESTO_V103.json` e preserva `.env`, dados e backups.
 
----
 
-# Adendo permanente v106 — preservação do histórico
-
-A simplificação do projeto serve apenas para reduzir a superfície ativa de edição e teste. Ela não autoriza apagar documentação, decisões, checkpoints ou contexto acumulado.
-
-Regras adicionais:
-- manter a documentação bruta dentro do ZIP/master;
-- nunca mover documentação histórica para fora do projeto como parte de uma atualização;
-- se testes antigos forem retirados da suíte ativa, preservar cópias dentro de `docs/historico_bruto/`;
-- manter `docs/CONTEXTO_NOVO_CHAT.md`, `docs/MASTER.md` e `docs/UI_MAP.md` atualizados;
-- quando houver conflito entre um resumo atual e o histórico, investigar os documentos brutos antes de concluir que uma regra antiga deixou de valer;
-- ao criar uma nova versão, preservar o histórico existente e apenas acrescentar o novo contexto.
+## CHECKPOINT v126 — WhatsApp coexistência
+Ao continuar: não voltar ao cadastro normal do número. O número já está no WhatsApp Business. A v126 implementa `/whatsapp/connect` com Embedded Signup e `featureType: whatsapp_business_app_onboarding`. Depois de completar e gravar esse fluxo, retomar imediatamente o App Review da permissão `whatsapp_business_management`.
 
 
-# Adendo v107 — preview do sino
+## CHECKPOINT v127 — CSP Meta corrigida
+A v126 chegou ao Railway, mas o Edge mostrou `Content Security Policy` bloqueando `connect.facebook.net/app_config/json/...` e estilo inline do SDK. A v127 corrige somente as permissões CSP necessárias ao Embedded Signup, preservando o modo de coexistência `whatsapp_business_app_onboarding`. Próximo passo: instalar, fazer push, esperar o Railway e testar novamente o botão público.
 
-O preview de notificações deve abrir abaixo do sino e para a esquerda, permanecendo totalmente visível no viewport. A camada atual de posicionamento fica em `public/ui-current.css`; o histórico acumulado de estilos permanece em `public/style.css`.
-
-
-# Adendo v109 — páginas limpas
-
-A partir da v109, a Sofia reduz controles redundantes nas páginas. A regra é: a superfície principal deve parecer uma página/documento, e não um painel administrativo.
-
-- trocar ícone: clicar no ícone;
-- trocar capa: clicar na própria capa;
-- ações secundárias: menu `•••`;
-- templates: continuam existindo, mas não ocupam espaço visual fixo sob o título;
-- subpáginas: devem parecer links/cartões limpos e não uma seção pesada com divisórias.
+## CHECKPOINT v128 — callback do FB.login corrigido
+A v127 chegou ao Railway e removeu os erros CSP. O Console passou a mostrar somente `Expression is of type asyncfunction, not function` (além do favicon 403 irrelevante). A v128 corrige `FB.login(async response => ...)` para callback normal e mantém a finalização assíncrona internamente. Próximo passo: instalar, fazer push, esperar Railway e testar `/whatsapp/connect` novamente.
 
 
-# Adendo v110 — hover das entradas vazias
+## CHECKPOINT v129 — Verificação de acesso da Meta
+O App Review já foi enviado. A Verificação do acesso pediu um site público completo. A v129 publica `/site`, `/terms` e `/data-deletion` e atualiza `/privacy`, mantendo o painel privado. Depois do deploy, usar `https://sofiaos.up.railway.app/site` no campo **Provide a link to your website** e enviar a verificação de acesso.
 
-Linhas vazias de texto não devem ficar chamando atenção permanentemente. O placeholder aparece somente quando o mouse passa sobre a linha. A ação de adicionar bloco segue a mesma lógica. A capa permanece encostada no topo e os ícones usam o visual anterior.
+## Estado adicional a partir da v130
+- O painel no Railway exige sessão autenticada por senha; sem sessão a raiz redireciona para `/login`.
+- `SOFIA_LOGIN_PASSWORD` é segredo de ambiente e nunca deve ser salvo em arquivos versionados.
+- As rotas públicas da Meta/WhatsApp permanecem públicas, mas painel, assets privados e APIs exigem sessão no Railway.
+- O login v130 é single-owner/admin. Não apresentar isso como suporte a contas de clientes; multiusuário exige isolamento de dados real.
 
-
-# Adendo v111 — espaçamento de blocos
-
-Os controles `+` e arrastar devem ter coluna própria e não podem encostar no texto do bloco. O placeholder continua invisível fora do hover.
-
-
-# Adendo v117
-- subpáginas da sidebar devem iniciar fechadas em cada nova carga do app;
-- o estado expandido não deve persistir entre recarregamentos.
+V131: preservar o menu de conta e o botão Sair dentro da interface. Sessões online são single-owner, 12h, em memória e expiram em deploy. O frontend deve redirecionar a /login quando receber AUTH_REQUIRED. Não criar cadastro público, recuperação por e-mail ou múltiplos usuários até o backend ter isolamento real de contas.
 
 
-# Adendo v118 — Agenda como viewer
-- A Agenda é uma visão de calendário, não uma grade de cards.
-- Deve consolidar compromissos/eventos, lembretes, tarefas datadas e outros registros datados sem perder a origem.
-- A interface deve priorizar leitura temporal, navegação por mês e programação cronológica.
+Estado v132: a Sofia possui perfil editável do proprietário e menu de conta que fecha corretamente ao clicar fora/Esc. Preservar esse comportamento.
 
+## CHECKPOINT v133 — conta do proprietário
+Preservar login por **e-mail + senha**. O e-mail do perfil é o nome de login e também o destino de recuperação. O e-mail inicial deve vir de `SOFIA_LOGIN_EMAIL`, sem hardcode de endereço pessoal. `/forgot-password` envia link de uso único por SMTP seguro; token expira em 30 minutos e é armazenado apenas como hash. Senha redefinida fica como hash scrypt em `data/owner-auth.json`. Troca/redefinição encerra todas as sessões. Não voltar ao login só por senha e não criar cadastro multiusuário fictício.
 
-# Adendo v119 — Agenda como superfície unificada
-
-A Agenda não deve criar cópias independentes. Ela visualiza e edita Tarefas, Eventos, Lembretes e outros registros datados nas respectivas fontes. A futura integração com Google Calendar deve usar IDs externos e estado de sincronização, preservando a entidade local como registro vinculado e tratando conflitos explicitamente.
-
-
-## v120 — correção da tela Tarefas
-A v119 removeu acidentalmente `loadTaskCards()` e os helpers de prioridade. A v120 restaura essas funções e adiciona teste de regressão para evitar o erro `loadTaskCards is not defined`.
-
-
-## v121 — navegação Início/Resumo
-- `Início` deve sempre abrir no topo, independentemente da última posição do Resumo antes de sair para Agenda/Tarefas/etc.
-- `Resumo` só deve ser aberto quando o usuário clicar explicitamente em Resumo.
-
-
-# Adendo v122 — scroll lateral
-
-A barra de rolagem da sidebar é um elemento visual persistente no desktop. Não deve ficar transparente fora do hover nem sumir ao abrir subpáginas. O padrão visual é fino, arredondado e discreto, inspirado no Notion.
-
-
-## Infraestrutura acordada em setembro de 2026
-- GitHub: código/versionamento e origem do deploy.
-- Railway: hospedagem contínua do servidor Node; não é a IA e não decide ações.
-- OpenAI: camada de inteligência; o backend valida e executa.
-- Supabase: futuro banco/índice estruturado de memória e relações, evitando usar storage caro para arquivos brutos.
-- Google Drive: arquivos brutos/pesados; Supabase mantém referências/resumos quando necessário.
-- Next.js + Vercel: direção futura para a interface web; não bloquear a integração WhatsApp atual por uma reescrita prematura.
-- Segredos: somente `.env`/variáveis seguras do provedor; nunca GitHub, documentação, logs ou frontend.
-
-
-## v138 — aplicativo Android e mesma base
-
-Login nativo por e-mail e senha, sessão Bearer com hash e expiração, mensagens e áudios no mesmo SofiaCore. A API do app expõe somente operações de usuário autenticadas, reutilizando o catálogo e as mesmas operações do site. Sessões web e nativas são revogadas juntas ao trocar a senha ou sair de todos os dispositivos. O diário mantém autenticação adicional e criptografia, separado da memória comum. Nenhuma dependência da aprovação Meta para conversar no app. Não significa que o WhatsApp esteja ativado ou que as conversas de outros contatos possam usar a memória privada do proprietário.
-
-Base desta integração no GitHub: v134; documentos anteriores preservados em snapshots_v138. Não altera .env, senhas, diretórios existentes de dados ou backups. Publicar em produção somente depois dos testes e da conferência de persistência/backup. APK compilado não comprova a credencial real da IA nem equivalência a todos os gestos avançados do editor desktop.
+## CHECKPOINT v134 — perfil/sidebar
+Preservar a correção visual do rodapé: o card Pedro Silva/e-mail respeita a largura útil e o e-mail não é cortado pela scrollbar. O menu da conta é overlay fixo ancorado ao card e não pode voltar a ficar preso pelo `overflow` da sidebar.

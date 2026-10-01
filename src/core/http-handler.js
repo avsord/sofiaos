@@ -9,6 +9,8 @@ const {AppError,cleanText,validId,publicError,atomicWrite}=require('./util');
 const {verifySignature,normalizeWebhook}=require('../channels/whatsapp');
 const {OwnerAuth,normalizeEmail}=require('../services/owner-auth');
 const {AccountMailer}=require('../services/account-mailer');
+const {MobileSessions}=require('../services/mobile-sessions');
+const {makeMobileApi}=require('../channels/mobile');
 const STATIC={'/':['index.html','text/html; charset=utf-8'],'/index.html':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8'],'/ui-current.css':['ui-current.css','text/css; charset=utf-8']};
 const PUBLIC_STATIC={'/login.js':['login.js','text/javascript; charset=utf-8'],'/whatsapp/connect':['whatsapp-connect.html','text/html; charset=utf-8'],'/whatsapp-connect.js':['whatsapp-connect.js','text/javascript; charset=utf-8'],'/whatsapp-connect.css':['whatsapp-connect.css','text/css; charset=utf-8'],'/site':['site.html','text/html; charset=utf-8'],'/terms':['terms.html','text/html; charset=utf-8'],'/data-deletion':['data-deletion.html','text/html; charset=utf-8']};
 function bodyJson(req,limitBytes=65536) {
@@ -114,12 +116,15 @@ function createHandler(runtime) {
   const tooManyFailures=req=>{const key=attemptKey(req),now=Date.now(),windowMs=15*60*1000;const arr=(loginAttempts.get(key)||[]).filter(ts=>now-ts<windowMs);loginAttempts.set(key,arr);return arr.length>=12;};
   const registerResetRequest=req=>{const key=attemptKey(req),now=Date.now(),windowMs=30*60*1000;const arr=(resetAttempts.get(key)||[]).filter(ts=>now-ts<windowMs);arr.push(now);resetAttempts.set(key,arr);return arr.length;};
   const tooManyResetRequests=req=>{const key=attemptKey(req),now=Date.now(),windowMs=30*60*1000;const arr=(resetAttempts.get(key)||[]).filter(ts=>now-ts<windowMs);resetAttempts.set(key,arr);return arr.length>=5;};
+  const mobileSessions=new MobileSessions(store,ownerAuth,config);
+  const mobileApi=makeMobileApi(runtime,{bodyJson,json,ownerAuth,mobileSessions,tooManyFailures,registerFailure,clearFailures:req=>loginAttempts.delete(attemptKey(req)),revokeWebSessions:()=>sessions.clear()});
   return async function handler(req,res) {
     const url=new URL(req.url,'http://localhost');const p=url.pathname,m=req.method;
     if(publicRoute(p,m))publicHeaders(res,p);else headers(res);
     try {
       if(req.url.length>4096)throw new AppError('URL_TOO_LONG','Endereço grande demais.',414);
       if(!['GET','POST','PATCH','DELETE'].includes(m))throw new AppError('METHOD','Método não suportado.',405);
+      if(await mobileApi(req,res,p,m,url))return;
       if(m==='GET'&&p==='/login'){
         if(railwayEnv()&&validSession(req))return redirect(res,303,'/');
         return plain(res,200,loginPage({error:url.searchParams.get('error')==='1',expired:url.searchParams.get('expired')==='1',loggedOut:url.searchParams.get('logout')==='1',loggedOutAll:url.searchParams.get('logout')==='all',rateLimited:url.searchParams.get('rate')==='1',reset:url.searchParams.get('reset')==='1',passwordChanged:url.searchParams.get('changed')==='1',configured:ownerAuth.passwordConfigured()}),'text/html; charset=utf-8');
@@ -154,7 +159,7 @@ function createHandler(runtime) {
         if(password.length<12)return plain(res,400,resetPasswordPage({token:resetToken,valid:true,error:'A nova senha precisa ter pelo menos 12 caracteres.'}),'text/html; charset=utf-8');
         if(password!==confirmation)return plain(res,400,resetPasswordPage({token:resetToken,valid:true,error:'As duas senhas precisam ser iguais.'}),'text/html; charset=utf-8');
         if(!ownerAuth.consumeReset(resetToken,password))return plain(res,400,resetPasswordPage({valid:false}),'text/html; charset=utf-8');
-        sessions.clear();return redirect(res,303,'/login?reset=1');
+        sessions.clear();mobileSessions.revokeAll();return redirect(res,303,'/login?reset=1');
       }
       if(m==='GET'&&p==='/logout'){if(railwayEnv())clearSession(req,res);return redirect(res,303,railwayEnv()?'/login?logout=1':'/');}
       if(m==='GET'&&p==='/health')return json(res,200,{ok:true,name:'Sofia OS',version:VERSION,storage:'sqlite-local'});
@@ -167,8 +172,8 @@ function createHandler(runtime) {
       if(railwayEnv()){if(!validSession(req)){if(m==='GET'&&(p==='/'||p==='/index.html'))return redirect(res,303,'/login');throw new AppError('AUTH_REQUIRED','Faça login para acessar a Sofia.',401);}checkOnlinePrivateRequest(req,config);}else checkLocalRequest(req);
       if(m!=='GET' && req.headers['x-sofia-token']!==token)throw new AppError('CSRF','Reabra a página para atualizar a sessão local.',403);
       if(m==='GET' && p==='/api/bootstrap'){const current=sessionFor(req);return json(res,200,{ok:true,token,version:VERSION,identity_version:IDENTITY_VERSION,model:config.model,key_present:Boolean(config.apiKey),settings:store.settings(),usage:store.usage(),stats:store.stats(),backup_warning:backups.lastError,auth:{online:railwayEnv(),role:'owner',login_email:ownerAuth.registeredEmail(),recovery_email_configured:accountMailer.configured(),session_expires_at:current?new Date(current.expires).toISOString():null,session_ttl_hours:12}});}
-      if(m==='POST' && p==='/api/auth/logout-all'){sessions.clear();clearSession(req,res);return json(res,200,{ok:true,redirect:'/login?logout=all'});}
-      if(m==='POST' && p==='/api/auth/change-password'){const b=await bodyJson(req,8192),currentPassword=String(b.currentPassword||''),newPassword=String(b.newPassword||''),confirmPassword=String(b.confirmPassword||'');if(!ownerAuth.verifyPassword(currentPassword))throw new AppError('PASSWORD_INVALID','A senha atual está incorreta.',403);if(newPassword.length<12)throw new AppError('PASSWORD_WEAK','A nova senha precisa ter pelo menos 12 caracteres.',400);if(newPassword!==confirmPassword)throw new AppError('PASSWORD_MISMATCH','As duas senhas novas precisam ser iguais.',400);ownerAuth.setPassword(newPassword);sessions.clear();clearSession(req,res);return json(res,200,{ok:true,redirect:'/login?changed=1'});}
+      if(m==='POST' && p==='/api/auth/logout-all'){sessions.clear();mobileSessions.revokeAll();clearSession(req,res);return json(res,200,{ok:true,redirect:'/login?logout=all'});}
+      if(m==='POST' && p==='/api/auth/change-password'){const b=await bodyJson(req,8192),currentPassword=String(b.currentPassword||''),newPassword=String(b.newPassword||''),confirmPassword=String(b.confirmPassword||'');if(!ownerAuth.verifyPassword(currentPassword))throw new AppError('PASSWORD_INVALID','A senha atual está incorreta.',403);if(newPassword.length<12)throw new AppError('PASSWORD_WEAK','A nova senha precisa ter pelo menos 12 caracteres.',400);if(newPassword!==confirmPassword)throw new AppError('PASSWORD_MISMATCH','As duas senhas novas precisam ser iguais.',400);ownerAuth.setPassword(newPassword);sessions.clear();mobileSessions.revokeAll();clearSession(req,res);return json(res,200,{ok:true,redirect:'/login?changed=1'});}
       if(m==='GET' && p==='/api/usage-status')return json(res,200,{ok:true,usage:await usageService.status()});
       if(m==='GET' && STATIC[p]) {const [f,type]=STATIC[p];res.setHeader('Content-Type',type);res.end(fs.readFileSync(path.join(config.root,'public',f)));return;}
       if(await extra(req,res,p,m,url))return;
