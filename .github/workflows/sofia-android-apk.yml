@@ -9,63 +9,124 @@ on:
       - '.github/workflows/sofia-android-apk.yml'
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: sofia-android-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 55
     defaults:
       run:
         working-directory: SOFIA_APP
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_PUBLIC_API_URL: https://sofiaos.up.railway.app
     steps:
-      - name: Checkout
+      - name: Checkout isolated app branch
         uses: actions/checkout@v4
-
+        with:
+          ref: ${{ github.sha }}
       - name: Node 22
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: SOFIA_APP/package-lock.json
-
       - name: Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Validate TypeScript
+      - name: Normalize initial source import
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/screens/Workspace.tsx')
+          t=p.read_text().replace("{b.type==='divider'?<View style={{height:1,backgroundColor:c.line}}>:null}","{b.type==='divider'?<View style={{height:1,backgroundColor:c.line}}/>:null}")
+          p.write_text(t)
+          p=Path('tools/assets.cjs')
+          t=p.read_text().replace('AjMvcGNP12QbYtOMQpLoG8','AjMvcGNP12QbYt+y8BWEyno1NKuRfR2mQM2BgD0FsWO5k0tOMQpLoG8')
+          p.write_text(t)
+          PY
+      - name: Install and align SDK dependencies
+        run: |
+          if test -f package-lock.json; then npm ci; else npm install; fi
+          npx expo install --fix
+          npm run prepare-assets
+      - name: Persist lock and normalized source on app branch only
+        run: |
+          cd ..
+          git config user.name 'Sofia build'
+          git config user.email 'sofia-build@users.noreply.github.com'
+          git add -- SOFIA_APP/package.json SOFIA_APP/package-lock.json SOFIA_APP/assets/icon.png SOFIA_APP/src/screens/Workspace.tsx SOFIA_APP/tools/assets.cjs
+          if ! git diff --cached --quiet; then
+            git commit -m 'build: lock Expo dependencies and normalize app sources [skip ci]'
+            git push origin HEAD:refs/heads/sofia-app-android
+          fi
+      - name: Full TypeScript validation
         run: npm run check
-
-      - name: Unit tests
+      - name: Application unit tests
         run: npm test
-
-      - name: Generate Android project
-        env:
-          EXPO_PUBLIC_API_URL: https://sofiaos.up.railway.app
+      - name: Generate native Android project
         run: npx expo prebuild --platform android --non-interactive --clean
-
-      - name: Build installable APK
-        env:
-          EXPO_PUBLIC_API_URL: https://sofiaos.up.railway.app
+      - name: Build standalone internal APK with bundled JavaScript
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
-
-      - name: Stage APK
+          ./gradlew :app:assembleRelease --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a,x86_64
+      - name: Stage APK and verify embedded bundle
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/Sofia.apk
-
-      - name: Upload APK
+          cp android/app/build/outputs/apk/release/app-release.apk dist/Sofia.apk
+          unzip -l dist/Sofia.apk | grep -E 'assets/index.android.bundle|assets/.*\.bundle'
+          sha256sum dist/Sofia.apk > dist/Sofia.apk.sha256
+          git rev-parse HEAD > dist/SOURCE_COMMIT.txt
+          printf 'Internal validation build. Release-mode JavaScript bundle; development signing certificate. Not a Play Store production release.\n' > dist/BUILD_SCOPE.txt
+      - name: Enable KVM for Android smoke test
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install and launch without Metro on Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: |
+            mkdir -p SOFIA_APP/dist
+            adb install SOFIA_APP/dist/Sofia.apk
+            adb logcat -c
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            sleep 20
+            adb shell pidof com.avsord.sofiaapp
+            adb shell uiautomator dump /sdcard/sofia-login.xml
+            adb pull /sdcard/sofia-login.xml SOFIA_APP/dist/login-ui.xml
+            adb exec-out screencap -p > SOFIA_APP/dist/login-screen.png
+            adb logcat -d -s ReactNativeJS:E AndroidRuntime:E > SOFIA_APP/dist/native-errors.txt
+            ! grep -q 'FATAL EXCEPTION' SOFIA_APP/dist/native-errors.txt
+            grep -q 'Entrar na Sofia' SOFIA_APP/dist/login-ui.xml
+      - name: Upload APK and smoke-test evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Sofia-Android-APK
-          path: SOFIA_APP/dist/Sofia.apk
-          if-no-files-found: error
+          path: SOFIA_APP/dist/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Upload exact source and dependency lock
+        if: always()
+        run: |
+          cd ..
+          zip -q -r /tmp/Sofia-app-source.zip SOFIA_APP -x '*/node_modules/*' '*/android/*' '*/.expo/*' '*/dist/*' '*.keystore' '*.jks'
+      - name: Retain source build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sofia-app-source-validated
+          path: /tmp/Sofia-app-source.zip
           retention-days: 30

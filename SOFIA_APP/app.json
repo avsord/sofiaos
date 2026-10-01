@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Sofia",
+    "slug": "sofia-app",
+    "version": "0.2.0",
+    "scheme": "sofiaapp",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#F7F6FA",
+    "icon": "./assets/icon.png",
+    "ios": { "bundleIdentifier": "com.avsord.sofiaapp", "supportsTablet": true },
+    "android": {
+      "package": "com.avsord.sofiaapp",
+      "versionCode": 2,
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": ["android.permission.RECORD_AUDIO"],
+      "blockedPermissions": ["android.permission.READ_CONTACTS", "android.permission.ACCESS_FINE_LOCATION"],
+      "adaptiveIcon": { "foregroundImage": "./assets/icon.png", "backgroundColor": "#7258E8" }
+    },
+    "plugins": [
+      "expo-secure-store",
+      ["expo-audio", { "microphonePermission": "A Sofia usa o microfone somente quando você escolhe gravar uma mensagem de voz.", "enableBackgroundRecording": false, "enableBackgroundPlayback": false }]
+    ]
+  }
+}
