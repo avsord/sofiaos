@@ -35,6 +35,7 @@ export class SofiaApi {
       try { data = await response.json(); } catch { throw new ApiError('O servidor não retornou dados válidos. A API móvel da Sofia precisa estar publicada.', 'INVALID_RESPONSE', response.status); }
       if (!response.ok && path === '/auth/login' && (response.status === 404 || response.status === 405 || data.code === 'AUTH_REQUIRED')) throw new ApiError('O servidor ainda precisa receber a API móvel da Sofia. Não é um erro da sua senha.', 'MOBILE_API_NOT_PUBLISHED', response.status);
       if (!response.ok && path === '/auth/login' && (response.status === 404 || response.status === 405 || data.code === 'AUTH_REQUIRED')) throw new ApiError('O servidor ainda precisa receber a API móvel da Sofia. Não é um erro da sua senha.', 'MOBILE_API_NOT_PUBLISHED', response.status);
+      if (!response.ok && path === '/auth/login' && (response.status === 404 || response.status === 405 || data.code === 'AUTH_REQUIRED')) throw new ApiError('O servidor ainda precisa receber a API móvel da Sofia. Não é um erro da sua senha.', 'MOBILE_API_NOT_PUBLISHED', response.status);
       if (!response.ok) { if (response.status === 401 && path !== '/auth/login') this.onExpired(); throw new ApiError(data.error || 'Não foi possível concluir.', data.code || 'HTTP_ERROR', response.status, data); }
       return data as T;
     } catch (error) {
