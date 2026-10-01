@@ -38,11 +38,23 @@ jobs:
           fi
           git rev-parse HEAD > /tmp/sofia-validation/SOURCE_COMMIT.txt
       - name: Read-only check of public deployment
-        continue-on-error: true
         run: |
-          curl --fail --max-time 20 https://sofiaos.up.railway.app/health > /tmp/sofia-validation/live-health.json
-          CODE=$(curl -sS -o /tmp/sofia-validation/mobile-login-probe.json -w '%{http_code}' --max-time 20 -H 'Content-Type: application/json' -d '{"email":"probe@example.invalid","password":"not-a-real-password","device_name":"validation"}' https://sofiaos.up.railway.app/api/mobile/auth/login || true)
-          printf '%s\n' "$CODE" > /tmp/sofia-validation/mobile-login-status.txt
+          set -e
+          for i in $(seq 1 30); do
+            curl -fsS --max-time 20 https://sofiaos.up.railway.app/health > /tmp/sofia-validation/live-health.json || true
+            VERSION=$(node -e "try{const x=require('/tmp/sofia-validation/live-health.json');process.stdout.write(String(x.version||''))}catch{}")
+            CODE=$(curl -sS -o /tmp/sofia-validation/mobile-login-probe.json -w '%{http_code}' --max-time 20 -H 'Content-Type: application/json' -d '{"email":"probe@example.invalid","password":"not-a-real-password","device_name":"validation"}' https://sofiaos.up.railway.app/api/mobile/auth/login || true)
+            printf '%s\n' "$CODE" > /tmp/sofia-validation/mobile-login-status.txt
+            if [ "$VERSION" = "138.0.0" ] && [ "$CODE" = "401" ] && grep -q '"code":"LOGIN_INVALID"' /tmp/sofia-validation/mobile-login-probe.json; then
+              echo "Mobile API v138 is live."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Production did not reach mobile API v138 in time." >&2
+          cat /tmp/sofia-validation/live-health.json >&2 || true
+          cat /tmp/sofia-validation/mobile-login-probe.json >&2 || true
+          exit 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
