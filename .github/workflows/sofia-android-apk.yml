@@ -1,5 +1,4 @@
 name: Sofia Android APK
-
 on:
   workflow_dispatch:
   push:
@@ -7,14 +6,11 @@ on:
     paths:
       - 'SOFIA_APP/**'
       - '.github/workflows/sofia-android-apk.yml'
-
 permissions:
   contents: write
-
 concurrency:
   group: sofia-android-${{ github.ref }}
   cancel-in-progress: false
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -40,36 +36,24 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Normalize initial source import
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('src/screens/Workspace.tsx')
-          t=p.read_text().replace("{b.type==='divider'?<View style={{height:1,backgroundColor:c.line}}>:null}","{b.type==='divider'?<View style={{height:1,backgroundColor:c.line}}/>:null}")
-          p.write_text(t)
-          p=Path('tools/assets.cjs')
-          t=p.read_text().replace('AjMvcGNP12QbYtOMQpLoG8','AjMvcGNP12QbYt+y8BWEyno1NKuRfR2mQM2BgD0FsWO5k0tOMQpLoG8')
-          p.write_text(t)
-          PY
-      - name: Install and align SDK dependencies
-        run: |
-          if test -f package-lock.json; then npm ci; else npm install; fi
-          npx expo install --fix
-          npm run prepare-assets
-      - name: Persist lock and normalized source on app branch only
-        run: |
-          cd ..
-          git config user.name 'Sofia build'
-          git config user.email 'sofia-build@users.noreply.github.com'
-          git add -- SOFIA_APP/package.json SOFIA_APP/package-lock.json SOFIA_APP/assets/icon.png SOFIA_APP/src/screens/Workspace.tsx SOFIA_APP/tools/assets.cjs
-          if ! git diff --cached --quiet; then
-            git commit -m 'build: lock Expo dependencies and normalize app sources [skip ci]'
-            git push origin HEAD:refs/heads/sofia-app-android
-          fi
+      - name: Apply checked source normalization
+        run: node tools/normalize-source.cjs
+      - name: Install locked dependencies
+        run: npm ci
       - name: Full TypeScript validation
         run: npm run check
       - name: Application unit tests
         run: npm test
+      - name: Persist normalized source on app branch only
+        run: |
+          cd ..
+          git config user.name 'Sofia build'
+          git config user.email 'sofia-build@users.noreply.github.com'
+          git add -- SOFIA_APP/package.json SOFIA_APP/package-lock.json SOFIA_APP/app.json SOFIA_APP/src
+          if ! git diff --cached --quiet; then
+            git commit -m 'fix: align native task priority and backend readiness messages [skip ci]'
+            git push origin HEAD:refs/heads/sofia-app-android
+          fi
       - name: Generate native Android project
         run: npx expo prebuild --platform android --non-interactive --clean
       - name: Build standalone internal APK with bundled JavaScript
