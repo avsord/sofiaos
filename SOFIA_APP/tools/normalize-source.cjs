@@ -7,8 +7,8 @@ edit('src/lib/types.ts',s=>s.replace('priority?: number; area?: string','priorit
 edit('src/screens/Workspace.tsx',s=>s.replace("priority:2,area:'Pessoal'","priority_level:'medium',area:'Pessoal'").replace("String(editing.priority??2)","String(editing.priority_level||'none')").replace('({...t,priority:Number(v)})','({...t,priority_level:v})').replace("[{value:'1',label:'Alta'},{value:'2',label:'Normal'},{value:'3',label:'Baixa'}]","[{value:'none',label:'Sem prioridade'},{value:'important',label:'Importante'},{value:'medium',label:'Média'},{value:'light',label:'Leve'}]"));
 edit('src/lib/api.ts',s=>s.replace("if (!response.ok) { if (response.status", "if (!response.ok && path === '/auth/login' && (response.status === 404 || response.status === 405 || data.code === 'AUTH_REQUIRED')) throw new ApiError('O servidor ainda precisa receber a API móvel da Sofia. Não é um erro da sua senha.', 'MOBILE_API_NOT_PUBLISHED', response.status);\n      if (!response.ok) { if (response.status"));
 
-for(const name of ['package.json','package-lock.json'])edit(name,s=>{const p=JSON.parse(s);p.version='0.3.0';if(p.packages?.[''])p.packages[''].version='0.3.0';return JSON.stringify(p,null,2)+'\n';});
-edit('app.json',s=>{const p=JSON.parse(s);p.expo.version='0.3.0';p.expo.android.versionCode=5;return JSON.stringify(p,null,2)+'\n';});
+for(const name of ['package.json','package-lock.json'])edit(name,s=>{const p=JSON.parse(s);p.version='0.3.1';if(p.packages?.[''])p.packages[''].version='0.3.1';return JSON.stringify(p,null,2)+'\n';});
+edit('app.json',s=>{const p=JSON.parse(s);p.expo.version='0.3.1';p.expo.android.versionCode=6;return JSON.stringify(p,null,2)+'\n';});
 const ui=fs.readFileSync(path.join(root,'src/screens/Workspace.tsx'),'utf8');if(!ui.includes('editing.priority_level')||ui.includes('priority:Number(v)'))throw new Error('Task priority mapping did not apply.');
 
 edit('app.json',s=>{const p=JSON.parse(s);p.expo.name='Sofia OS';return JSON.stringify(p,null,2)+'\n';});
