@@ -92,7 +92,7 @@ class Store {
     return c;
   }
   createConversation(title = 'Chat', channel = 'web') {
-    if (!['web','test','whatsapp-simulator'].includes(channel)) throw new AppError('BAD_CHANNEL','Canal inválido.');
+    if (!['web','test','whatsapp-simulator','mobile'].includes(channel)) throw new AppError('BAD_CHANNEL','Canal inválido.');
     const c = { id: id(), title: cleanText(title,'Título',100), channel, created_at: now() };
     this.db.prepare("INSERT INTO conversations VALUES (?,?,?,?, 'active',?,?)").run(c.id, OWNER, c.title, channel, c.created_at, c.created_at);
     this.audit('conversation.created',c.id); return this.conversation(c.id);

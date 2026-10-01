@@ -1,7 +1,7 @@
 {
   "name": "sofia-os",
-  "version": "1.84.0",
-  "description": "Sofia OS — v134 corrige o perfil da sidebar e transforma o menu da conta em overlay sem recortes",
+  "version": "1.88.0",
+  "description": "Sofia OS v138 — API nativa e workspace compartilhado com o app",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
