@@ -58,7 +58,15 @@ function makeMobileApi(runtime, deps) {
   async function receive(input) { const result = await core.receive(input, { channel: 'mobile' }); return { ...result, ...messages(result.conversation_id) }; }
   function aiStatus() {
     try { routing.profile('private'); return { ready: true, reason: null }; }
-    catch (e) { return { ready: false, reason: 'Configure e confirme o Filtro Privado na Sofia web para usar a IA e os áudios.', code: e.code }; }
+    catch (e) {
+      const reasons = {
+        ROUTE_KEY_MISSING: 'O servidor online ainda não recebeu a chave do Filtro Privado. Configure OPENAI_PRIVATE_API_KEY no Railway; o app e a web usarão a mesma configuração.',
+        ROUTING_SETUP: 'O Filtro Privado existe, mas o roteamento ainda não foi ativado no servidor.',
+        PROJECT_NOT_CONFIRMED: 'O Filtro Privado existe no servidor, mas a confirmação de projeto ainda não foi aplicada.',
+        SAME_PROJECT_KEY: 'Os filtros Privado e Compartilhado estão usando a mesma chave. Eles precisam continuar separados.'
+      };
+      return { ready: false, reason: reasons[e.code] || 'O Filtro Privado da Sofia online ainda não está pronto para IA e áudio.', code: e.code };
+    }
   }
   return async function mobile(req, res, p, m, url) {
     if (!p.startsWith('/api/mobile/')) return false;
