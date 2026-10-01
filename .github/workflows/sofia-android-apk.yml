@@ -64,9 +64,9 @@ jobs:
       - name: Stage APK and verify embedded bundle
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/release/app-release.apk dist/Sofia.apk
-          unzip -l dist/Sofia.apk | grep -E 'assets/index.android.bundle|assets/.*\.bundle'
-          sha256sum dist/Sofia.apk > dist/Sofia.apk.sha256
+          cp android/app/build/outputs/apk/release/app-release.apk dist/Sofia-OS.apk
+          unzip -l dist/Sofia-OS.apk | grep -E 'assets/index.android.bundle|assets/.*\.bundle'
+          sha256sum dist/Sofia-OS.apk > dist/Sofia-OS.apk.sha256
           git rev-parse HEAD > dist/SOURCE_COMMIT.txt
           printf 'Internal validation build. Release-mode JavaScript bundle; development signing certificate. Not a Play Store production release.\n' > dist/BUILD_SCOPE.txt
       - name: Enable KVM for Android smoke test
@@ -83,7 +83,16 @@ jobs:
           disable-animations: true
           script: |
             mkdir -p SOFIA_APP/dist
-            adb install SOFIA_APP/dist/Sofia.apk
+            if [ "${{ github.run_number }}" = "5" ]; then
+              curl -L -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/11181864125/zip" -o /tmp/sofia-previous.zip
+              mkdir -p /tmp/sofia-previous && unzip -q /tmp/sofia-previous.zip -d /tmp/sofia-previous
+              PREV=$(find /tmp/sofia-previous -name '*.apk' | head -n 1)
+              test -n "$PREV"
+              adb install "$PREV"
+              adb install -r SOFIA_APP/dist/Sofia-OS.apk
+            else
+              adb install SOFIA_APP/dist/Sofia-OS.apk
+            fi
             adb logcat -c
             adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
             sleep 20
@@ -93,7 +102,19 @@ jobs:
             adb exec-out screencap -p > SOFIA_APP/dist/login-screen.png
             adb logcat -d -s ReactNativeJS:E AndroidRuntime:E > SOFIA_APP/dist/native-errors.txt
             ! grep -q 'FATAL EXCEPTION' SOFIA_APP/dist/native-errors.txt
-            grep -q 'Entrar na Sofia' SOFIA_APP/dist/login-ui.xml
+            grep -q 'Sofia OS' SOFIA_APP/dist/login-ui.xml
+            grep -q 'Entrar' SOFIA_APP/dist/login-ui.xml
+      - name: Publish direct-update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="sofia-android-v${VERSION}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/Sofia-OS.apk --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" dist/Sofia-OS.apk --repo "$GITHUB_REPOSITORY" --title "Sofia OS Android ${VERSION}" --notes "Atualização direta da Sofia OS para Android. Instalação exige confirmação do sistema."
+          fi
       - name: Upload APK and smoke-test evidence
         if: always()
         uses: actions/upload-artifact@v4
