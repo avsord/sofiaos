@@ -39,7 +39,10 @@ jobs:
           git rev-parse HEAD > /tmp/sofia-validation/SOURCE_COMMIT.txt
       - name: Read-only check of public deployment
         continue-on-error: true
-        run: curl --fail --max-time 20 https://sofiaos.up.railway.app/health > /tmp/sofia-validation/live-health.json
+        run: |
+          curl --fail --max-time 20 https://sofiaos.up.railway.app/health > /tmp/sofia-validation/live-health.json
+          CODE=$(curl -sS -o /tmp/sofia-validation/mobile-login-probe.json -w '%{http_code}' --max-time 20 -H 'Content-Type: application/json' -d '{"email":"probe@example.invalid","password":"not-a-real-password","device_name":"validation"}' https://sofiaos.up.railway.app/api/mobile/auth/login || true)
+          printf '%s\n' "$CODE" > /tmp/sofia-validation/mobile-login-status.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
