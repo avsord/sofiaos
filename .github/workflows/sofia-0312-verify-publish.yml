@@ -1,0 +1,144 @@
+name: Sofia 0.3.12 native verification and publication
+on:
+  push:
+    branches: [sofia-app-android]
+    paths: ['.github/workflows/sofia-0312-verify-publish.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: sofia-0312-verified-publication
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: '409763ea39d556022ac5ffde06ea749d0e260c29'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Require original source, type checks, tests and native production build success
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/37035516081/jobs" > /tmp/original-jobs.json
+          node <<'NODE'
+          const job=require('/tmp/original-jobs.json').jobs.find(j=>j.id===110932626650);
+          if(!job)throw Error('Source job missing');
+          for(const name of ['Full TypeScript validation','Application, initial layout and updater regression tests','Build standalone internal APK with bundled JavaScript','Stage production APK and verify no CI fixture was bundled']){
+            if(!job.steps.some(s=>s.name===name&&s.conclusion==='success'))throw Error('Original gate did not pass: '+name);
+          }
+          NODE
+          gh run download 37035516081 --repo "$GITHUB_REPOSITORY" -n Sofia-Android-APK -D SOFIA_APP/dist
+          test "$(cat SOFIA_APP/dist/SOURCE_COMMIT.txt)" = '409763ea39d556022ac5ffde06ea749d0e260c29'
+          echo 'a032d588dd542748da4a383e1022cc60a0df82b5b93d948188cc802c5c5c3488  SOFIA_APP/dist/Sofia-OS.apk' | sha256sum -c -
+          rm -rf SOFIA_APP/dist/pager-evidence
+      - name: Bundle real-component fixture separately, preserving all production source
+        working-directory: SOFIA_APP
+        run: |
+          npm ci
+          npm run check
+          npm test
+          mkdir -p /tmp/qa/assets
+          npx expo export:embed --platform android --entry-file ./tests/native-pager-entry.tsx --dev false --bundle-output /tmp/qa/assets/index.android.bundle --assets-dest /tmp/qa/resources
+          # Android's wall-clock input swipe dropped most move samples on the cold emulator.
+          # A longer injected finger path must complete on its FIRST attempt. No app timing changes.
+          cp tools/native-pager-smoke.py /tmp/original-pager-smoke.py
+          sed -i "s/str(y),'350'/str(y),'900'/" tools/native-pager-smoke.py
+      - name: Package disposable fixture only with ephemeral certificate
+        run: |
+          python3 <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('SOFIA_APP/dist/Sofia-OS.apk') as src, ZipFile('/tmp/qa-unsigned.apk','w') as dst:
+            for info in src.infolist():
+              if info.filename.startswith('META-INF/'):continue
+              data=Path('/tmp/qa/assets/index.android.bundle').read_bytes() if info.filename=='assets/index.android.bundle' else src.read(info.filename)
+              dst.writestr(info,data)
+          PY
+          BUILD_TOOLS=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          keytool -genkeypair -keystore /tmp/qa-only.jks -alias fixture -storepass fixture-only -keypass fixture-only -dname 'CN=Disposable CI fixture' -keyalg RSA -validity 2
+          "$BUILD_TOOLS/zipalign" -f -P 16 4 /tmp/qa-unsigned.apk /tmp/qa-aligned.apk
+          "$BUILD_TOOLS/apksigner" sign --ks /tmp/qa-only.jks --ks-key-alias fixture --ks-pass pass:fixture-only --key-pass pass:fixture-only --out /tmp/Sofia-qa.apk /tmp/qa-aligned.apk
+          (cd SOFIA_APP && sha256sum -c dist/Sofia-OS.apk.sha256)
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Test first native swipe, all directions, resize and editor, then upgrade production
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: false
+          script: |
+            adb install /tmp/Sofia-qa.apk
+            adb logcat -c
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            sh -c 'python3 SOFIA_APP/tools/native-pager-smoke.py; result=$?; adb logcat -d -s ReactNativeJS:V AndroidRuntime:E > SOFIA_APP/dist/pager-native.log; exit $result'
+            adb uninstall com.avsord.sofiaapp
+            sh -c 'curl -fsSL "https://github.com/avsord/sofiaos/releases/download/sofia-android-v0.3.11/Sofia-OS.apk" -o /tmp/Sofia-0.3.11.apk && adb install /tmp/Sofia-0.3.11.apk && adb install -r SOFIA_APP/dist/Sofia-OS.apk'
+            adb logcat -c
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            sleep 15
+            adb shell pidof com.avsord.sofiaapp
+            adb shell uiautomator dump /sdcard/production-login.xml
+            adb pull /sdcard/production-login.xml SOFIA_APP/dist/login-ui.xml
+            adb exec-out screencap -p > SOFIA_APP/dist/login-screen.png
+            adb logcat -d -s ReactNativeJS:E AndroidRuntime:E > SOFIA_APP/dist/native-errors.txt
+            ! grep -q 'FATAL EXCEPTION' SOFIA_APP/dist/native-errors.txt
+            grep -q 'Entrar' SOFIA_APP/dist/login-ui.xml
+      - name: Restore exact production source and verify compatible server
+        run: |
+          cp /tmp/original-pager-smoke.py SOFIA_APP/tools/native-pager-smoke.py
+          git diff --exit-code -- SOFIA_APP
+          curl -fsS --max-time 20 https://sofiaos.up.railway.app/health > /tmp/health.json
+          node -e "const h=require('/tmp/health.json');if(!h.ok||Number(h.version.split('.')[0])<141)throw Error('Compatible server not deployed')"
+      - name: Publish only the original verified production APK
+        working-directory: SOFIA_APP
+        run: |
+          node -e "if(!require('./dist/pager-evidence/result.json').passed)throw Error('Native fixture did not pass')"
+          sha256sum -c dist/Sofia-OS.apk.sha256
+          node tools/publish-release.cjs
+      - name: Verify discovery using exact old 0.3.11 updater
+        working-directory: SOFIA_APP
+        run: |
+          git fetch --depth=1 origin b79f8a564b0282a293b87e571fd7788da0d7f368
+          git show b79f8a564b0282a293b87e571fd7788da0d7f368:SOFIA_APP/src/lib/update.ts > /tmp/old-updater.ts
+          node <<'NODE'
+          const fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript'),exports={};
+          const code=ts.transpileModule(fs.readFileSync('/tmp/old-updater.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+          vm.runInNewContext(code,{exports,fetch,AbortController,setTimeout,clearTimeout,Date,Error,Promise});
+          exports.checkForUpdate().then(update=>{if(update?.version!=='0.3.12')throw Error('0.3.11 did not discover 0.3.12');console.log(update);fs.writeFileSync('dist/old-updater-discovery.json',JSON.stringify(update));}).catch(error=>{console.error(error);process.exitCode=1;});
+          NODE
+      - name: Verify Atualizar dialog in original unmodified 0.3.11 Android APK
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: false
+          script: |
+            adb uninstall com.avsord.sofiaapp || true
+            adb install /tmp/Sofia-0.3.11.apk
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            python3 SOFIA_APP/tools/native-update-smoke.py
+      - name: Retain production bytes and real Android evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sofia-Android-0.3.12-verified
+          path: SOFIA_APP/dist/
+          retention-days: 30
