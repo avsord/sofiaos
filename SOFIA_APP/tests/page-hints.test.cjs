@@ -38,7 +38,7 @@ test('page canvas stays compact and subpages render as inline page rows',()=>{
  const tree=fs.readFileSync(path.join(__dirname,'../src/components/PageTreeList.tsx'),'utf8');
  assert.ok(source.includes("height:hasCover?190:28"));
  assert.ok(source.includes("marginTop:hasCover?-44:0"));
- assert.ok(source.includes("style={{minHeight:18}}"));
+ assert.ok(source.includes("style={{minHeight:subpages.length&&emptyBody&&!showBodyGuide?0:18}}"));
  assert.ok(source.includes('fontSize:58'));
  assert.ok(source.includes("<PageTreeList roots={subpages}"));
  assert.ok(!source.includes("Subpáginas ·"));
