@@ -30,7 +30,7 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
     for(const [id,rect] of rects.current)if(id!==page.id&&hit(rect,x,y)&&canParent(page.id,id))return id;
     return null;
   };
-  const start=(page:Entity)=>{dragId.current=page.id;setDragging(page);setTarget(null);setOverRoot(false);};
+  const start=(page:Entity)=>{dragId.current=page.id;measureAll();setDragging(page);setTarget(null);setOverRoot(false);};
   const move=(page:Entity,x:number,y:number)=>{
     if(dragId.current!==page.id)return;
     const root=hit(rootRect.current,x,y);setOverRoot(root);
@@ -80,13 +80,18 @@ function TreeRow({page,children,expanded,toggle,onOpen,ancestors,compact,draggin
 function DragIcon({page,active,onStart,onMove,onEnd}:{page:Entity;active:boolean;onStart:(page:Entity)=>void;onMove:(page:Entity,x:number,y:number)=>void;onEnd:(page:Entity,x:number,y:number)=>void}){
   const c=useTheme(),pan=useRef(new Animated.ValueXY()).current;
   const handlers=useMemo(()=>PanResponder.create({
-    onMoveShouldSetPanResponder:(_e,g)=>Math.abs(g.dx)+Math.abs(g.dy)>6,
-    onMoveShouldSetPanResponderCapture:(_e,g)=>Math.abs(g.dx)+Math.abs(g.dy)>8,
+    // The icon is a dedicated drag handle: claim it immediately so the outer
+    // horizontal menu pager cannot steal a page hierarchy drag.
+    onStartShouldSetPanResponder:()=>true,
+    onStartShouldSetPanResponderCapture:()=>true,
+    onMoveShouldSetPanResponder:()=>true,
+    onMoveShouldSetPanResponderCapture:()=>true,
     onPanResponderGrant:()=>{pan.stopAnimation();pan.setValue({x:0,y:0});onStart(page);},
     onPanResponderMove:(_e,g)=>{pan.setValue({x:g.dx,y:g.dy});onMove(page,g.moveX,g.moveY);},
     onPanResponderRelease:(_e,g)=>{onEnd(page,g.moveX,g.moveY);Animated.spring(pan,{toValue:{x:0,y:0},useNativeDriver:true,speed:28,bounciness:4}).start();},
     onPanResponderTerminate:(_e,g)=>{onEnd(page,g.moveX,g.moveY);Animated.spring(pan,{toValue:{x:0,y:0},useNativeDriver:true,speed:28,bounciness:4}).start();},
-    onPanResponderTerminationRequest:()=>false
+    onPanResponderTerminationRequest:()=>false,
+    onShouldBlockNativeResponder:()=>true
   }),[page,onStart,onMove,onEnd,pan]);
   return <Animated.View {...handlers.panHandlers} accessibilityLabel={'Arrastar página '+page.title}
     style={{width:34,height:40,alignItems:'center',justifyContent:'center',zIndex:active?20:1,elevation:active?8:0,transform:[...pan.getTranslateTransform(),{scale:active?1.12:1}]}}>
