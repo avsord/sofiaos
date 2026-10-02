@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.3.7';
+export const APP_VERSION = '0.3.8';
 const RELEASE_PREFIX = 'sofia-android-v';
 const RELEASES_API = 'https://api.github.com/repos/avsord/sofiaos/releases?per_page=20';
 
