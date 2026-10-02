@@ -7,6 +7,7 @@ import {useTheme} from '../lib/theme';
 import {errorText} from '../lib/chat-model';
 import {PageEditorStore,newBlock,expandedIds,toggleExpanded} from '../lib/page-editor';
 import type {PageBlock,PageDraft} from '../lib/page-editor';
+import {pageBodyIsEmpty,pageBlockHint} from '../lib/page-hints';
 import {Empty,ErrorBanner,IconButton} from '../components/UI';
 import {Icon} from '../components/Icon';
 import {PageCover,PageAppearance,PAGE_COVERS} from '../components/PageAppearance';
@@ -41,6 +42,8 @@ export function Pages({api,active,storageScope}:{api:SofiaApi;active:boolean;sto
  const byId=useMemo(()=>new Map(displayPages.map(p=>[p.id,p])),[displayPages]);
  const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of displayPages){const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const list of m.values())list.sort((a,b)=>a.title.localeCompare(b.title,'pt-BR'));return m;},[displayPages]);
  const entry=selectedId?store.get(selectedId):undefined;
+ const emptyBody=entry?pageBodyIsEmpty(entry.draft.blocks):true;
+ const placeholderColor=c.muted+'80';
  useEffect(()=>{if(active&&focus&&focus!=='title')inputRefs.current.get(focus)?.focus();},[focus,selectedId,active]);
  function toggle(id:string){setExpanded(old=>{const next=toggleExpanded(old,id),value=JSON.stringify([...next]);expandDisk.current=expandDisk.current.catch(()=>{}).then(()=>AsyncStorage.setItem(key+':expanded',value)).catch(()=>{if(mounted.current)setError('Não foi possível guardar a abertura das subpáginas neste aparelho.');});return next;});}
  function open(page:Entity,push=true){if(selectedId){void store.flush(selectedId);if(push&&selectedId!==page.id)history.current.push(selectedId);}store.open(pages.find(p=>p.id===page.id)||page);setSelectedId(page.id);setFocus(null);setAppearance(null);setError('');}
@@ -68,7 +71,7 @@ export function Pages({api,active,storageScope}:{api:SofiaApi;active:boolean;sto
   return <View key={b.id} style={{flexDirection:'row',alignItems:'flex-start',gap:b.type==='todo'?7:0}}>
    {b.type==='todo'?<Switch accessibilityLabel="Concluir tarefa" value={!!b.checked} onValueChange={checked=>updateBlock(b,{checked})}/>:prefix?<Text style={{fontSize:heading,lineHeight:heading+9,color:c.muted,paddingTop:4}}>{prefix}</Text>:null}
    <TextInput ref={node=>{if(node)inputRefs.current.set(b.id,node);else inputRefs.current.delete(b.id);}} accessibilityLabel={'Conteúdo do bloco '+(i+1)} value={b.text||''} onChangeText={text=>updateBlock(b,{text,html:''},'text:'+b.id)}
-    onFocus={()=>setFocus(b.id)} onBlur={()=>{if(selectedId)void store.flush(selectedId);}} multiline placeholder={focus===b.id?'Digite / para opções':''} placeholderTextColor={c.muted}
+    onFocus={()=>setFocus(b.id)} onBlur={()=>{if(selectedId)void store.flush(selectedId);}} multiline placeholder={pageBlockHint(b,i,emptyBody,focus===b.id)} placeholderTextColor={placeholderColor}
     style={{flex:1,minHeight:42,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:4,fontFamily:b.type==='code'?'monospace':undefined,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:8,paddingHorizontal:b.type==='code'?10:0}}/>
   </View>;
  }
@@ -84,9 +87,14 @@ export function Pages({api,active,storageScope}:{api:SofiaApi;active:boolean;sto
  const hasCover=!!draft.appearance.cover_type;
  return <View style={{flex:1,backgroundColor:c.bg}}>
   <View style={{minHeight:54,flexDirection:'row',alignItems:'center',paddingHorizontal:4,borderBottomWidth:1,borderColor:c.line,backgroundColor:c.surface}}>
-   <IconButton name="back" label="Voltar" size={34} onPress={back}/><IconButton name="undo" label="Desfazer" size={34} disabled={!entry.past.length} onPress={()=>store.undo(selected.id)}/><IconButton name="redo" label="Refazer" size={34} disabled={!entry.future.length} onPress={()=>store.redo(selected.id)}/>
-   <View style={{flex:1,paddingHorizontal:5}}><Text numberOfLines={1} style={{color:c.muted,fontSize:11}}>{path.map(p=>p.title).join(' › ')}</Text><Text accessibilityLiveRegion="polite" style={{color:entry.state==='error'||entry.state==='conflict'?c.danger:c.muted,fontSize:9,marginTop:3}}>{status}</Text></View>
-   <IconButton name="plus" label="Criar subpágina" size={34} onPress={()=>void create(selected)}/><IconButton name="trash" label="Excluir página" size={34} onPress={removePage}/>
+   <IconButton name="back" label="Voltar" size={34} onPress={back}/>
+   <View style={{flex:1,minWidth:0,paddingHorizontal:5}}><Text numberOfLines={1} style={{color:c.muted,fontSize:11}}>{path.map(p=>p.title).join(' › ')}</Text><Text accessibilityLiveRegion="polite" style={{color:entry.state==='error'||entry.state==='conflict'?c.danger:c.muted,fontSize:9,marginTop:3}}>{status}</Text></View>
+   <View testID="page-tools-right" style={{flexDirection:'row',alignItems:'center',flexShrink:0}}>
+    <IconButton name="undo" label="Desfazer" size={34} disabled={!entry.past.length} onPress={()=>store.undo(selected.id)}/>
+    <IconButton name="redo" label="Refazer" size={34} disabled={!entry.future.length} onPress={()=>store.redo(selected.id)}/>
+    <IconButton name="plus" label="Criar subpágina" size={34} onPress={()=>void create(selected)}/>
+    <IconButton name="trash" label="Excluir página" size={34} onPress={removePage}/>
+   </View>
   </View>
   {error?<ErrorBanner text={error}/>:null}{entry.error?<ErrorBanner text={entry.error} onRetry={entry.state==='conflict'?resolveConflict:()=>void store.flush(selected.id)}/>:null}
   <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingBottom:60}}>
@@ -95,7 +103,7 @@ export function Pages({api,active,storageScope}:{api:SofiaApi;active:boolean;sto
    </Pressable>
    <View style={{paddingHorizontal:24,marginTop:hasCover?-28:0}}>
     <Pressable accessibilityRole="button" accessibilityLabel="Alterar ícone da página" onPress={()=>setAppearance('icon')} style={{width:60,height:60,borderRadius:14,alignItems:'center',justifyContent:'center',backgroundColor:c.surface,borderWidth:1,borderColor:c.line}}><Text style={{fontSize:34,color:c.text}}>{String(draft.appearance.icon||'📄')}</Text></Pressable>
-    <TextInput accessibilityLabel="Título da página" value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>void store.flush(selected.id)} multiline placeholder={focus==='title'?'Sem título':''} placeholderTextColor={c.muted} style={{minHeight:65,fontSize:34,lineHeight:42,fontWeight:'800',letterSpacing:-1,color:c.text,paddingVertical:14}}/>
+    <TextInput accessibilityLabel="Título da página" value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>void store.flush(selected.id)} multiline placeholder="Título" placeholderTextColor={placeholderColor} style={{minHeight:65,fontSize:34,lineHeight:42,fontWeight:'800',letterSpacing:-1,color:c.text,paddingVertical:14}}/>
     {String(selected.data.purpose||'').trim()?<Text style={{fontSize:13,lineHeight:20,color:c.muted,marginBottom:12}}>{String(selected.data.purpose)}</Text>:null}
     <View style={{gap:6}}>{draft.blocks.map(blockView)}</View>
     {focus&&focus!=='title'?<View style={{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:4,paddingVertical:8}}>

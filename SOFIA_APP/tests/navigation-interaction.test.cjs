@@ -23,14 +23,23 @@ function button(onSelect){
  const props={item:{id:'pages',label:'Páginas',icon:'book'},selected:false,onSelect,motion:createMenuMotion()};
  return {render:patch=>h.render(()=>MenuTab({...props,...patch})).props};
 }
-function pager(){
+function pager(options={}){
  const h=hooks(),commands=[],selected=[],ref={current:null};
  const native={scrollTo:command=>commands.push({...command})};
  const {TabPager}=load('src/components/TabPager.tsx',{'react':h.React,'react/jsx-runtime':jsx,'react-native':{Animated:animated.Animated,ScrollView:'ScrollView',View:'View',StyleSheet:{create:s=>s}},'../lib/tab-navigation':model});
- let props={motion:createMenuMotion(),activeTab:'chat',enabled:true,onSelect:tab=>{selected.push(tab);ref.current.goTo(tab);},children:Array.from(model.TAB_ORDER,x=>({type:'Screen',props:{id:x}}))};
- function render(patch={}){props={...props,...patch};const outer=h.render(()=>TabPager(props,ref));const scroll=outer.props.children;scroll.props.ref.current=native;h.flush();return {outer:outer.props,scroll:scroll.props};}
- let rendered=render();rendered.outer.onLayout({nativeEvent:{layout:{width:400}}});rendered=render();commands.length=0;
- return {commands,selected,ref,render,scroll:rendered.scroll};
+ let props={motion:options.motion||createMenuMotion(),activeTab:options.initial||'chat',enabled:true,onSelect:tab=>{selected.push(tab);ref.current.goTo(tab);},children:Array.from(model.TAB_ORDER,x=>({type:'Screen',props:{id:x}}))};
+ let rendered;
+ function render(patch={}){props={...props,...patch};const outer=h.render(()=>TabPager(props,ref));const scroll=outer.props.children;if(scroll)scroll.props.ref.current=native;h.flush();rendered={outer:outer.props,scroll:scroll?.props};return rendered;}
+ render();
+ function measure(width=400,contentFirst=false){
+  rendered.outer.onLayout({nativeEvent:{layout:{width}}});render();
+  const viewport=()=>rendered.scroll.onLayout({nativeEvent:{layout:{width}}});
+  const content=()=>rendered.scroll.onContentSizeChange(width*6,700);
+  if(contentFirst){content();viewport();}else{viewport();content();}
+  render();
+ }
+ if(options.measure!==false){measure();commands.length=0;}
+ return {commands,selected,ref,render,measure,get outer(){return rendered.outer;},get scroll(){return rendered.scroll;}};
 }
 const end=(x,velocity=0)=>({nativeEvent:{contentOffset:{x,y:0},velocity:{x:velocity,y:0}}});
 
@@ -78,4 +87,52 @@ test('recording or keyboard lock disables the native gesture and cancels a pendi
 test('page-body JSON is cached before navigation, while scrollable rows stay release-activated',()=>{
  const source=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');assert.ok(source.includes('items.forEach(page=>store.open(page))'));assert.ok(source.includes('store.open(pages.find(p=>p.id===page.id)||page)'));
  assert.ok(!source.includes('onPressIn={()=>open('));assert.ok(!source.includes('onPressIn={()=>onOpen('));
+});
+
+
+test('cold startup does not mount zero-width pages before measuring the viewport',()=>{
+ const p=pager({measure:false});assert.equal(p.scroll,undefined);assert.equal(p.commands.length,0);
+ p.outer.onLayout({nativeEvent:{layout:{width:400}}});p.render();
+ assert.equal(p.scroll.contentOffset.x,400);assert.equal(p.scroll.scrollEnabled,false);
+ assert.equal(p.scroll.style[1].opacity,0);assert.equal(p.commands.length,0);
+});
+test('initial selection is applied after both native dimensions, in either callback order',()=>{
+ for(const contentFirst of [false,true]){const p=pager({measure:false});p.measure(400,contentFirst);
+  assert.deepEqual(p.commands,[{x:400,y:0,animated:false}]);assert.equal(p.scroll.style[1].opacity,1);assert.equal(p.scroll.scrollEnabled,true);}
+});
+test('partial content cannot clamp initial Conversa to Home',()=>{
+ const p=pager({measure:false});p.outer.onLayout({nativeEvent:{layout:{width:400}}});p.render();
+ p.scroll.onLayout({nativeEvent:{layout:{width:400}}});
+ for(const w of [0,400,800,2000])p.scroll.onContentSizeChange(w,700);
+ assert.equal(p.commands.length,0);p.scroll.onContentSizeChange(2400,700);
+ assert.deepEqual(p.commands,[{x:400,y:0,animated:false}]);
+});
+test('native focus is not allowed to move the outer pager to an offscreen input',()=>{
+ const p=pager();assert.equal(p.scroll.scrollsChildToFocus,false);assert.equal(p.scroll.contentContainerStyle[1].width,2400);
+});
+test('the starting native offset stays stable across React selection changes',()=>{
+ const p=pager(),offset=p.scroll.contentOffset;p.ref.current.goTo('pages');p.render({activeTab:'pages'});
+ assert.equal(p.scroll.contentOffset,offset);assert.equal(p.scroll.contentOffset.x,400);
+});
+test('a tap before native layout is ready selects the page shown when it becomes ready',()=>{
+ const p=pager({measure:false});p.ref.current.goTo('profile');p.measure();assert.equal(p.scroll.contentOffset.x,2000);
+ assert.equal(p.commands.at(-1).x,2000);
+});
+test('remounting with a reused motion resets the highlight without changing spring timing',()=>{
+ const motion=createMenuMotion();motion.resize(400,'chat');motion.select('profile');animated.advance(1);
+ const p=pager({motion});assert.equal(animated.read(motion.weights[1]),1);assert.equal(animated.read(motion.weights[5]),0);assert.equal(p.scroll.contentOffset.x,400);
+});
+test('resizing waits for matching geometry and preserves the selected page',()=>{
+ const p=pager();p.ref.current.goTo('pages');p.render({activeTab:'pages'});p.commands.length=0;
+ p.outer.onLayout({nativeEvent:{layout:{width:600}}});p.render();assert.equal(p.scroll.scrollEnabled,false);
+ p.scroll.onLayout({nativeEvent:{layout:{width:400}}});p.scroll.onContentSizeChange(2400,700);assert.equal(p.commands.length,0);
+ p.scroll.onLayout({nativeEvent:{layout:{width:600}}});p.scroll.onContentSizeChange(3600,700);p.render();
+ assert.equal(p.commands.at(-1).x,1200);assert.equal(p.scroll.scrollEnabled,true);assert.equal(p.scroll.contentOffset.x,1200);
+});
+test('late stale content callbacks cannot break subsequent direct menu taps',()=>{
+ const p=pager();p.scroll.onContentSizeChange(0,0);p.scroll.onLayout({nativeEvent:{layout:{width:0}}});p.ref.current.goTo('apps');assert.equal(p.commands.at(-1).x,1600);
+});
+test('existing native swipe speed and no-animation tap behavior are unchanged',()=>{
+ const p=pager();assert.equal(p.scroll.decelerationRate,'fast');assert.equal(p.scroll.disableIntervalMomentum,true);
+ p.ref.current.goTo('home');assert.equal(p.commands.at(-1).animated,false);
 });

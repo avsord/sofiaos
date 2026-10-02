@@ -10,7 +10,7 @@ export function tabAtOffset(offset: number, width: number): Tab | null {
 }
 /** A native scroll event from before a menu tap must never undo that tap. */
 export function createPagerSelection(initial: Tab = 'chat') {
-  let selected: Tab = initial;
+  let selected: Tab = tabIndex(initial)>=0?initial:'chat';
   let dragging = false;
   return {
     current: () => selected,

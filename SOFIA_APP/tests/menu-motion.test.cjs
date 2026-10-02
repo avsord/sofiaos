@@ -10,3 +10,9 @@ test('tap during swipe takes over from the current visible purple weights',()=>{
 test('rapid taps interrupt preceding springs and do not restart on React commit',()=>{const f=fixture();f.motion.select('pages');f.advance(.4);const old=f.springs.slice();f.motion.select('profile');assert.ok(old.every(s=>s.stopped));const count=f.springs.length;f.motion.select('profile');assert.equal(f.springs.length,count);});
 test('reduced motion removes scale changes but preserves synchronized selection',()=>{const f=fixture();f.motion.setReducedMotion(true);assert.equal(f.read(f.motion.motionAmount),0);f.motion.select('pages');assert.equal(f.read(f.motion.weights[2]),1);assert.equal(f.springs.length,0);f.motion.beginDrag(800);f.motion.onScroll(event(1000));assert.equal(f.read(f.motion.weights[2]),.5);assert.equal(f.read(f.motion.weights[3]),.5);});
 test('resizing, short returned swipes and notification overlays preserve a valid state',()=>{const f=fixture();f.motion.resize(600,'chat');f.motion.beginDrag(600);f.motion.onScroll(event(800));f.motion.onScroll(event(600));f.motion.settle('chat',600);f.motion.select('chat');assert.equal(f.read(f.motion.weights[1]),1);f.motion.select('notifications');f.advance(1);assert.ok(f.motion.weights.every(w=>f.read(w)===0));});
+
+test('reset reconciles a newly mounted pager without changing the approved spring',()=>{
+ const f=fixture();f.motion.select('profile');f.advance(1);f.motion.reset('chat');
+ assert.equal(f.read(f.motion.weights[1]),1);assert.equal(f.read(f.motion.weights[5]),0);assert.equal(f.read(f.motion.scrollX),400);
+ assert.equal(f.MENU_SPRING.stiffness,420);assert.equal(f.MENU_SPRING.damping,30);assert.equal(f.MENU_SPRING.mass,.8);
+});

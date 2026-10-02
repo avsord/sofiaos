@@ -48,6 +48,12 @@ export function createMenuMotion(initial:Tab='chat') {
   }
   return {
     scrollX,onScroll,weights,motionAmount,select,
+    reset(tab:Tab) {
+      // Layout/session alignment is not a decorative transition. Preserve all spring settings.
+      stop();selected=tab;dragging=false;tracking=false;live.setValue(0);
+      lastOffset=Math.max(0,tabIndex(tab))*width;scrollX.setValue(lastOffset);
+      taps.forEach((tap,i)=>tap.setValue(TAB_ORDER[i]===tab?1:0));
+    },
     resize(nextWidth:number,tab:Tab) {
       if(!Number.isFinite(nextWidth)||nextWidth<=0||nextWidth===width)return;
       width=nextWidth;lastOffset=Math.max(0,tabIndex(tab))*width;
