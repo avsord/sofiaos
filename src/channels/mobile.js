@@ -22,6 +22,7 @@ function makeMobileApi(runtime, deps) {
   const { store, config, core, routing, workspace, audioService } = runtime;
   const { bodyJson, json, ownerAuth, mobileSessions, tooManyFailures, registerFailure, clearFailures } = deps;
   const extra = makeApi45(runtime, { bodyJson, json });
+  const chatSync = require('../services/chat-sync').makeChatSyncApi(store, { bodyJson, json, client: 'mobile' });
   const inAudio = new Set(), rateBuckets = new Map();
   store.db.exec(`CREATE TABLE IF NOT EXISTS mobile_voice_receipts (
     client_id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, audio_hash TEXT NOT NULL,
@@ -84,6 +85,10 @@ function makeMobileApi(runtime, deps) {
       clearFailures(req); return send({ ok: true, ...mobileSessions.issue(b.device_name), profile: profile() });
     }
     const session = mobileSessions.require(req);
+    if (p.startsWith('/api/mobile/chat-sync')) {
+      if (m !== 'GET') rate(session, 'chat-sync-write', 30);
+      if (await chatSync(req, res, p, m, url)) return true;
+    }
     if (p === '/api/mobile/auth/logout' && m === 'POST') { mobileSessions.revoke(session); return send({ ok: true }); }
     if (p === '/api/mobile/auth/logout-all' && m === 'POST') {
       await bodyJson(req, 1024); mobileSessions.revokeAll(); deps.revokeWebSessions?.(); return send({ ok: true });

@@ -6,17 +6,17 @@ const path=require('node:path');
 const root=path.join(__dirname,'..');
 const read=rel=>fs.readFileSync(path.join(root,rel),'utf8');
 
-test('v140: identidade e cache atuais estão alinhados',()=>{
+test('v141: identidade e cache atuais estão alinhados',()=>{
   const cfg=read('src/config/sofia.js'),html=read('public/index.html'),pkg=JSON.parse(read('package.json'));
-  assert.ok(cfg.includes("const VERSION = '140.0.0'"));
-  assert.ok(html.includes('Sofia OS · v140'));
-  assert.ok(html.includes('/ui-current.css?v=140'));
-  assert.ok(html.includes('/app.js?v=140'));
-  assert.ok(html.includes('Core v140 · AVSORD Technology'));
-  assert.equal(pkg.version,'1.88.0');
+  assert.ok(cfg.includes("const VERSION = '141.0.0'"));
+  assert.ok(html.includes('Sofia OS · v141'));
+  assert.ok(html.includes('/ui-current.css?v=141'));
+  assert.ok(html.includes('/app.js?v=141'));
+  assert.ok(html.includes('Core v141 · AVSORD Technology'));
+  assert.equal(pkg.version,'1.89.0');
 });
 
-test('v119: subpáginas continuam fechadas ao iniciar',()=>{
+test('v141: subpáginas sem preferência começam fechadas',()=>{
   const app=read('public/app.js');
   assert.ok(app.includes('function pageTreeExpanded(pageId){if(state.userPageExpanded[pageId]===undefined)state.userPageExpanded[pageId]=false'));
   assert.ok(!app.includes("localStorage.setItem('sofiaPageTreeExpanded'"));
@@ -89,14 +89,16 @@ test('v122: barra lateral dos menus mantém thumb visível no estilo Notion',()=
 });
 
 
-test('v124: APPS e PARTICULAR persistem e subpáginas reiniciam fechadas',()=>{
+test('v124: APPS e PARTICULAR persistem e subpáginas preservam a escolha do usuário',()=>{
   const app=read('public/app.js');
   assert.ok(app.includes("localStorage.setItem('sofiaAppsExpanded',open?'1':'0')"));
   assert.ok(app.includes("localStorage.getItem('sofiaAppsExpanded')!=='0'"));
   assert.ok(app.includes("localStorage.setItem('sofiaParticularExpanded',open?'1':'0')"));
   assert.ok(app.includes("localStorage.getItem('sofiaParticularExpanded')!=='0'"));
   assert.ok(!app.includes("localStorage.setItem('sofiaPageTreeExpanded'"));
-  assert.ok(app.includes("if(open&&!wasOpen){state.userPageExpanded={};loadUserPages().catch(showError);}"));
+  assert.ok(app.includes("if(open&&!wasOpen){loadUserPages().catch(showError);}"));
+  assert.ok(app.includes("localStorage.setItem('sofiaPageExpandedV141'"));
+  assert.ok(app.includes("localStorage.getItem('sofiaPageExpandedV141'"));
 });
 
 
@@ -228,7 +230,7 @@ test('v134: perfil da sidebar não corta conteúdo e menu da conta usa overlay d
 });
 
 
-test('v140: web permite apagar mensagem individual e limpar histórico sincronizado',()=>{
+test('v141: web permite apagar mensagem individual e limpar histórico sincronizado',()=>{
   const app=read('public/app.js'),html=read('public/index.html'),handler=read('src/core/http-handler.js'),store=read('src/memory/store.js');
   assert.ok(app.includes('deleteChatMessage(message)'));
   assert.ok(app.includes("api('/api/chat-history'"));

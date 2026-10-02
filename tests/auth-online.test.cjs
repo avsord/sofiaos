@@ -26,8 +26,8 @@ test('v133: Railway redireciona raiz para login e libera painel somente após se
 
   r=await fetch(base+'/auth/login',{method:'POST',redirect:'manual',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({email:'owner@example.com',password:f.config.loginPassword})});
   assert.equal(r.status,303);assert.equal(r.headers.get('location'),'/');const cookie=cookieFrom(r.headers.get('set-cookie'));assert.match(cookie,/^sofia_session=/);
-  r=await fetch(base+'/',{headers:{Cookie:cookie}});assert.equal(r.status,200);assert.match(await r.text(),/Sofia OS · v140/);
-  r=await fetch(base+'/api/bootstrap',{headers:{Cookie:cookie}});assert.equal(r.status,200);assert.equal((await r.json()).version,'140.0.0');
+  r=await fetch(base+'/',{headers:{Cookie:cookie}});assert.equal(r.status,200);assert.match(await r.text(),/Sofia OS · v141/);
+  r=await fetch(base+'/api/bootstrap',{headers:{Cookie:cookie}});assert.equal(r.status,200);assert.equal((await r.json()).version,'141.0.0');
 });
 
 test('v133: páginas Meta continuam públicas sem sessão',async t=>{
@@ -60,7 +60,7 @@ test('v133: sair limpa a sessão e encerrar todas invalida sessões abertas',asy
 });
 
 
-test('v140: sessão web persiste entre handlers com o mesmo banco',async t=>{
+test('v141: sessão web persiste entre handlers com o mesmo banco',async t=>{
   const old=process.env.RAILWAY_ENVIRONMENT;process.env.RAILWAY_ENVIRONMENT='test';
   t.after(()=>{if(old===undefined)delete process.env.RAILWAY_ENVIRONMENT;else process.env.RAILWAY_ENVIRONMENT=old;});
   const f=fixture(t);f.config.loginPassword='senha-segura-de-teste-140';f.config.loginEmail='owner@example.com';

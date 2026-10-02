@@ -103,6 +103,7 @@ function decorateMessages(store,messages){const route=store.db.prepare('SELECT r
 function createHandler(runtime) {
   const {store,core,backups,config,usageService,audioService}=runtime;
   const extra=require('./api45').makeApi45(runtime,{bodyJson,json});
+  const chatSync=require('../services/chat-sync').makeChatSyncApi(store,{bodyJson,json,client:'web',decorateRows:rows=>decorateMessages(store,rows)});
   const token=crypto.randomBytes(32).toString('hex');
   const ownerAuth=runtime.ownerAuth||new OwnerAuth(config,store),accountMailer=runtime.accountMailer||new AccountMailer(config);
   const loginAttempts=new Map(),resetAttempts=new Map(),sessionCookie='sofia_session',sessionTtlMs=12*60*60*1000;
@@ -180,6 +181,7 @@ function createHandler(runtime) {
       if(m==='POST' && p==='/api/auth/change-password'){const b=await bodyJson(req,8192),currentPassword=String(b.currentPassword||''),newPassword=String(b.newPassword||''),confirmPassword=String(b.confirmPassword||'');if(!ownerAuth.verifyPassword(currentPassword))throw new AppError('PASSWORD_INVALID','A senha atual está incorreta.',403);if(newPassword.length<12)throw new AppError('PASSWORD_WEAK','A nova senha precisa ter pelo menos 12 caracteres.',400);if(newPassword!==confirmPassword)throw new AppError('PASSWORD_MISMATCH','As duas senhas novas precisam ser iguais.',400);ownerAuth.setPassword(newPassword);revokeWebSessions();mobileSessions.revokeAll();clearSession(req,res);return json(res,200,{ok:true,redirect:'/login?changed=1'});}
       if(m==='GET' && p==='/api/usage-status')return json(res,200,{ok:true,usage:await usageService.status()});
       if(m==='GET' && STATIC[p]) {const [f,type]=STATIC[p];res.setHeader('Content-Type',type);res.end(fs.readFileSync(path.join(config.root,'public',f)));return;}
+      if(await chatSync(req,res,p,m,url))return;
       if(await extra(req,res,p,m,url))return;
       if(m==='GET' && p==='/api/conversations')return json(res,200,{items:store.conversations(limitNumber(url.searchParams.get('limit'),100),limitNumber(url.searchParams.get('offset'),0,1000000))});
       if(m==='POST' && p==='/api/conversations') {const b=await bodyJson(req);const channel=store.settings().privacyMode==='test'?'test':(b.channel==='whatsapp-simulator'?'whatsapp-simulator':'web');return json(res,201,store.createConversation(b.title || 'Chat',channel));}
