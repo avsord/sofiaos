@@ -48,9 +48,9 @@ function Shell(){
  {!ready?<View style={{flex:1,justifyContent:'center'}}><ActivityIndicator color={c.accent}/></View>:!auth?<Login onLogin={login}/>:!bootstrap?<View style={{flex:1,justifyContent:'center',padding:24,gap:14}}>{booting?<ActivityIndicator color={c.accent}/>:null}<Text style={{fontSize:23,fontWeight:'600',color:c.text}}>Abrindo sua Sofia…</Text>{error?<ErrorBanner text={error}/>:null}<Button title="Tentar novamente" onPress={()=>void boot()} loading={booting}/><Button title="Voltar para o login" secondary onPress={()=>void logout()}/></View>:<><Animated.View style={{flex:1,opacity:transition,transform:[{translateY:transitionY}]}}>
  <View style={{flex:1,display:tab==='chat'?'flex':'none'}}><Chat key={'chat-'+chatEpoch} api={api} bootstrap={bootstrap} enterToSend={prefs.enterToSend} autoSendVoice={prefs.autoSendVoice} onLock={setLocked} active={tab==='chat'} onRefreshBootstrap={boot}/></View>
  <View style={{flex:1,display:tab==='home'?'flex':'none'}}><Home api={api} bootstrap={bootstrap} navigate={navigate}/></View>
- <View style={{flex:1,display:tab==='pages'?'flex':'none'}}><Pages api={api}/></View>
+ <View style={{flex:1,display:tab==='pages'?'flex':'none'}}><Pages api={api} active={tab==='pages'}/></View>
  <View style={{flex:1,display:tab==='agenda'?'flex':'none'}}><Agenda api={api}/></View>
- <View style={{flex:1,display:tab==='apps'?'flex':'none'}}><Workspace api={api} navigate={navigate} onDepthChange={setWorkspaceDepth}/></View>
+ <View style={{flex:1,display:tab==='apps'?'flex':'none'}}><Workspace api={api} navigate={navigate} onDepthChange={setWorkspaceDepth} active={tab==='apps'}/></View>
  <View style={{flex:1,display:tab==='notifications'?'flex':'none'}}><Notifications api={api} onBack={()=>{void goBack();}}/></View>
  <View style={{flex:1,display:tab==='profile'?'flex':'none'}}><Profile api={api} bootstrap={bootstrap} prefs={prefs} onPrefs={changePrefs} onProfile={profile} onLogout={logout} onCheckUpdate={()=>checkUpdate(true)} onChatHistoryCleared={()=>setChatEpoch(v=>v+1)}/></View>
  </Animated.View>
