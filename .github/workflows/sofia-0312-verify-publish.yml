@@ -2,7 +2,7 @@ name: Sofia 0.3.12 native verification and publication
 on:
   push:
     branches: [sofia-app-android]
-    paths: ['.github/workflows/sofia-0312-verify-publish.yml']
+    paths: ['.github/workflows/sofia-0312-verify-publish.yml', 'tools/qa/native-pager-smoke.py']
   workflow_dispatch:
 permissions:
   contents: write
@@ -44,6 +44,7 @@ jobs:
           echo 'a032d588dd542748da4a383e1022cc60a0df82b5b93d948188cc802c5c5c3488  SOFIA_APP/dist/Sofia-OS.apk' | sha256sum -c -
           rm -rf SOFIA_APP/dist/pager-evidence
           gh api "repos/$GITHUB_REPOSITORY/contents/tools/qa/native-pager-smoke.py?ref=$GITHUB_SHA" --jq '.content' | base64 --decode > /tmp/native-pager-smoke.py
+          python3 -m py_compile /tmp/native-pager-smoke.py
       - name: Bundle real-component fixture separately, preserving all production source
         working-directory: SOFIA_APP
         run: |
@@ -81,13 +82,13 @@ jobs:
           target: google_apis
           disable-animations: false
           script: |
-            adb install /tmp/Sofia-qa.apk
+            adb install --no-incremental /tmp/Sofia-qa.apk
             adb logcat -c
             adb shell settings put secure show_ime_with_hard_keyboard 1
             adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
             sh -c 'SOFIA_QA_APP_ROOT="$GITHUB_WORKSPACE/SOFIA_APP" python3 /tmp/native-pager-smoke.py; result=$?; adb logcat -d -s ReactNativeJS:V AndroidRuntime:E > SOFIA_APP/dist/pager-native.log; exit $result'
             adb uninstall com.avsord.sofiaapp
-            sh -c 'curl -fsSL "https://github.com/avsord/sofiaos/releases/download/sofia-android-v0.3.11/Sofia-OS.apk" -o /tmp/Sofia-0.3.11.apk && adb install /tmp/Sofia-0.3.11.apk && adb install -r SOFIA_APP/dist/Sofia-OS.apk'
+            sh -c 'curl -fsSL "https://github.com/avsord/sofiaos/releases/download/sofia-android-v0.3.11/Sofia-OS.apk" -o /tmp/Sofia-0.3.11.apk && adb install --no-incremental /tmp/Sofia-0.3.11.apk && adb install --no-incremental -r SOFIA_APP/dist/Sofia-OS.apk'
             adb logcat -c
             adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
             sleep 15
@@ -129,7 +130,7 @@ jobs:
           disable-animations: false
           script: |
             adb uninstall com.avsord.sofiaapp || true
-            adb install /tmp/Sofia-0.3.11.apk
+            adb install --no-incremental /tmp/Sofia-0.3.11.apk
             adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
             python3 SOFIA_APP/tools/native-update-smoke.py
       - name: Retain production bytes and real Android evidence
