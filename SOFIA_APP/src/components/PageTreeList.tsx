@@ -42,9 +42,9 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
     dragId.current='';setDragging(null);setTarget(null);setOverRoot(false);
     if(next!==null&&canParent(page.id,next))void onMove(page,next);
   };
-  return <View>
-    {dragging?<View ref={node=>{rootRef.current=node;}} collapsable={false} accessibilityLabel="Soltar como página principal"
-      style={{minHeight:44,marginHorizontal:compact?0:8,marginBottom:4,borderRadius:10,borderWidth:1,borderColor:overRoot?c.accent:c.line,backgroundColor:overRoot?c.accentSoft:c.surface,alignItems:'center',justifyContent:'center'}}>
+  return <View style={{position:'relative'}}>
+    {dragging?<View ref={node=>{rootRef.current=node;}} collapsable={false} pointerEvents="none" accessibilityLabel="Soltar como página principal"
+      style={{position:'absolute',top:0,left:compact?0:8,right:compact?0:8,zIndex:40,elevation:12,minHeight:44,borderRadius:10,borderWidth:1,borderColor:overRoot?c.accent:c.line,backgroundColor:overRoot?c.accentSoft:c.surface,alignItems:'center',justifyContent:'center'}}>
       <Text style={{fontSize:12,fontWeight:'700',color:overRoot?c.accent:c.muted}}>Solte aqui para página principal</Text>
     </View>:null}
     {roots.map(page=><TreeRow key={page.id} page={page} children={children} expanded={expanded} toggle={toggle} onOpen={onOpen}
@@ -60,6 +60,7 @@ function TreeRow({page,children,expanded,toggle,onOpen,ancestors,compact,draggin
   const c=useTheme();
   if(ancestors.includes(page.id)||ancestors.length>40)return null;
   const kids=children.get(page.id)||[],open=expanded.has(page.id),isTarget=targetId===page.id,isDragging=draggingId===page.id;
+  const pageLabel=String(page.data?.parent_id||'')?'Abrir subpágina '+page.title:'Abrir página principal '+page.title;
   return <View>
     <View ref={node=>register(page.id,node)} collapsable={false} onLayout={()=>{}} style={{flexDirection:'row',alignItems:'center',paddingLeft:Math.min(ancestors.length,6)*(compact?12:14),borderRadius:10,backgroundColor:isTarget?c.accentSoft:'transparent',opacity:isDragging?.55:1}}>
       {kids.length?<Pressable accessibilityRole="button" accessibilityLabel={open?'Recolher subpáginas de '+page.title:'Expandir subpáginas de '+page.title} accessibilityState={{expanded:open}}
@@ -67,7 +68,7 @@ function TreeRow({page,children,expanded,toggle,onOpen,ancestors,compact,draggin
         <View style={{transform:[{rotate:open?'90deg':'0deg'}]}}><Icon name="chevron" size={14} color={c.muted}/></View>
       </Pressable>:<View style={{width:30}}/>}
       <DragIcon page={page} active={isDragging} onStart={onStart} onMove={onMove} onEnd={onEnd}/>
-      <Pressable accessibilityRole="button" accessibilityLabel={'Abrir página '+page.title} onPress={()=>onOpen(page)}
+      <Pressable accessibilityRole="button" accessibilityLabel={pageLabel} onPress={()=>onOpen(page)}
         style={({pressed})=>({flex:1,minHeight:compact?42:48,justifyContent:'center',paddingRight:10,paddingLeft:8,borderRadius:9,backgroundColor:pressed&&!isTarget?c.input:'transparent'})}>
         <Text numberOfLines={1} style={{fontSize:compact?15:16,color:c.text,fontWeight:ancestors.length?'400':'600'}}>{page.title}</Text>
       </Pressable>
@@ -94,7 +95,7 @@ function DragIcon({page,active,onStart,onMove,onEnd}:{page:Entity;active:boolean
     onShouldBlockNativeResponder:()=>true
   }),[page,onStart,onMove,onEnd,pan]);
   return <Animated.View {...handlers.panHandlers} accessibilityLabel={'Arrastar página '+page.title}
-    style={{width:34,height:40,alignItems:'center',justifyContent:'center',zIndex:active?20:1,elevation:active?8:0,transform:[...pan.getTranslateTransform(),{scale:active?1.12:1}]}}>
+    style={{width:34,height:40,alignItems:'center',justifyContent:'center',zIndex:active?50:1,elevation:active?16:0,transform:[...pan.getTranslateTransform(),{scale:active?1.12:1}]}}>
     <Text style={{fontSize:22,color:c.text}}>{iconFor(page)}</Text>
   </Animated.View>;
 }
