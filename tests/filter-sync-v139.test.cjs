@@ -2,6 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {Store}=require('../src/memory/store');
 const {createRuntime}=require('../src/core/runtime');
+const {saveCredential}=require('../src/services/credentials');
 const PRIVATE_KEY='sk-'+'private_sync_test_'.repeat(3);
 
 function config(dir,privateApiKey=''){
@@ -27,4 +28,20 @@ test('server does not invent a private configuration when the private key is abs
   createRuntime(config(dir,''),{store,secureDir:path.join(dir,'secure'),providerFactory:()=>({})});
   const settings=store.settings();
   assert.equal(settings.privateConfirmed,false);
+});
+
+
+test('private key configured in the web persists and is restored for the mobile app after redeploy',t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sofia-filter-persist-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const first={...config(dir,''),root:dir};
+  saveCredential(first,'private',PRIVATE_KEY);
+  assert.equal(first.privateApiKey,PRIVATE_KEY);
+  const second={...config(dir,''),root:dir};
+  const store=new Store(path.join(dir,'data','sofia.sqlite'));
+  t.after(()=>{try{store.close();}catch{}});
+  createRuntime(second,{store,secureDir:path.join(dir,'secure'),providerFactory:()=>({})});
+  assert.equal(second.privateApiKey,PRIVATE_KEY);
+  assert.equal(store.settings().routingEnabled,true);
+  assert.equal(store.settings().privateConfirmed,true);
 });

@@ -1,8 +1,9 @@
 'use strict';
 const path=require('node:path');const {Store}=require('../memory/store');
 const {KeyStore,BackupService}=require('../services/backup');const {SofiaCore}=require('./sofia-core');const {createHandler}=require('./http-handler');const {seed}=require('./seed');const {seed45}=require('./seed45');
-const {Workspace}=require('./workspace');const {UsageService}=require('../services/usage');const {AudioService}=require('../services/audio');const {seed46}=require('./seed46');const {seed47}=require('./seed47');const {seed48}=require('./seed48');const {seed52}=require('./seed52');const {seed58}=require('./seed58');const {seed59}=require('./seed59');const {seed61}=require('./seed61');const {RoutingService}=require('../services/routing');const {VaultService}=require('../services/vault');const {Scheduler}=require('../services/scheduler');
+const {Workspace}=require('./workspace');const {UsageService}=require('../services/usage');const {AudioService}=require('../services/audio');const {loadPersistedCredentials}=require('../services/credentials');const {seed46}=require('./seed46');const {seed47}=require('./seed47');const {seed48}=require('./seed48');const {seed52}=require('./seed52');const {seed58}=require('./seed58');const {seed59}=require('./seed59');const {seed61}=require('./seed61');const {RoutingService}=require('../services/routing');const {VaultService}=require('../services/vault');const {Scheduler}=require('../services/scheduler');
 function createRuntime(config,options={}){
+ loadPersistedCredentials(config);
  const store=options.store||new Store(path.join(config.dataDir,'sofia.sqlite'));seed(store);const workspace=new Workspace(store);seed45(store,workspace);seed46(store,workspace);seed47(store,workspace);seed48(store,workspace);seed52(store,workspace);seed58(store,workspace);seed59(store,workspace);seed61(store,workspace);
  let current=store.settings();
  // v133: inicializa o e-mail pessoal a partir do segredo/configuração de ambiente sem publicá-lo no Git/ZIP.
@@ -13,7 +14,7 @@ function createRuntime(config,options={}){
  // v139: a presença explícita de OPENAI_PRIVATE_API_KEY no ambiente do servidor é a fonte de verdade
  // para o Filtro Privado online. Isso sincroniza web e app após redeploy sem gravar a chave no banco.
  // Não há fallback silencioso para a chave compartilhada: se a variável privada não existir, o Privado continua bloqueado.
- if(config.privateApiKey){const updates={};if(!current.routingEnabled)updates.routingEnabled=true;if(!current.privateConfirmed)updates.privateConfirmed=true;if(Object.keys(updates).length){store.updateSettings(updates);current=store.settings();}}
+ if(config.privateApiKey||(config.apiKey&&current.legacyRoute==='private')){const updates={};if(!current.routingEnabled)updates.routingEnabled=true;if(!current.privateConfirmed)updates.privateConfirmed=true;if(Object.keys(updates).length){store.updateSettings(updates);current=store.settings();}}
  const vault=new VaultService(store,{secureDir:options.secureDir});const routing=new RoutingService(store,config,options.providerFactory||(options.provider?()=>options.provider:undefined));
  const backups=new BackupService(store,config.backupDir,new KeyStore(options.secureDir));backups.vault=vault;
  const usageService=options.usageService||new UsageService(store,config,routing,options.fetchImpl||global.fetch);const audioService=options.audioService||new AudioService(config,options.fetchImpl||global.fetch);const core=new SofiaCore({store,config,workspace,routing,usageService});const scheduler=new Scheduler(workspace,options.schedulerOptions);

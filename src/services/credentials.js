@@ -10,18 +10,33 @@ function normalize(route,value){
   if(typeof value!=='string'||!/^sk-[A-Za-z0-9_-]{16,}$/.test(value.trim()))throw new AppError('BAD_KEY','Cole somente a chave completa, sem quebras de linha. Ela não foi salva.');
   return value.trim();
 }
-function persist(config,route,key){
-  const varName=route==='private'?'OPENAI_PRIVATE_API_KEY':route==='shared'?'OPENAI_SHARED_API_KEY':'OPENAI_ADMIN_KEY',file=path.join(config.root,'.env');
+function credentialFile(config){return path.join(config.dataDir||path.join(config.root,'data'),'runtime-credentials.env');}
+function updateEnvFile(file,varName,key){
   let text=fs.existsSync(file)?fs.readFileSync(file,'utf8'):'';
   if(text.length>1024*1024)throw new AppError('BAD_ENV','Arquivo de configuração inesperado.');
   const lines=text.split(/\r?\n/).filter(l=>!new RegExp('^\\s*'+varName+'\\s*=').test(l));
   lines.push(varName+'='+key);
   atomicWrite(file,Buffer.from(lines.join('\n').replace(/\n{3,}/g,'\n\n')+'\n'));
+}
+function loadPersistedCredentials(config){
+  const file=credentialFile(config);if(!fs.existsSync(file))return {private:false,shared:false,admin:false};
+  const text=fs.readFileSync(file,'utf8');if(text.length>1024*1024)throw new AppError('BAD_ENV','Arquivo de configuração inesperado.');
+  const found={};
+  for(const line of text.split(/\r?\n/)){const m=/^\s*(OPENAI_PRIVATE_API_KEY|OPENAI_SHARED_API_KEY|OPENAI_ADMIN_KEY)\s*=\s*(sk-[A-Za-z0-9_-]{16,})\s*$/.exec(line);if(m)found[m[1]]=m[2];}
+  if(!config.privateApiKey&&found.OPENAI_PRIVATE_API_KEY)config.privateApiKey=found.OPENAI_PRIVATE_API_KEY;
+  if(!config.sharedApiKey&&found.OPENAI_SHARED_API_KEY)config.sharedApiKey=found.OPENAI_SHARED_API_KEY;
+  if(!config.adminApiKey&&found.OPENAI_ADMIN_KEY)config.adminApiKey=found.OPENAI_ADMIN_KEY;
+  return {private:Boolean(config.privateApiKey),shared:Boolean(config.sharedApiKey),admin:Boolean(config.adminApiKey)};
+}
+function persist(config,route,key){
+  const varName=route==='private'?'OPENAI_PRIVATE_API_KEY':route==='shared'?'OPENAI_SHARED_API_KEY':'OPENAI_ADMIN_KEY';
+  updateEnvFile(path.join(config.root,'.env'),varName,key);
+  updateEnvFile(credentialFile(config),varName,key);
   if(route==='private')config.privateApiKey=key;else if(route==='shared')config.sharedApiKey=key;else config.adminApiKey=key;
 }
 function saveCredential(config,route,value){
   const key=normalize(route,value);persist(config,route,key);
-  return {saved:true,route,validated:false,notice:route==='admin'?'Chave Admin guardada somente no .env local.':'Chave guardada somente no .env local. A política de compartilhamento do projeto deve ser confirmada manualmente na OpenAI.'};
+  return {saved:true,route,validated:false,notice:route==='admin'?'Chave Admin guardada na configuração persistente do servidor.':'Chave guardada na configuração persistente do servidor. A política de compartilhamento do projeto deve ser confirmada manualmente na OpenAI.'};
 }
 function validationUrl(route){
   if(route!=='admin')return MODELS_ENDPOINT;
@@ -49,4 +64,4 @@ async function saveCredentialValidated(config,route,value,fetchImpl=null){
   persist(config,route,key);
   return {saved:true,validated:true,route,notice:route==='admin'?'Chave Admin validada no Usage da OpenAI e salva no .env local.':'Chave validada pela OpenAI e salva no .env local. Nenhuma mensagem pessoal foi enviada durante este teste.'};
 }
-module.exports={saveCredential,validateCredential,saveCredentialValidated};
+module.exports={saveCredential,validateCredential,saveCredentialValidated,loadPersistedCredentials};
