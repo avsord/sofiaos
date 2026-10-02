@@ -87,7 +87,7 @@ class Store {
     return this.tx(() => { for (const [k,v] of Object.entries(updates)) this.db.prepare('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(k,JSON.stringify(v)); this.audit('settings.updated'); return this.settings(); });
   }
   conversation(conversationId) {
-    const c = this.db.prepare('SELECT * FROM conversations WHERE id=? AND owner=?').get(conversationId, OWNER);
+    const c = this.db.prepare("SELECT * FROM conversations WHERE id=? AND owner=? AND state<>'deleted'").get(conversationId, OWNER);
     if (!c) throw new AppError('NOT_FOUND', 'Conversa não encontrada.', 404);
     return c;
   }
@@ -97,15 +97,57 @@ class Store {
     this.db.prepare("INSERT INTO conversations VALUES (?,?,?,?, 'active',?,?)").run(c.id, OWNER, c.title, channel, c.created_at, c.created_at);
     this.audit('conversation.created',c.id); return this.conversation(c.id);
   }
-  conversations(limit = 100, offset = 0) { return this.db.prepare('SELECT * FROM conversations WHERE owner=? ORDER BY updated_at DESC,rowid DESC LIMIT ? OFFSET ?').all(OWNER, limit, offset); }
+  conversations(limit = 100, offset = 0) { return this.db.prepare("SELECT * FROM conversations WHERE owner=? AND state<>'deleted' ORDER BY updated_at DESC,rowid DESC LIMIT ? OFFSET ?").all(OWNER, limit, offset); }
   messages(conversationId, limit = 100, before = Number.MAX_SAFE_INTEGER) {
     this.conversation(conversationId);
-    return this.db.prepare('SELECT rowid AS sequence,* FROM messages WHERE conversation_id=? AND owner=? AND rowid<? ORDER BY rowid DESC LIMIT ?').all(conversationId, OWNER, before, limit).reverse();
+    return this.db.prepare("SELECT rowid AS sequence,* FROM messages WHERE conversation_id=? AND owner=? AND status<>'deleted' AND rowid<? ORDER BY rowid DESC LIMIT ?").all(conversationId, OWNER, before, limit).reverse();
   }
   message(messageId) {
-    const m = this.db.prepare('SELECT rowid AS sequence,* FROM messages WHERE id=? AND owner=?').get(messageId,OWNER);
+    const m = this.db.prepare("SELECT rowid AS sequence,* FROM messages WHERE id=? AND owner=? AND status<>'deleted'").get(messageId,OWNER);
     if (!m) throw new AppError('NOT_FOUND','Mensagem não encontrada.',404);
     return m;
+  }
+  deleteMessage(messageId) {
+    const m=this.message(messageId);if(m.status==='pending')throw new AppError('IN_PROGRESS','Espere a resposta terminar antes de apagar esta mensagem.',409);
+    return this.tx(()=>{
+      this.db.prepare('DELETE FROM voice_messages WHERE message_id=?').run(m.id);
+      this.db.prepare('DELETE FROM search_index WHERE entity_id=?').run(m.id);
+      this.db.prepare("DELETE FROM annotations WHERE entity_type='message' AND entity_id=?").run(m.id);
+      this.db.prepare('DELETE FROM route_decisions WHERE message_id=?').run(m.id);
+      this.db.prepare('DELETE FROM routing_log WHERE message_id=?').run(m.id);
+      this.db.prepare('DELETE FROM intent_decisions WHERE message_id=?').run(m.id);
+      this.db.prepare('DELETE FROM pending_intents WHERE source_message_id=?').run(m.id);
+      this.db.prepare("UPDATE messages SET content='',client_id=NULL,status='deleted',error_code=NULL,refs='[]' WHERE id=? AND owner=?").run(m.id,OWNER);
+      this.db.prepare('UPDATE checkpoints SET digest_id=NULL WHERE conversation_id=?').run(m.conversation_id);
+      this.db.prepare('DELETE FROM digests WHERE conversation_id=?').run(m.conversation_id);
+      this.db.prepare('UPDATE conversations SET updated_at=? WHERE id=?').run(now(),m.conversation_id);
+      if(this.db.prepare("SELECT id FROM messages WHERE conversation_id=? AND owner=? AND status<>'deleted' AND role='user' LIMIT 1").get(m.conversation_id,OWNER))this.makeDigest(m.conversation_id);
+      this.audit('message.deleted',m.id);return {ok:true,id:m.id,conversation_id:m.conversation_id};
+    });
+  }
+  clearChatHistory() {
+    const conversations=this.db.prepare("SELECT id FROM conversations WHERE owner=? AND state<>'deleted' AND channel IN ('web','mobile','test')").all(OWNER);
+    return this.tx(()=>{
+      let messages=0;
+      for(const conv of conversations){
+        const ids=this.db.prepare('SELECT id FROM messages WHERE conversation_id=? AND owner=?').all(conv.id,OWNER).map(r=>r.id);messages+=ids.length;
+        for(const mid of ids){
+          this.db.prepare('DELETE FROM voice_messages WHERE message_id=?').run(mid);
+          this.db.prepare('DELETE FROM search_index WHERE entity_id=?').run(mid);
+          this.db.prepare("DELETE FROM annotations WHERE entity_type='message' AND entity_id=?").run(mid);
+          this.db.prepare('DELETE FROM route_decisions WHERE message_id=?').run(mid);
+          this.db.prepare('DELETE FROM routing_log WHERE message_id=?').run(mid);
+          this.db.prepare('DELETE FROM intent_decisions WHERE message_id=?').run(mid);
+          this.db.prepare('DELETE FROM pending_intents WHERE source_message_id=?').run(mid);
+        }
+        this.db.prepare('DELETE FROM pending_intents WHERE conversation_id=?').run(conv.id);
+        this.db.prepare('DELETE FROM checkpoints WHERE conversation_id=?').run(conv.id);
+        this.db.prepare('DELETE FROM digests WHERE conversation_id=?').run(conv.id);
+        this.db.prepare("UPDATE messages SET content='',client_id=NULL,status='deleted',error_code=NULL,refs='[]' WHERE conversation_id=? AND owner=?").run(conv.id,OWNER);
+        this.db.prepare("UPDATE conversations SET title='Conversa apagada',state='deleted',updated_at=? WHERE id=? AND owner=?").run(now(),conv.id,OWNER);
+      }
+      this.audit('chat.history.deleted');return {ok:true,conversations:conversations.length,messages};
+    });
   }
   privacyOf(type, entityId) { return entityId ? (this.db.prepare('SELECT privacy FROM annotations WHERE entity_type=? AND entity_id=?').get(type,entityId)?.privacy || null) : null; }
   annotate(type, entityId, privacy='private', tags='[]') { if(!['local','private','shared'].includes(privacy))throw new AppError('BAD_PRIVACY','Privacidade inválida.');this.db.prepare("INSERT INTO annotations VALUES(?,?,?,?) ON CONFLICT(entity_type,entity_id) DO UPDATE SET privacy=excluded.privacy,tags=excluded.tags").run(type,entityId,typeof tags==='string'?tags:JSON.stringify(tags),privacy); }
