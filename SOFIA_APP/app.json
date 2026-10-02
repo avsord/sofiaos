@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sofia OS",
     "slug": "sofia-app",
-    "version": "0.3.4",
+    "version": "0.3.5",
     "scheme": "sofiaapp",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -14,30 +14,15 @@
     },
     "android": {
       "package": "com.avsord.sofiaapp",
-      "versionCode": 9,
+      "versionCode": 10,
       "softwareKeyboardLayoutMode": "resize",
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ],
-      "blockedPermissions": [
-        "android.permission.READ_CONTACTS",
-        "android.permission.ACCESS_FINE_LOCATION"
-      ],
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#7258E8"
-      }
+      "permissions": ["android.permission.RECORD_AUDIO"],
+      "blockedPermissions": ["android.permission.READ_CONTACTS", "android.permission.ACCESS_FINE_LOCATION"],
+      "adaptiveIcon": {"foregroundImage": "./assets/icon.png", "backgroundColor": "#7258E8"}
     },
     "plugins": [
       "expo-secure-store",
-      [
-        "expo-audio",
-        {
-          "microphonePermission": "A Sofia usa o microfone somente quando você escolhe gravar uma mensagem de voz.",
-          "enableBackgroundRecording": false,
-          "enableBackgroundPlayback": false
-        }
-      ]
+      ["expo-audio", {"microphonePermission": "A Sofia usa o microfone somente quando você escolhe gravar uma mensagem de voz.", "enableBackgroundRecording": false, "enableBackgroundPlayback": false}]
     ]
   }
 }

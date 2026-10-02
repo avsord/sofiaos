@@ -1,13 +1,13 @@
 {
   "name": "sofia-app",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "private": true,
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "check": "tsc --noEmit",
-    "test": "node tools/test.cjs",
+    "test": "node tools/test.cjs && node --test tests/navigation.test.cjs",
     "prepare-assets": "node tools/assets.cjs"
   },
   "dependencies": {
@@ -24,11 +24,6 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-svg": "15.15.4"
   },
-  "devDependencies": {
-    "@types/react": "~19.2.0",
-    "typescript": "~6.0.3"
-  },
-  "engines": {
-    "node": ">=22.16.0"
-  }
+  "devDependencies": {"@types/react": "~19.2.0", "typescript": "~6.0.3"},
+  "engines": {"node": ">=22.16.0"}
 }
