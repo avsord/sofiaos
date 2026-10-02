@@ -5,7 +5,6 @@ on:
     branches: [sofia-app-android]
     paths:
       - 'SOFIA_APP/**'
-      - 'tools/releases/0.3.10/**'
       - '.github/workflows/sofia-android-apk.yml'
 permissions:
   contents: write
@@ -37,36 +36,26 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Apply checksum-verified 0.3.10 release source once
-        run: |
-          if [ "$(node -p "require('./package.json').version")" = '0.3.9' ]; then
-            node ../tools/releases/0.3.10/apply.cjs app ..
-          fi
       - name: Apply checked source normalization
         run: node tools/normalize-source.cjs
-      - name: Resolve the added image picker into the dependency lock
-        run: |
-          if ! node -e "const p=require('./package-lock.json');process.exit(p.packages?.['node_modules/expo-image-picker']?0:1)"; then
-            npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          fi
       - name: Install locked dependencies
         run: npm ci
       - name: Full TypeScript validation
         run: npm run check
-      - name: Application unit tests
+      - name: Application and updater regression tests
         run: npm test
-      - name: Persist complete validated source and dependency lock on app branch only
+      - name: Persist validated source and lock without overwriting concurrent changes
         run: |
           cd ..
           git config user.name 'Sofia build'
           git config user.email 'sofia-build@users.noreply.github.com'
           git add -- SOFIA_APP
           if ! git diff --cached --quiet; then
-            git commit -m 'release: validated Sofia Android 0.3.10 source and locked dependencies [skip ci]'
+            git commit -m 'build: normalize validated Android version metadata [skip ci]'
             git push origin HEAD:refs/heads/sofia-app-android
           fi
       - name: Generate native Android project
-        run: npx expo prebuild --platform android --non-interactive --clean
+        run: npx expo prebuild --platform android --clean
       - name: Build standalone internal APK with bundled JavaScript
         run: |
           cd android
@@ -79,13 +68,13 @@ jobs:
           unzip -l dist/Sofia-OS.apk | grep -E 'assets/index.android.bundle|assets/.*\.bundle'
           sha256sum dist/Sofia-OS.apk > dist/Sofia-OS.apk.sha256
           git rev-parse HEAD > dist/SOURCE_COMMIT.txt
-          printf 'Internal validation build. Release-mode JavaScript bundle; development signing certificate. Not a Play Store production release.\n' > dist/BUILD_SCOPE.txt
+          printf 'Release-mode JavaScript bundle; existing development signing certificate. Not a Play Store production release.\n' > dist/BUILD_SCOPE.txt
       - name: Enable KVM for Android smoke test
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Install over 0.3.9 and launch without Metro on Android
+      - name: Install over 0.3.9 then 0.3.10 and launch without Metro
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -94,7 +83,7 @@ jobs:
           disable-animations: true
           script: |
             mkdir -p SOFIA_APP/dist
-            sh -lc 'curl -fsSL "https://github.com/avsord/sofiaos/releases/download/sofia-android-v0.3.9/Sofia-OS.apk" -o /tmp/Sofia-OS-0.3.9.apk && adb install /tmp/Sofia-OS-0.3.9.apk && adb install -r SOFIA_APP/dist/Sofia-OS.apk'
+            sh -lc 'curl -fsSL "https://github.com/avsord/sofiaos/releases/download/sofia-android-v0.3.9/Sofia-OS.apk" -o /tmp/Sofia-0.3.9.apk && curl -fsSL "https://github.com/avsord/sofiaos/releases/download/sofia-android-v0.3.10/Sofia-OS.apk" -o /tmp/Sofia-0.3.10.apk && adb install /tmp/Sofia-0.3.9.apk && adb install -r /tmp/Sofia-0.3.10.apk && adb install -r SOFIA_APP/dist/Sofia-OS.apk'
             adb logcat -c
             adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
             sleep 20
@@ -108,25 +97,21 @@ jobs:
             grep -q 'Entrar' SOFIA_APP/dist/login-ui.xml
       - name: Require the compatible chat-sync server before publishing
         run: |
-          for i in $(seq 1 30); do
-            body=$(curl --silent --show-error --max-time 15 https://sofiaos.up.railway.app/health || true)
-            echo "$body"
-            echo "$body" | grep -q '"version":"141.0.0"' && exit 0
-            sleep 10
-          done
-          echo 'Compatible server is not confirmed; refusing to publish an incomplete update.'
-          exit 1
-      - name: Publish direct-update release from the actual validated app commit
+          curl --fail --silent --show-error --max-time 20 https://sofiaos.up.railway.app/health > /tmp/sofia-health.json
+          node -e "const h=require('/tmp/sofia-health.json');if(!h.ok||Number(h.version.split('.')[0])<141)throw Error('Compatible server not deployed');console.log(h)"
+      - name: Publish exact tested APK and verify latest discovery
         env:
           GH_TOKEN: ${{ github.token }}
+        run: node tools/publish-release.cjs
+      - name: Check actual public update discovery with the application code
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          TAG="sofia-android-v${VERSION}"
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/Sofia-OS.apk --clobber --repo "$GITHUB_REPOSITORY"
-          else
-            gh release create "$TAG" dist/Sofia-OS.apk --target "$(git rev-parse HEAD)" --repo "$GITHUB_REPOSITORY" --title "Sofia OS Android ${VERSION}" --notes-file RELEASE_0.3.10.md
-          fi
+          node <<'NODE'
+          const fs=require('node:fs'),ts=require('typescript'),vm=require('node:vm');
+          const exports={};
+          const source=ts.transpileModule(fs.readFileSync('src/lib/update.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+          vm.runInNewContext(source,{exports,fetch,AbortController,setTimeout,clearTimeout,Date,Error,Promise});
+          (async()=>{const version=require('./package.json').version;for(const old of ['0.3.9','0.3.10']){const next=await exports.checkForUpdate({currentVersion:old});if(next?.version!==version)throw Error('Public updater does not offer '+version+' from '+old);console.log(old,'->',next.version,next.url);}})().catch(error=>{console.error(error);process.exitCode=1;});
+          NODE
       - name: Upload APK and smoke-test evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -135,7 +120,7 @@ jobs:
           path: SOFIA_APP/dist/
           if-no-files-found: warn
           retention-days: 30
-      - name: Upload exact source and dependency lock
+      - name: Pack exact source and dependency lock
         if: always()
         run: |
           cd ..

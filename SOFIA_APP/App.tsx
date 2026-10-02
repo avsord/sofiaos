@@ -20,7 +20,7 @@ import {Notifications as NotificationsScreen} from './src/screens/Notifications'
 import {Profile as ProfileScreen} from './src/screens/Profile';
 import {Workspace as WorkspaceScreen} from './src/screens/Workspace';
 import {Pages as PagesScreen} from './src/screens/Pages';
-import {checkForUpdate} from './src/lib/update';
+import {APP_VERSION,checkForUpdate} from './src/lib/update';
 
 // Keep screen instances and unchanged screen trees across menu taps and swipes.
 const Home=React.memo(HomeScreen),Chat=React.memo(ChatScreen),Agenda=React.memo(AgendaScreen),Notifications=React.memo(NotificationsScreen),Profile=React.memo(ProfileScreen),Workspace=React.memo(WorkspaceScreen),Pages=React.memo(PagesScreen);
@@ -39,10 +39,29 @@ function Shell(){
  const c=prefs.appearance==='dark'||(prefs.appearance==='system'&&system==='dark')?dark:light;
  const expired=useCallback(()=>{tabHistory.current=[];setAuth(null);setBootstrap(null);setLocked(false);void forgetAuth().catch(()=>{});},[]);
  const api=useMemo(()=>new SofiaApi(auth?.token||'',expired),[auth?.token,expired]);
- const checkUpdate=useCallback(async(manual=false)=>{try{const update=await checkForUpdate();if(!update){if(manual)Alert.alert('Sofia OS','Você já está na versão mais recente.');return;}Alert.alert('Atualização disponível',`Sofia OS ${update.version} está disponível. O Android pedirá sua confirmação para instalar.`,[{text:'Depois',style:'cancel'},{text:'Atualizar',onPress:()=>{void Linking.openURL(update.url);}}]);}catch{if(manual)Alert.alert('Atualizações','Não foi possível verificar atualizações agora.');}},[]);
+ const checkingUpdate=useRef(false),lastUpdateCheck=useRef(0),lastUpdatePrompt=useRef('');
+ const checkUpdate=useCallback(async(manual=false)=>{
+  if(checkingUpdate.current)return;
+  if(!manual&&(AppState.currentState!=='active'||navigation.current.locked||Date.now()-lastUpdateCheck.current<300000))return;
+  checkingUpdate.current=true;lastUpdateCheck.current=Date.now();
+  try{
+   const update=await checkForUpdate();
+   if(!update){if(manual)Alert.alert('Sofia OS '+APP_VERSION,'Você já está na versão mais recente.');return;}
+   if(!manual&&(AppState.currentState!=='active'||navigation.current.locked||lastUpdatePrompt.current===update.version))return;
+   lastUpdatePrompt.current=update.version;
+   Alert.alert('Atualização disponível',`Instalada: ${APP_VERSION}\nDisponível: ${update.version}\nO Android pedirá sua confirmação para instalar.`,[{text:'Depois',style:'cancel'},{text:'Atualizar',onPress:()=>{void Linking.openURL(update.url).catch(()=>Alert.alert('Atualizações','Não foi possível abrir o instalador. Tente novamente no Perfil.'));}}]);
+  }catch(e){if(manual)Alert.alert('Atualizações',errorText(e));}
+  finally{checkingUpdate.current=false;}
+ },[]);
  useEffect(()=>{const a=Keyboard.addListener('keyboardDidShow',()=>setKeyboard(true)),b=Keyboard.addListener('keyboardDidHide',()=>setKeyboard(false));return()=>{a.remove();b.remove();};},[]);
  useEffect(()=>{let active=true;Promise.all([readAuth(),readPrefs()]).then(([a,p])=>{if(active){setAuth(a);setPrefs(p);}}).catch(e=>{if(active)setError(errorText(e));}).finally(()=>{if(active)setReady(true);});return()=>{active=false;};},[]);
- useEffect(()=>{if(ready)void checkUpdate(false);},[ready,checkUpdate]);
+ useEffect(()=>{
+  if(!ready)return;
+  void checkUpdate(false);
+  const interval=setInterval(()=>void checkUpdate(false),300000);
+  const sub=AppState.addEventListener('change',state=>{if(state==='active')void checkUpdate(false);});
+  return()=>{clearInterval(interval);sub.remove();};
+ },[ready,checkUpdate]);
  const boot=useCallback(async()=>{if(!auth)return;setBooting(true);try{const b=await api.bootstrap();setBootstrap(b);setError('');}catch(e){setError(errorText(e));}finally{setBooting(false);}},[api,auth]);
  useEffect(()=>{if(auth)void boot();},[api]);
  useEffect(()=>{if(!auth)return;const sub=AppState.addEventListener('change',state=>{if(state==='active'&&!locked)void boot();else if(state!=='active')void silenceVoices();});return()=>sub.remove();},[auth,locked,boot]);
