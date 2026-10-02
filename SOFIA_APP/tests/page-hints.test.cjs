@@ -42,8 +42,19 @@ test('page canvas stays compact and subpages render as inline page rows',()=>{
  assert.ok(source.includes('fontSize:58'));
  assert.ok(source.includes("<PageTreeList roots={subpages}"));
  assert.ok(!source.includes("Subpáginas ·"));
- assert.ok(tree.includes("Solte aqui para página principal"));
+ assert.ok(!tree.includes("Solte aqui para página principal"));
  assert.ok(tree.includes("PanResponder.create"));
- assert.ok(tree.includes('onStartShouldSetPanResponderCapture:()=>true'));
  assert.ok(tree.includes("Arrastar página "));
+ assert.ok(tree.includes("dx<-30"));
+ assert.ok(tree.includes("Abrir subpágina "));
+ assert.ok(tree.includes("Abrir página principal "));
+});
+
+test('writing hint disappears after the page has a real title and blank body stops reserving vertical space',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
+ assert.ok(source.includes("const showBodyGuide=emptyBody&&titleIsBlank"));
+ assert.ok(source.includes("height:(!b.text&&!b.html&&!pageBlockHint(b,i,showBodyGuide,focus===b.id)&&focus!==b.id)?0:undefined"));
+ assert.ok(source.includes("marginTop:2"));
+ assert.ok(!source.includes('accessibilityLabel="Recolher subpáginas"'));
+ assert.ok(!source.includes('accessibilityLabel="Mostrar subpáginas"'));
 });
