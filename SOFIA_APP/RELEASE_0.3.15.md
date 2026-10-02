@@ -1,11 +1,11 @@
 # Sofia OS Android 0.3.15
 
-Corrige três pontos de navegação e páginas no Android.
+Corrige a navegação interna e o comportamento real das Páginas no Android.
 
-**Páginas com visual de documento:** a tela deixa de parecer um formulário. A capa ocupa a largura, o ícone fica solto sobre a capa sem cartão branco, o título é maior, o conteúdo começa logo abaixo e o espaço artificial entre conteúdo e subpáginas foi reduzido. O cabeçalho mostra o nome da página e “Particular” para páginas privadas; não volta a exibir “Salvo”. Placeholders discretos continuam aparecendo somente enquanto título/corpo estão vazios.
+**Página no fluxo do Notion:** a capa ocupa a largura, o ícone fica solto sobre a capa, o título vem logo abaixo e as subpáginas entram imediatamente no fluxo do documento. “Escreva algo…” aparece apenas enquanto a página realmente está vazia; depois que existe um título real ou conteúdo, o bloco vazio não reserva altura nem deixa um texto auxiliar permanente. Dentro da página, as subpáginas ficam visíveis como linhas de página, sem seta/label de “Subpáginas” para recolher o grupo.
 
-**Voltar arrastando:** quando uma página está aberta dentro da aba Páginas, um arraste horizontal para a direita move a própria página junto com o dedo e revela a lista por baixo. Enquanto a página estiver aberta, esse gesto pertence à navegação interna e não ao carrossel principal. Depois que a página fecha e a lista de Páginas volta a aparecer, o swipe entre Início, Conversa, Páginas, Agenda, Apps e Perfil volta a funcionar normalmente. A velocidade/motion aprovado do carrossel principal não foi alterado.
+**Voltar arrastando:** quando uma página está aberta na aba Páginas, arrastar para a direita move a própria página junto com o dedo e revela a lista por baixo. Enquanto a página está aberta, o pager principal fica bloqueado para esse gesto. Depois que a página fecha e a lista volta a aparecer, o swipe entre Início, Conversa, Páginas, Agenda, Apps e Perfil volta a funcionar normalmente. A velocidade/motion aprovado do carrossel principal não foi alterado.
 
-**Hierarquia por arraste:** o ícone de cada página é um handle dedicado que captura o gesto antes do pager principal. Arrastar uma página sobre outra muda seu parent_id e a transforma em subpágina; a área “Solte aqui para página principal” remove o parent_id e devolve a página à raiz. Ciclos continuam bloqueados e a mudança é persistida no servidor.
+**Hierarquia por arraste:** a linha inteira da página — ícone e texto — pode ser arrastada. Soltar sobre outra página altera o parent_id e transforma a página em subpágina. Para voltar a ser página principal, basta puxar a subpágina para a esquerda/para fora da hierarquia; não existe área nem label “solte aqui”. Ciclos continuam bloqueados e a mudança é salva no servidor.
 
-A Sofia continua iniciando em **Início**. Versão 0.3.15; versionCode 20; package com.avsord.sofiaapp; canal sofia-android-v preservado para atualização dentro do app.
+A Sofia continua iniciando em **Início**. Versão 0.3.15; versionCode 20; package `com.avsord.sofiaapp`; canal `sofia-android-v` preservado para atualização dentro do próprio app.
