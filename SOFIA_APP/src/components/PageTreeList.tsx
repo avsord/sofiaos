@@ -71,7 +71,7 @@ function TreeRow({page,children,expanded,toggle,onOpen,ancestors,compact,draggin
     onShouldBlockNativeResponder:()=>true
   }),[page,onStart,onMove,onEnd,pan]);
   return <View>
-    <Animated.View {...handlers.panHandlers} ref={node=>register(page.id,node)} collapsable={false}
+    <Animated.View {...handlers.panHandlers} ref={node=>register(page.id,node as unknown as View|null)} collapsable={false}
       onTouchStart={()=>onInteractionChange?.(true)} onTouchEnd={()=>{if(!isDragging)onInteractionChange?.(false);}} onTouchCancel={()=>onInteractionChange?.(false)}
       accessibilityLabel={'Arrastar página '+page.title}
       style={{flexDirection:'row',alignItems:'center',paddingLeft:Math.min(ancestors.length,6)*(compact?14:16),borderRadius:9,
