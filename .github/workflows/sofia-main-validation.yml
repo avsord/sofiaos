@@ -34,8 +34,8 @@ jobs:
           for i in $(seq 1 30); do
             body=$(curl --silent --show-error --max-time 15 https://sofiaos.up.railway.app/health || true)
             echo "$body"
-            echo "$body" | grep -q '"private_filter":' && exit 0
+            echo "$body" | grep -q '"version":"139.0.1"' && exit 0
             sleep 10
           done
-          echo "Railway did not report the current private-filter diagnostic within the validation window."
+          echo "Railway did not report v139.0.1 within the validation window."
           exit 1

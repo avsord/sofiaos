@@ -6,13 +6,13 @@ const path=require('node:path');
 const root=path.join(__dirname,'..');
 const read=rel=>fs.readFileSync(path.join(root,rel),'utf8');
 
-test('v139: identidade e cache atuais estão alinhados',()=>{
+test('v139.0.1: identidade e cache atuais estão alinhados',()=>{
   const cfg=read('src/config/sofia.js'),html=read('public/index.html'),pkg=JSON.parse(read('package.json'));
-  assert.ok(cfg.includes("const VERSION = '139.0.0'"));
-  assert.ok(html.includes('Sofia OS · v139'));
-  assert.ok(html.includes('/ui-current.css?v=139'));
-  assert.ok(html.includes('/app.js?v=139'));
-  assert.ok(html.includes('Core v139 · AVSORD Technology'));
+  assert.ok(cfg.includes("const VERSION = '139.0.1'"));
+  assert.ok(html.includes('Sofia OS · v139.0.1'));
+  assert.ok(html.includes('/ui-current.css?v=13901'));
+  assert.ok(html.includes('/app.js?v=13901'));
+  assert.ok(html.includes('Core v139.0.1 · AVSORD Technology'));
   assert.equal(pkg.version,'1.88.0');
 });
 
