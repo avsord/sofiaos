@@ -14,6 +14,7 @@ export function createPagerSelection(initial: Tab = 'chat') {
   let dragging = false;
   return {
     current: () => selected,
+    isDragging: () => dragging,
     select(next: Tab) { dragging = false; if (tabIndex(next) >= 0) selected = next; },
     beginDrag() { dragging = true; },
     cancelDrag() { dragging = false; },
@@ -25,5 +26,20 @@ export function createPagerSelection(initial: Tab = 'chat') {
       selected = next;
       return next;
     }
+  };
+}
+
+/** For the fixed tab bar only: never use touch-down navigation in scrollable rows. */
+export function createImmediateMenuPress(activate: () => void) {
+  let activatedOnDown = false;
+  return {
+    pressIn() { activatedOnDown = true; activate(); },
+    press() {
+      const wasActivated = activatedOnDown;
+      activatedOnDown = false;
+      if (!wasActivated) activate(); // Keyboard / accessibility activation without touch-down.
+    },
+    cancel() { activatedOnDown = false; },
+    accessibilityActivate() { activatedOnDown = false; activate(); }
   };
 }

@@ -1,5 +1,5 @@
 import React,{Component,ErrorInfo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {View,Text,Pressable,StatusBar,ActivityIndicator,useColorScheme,AppState,Alert,Keyboard,BackHandler,Linking,StyleSheet} from 'react-native';
+import {View,Text,StatusBar,ActivityIndicator,useColorScheme,AppState,Alert,Keyboard,BackHandler,Linking,StyleSheet} from 'react-native';
 import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
 import {SofiaApi,readAuth,saveAuth,forgetAuth,readPrefs,savePrefs} from './src/lib/api';
 import type {Auth,Bootstrap,Prefs,Tab,Profile as UserProfile} from './src/lib/types';
@@ -9,6 +9,7 @@ import {silenceVoices} from './src/lib/audio-focus';
 import {Icon,IconName} from './src/components/Icon';
 import {Button,ErrorBanner} from './src/components/UI';
 import {TabPager} from './src/components/TabPager';
+import {MenuTab} from './src/components/MenuTab';
 import type {TabPagerHandle} from './src/components/TabPager';
 import {Login} from './src/screens/Login';
 import {Home as HomeScreen} from './src/screens/Home';
@@ -78,7 +79,7 @@ function Shell(){
  </View>
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?1:0,backgroundColor:c.bg}]} pointerEvents={tab==='notifications'?'auto':'none'} accessibilityElementsHidden={tab!=='notifications'} importantForAccessibility={tab==='notifications'?'auto':'no-hide-descendants'}><Notifications api={api} onBack={notificationBack}/></View>
  </View>
- {!keyboard?<View style={{flexDirection:'row',backgroundColor:c.surface,borderTopWidth:1,borderColor:c.line,paddingHorizontal:8,paddingTop:7,paddingBottom:4}}>{tabs.map(item=><Pressable key={item.id} onPress={()=>navigate(item.id)} accessibilityRole="tab" accessibilityLabel={item.label} accessibilityState={{selected:tab===item.id}} style={{flex:1,alignItems:'center',justifyContent:'center',minHeight:57,gap:4}}><View style={{height:32,minWidth:48,borderRadius:999,overflow:'hidden',alignItems:'center',justifyContent:'center',backgroundColor:tab===item.id?c.accentSoft:'transparent'}}><Icon name={item.icon} color={tab===item.id?c.accent:c.muted}/></View><Text style={{fontSize:9.5,fontWeight:tab===item.id?'700':'500',color:tab===item.id?c.accent:c.muted}}>{item.label}</Text></Pressable>)}</View>:null}</>}
+ {!keyboard?<View style={{flexDirection:'row',backgroundColor:c.surface,borderTopWidth:1,borderColor:c.line,paddingHorizontal:8,paddingTop:7,paddingBottom:4}}>{tabs.map(item=><MenuTab key={item.id} item={item} selected={tab===item.id} onSelect={navigate}/>)}</View>:null}</>}
  </View></SafeAreaView></ThemeContext.Provider>;
 }
 export default function App(){return <AppBoundary><SafeAreaProvider><Shell/></SafeAreaProvider></AppBoundary>;}

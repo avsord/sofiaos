@@ -19,9 +19,10 @@ export function Pages({api,active}:{api:SofiaApi;active:boolean}){
  async function load(manual=false){if(manual)setRefreshing(true);try{const r=await api.entities('user_page');const items=r.items.filter(x=>x.state!=='archived');setPages(items);if(selected){const fresh=items.find(x=>x.id===selected.id);if(fresh)setSelected(fresh);}setError('');}catch(e){setError(errorText(e));}finally{if(manual)setRefreshing(false);}}
  useEffect(()=>{void load();},[api]);
  const byId=useMemo(()=>new Map(pages.map(p=>[p.id,p])),[pages]);
+ const cachedBlocks=useMemo(()=>new Map(pages.map(p=>[p.id,parseBlocks(p)])),[pages]);
  const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of pages){const parent=String(pdata(p).parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const list of m.values())list.sort((a,b)=>a.title.localeCompare(b.title,'pt-BR'));return m;},[pages]);
  function pathFor(p:Entity){const out:Entity[]=[];let cur:Entity|undefined=p,guard=0;while(cur&&guard++<30){out.unshift(cur);const parentId:string=String(pdata(cur).parent_id||'');cur=parentId?byId.get(parentId):undefined;}return out;}
- function open(page:Entity,push=true){if(push&&selected)history.current.push(selected.id);setSelected(page);setTitle(page.title);setBlocks(parseBlocks(page));setError('');}
+ function open(page:Entity,push=true){if(push&&selected)history.current.push(selected.id);setSelected(page);setTitle(page.title);setBlocks(cachedBlocks.get(page.id)||parseBlocks(page));setError('');}
  function back(){const id=history.current.pop();if(id){const p=byId.get(id);if(p){open(p,false);return;}}setSelected(null);}
  useEffect(()=>{if(!active)return;const sub=BackHandler.addEventListener('hardwareBackPress',()=>{if(!selected)return false;back();return true;});return()=>sub.remove();},[active,selected,byId]);
  async function save(){if(!selected||saving||!title.trim())return;setSaving(true);try{const saved=await api.saveEntity({...selected,title:title.trim(),data:{...pdata(selected),blocks_json:JSON.stringify(blocks)}});setSelected(saved);setPages(old=>old.map(p=>p.id===saved.id?saved:p));setError('');}catch(e){setError(errorText(e));}finally{setSaving(false);}}

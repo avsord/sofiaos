@@ -17,6 +17,9 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
   latest.current = {activeTab,enabled,onSelect};
 
   const align = useCallback(() => {
+    // Content/layout updates must not pull the native surface away from the finger.
+    // Keep this guard through momentum; an explicit menu tap clears it in goTo.
+    if (selection.current.isDragging()) return;
     const index = tabIndex(selection.current.current());
     if (size.current > 0 && index >= 0) scroll.current?.scrollTo({x:index * size.current,y:0,animated:false});
   },[]);
@@ -61,4 +64,4 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
     </ScrollView>
   </View>;
 });
-const styles=StyleSheet.create({fill:{flex:1},row:{height:'100%'},page:{height:'100%'}});
+const styles=StyleSheet.create({fill:{flex:1},row:{height:'100%'},page:{height:'100%',flexShrink:0}});
