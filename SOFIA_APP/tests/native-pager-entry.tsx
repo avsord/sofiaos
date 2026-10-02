@@ -16,11 +16,13 @@ import type {Entity,Tab} from '../src/lib/types';
 import type {IconName} from '../src/components/Icon';
 const tabs:{id:Tab;label:string;icon:IconName}[]=[{id:'home',label:'Início',icon:'home'},{id:'chat',label:'Conversa',icon:'chat'},{id:'pages',label:'Páginas',icon:'book'},{id:'agenda',label:'Agenda',icon:'calendar'},{id:'apps',label:'Apps',icon:'grid'},{id:'profile',label:'Perfil',icon:'user'}];
 function Fixture(){
- const [tab,setTab]=useState<Tab>('home'),[epoch,setEpoch]=useState(0),[compact,setCompact]=useState(false),[many,setMany]=useState(false),[keyboard,setKeyboard]=useState(false);
+ const [tab,setTab]=useState<Tab>('home'),[epoch,setEpoch]=useState(0),[compact,setCompact]=useState(false),[many,setMany]=useState(false),[keyboard,setKeyboard]=useState(false),[pagesDepth,setPagesDepth]=useState(false);
  const pager=useRef<TabPagerHandle>(null),motion=useMemo(()=>createMenuMotion('home'),[]),win=useWindowDimensions();
  useEffect(()=>{const timer=setTimeout(()=>setMany(true),700);const a=Keyboard.addListener('keyboardDidShow',()=>setKeyboard(true)),b=Keyboard.addListener('keyboardDidHide',()=>setKeyboard(false));return()=>{clearTimeout(timer);a.remove();b.remove();motion.dispose();};},[motion]);
  const api=useMemo(()=>{
-  let sequence=0;const rows=new Map<string,Entity>();
+  let sequence=2;
+  const make=(id:string,title:string,parent_id=''):Entity=>({id,kind:'user_page',title,content:'',area:'Pessoal',state:'active',privacy:'private',tags:[],revision:1,data:{icon:title==='Alpha'?'🅰️':'🅱️',icon_mode:'emoji',cover_type:'',cover_value:'',cover_attachment_id:'',purpose:'',layout:'notes',suggested:false,parent_id,node_type:parent_id?'page':'space',blocks_json:'[]'}});
+  const rows=new Map<string,Entity>([['qa-alpha',make('qa-alpha','Alpha')],['qa-beta',make('qa-beta','Beta')]]);
   return {
    entities:async()=>({items:[...rows.values()]}),
    entity:async(id:string)=>{const row=rows.get(id);if(!row)throw Error('No synthetic page');return row;},
@@ -33,10 +35,10 @@ function Fixture(){
  return <ThemeContext.Provider value={light}><SafeAreaView style={styles.root}>
   <Text style={styles.status}>SOFIA_NATIVE_PAGER_FIXTURE_ONLY</Text>
   <View style={{flex:1,width:Math.min(760,win.width)*(compact?.85:1),alignSelf:'center'}}>
-   <TabPager key={epoch} ref={pager} activeTab={tab} enabled={!keyboard} onSelect={select} motion={motion}>
+   <TabPager key={epoch} ref={pager} activeTab={tab} enabled={!keyboard&&!(tab==='pages'&&pagesDepth)} onSelect={select} motion={motion}>
     {TAB_ORDER.map(id=><View key={id} style={{flex:1}}>
      <Text testID={'qa-surface-'+id} style={styles.marker}>{'VISIBLE PAGE '+id}</Text>
-     {id==='pages'?<Pages api={api} active={tab==='pages'} storageScope="ci-synthetic-only"/>:
+     {id==='pages'?<Pages api={api} active={tab==='pages'} storageScope="ci-synthetic-only" onDepthChange={setPagesDepth}/>:
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:20}}>
        <Pressable accessibilityLabel={'qa-first-'+id}><Text>{id+' first control'}</Text></Pressable>
        <TextInput accessibilityLabel={'qa-input-'+id} placeholder="Synthetic input" style={{minHeight:44}}/>
