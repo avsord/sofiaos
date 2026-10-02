@@ -256,16 +256,19 @@ class SofiaCore{
     }
     if(plan.intent==='create_user_page'){
       const title=a.title||a.content;if(!title)throw new AppError('ACTION_INVALID','A página precisa de um nome.');
+      const pageKey=value=>normalize(String(value||'')).replace(/\s+/g,'');
+      const pages=this.workspace.list({kind:'user_page',limit:500}).filter(e=>e.state==='active');
       const parentTitle=String(a.parent_title||'').trim();let parent=null;
       if(parentTitle){
-        const wanted=normalize(parentTitle),pages=this.workspace.list({kind:'user_page',limit:500}).filter(e=>e.state==='active');
-        const exact=pages.filter(e=>normalize(e.title)===wanted);
+        const wanted=pageKey(parentTitle),exact=pages.filter(e=>pageKey(e.title)===wanted);
         if(exact.length===1)parent=exact[0];
         else if(exact.length>1){const roots=exact.filter(e=>!e.data?.parent_id);if(roots.length===1)parent=roots[0];else throw new AppError('PAGE_PARENT_AMBIGUOUS','Há mais de uma página chamada “'+parentTitle+'”. Abra o espaço desejado e crie a subpágina por lá.',409);}
         else throw new AppError('PAGE_PARENT_NOT_FOUND','Não encontrei o espaço ou página “'+parentTitle+'”. Não criei a página fora dele.',409);
       }
-      const e=this.workspace.save({kind:'user_page',title,content:a.content||'',area:a.area||'Pessoal',privacy:route,source_id:user.id,state:'active',data:{icon:'',icon_mode:'default',cover_type:'preset',cover_value:'linear-gradient(135deg,#d9d2ff,#b8aaff)',cover_attachment_id:'',purpose:a.content||'',layout:'notes',suggested:false,parent_id:parent?.id||'',node_type:parent?'page':'space',blocks_json:'[]'},tags:a.tags||[]});
-      return {reply:(parent?'Página criada: “'+e.title+'” dentro de “'+parent.title+'”.':'Espaço criado: “'+e.title+'”.'),ui_target:'userpage',items:[e]};
+      const parentId=parent?.id||'',existing=pages.find(e=>pageKey(e.title)===pageKey(title)&&String(e.data?.parent_id||'')===parentId);
+      if(existing)return {reply:(parent?'A página “'+existing.title+'” já existe dentro de “'+parent.title+'”; usei a existente.':'O espaço “'+existing.title+'” já existe; usei o existente.'),ui_target:'userpage',items:[existing],details:{page_changed:false,page_id:existing.id,created:false,reused:true}};
+      const e=this.workspace.save({kind:'user_page',title,content:a.content||'',area:a.area||'Pessoal',privacy:route,source_id:user.id,state:'active',data:{icon:'',icon_mode:'default',cover_type:'preset',cover_value:'linear-gradient(135deg,#d9d2ff,#b8aaff)',cover_attachment_id:'',purpose:a.content||'',layout:'notes',suggested:false,parent_id:parentId,node_type:parent?'page':'space',blocks_json:'[]'},tags:a.tags||[]});
+      return {reply:(parent?'Página criada: “'+e.title+'” dentro de “'+parent.title+'”.':'Espaço criado: “'+e.title+'”.'),ui_target:'userpage',items:[e],details:{page_changed:true,page_id:e.id,created:true,reused:false}};
     }
     if(plan.intent==='delete_scope'){
       const result=this.workspace.deleteScope(a.scope_id,{scope:a.scope||'all',targetIds:a.target_ids||[]});const deleted=result.deleted;const byKind={};for(const x of deleted)byKind[x.kind]=(byKind[x.kind]||0)+1;
