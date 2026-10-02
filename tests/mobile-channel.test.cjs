@@ -99,9 +99,10 @@ test('mobile: áudio malformado e reuso de id com conteúdo diferente são recus
   data.audio_base64=Buffer.from('audio one').toString('base64');assert.equal((await f.request('/messages/audio',data,'POST',token)).status,200);
   data.audio_base64=Buffer.from('audio two').toString('base64');assert.equal((await f.request('/messages/audio',data,'POST',token)).status,409);
 });
-test('mobile: não transcreve por projeto compartilhado quando filtro privado não está pronto', async t => {
-  const f = await setup(t), token = await f.login(), c = await f.create(token); f.store.updateSettings({privateConfirmed:false});
-  const b = await f.request('/bootstrap',undefined,'GET',token);assert.equal(b.body.ai.ready,false);
+test('mobile: não transcreve por projeto compartilhado quando a chave privada não está presente', async t => {
+  const f = await setup(t), token = await f.login(), c = await f.create(token);
+  f.config.privateApiKey='';f.store.updateSettings({routingEnabled:false,privateConfirmed:false,legacyRoute:'none'});
+  const b = await f.request('/bootstrap',undefined,'GET',token);assert.equal(b.body.ai.ready,false);assert.equal(b.body.ai.code,'ROUTE_KEY_MISSING');
   const r = await f.request('/messages/audio',{conversation_id:c.id,client_message_id:crypto.randomUUID(),audio_base64:Buffer.from('fake audio').toString('base64'),mime:'audio/mp4',duration_ms:1000},'POST',token);
   assert.notEqual(r.status,200);assert.equal(f.transcriptions.length,0);
 });
