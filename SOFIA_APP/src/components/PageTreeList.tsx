@@ -19,25 +19,27 @@ const iconFor=(page:Entity)=>String(page.data?.icon||'').trim()||'📄';
 const hit=(rect:Rect|null,x:number,y:number)=>!!rect&&x>=rect.x&&x<=rect.x+rect.width&&y>=rect.y&&y<=rect.y+rect.height;
 
 export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canParent,compact=false}:Props){
-  const c=useTheme(),rows=useRef(new Map<string,View>()),rects=useRef(new Map<string,Rect>()),rootRef=useRef<View|null>(null),rootRect=useRef<Rect|null>(null);
+  const c=useTheme(),rows=useRef(new Map<string,View>()),rects=useRef(new Map<string,Rect>()),rootRef=useRef<View|null>(null),rootRect=useRef<Rect|null>(null),dragId=useRef('');
   const [dragging,setDragging]=useState<Entity|null>(null),[target,setTarget]=useState<string|null>(null),[overRoot,setOverRoot]=useState(false);
   const measureAll=()=>{
     rows.current.forEach((node,id)=>node.measureInWindow((x,y,width,height)=>{if(width>0&&height>0)rects.current.set(id,{x,y,width,height});}));
     rootRef.current?.measureInWindow((x,y,width,height)=>{rootRect.current=width>0&&height>0?{x,y,width,height}:null;});
   };
   useEffect(()=>{if(dragging)measureAll();else{rootRect.current=null;setTarget(null);setOverRoot(false);}},[dragging]);
-  const start=(page:Entity)=>{setDragging(page);setTarget(null);setOverRoot(false);};
+  const targetAt=(page:Entity,x:number,y:number)=>{
+    for(const [id,rect] of rects.current)if(id!==page.id&&hit(rect,x,y)&&canParent(page.id,id))return id;
+    return null;
+  };
+  const start=(page:Entity)=>{dragId.current=page.id;setDragging(page);setTarget(null);setOverRoot(false);};
   const move=(page:Entity,x:number,y:number)=>{
-    if(!dragging||dragging.id!==page.id)return;
+    if(dragId.current!==page.id)return;
     const root=hit(rootRect.current,x,y);setOverRoot(root);
-    if(root){setTarget(null);return;}
-    let next:string|null=null;
-    for(const [id,rect] of rects.current){if(id!==page.id&&hit(rect,x,y)&&canParent(page.id,id)){next=id;break;}}
-    setTarget(next);
+    setTarget(root?null:targetAt(page,x,y));
   };
   const finish=(page:Entity,x:number,y:number)=>{
-    const root=hit(rootRect.current,x,y),next=root?'':target;
-    setDragging(null);setTarget(null);setOverRoot(false);
+    if(dragId.current!==page.id)return;
+    const root=hit(rootRect.current,x,y),next=root?'':targetAt(page,x,y);
+    dragId.current='';setDragging(null);setTarget(null);setOverRoot(false);
     if(next!==null&&canParent(page.id,next))void onMove(page,next);
   };
   return <View>
