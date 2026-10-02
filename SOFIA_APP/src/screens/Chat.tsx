@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, FlatList, Modal, ScrollView, Pressable, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Linking, AppState } from 'react-native';
+import { View, Text, FlatList, Modal, ScrollView, Pressable, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, AppState } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import * as Clipboard from 'expo-clipboard';
 import * as Speech from 'expo-speech';
 import { File } from 'expo-file-system';
 import type { Bootstrap, Conversation, Message, VoiceDraft, ChatResult } from '../lib/types';
-import { SofiaApi, SITE } from '../lib/api';
+import { SofiaApi } from '../lib/api';
 import { dayKey, errorText, mergeMessages, statusLabel } from '../lib/chat-model';
 import { useTheme } from '../lib/theme';
 import { silenceVoices } from '../lib/audio-focus';
@@ -22,7 +22,7 @@ function Bubble({message,previous,api,onRetry,onSpeak}:{message:Message;previous
  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'flex-end',gap:8}}>{!mine?<IconButton name="volume" label="Ouvir esta resposta com a voz do celular" size={32} onPress={()=>onSpeak(message.content)}/>:null}<Text style={{color:c.muted,fontSize:10}}>{new Date(message.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}{mine?' · '+statusLabel(message.status):''}</Text></View></Pressable></View>
  {mine&&message.status==='failed'?<Pressable accessibilityRole="button" onPress={()=>onRetry(message)} style={{alignSelf:'flex-end',padding:10,minHeight:40}}><Text style={{color:c.danger,fontSize:12,fontWeight:'600'}}>Tentar novamente</Text></Pressable>:null}</View>;
 }
-export function Chat({api,bootstrap,enterToSend,onLock,active}:{api:SofiaApi;bootstrap:Bootstrap;enterToSend:boolean;onLock:(v:boolean)=>void;active:boolean}) {
+export function Chat({api,bootstrap,enterToSend,onLock,active,onRefreshBootstrap}:{api:SofiaApi;bootstrap:Bootstrap;enterToSend:boolean;onLock:(v:boolean)=>void;active:boolean;onRefreshBootstrap:()=>Promise<void>|void}) {
  const c=useTheme(),list=useRef<FlatList<Message>>(null);
  const [conversation,setConversation]=useState<Conversation|null>(null),[messages,setMessages]=useState<Message[]>([]),[hasMore,setHasMore]=useState(false);
  const [loading,setLoading]=useState(true),[sending,setSending]=useState(false),[refreshing,setRefreshing]=useState(false),[dirty,setDirty]=useState(false),[recordingLock,setRecordingLock]=useState(false),[error,setError]=useState('');
@@ -71,7 +71,7 @@ export function Chat({api,bootstrap,enterToSend,onLock,active}:{api:SofiaApi;boo
  function speak(value:string){const run=++speechId.current;void silenceVoices().then(()=>{const max=Math.min(2800,Speech.maxSpeechInputLength||2800),chunks:string[]=[];for(let i=0;i<value.length;i+=max)chunks.push(value.slice(i,i+max));const next=()=>{if(run!==speechId.current||!mounted.current)return;const chunk=chunks.shift();if(chunk)Speech.speak(chunk,{language:'pt-BR',onDone:next,onError:()=>Alert.alert('Leitura','A voz do aparelho não está disponível.')});};next();});}
  return <KeyboardAvoidingView style={{flex:1,backgroundColor:c.bg}} behavior={Platform.OS==='ios'?'padding':undefined}>
  <View style={{paddingHorizontal:16,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:11,borderBottomWidth:1,borderColor:c.line,backgroundColor:c.surface}}><Brand/><View style={{flex:1}}><Text style={{color:c.text,fontSize:19,fontWeight:'700'}}>Sofia</Text><Text numberOfLines={1} style={{color:c.muted,fontSize:11,marginTop:3}}>Sua assistente · mesma memória</Text></View><IconButton name="history" label="Histórico de conversas" onPress={()=>void openHistory()} disabled={dirty||sending||recordingLock}/><IconButton name="plus" label="Nova conversa" onPress={()=>void newChat()} disabled={dirty||sending||recordingLock}/></View>
- {!bootstrap.ai.ready?<ErrorBanner text={bootstrap.ai.reason||'A IA precisa ser configurada no servidor.'} onRetry={()=>void Linking.openURL(SITE)}/>:null}{error?<ErrorBanner text={error} onRetry={()=>void (conversation?refresh():initialize())}/>:null}
+ {!bootstrap.ai.ready?<ErrorBanner text={bootstrap.ai.reason||'O Filtro Privado está sendo sincronizado com o servidor.'} onRetry={()=>void onRefreshBootstrap()}/>:null}{error?<ErrorBanner text={error} onRetry={()=>void (conversation?refresh():initialize())}/>:null}
  {loading?<View style={{flex:1,justifyContent:'center'}}><ActivityIndicator color={c.accent}/></View>:<FlatList ref={list} data={messages} keyExtractor={m=>m.id} keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:16,paddingBottom:22,flexGrow:1}} refreshing={refreshing} onRefresh={()=>void refresh()} onScroll={e=>{const n=e.nativeEvent;scrollEnd.current=n.contentSize.height-n.contentOffset.y-n.layoutMeasurement.height<100;}} scrollEventThrottle={100} onContentSizeChange={()=>{if(scrollEnd.current)list.current?.scrollToEnd({animated:false});}}
  ListHeaderComponent={hasMore?<Pressable onPress={()=>void older()} style={{alignItems:'center',padding:12,minHeight:44}}><Text style={{color:c.accent,fontSize:12}}>Carregar mensagens anteriores</Text></Pressable>:null}
  ListEmptyComponent={<View style={{flex:1,justifyContent:'center'}}><Empty title="Vamos conversar?" body="Escreva ou envie uma mensagem de voz. A mesma Sofia, o contexto e a memória da sua conta."/><Text style={{color:c.muted,textAlign:'center',fontSize:11,paddingHorizontal:30,lineHeight:17}}>Suas mensagens são processadas no servidor da Sofia e pelo provedor de IA configurado.</Text></View>}
