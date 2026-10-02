@@ -83,7 +83,7 @@ jobs:
           disable-animations: true
           script: |
             mkdir -p SOFIA_APP/dist
-            sh -lc 'curl -fsSL "https://github.com/avsord/sofiaos/releases/download/sofia-android-v0.3.5/Sofia-OS.apk" -o /tmp/Sofia-OS-0.3.5.apk && adb install /tmp/Sofia-OS-0.3.5.apk && adb install -r SOFIA_APP/dist/Sofia-OS.apk'
+            sh -lc 'curl -fsSL "https://github.com/avsord/sofiaos/releases/download/sofia-android-v0.3.6/Sofia-OS.apk" -o /tmp/Sofia-OS-0.3.6.apk && adb install /tmp/Sofia-OS-0.3.6.apk && adb install -r SOFIA_APP/dist/Sofia-OS.apk'
             adb logcat -c
             adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
             sleep 20
