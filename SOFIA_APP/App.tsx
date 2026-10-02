@@ -1,5 +1,5 @@
 import React,{Component,ErrorInfo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {View,Text,Pressable,StatusBar,ActivityIndicator,useColorScheme,AppState,Alert,Keyboard,BackHandler,Linking} from 'react-native';
+import {View,Text,Pressable,StatusBar,ActivityIndicator,useColorScheme,AppState,Alert,Keyboard,BackHandler,Linking,PanResponder} from 'react-native';
 import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
 import {SofiaApi,readAuth,saveAuth,forgetAuth,readPrefs,savePrefs} from './src/lib/api';
 import type {Auth,Bootstrap,Prefs,Tab,Profile as UserProfile} from './src/lib/types';
@@ -45,8 +45,19 @@ function Shell(){
  function navigate(next:Tab){if(next===tab)return;if(locked){Alert.alert('Sua conversa','Pare a gravação ou aguarde a resposta antes de trocar de aba.');return;}tabHistory.current=[...tabHistory.current,tab].slice(-30);switchTab(next);}
  const profile=(p:UserProfile)=>setBootstrap(prev=>prev?{...prev,profile:p}:prev);
  const tabs:{id:Tab;label:string;icon:IconName}[]=[{id:'home',label:'Início',icon:'home'},{id:'chat',label:'Conversa',icon:'chat'},{id:'pages',label:'Páginas',icon:'book'},{id:'agenda',label:'Agenda',icon:'calendar'},{id:'apps',label:'Apps',icon:'grid'},{id:'profile',label:'Perfil',icon:'user'}];
+ const swipe=useMemo(()=>PanResponder.create({
+  onMoveShouldSetPanResponder:(_event,g)=>!locked&&!keyboard&&Math.abs(g.dx)>=24&&Math.abs(g.dx)>Math.abs(g.dy)*1.35,
+  onPanResponderRelease:(_event,g)=>{
+   if(locked||keyboard||Math.abs(g.dx)<55)return;
+   const order:Tab[]=['home','chat','pages','agenda','apps','profile'],index=order.indexOf(tab);
+   if(index<0)return;
+   const next=g.dx<0?order[index+1]:order[index-1];
+   if(next)navigate(next);
+  },
+  onPanResponderTerminationRequest:()=>true
+ }),[tab,locked,keyboard]);
  return <ThemeContext.Provider value={c}><SafeAreaView style={{flex:1,backgroundColor:c.bg}} edges={['top','left','right','bottom']}><StatusBar barStyle={c===dark?'light-content':'dark-content'} backgroundColor={c.bg}/><View style={{flex:1,width:'100%',maxWidth:760,alignSelf:'center',backgroundColor:c.bg}}>
- {!ready?<View style={{flex:1,justifyContent:'center'}}><ActivityIndicator color={c.accent}/></View>:!auth?<Login onLogin={login}/>:!bootstrap?<View style={{flex:1,justifyContent:'center',padding:24,gap:14}}>{booting?<ActivityIndicator color={c.accent}/>:null}<Text style={{fontSize:23,fontWeight:'600',color:c.text}}>Abrindo sua Sofia…</Text>{error?<ErrorBanner text={error}/>:null}<Button title="Tentar novamente" onPress={()=>void boot()} loading={booting}/><Button title="Voltar para o login" secondary onPress={()=>void logout()}/></View>:<><View style={{flex:1}}>
+ {!ready?<View style={{flex:1,justifyContent:'center'}}><ActivityIndicator color={c.accent}/></View>:!auth?<Login onLogin={login}/>:!bootstrap?<View style={{flex:1,justifyContent:'center',padding:24,gap:14}}>{booting?<ActivityIndicator color={c.accent}/>:null}<Text style={{fontSize:23,fontWeight:'600',color:c.text}}>Abrindo sua Sofia…</Text>{error?<ErrorBanner text={error}/>:null}<Button title="Tentar novamente" onPress={()=>void boot()} loading={booting}/><Button title="Voltar para o login" secondary onPress={()=>void logout()}/></View>:<><View style={{flex:1}} {...swipe.panHandlers}>
  <View style={{flex:1,display:tab==='chat'?'flex':'none'}}><Chat key={'chat-'+chatEpoch} api={api} bootstrap={bootstrap} enterToSend={prefs.enterToSend} autoSendVoice={prefs.autoSendVoice} onLock={setLocked} active={tab==='chat'} onRefreshBootstrap={boot}/></View>
  <View style={{flex:1,display:tab==='home'?'flex':'none'}}><Home api={api} bootstrap={bootstrap} navigate={navigate}/></View>
  <View style={{flex:1,display:tab==='pages'?'flex':'none'}}><Pages api={api} active={tab==='pages'}/></View>
