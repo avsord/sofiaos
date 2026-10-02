@@ -5,6 +5,7 @@ on:
     branches: [sofia-app-android]
     paths:
       - 'SOFIA_APP/**'
+      - 'tools/releases/0.3.10/**'
       - '.github/workflows/sofia-android-apk.yml'
 permissions:
   contents: write
@@ -36,22 +37,32 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Apply checksum-verified 0.3.10 release source once
+        run: |
+          if [ "$(node -p "require('./package.json').version")" = '0.3.9' ]; then
+            node ../tools/releases/0.3.10/apply.cjs app ..
+          fi
       - name: Apply checked source normalization
         run: node tools/normalize-source.cjs
+      - name: Resolve the added image picker into the dependency lock
+        run: |
+          if ! node -e "const p=require('./package-lock.json');process.exit(p.packages?.['node_modules/expo-image-picker']?0:1)"; then
+            npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          fi
       - name: Install locked dependencies
         run: npm ci
       - name: Full TypeScript validation
         run: npm run check
       - name: Application unit tests
         run: npm test
-      - name: Persist normalized source on app branch only
+      - name: Persist complete validated source and dependency lock on app branch only
         run: |
           cd ..
           git config user.name 'Sofia build'
           git config user.email 'sofia-build@users.noreply.github.com'
-          git add -- SOFIA_APP/package.json SOFIA_APP/package-lock.json SOFIA_APP/app.json SOFIA_APP/src
+          git add -- SOFIA_APP
           if ! git diff --cached --quiet; then
-            git commit -m 'fix: align native task priority and backend readiness messages [skip ci]'
+            git commit -m 'release: validated Sofia Android 0.3.10 source and locked dependencies [skip ci]'
             git push origin HEAD:refs/heads/sofia-app-android
           fi
       - name: Generate native Android project
@@ -74,7 +85,7 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Install and launch without Metro on Android
+      - name: Install over 0.3.9 and launch without Metro on Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -83,7 +94,7 @@ jobs:
           disable-animations: true
           script: |
             mkdir -p SOFIA_APP/dist
-            sh -lc 'curl -fsSL "https://github.com/avsord/sofiaos/releases/download/sofia-android-v0.3.6/Sofia-OS.apk" -o /tmp/Sofia-OS-0.3.6.apk && adb install /tmp/Sofia-OS-0.3.6.apk && adb install -r SOFIA_APP/dist/Sofia-OS.apk'
+            sh -lc 'curl -fsSL "https://github.com/avsord/sofiaos/releases/download/sofia-android-v0.3.9/Sofia-OS.apk" -o /tmp/Sofia-OS-0.3.9.apk && adb install /tmp/Sofia-OS-0.3.9.apk && adb install -r SOFIA_APP/dist/Sofia-OS.apk'
             adb logcat -c
             adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
             sleep 20
@@ -95,7 +106,17 @@ jobs:
             ! grep -q 'FATAL EXCEPTION' SOFIA_APP/dist/native-errors.txt
             grep -q 'Sofia OS' SOFIA_APP/dist/login-ui.xml
             grep -q 'Entrar' SOFIA_APP/dist/login-ui.xml
-      - name: Publish direct-update release
+      - name: Require the compatible chat-sync server before publishing
+        run: |
+          for i in $(seq 1 30); do
+            body=$(curl --silent --show-error --max-time 15 https://sofiaos.up.railway.app/health || true)
+            echo "$body"
+            echo "$body" | grep -q '"version":"141.0.0"' && exit 0
+            sleep 10
+          done
+          echo 'Compatible server is not confirmed; refusing to publish an incomplete update.'
+          exit 1
+      - name: Publish direct-update release from the actual validated app commit
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -104,7 +125,7 @@ jobs:
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/Sofia-OS.apk --clobber --repo "$GITHUB_REPOSITORY"
           else
-            gh release create "$TAG" dist/Sofia-OS.apk --repo "$GITHUB_REPOSITORY" --title "Sofia OS Android ${VERSION}" --notes "Atualização direta da Sofia OS para Android. Instalação exige confirmação do sistema."
+            gh release create "$TAG" dist/Sofia-OS.apk --target "$(git rev-parse HEAD)" --repo "$GITHUB_REPOSITORY" --title "Sofia OS Android ${VERSION}" --notes-file RELEASE_0.3.10.md
           fi
       - name: Upload APK and smoke-test evidence
         if: always()
