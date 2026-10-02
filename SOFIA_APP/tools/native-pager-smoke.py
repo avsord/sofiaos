@@ -56,6 +56,12 @@ def tap(name,attr='content-desc'):
     _,n=wait(name,attr);x1,y1,x2,y2=bounds(n)
     adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2))
 
+def drag(source,target):
+    _,a=wait(source);_,b=wait(target)
+    ax1,ay1,ax2,ay2=bounds(a);bx1,by1,bx2,by2=bounds(b)
+    adb('shell','input','swipe',str((ax1+ax2)//2),str((ay1+ay2)//2),str((bx1+bx2)//2),str((by1+by2)//2),'1100')
+    time.sleep(1.2)
+
 def shot(name,root=None):
     (OUT/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'))
     if root is not None:(OUT/(name+'.xml')).write_bytes(ET.tostring(root,encoding='utf-8'))
@@ -99,6 +105,10 @@ def main():
         swipe('left');page('chat')
         swipe('left');page('pages')
         tap('qa-resize');page('pages')
+        drag('Arrastar página Alpha','Abrir página principal Beta')
+        root,_=wait('Abrir subpágina Alpha');wait('Recolher subpáginas de Beta');shot('hierarchy-alpha-inside-beta',root)
+        drag('Arrastar página Alpha','Abrir página principal Beta')
+        root,_=wait('Abrir página principal Alpha');shot('hierarchy-alpha-back-root',root)
         tap('Nova página')
         root,title=wait('Título da página');_,body=wait('Conteúdo do bloco 1');shot('new-empty-page',root)
         assert title.get('text') in ('','Título'),title.attrib
@@ -117,8 +127,12 @@ def main():
         tap('Refazer');time.sleep(.3)
         root,body=wait('Conteúdo do bloco 1');assert body.get('text')=='Draft',body.attrib
         shot('redo-right-tools',root)
-        print('PASS: Início startup, first gestures, full-width alignment, direct taps, remount, resize, faint placeholders and working right-side undo/redo.')
-        (OUT/'result.json').write_text(json.dumps({'passed':True,'native_pages_checked':step,'scope':'real components, disposable fixture, synthetic data; production APK not modified'}))
+        swipe('right')
+        root=tree();assert node(root,'Título da página') is None,'Page editor did not leave with the finger'
+        page('pages');shot('page-back-reveals-pages-list',root)
+        swipe('right');page('chat')
+        print('PASS: Início startup, hierarchy drag in/out, page-first back swipe, resumed menu carousel, reference canvas and editor tools.')
+        (OUT/'result.json').write_text(json.dumps({'passed':True,'native_pages_checked':step,'hierarchy_drag':'subpage-and-root','page_back_swipe':True,'scope':'real components, disposable fixture, synthetic data; production APK not modified'}))
     except Exception:
         try:shot('failure',tree())
         except Exception:pass
