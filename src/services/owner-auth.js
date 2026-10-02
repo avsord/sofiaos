@@ -22,7 +22,7 @@ class OwnerAuth {
   read(){try{return safeState(JSON.parse(fs.readFileSync(this.file,'utf8')));}catch{return {};}}
   write(state){fs.mkdirSync(path.dirname(this.file),{recursive:true});atomicWrite(this.file,Buffer.from(JSON.stringify(state,null,2)+'\n'));}
   hasStoredPassword(){const state=this.read();return Boolean(state.password_salt&&state.password_hash);}
-  passwordConfigured(){return this.hasStoredPassword()||String(this.config.loginPassword||'').length>=12;}
+  passwordConfigured(){return this.hasStoredPassword()||String(this.config.loginPassword||'').length>=1;}
   verifyPassword(password){
     const state=this.read();
     if(state.password_salt&&state.password_hash){const derived=derive(password,state.password_salt);return safeEqualHex(derived,state.password_hash);}
