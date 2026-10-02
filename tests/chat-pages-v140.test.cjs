@@ -5,6 +5,7 @@ const {fixture}=require('./helpers.cjs');
 test('v140: excluir uma mensagem remove texto, voz/índice visível e mantém a conversa íntegra',t=>{
   const f=fixture(t),c=f.store.createConversation('Excluir teste','web');
   const m=f.store.userMessage({conversationId:c.id,clientId:'delete-one',message:'texto exclusivo para apagar',channel:'web'}).message;
+  f.store.db.prepare("UPDATE messages SET status='completed' WHERE id=?").run(m.id);
   assert.equal(f.store.messages(c.id).length,1);
   const out=f.store.deleteMessage(m.id);
   assert.equal(out.ok,true);
