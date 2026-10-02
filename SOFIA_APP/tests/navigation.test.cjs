@@ -34,7 +34,7 @@ test('gestures use the native horizontal pager and do not steal vertical scrolls
   assert.match(pager,/horizontal pagingEnabled/);assert.ok(pager.includes('directionalLockEnabled nestedScrollEnabled'));
   assert.ok(pager.includes('onMomentumScrollEnd={finish}'));assert.ok(pager.includes('onScrollBeginDrag={begin}'));
   assert.ok(pager.includes('velocity !== undefined && Math.abs(velocity) < 0.01'));
-  assert.ok(source.includes("enabled={!locked&&!keyboard&&tab!=='notifications'}"));
+  assert.ok(source.includes("enabled={!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)}"));
 });
 test('all six menus stay mounted in a fixed horizontal order',()=>{
   assert.deepEqual(Array.from(TAB_ORDER),['home','chat','pages','agenda','apps','profile']);
