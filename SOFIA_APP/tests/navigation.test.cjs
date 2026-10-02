@@ -26,6 +26,14 @@ test('Android identity and released version agree',()=>{
   const config=JSON.parse(fs.readFileSync(path.join(root,'app.json'))).expo;
   const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json')));
   const update=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');
-  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,10);
-  assert.equal(config.version,'0.3.5');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));
+  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,11);
+  assert.equal(config.version,'0.3.6');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));
+});
+
+
+test('Pages opens from cached entity immediately without awaiting api.entity',()=>{
+  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');
+  assert.match(pages,/function open\(page:Entity,push=true\)\{[^\n]*setSelected\(page\);[^\n]*setTitle\(page\.title\);[^\n]*setBlocks\(parseBlocks\(page\)\)/);
+  assert.ok(!pages.includes('await api.entity(page.id)'));
+  assert.ok(!pages.includes('const fresh=await api.entity(page.id)'));
 });
