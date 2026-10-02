@@ -58,3 +58,20 @@ test('v133: sair limpa a sessão e encerrar todas invalida sessões abertas',asy
   r=await fetch(base+'/api/auth/logout-all',{method:'POST',headers:{Cookie:second,'X-Sofia-Token':bootstrap.token}});assert.equal(r.status,200);assert.equal((await r.json()).redirect,'/login?logout=all');
   r=await fetch(base+'/',{redirect:'manual',headers:{Cookie:second}});assert.equal(r.status,303);assert.equal(r.headers.get('location'),'/login');
 });
+
+
+test('v140: sessão web persiste entre handlers com o mesmo banco',async t=>{
+  const old=process.env.RAILWAY_ENVIRONMENT;process.env.RAILWAY_ENVIRONMENT='test';
+  t.after(()=>{if(old===undefined)delete process.env.RAILWAY_ENVIRONMENT;else process.env.RAILWAY_ENVIRONMENT=old;});
+  const f=fixture(t);f.config.loginPassword='senha-segura-de-teste-140';f.config.loginEmail='owner@example.com';
+  let runtime=createRuntime(f.config,{store:f.store,provider:f.provider,secureDir:path.join(f.dir,'secure')});
+  let server=http.createServer(runtime.handler);await new Promise(r=>server.listen(0,'127.0.0.1',r));
+  let base='http://127.0.0.1:'+server.address().port;f.config.publicBaseUrl=base;
+  let r=await fetch(base+'/auth/login',{method:'POST',redirect:'manual',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({email:'owner@example.com',password:f.config.loginPassword})});
+  const cookie=cookieFrom(r.headers.get('set-cookie'));assert.match(cookie,/^sofia_session=/);
+  server.closeAllConnections();await new Promise(r=>server.close(r));
+  runtime=createRuntime(f.config,{store:f.store,provider:f.provider,secureDir:path.join(f.dir,'secure')});
+  server=http.createServer(runtime.handler);await new Promise(r=>server.listen(0,'127.0.0.1',r));base='http://127.0.0.1:'+server.address().port;f.config.publicBaseUrl=base;
+  t.after(async()=>{server.closeAllConnections();await new Promise(r=>server.close(r));});
+  r=await fetch(base+'/api/bootstrap',{headers:{Cookie:cookie}});assert.equal(r.status,200);
+});
