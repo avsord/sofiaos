@@ -77,12 +77,22 @@ test('notifications are outside the swipe sequence without losing the underlying
 test('Android identity, discovery prefix and version stay compatible',()=>{
   const config=JSON.parse(fs.readFileSync(path.join(root,'app.json'))).expo,pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json')));
   const update=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');
-  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,19);
-  assert.equal(config.version,'0.3.14');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
+  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,20);
+  assert.equal(config.version,'0.3.15');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
 });
 test('Pages opens a preloaded entity synchronously without a network wait',()=>{
  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');
  assert.ok(pages.includes('items.forEach(page=>store.open(page))'));
  const fn=pages.match(/function open\(page:Entity,push=true\)\{([^\n]*)/)[1];
  assert.ok(fn.includes('setSelectedId(page.id)'));assert.ok(!fn.includes('await '));assert.ok(!fn.includes('api.entity('));
+});
+
+test('an open page owns horizontal back gesture before the main menu pager',()=>{
+ assert.ok(source.includes("[pagesDepth,setPagesDepth]=useState(false)"));
+ assert.ok(source.includes("tab==='pages'&&pagesDepth"));
+ assert.ok(source.includes('onDepthChange={setPagesDepth}'));
+ const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');
+ assert.ok(pages.includes('PanResponder.create'));
+ assert.ok(pages.includes('translateX:backX'));
+ assert.ok(pages.includes('g.dx>8&&Math.abs(g.dx)>Math.abs(g.dy)*1.15'));
 });
