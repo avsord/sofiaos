@@ -1,4 +1,4 @@
-"""Verify the update offer in an unmodified, already published Android 0.3.11 APK.
+"""Verify the update offer in an unmodified, already published Android 0.3.12 APK.
 Android may apply all-caps to native dialog buttons. Match the caption without case,
 but require an enabled visible button belonging to Sofia and the exact versions.
 """
@@ -15,7 +15,7 @@ def update_offered(root, version):
         n.get('class')=='android.widget.Button' and n.get('text','').strip().casefold()=='atualizar' and
         n.get('enabled')=='true' and n.get('clickable')=='true' and visible(n) for n in nodes)
     return button and 'Atualização disponível' in text and any(
-        'Instalada: 0.3.11' in t and 'Disponível: '+version in t for t in text)
+        'Instalada: 0.3.12' in t and 'Disponível: '+version in t for t in text)
 
 def main():
     app=Path(__file__).resolve().parents[1]
@@ -28,9 +28,9 @@ def main():
         raw=subprocess.check_output(['adb','shell','cat','/sdcard/update-offer.xml'],timeout=15)
         root=ET.fromstring(raw)
         if update_offered(root,version):
-            (out/'update-offered-from-0.3.11.xml').write_bytes(raw)
-            (out/'update-offered-from-0.3.11.png').write_bytes(subprocess.check_output(['adb','exec-out','screencap','-p'],timeout=15))
-            print('PASS: unmodified 0.3.11 offers '+version+' with Atualizar inside Android.')
+            (out/'update-offered-from-0.3.12.xml').write_bytes(raw)
+            (out/'update-offered-from-0.3.12.png').write_bytes(subprocess.check_output(['adb','exec-out','screencap','-p'],timeout=15))
+            print('PASS: unmodified 0.3.12 offers '+version+' with Atualizar inside Android.')
             return
     (out/'update-offer-failure.xml').write_bytes(raw)
     (out/'update-offer-failure.png').write_bytes(subprocess.check_output(['adb','exec-out','screencap','-p'],timeout=15))
