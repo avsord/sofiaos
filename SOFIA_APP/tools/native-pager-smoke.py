@@ -62,6 +62,11 @@ def drag(source,target):
     adb('shell','input','swipe',str((ax1+ax2)//2),str((ay1+ay2)//2),str((bx1+bx2)//2),str((by1+by2)//2),'1100')
     time.sleep(1.2)
 
+def drag_left(source):
+    _,a=wait(source);ax1,ay1,ax2,ay2=bounds(a)
+    adb('shell','input','swipe',str((ax1+ax2)//2),str((ay1+ay2)//2),'4',str((ay1+ay2)//2),'1100')
+    time.sleep(1.2)
+
 def shot(name,root=None):
     (OUT/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'))
     if root is not None:(OUT/(name+'.xml')).write_bytes(ET.tostring(root,encoding='utf-8'))
@@ -105,9 +110,9 @@ def main():
         swipe('left');page('chat')
         swipe('left');page('pages')
         tap('qa-resize');page('pages')
-        drag('Arrastar página Alpha','Abrir página principal Beta')
+        drag('Abrir página principal Alpha','Abrir página principal Beta')
         root,_=wait('Abrir subpágina Alpha');wait('Recolher subpáginas de Beta');shot('hierarchy-alpha-inside-beta',root)
-        drag('Arrastar página Alpha','Abrir página principal Beta')
+        drag_left('Abrir subpágina Alpha')
         root,_=wait('Abrir página principal Alpha');shot('hierarchy-alpha-back-root',root)
         tap('Nova página')
         root,title=wait('Título da página');_,body=wait('Conteúdo do bloco 1');shot('new-empty-page',root)
