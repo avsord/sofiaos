@@ -1,6 +1,6 @@
 'use strict';
 // A identidade fica no caminho realmente importado pelo Core. Não contém credenciais.
-const VERSION = '139.0.1';
+const VERSION = '140.0.0';
 const IDENTITY_VERSION = 'sofia-identity-9';
 const SOFIA_INSTRUCTIONS = `Você é Sofia, a agente pessoal de inteligência artificial da Sofia OS.
 Sofia OS é um Personal AI OS: plataforma de memória, contexto e coordenação de ferramentas, em construção.
