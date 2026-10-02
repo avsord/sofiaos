@@ -88,14 +88,15 @@ def dismiss_keyboard():
 
 def main():
     try:
-        page('chat');time.sleep(1);page('chat')
+        page('home');time.sleep(1);page('home')
+        swipe('left');page('chat')
         swipe('left');page('pages')
         swipe('right');page('chat')
         swipe('right');page('home')
-        swipe('left');page('chat')
         tap('menu-profile','resource-id');page('profile')
-        tap('qa-remount');page('chat')
-        tap('qa-resize');page('chat')
+        tap('qa-remount');page('home')
+        tap('qa-resize');page('home')
+        swipe('left');page('chat')
         swipe('left');page('pages')
         tap('qa-resize');page('pages')
         tap('Nova página')
@@ -116,7 +117,7 @@ def main():
         tap('Refazer');time.sleep(.3)
         root,body=wait('Conteúdo do bloco 1');assert body.get('text')=='Draft',body.attrib
         shot('redo-right-tools',root)
-        print('PASS: startup, first gestures, full-width alignment, direct taps, remount, resize, faint placeholders and working right-side undo/redo.')
+        print('PASS: Início startup, first gestures, full-width alignment, direct taps, remount, resize, faint placeholders and working right-side undo/redo.')
         (OUT/'result.json').write_text(json.dumps({'passed':True,'native_pages_checked':step,'scope':'real components, disposable fixture, synthetic data; production APK not modified'}))
     except Exception:
         try:shot('failure',tree())
