@@ -1,0 +1,70 @@
+name: Sofia publish validated APK
+on:
+  push:
+    branches: [sofia-app-android]
+    paths: ['.github/workflows/sofia-publish-validated-apk.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: sofia-publish-0.3.10
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN: '37018099524'
+      SNAPSHOT: '869ea82256216f5d62439d188cd529cca643394f'
+    steps:
+      - name: Checkout the exact source snapshot with unchanged main workflows
+        uses: actions/checkout@v4
+        with:
+          ref: '869ea82256216f5d62439d188cd529cca643394f'
+      - name: Require successful original code, binary and upgrade validation
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN/jobs" > /tmp/jobs.json
+          node <<'NODE'
+          const fs=require('node:fs');
+          const jobs=JSON.parse(fs.readFileSync('/tmp/jobs.json','utf8')).jobs;
+          const job=jobs.find(j=>j.id===110873888988);
+          if(!job||job.head_sha!=='ff8da0091f648f1f7840075cb85af9634846aaa1')throw Error('Unexpected source run');
+          for(const name of ['Full TypeScript validation','Application unit tests','Build standalone internal APK with bundled JavaScript','Stage APK and verify embedded bundle','Install over 0.3.9 and launch without Metro on Android','Require the compatible chat-sync server before publishing']){
+            if(!job.steps.some(s=>s.name===name&&s.conclusion==='success'))throw Error('Missing successful validation: '+name);
+          }
+          console.log('All original code, APK, upgrade and server validation stages passed.');
+          NODE
+      - name: Download the already validated APK and evidence
+        run: gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" -n Sofia-Android-APK -D dist
+      - name: Verify exact APK bytes and source identity
+        run: |
+          test "$(cat dist/SOURCE_COMMIT.txt)" = '5a9f8d53f9cebfb02289807da4950ced025da38b'
+          test "$(git rev-parse HEAD:SOFIA_APP)" = 'bbc6733c78b737958555377f657fc4ac4cfed370'
+          echo 'd36c7372c9f7886df9de2e5a5cb4459caf61d1c8f282eceaedaf9ad83c7f384f  dist/Sofia-OS.apk' | sha256sum -c -
+          test "$(stat -c %s dist/Sofia-OS.apk)" = '49785780'
+          test "$(node -p "require('./SOFIA_APP/package.json').version")" = '0.3.10'
+          test "$(node -p "require('./SOFIA_APP/app.json').expo.android.versionCode")" = '15'
+          grep -q 'Entrar' dist/login-ui.xml
+          ! grep -q 'FATAL EXCEPTION' dist/native-errors.txt
+      - name: Confirm the compatible server is still deployed
+        run: |
+          curl --fail --silent --show-error --max-time 20 https://sofiaos.up.railway.app/health > /tmp/health.json
+          node -e "const h=require('/tmp/health.json');if(!h.ok||h.version!=='141.0.0')throw Error('Compatible server is not deployed');console.log(h)"
+      - name: Publish this verified binary with correct source provenance
+        run: |
+          TAG=sofia-android-v0.3.10
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Release already exists; refusing to replace an existing published binary.'
+            exit 1
+          fi
+          gh release create "$TAG" dist/Sofia-OS.apk dist/SOURCE_COMMIT.txt dist/Sofia-OS.apk.sha256 RELEASE_0.3.10_PROVENANCE.md --target "$SNAPSHOT" --repo "$GITHUB_REPOSITORY" --title 'Sofia OS Android 0.3.10' --notes-file SOFIA_APP/RELEASE_0.3.10.md
+      - name: Confirm publication and uploaded APK hash
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/sofia-android-v0.3.10" > /tmp/release.json
+          node <<'NODE'
+          const r=require('/tmp/release.json'),a=r.assets.find(x=>x.name==='Sofia-OS.apk');
+          if(r.draft||r.prerelease||!r.published_at||!a||a.state!=='uploaded'||a.size!==49785780||a.digest!=='sha256:d36c7372c9f7886df9de2e5a5cb4459caf61d1c8f282eceaedaf9ad83c7f384f')throw Error('Publication verification failed');
+          console.log('PUBLISHED:',r.tag_name,a.browser_download_url,a.digest);
+          NODE
