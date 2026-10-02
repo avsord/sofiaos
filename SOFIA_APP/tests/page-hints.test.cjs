@@ -44,7 +44,7 @@ test('page canvas stays compact and subpages render as inline page rows',()=>{
  assert.ok(!source.includes("Subpáginas ·"));
  assert.ok(!tree.includes("Solte aqui para página principal"));
  assert.ok(tree.includes("PanResponder.create"));
- assert.ok(tree.includes("Arrastar página "));
+ assert.ok(tree.includes("accessibilityHint={'Arraste para reorganizar '+page.title}"));
  assert.ok(tree.includes("dx<-30"));
  assert.ok(tree.includes("Abrir subpágina "));
  assert.ok(tree.includes("Abrir página principal "));
