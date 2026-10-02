@@ -123,6 +123,7 @@ function makeMobileApi(runtime, deps) {
       rate(session, 'new', 10); const b = await bodyJson(req, 2048);
       return send({ conversation: store.createConversation(cleanText(b.title || 'Conversa com a Sofia', 'Título', 100), 'mobile') });
     }
+    if (p === '/api/mobile/chat-history' && m === 'DELETE') { rate(session, 'delete', 10); return send(store.clearChatHistory()); }
     let match = p.match(/^\/api\/mobile\/conversations\/([\w-]+)$/);
     if (match && m === 'GET') {
       const c = conversation(match[1]), before = Number(url.searchParams.get('before')) || Number.MAX_SAFE_INTEGER;
@@ -132,6 +133,8 @@ function makeMobileApi(runtime, deps) {
       rate(session, 'message'); const b = await bodyJson(req, 65536);
       return send(await receive(payload(b, cleanText(b.message, 'Mensagem', config.maxMessageChars || 12000))));
     }
+    match = p.match(/^\/api\/mobile\/messages\/([\w-]+)$/);
+    if (match && m === 'DELETE') { rate(session, 'delete', 30); const row=store.message(validId(match[1]));conversation(row.conversation_id);return send(store.deleteMessage(row.id)); }
     if (p === '/api/mobile/messages/audio' && m === 'POST') {
       rate(session, 'audio', 12); const b = await bodyJson(req, 14 * 1024 * 1024), input = payload(b, ''), key = input.client_message_id;
       const raw = String(b.audio_base64 || '');
