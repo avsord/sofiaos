@@ -1,0 +1,31 @@
+name: Sofia main validation
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/sofia-main-validation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Backend test suite
+        run: node --test tests/*.test.cjs
+      - name: Syntax check routing and mobile API
+        run: |
+          node --check src/services/credentials.js
+          node --check src/core/runtime.js
+          node --check src/services/routing.js
+          node --check src/channels/mobile.js
