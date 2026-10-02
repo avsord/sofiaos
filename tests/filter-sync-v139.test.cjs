@@ -45,3 +45,20 @@ test('private key configured in the web persists and is restored for the mobile 
   assert.equal(store.settings().routingEnabled,true);
   assert.equal(store.settings().privateConfirmed,true);
 });
+
+
+test('validated private credential immediately activates the private route',async t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sofia-filter-activate-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const store=new Store(path.join(dir,'data','sofia.sqlite'));
+  t.after(()=>{try{store.close();}catch{}});
+  const cfg={...config(dir,''),root:dir};
+  const {saveCredential}=require('../src/services/credentials');
+  saveCredential(cfg,'private',PRIVATE_KEY);
+  store.updateSettings({routingEnabled:false,privateConfirmed:false});
+  const runtime=createRuntime(cfg,{store,secureDir:path.join(dir,'secure'),providerFactory:()=>({})});
+  const s=runtime.store.settings();
+  assert.equal(s.routingEnabled,true);
+  assert.equal(s.privateConfirmed,true);
+  assert.doesNotThrow(()=>runtime.routing.profile('private'));
+});

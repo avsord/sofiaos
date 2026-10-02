@@ -5,9 +5,9 @@ class RoutingService {
  constructor(store,config,providerFactory){this.store=store;this.config=config;this.factory=providerFactory||((c)=>new OpenAIProvider(c));}
  profile(route){const s=this.store.settings();if(!['private','shared'].includes(route))throw new AppError('BAD_ROUTE','Rota inválida.');
    const privateRoute=route==='private';
-   if(!s.routingEnabled)throw new AppError('ROUTING_SETUP','A inteligência ainda não foi conectada aos filtros. Abra Configuração no modo desenvolvedor.',409);
    const key=(privateRoute?this.config.privateApiKey:this.config.sharedApiKey)||(s.legacyRoute===route?this.config.apiKey:'');
-   if(!key)throw new AppError('ROUTE_KEY_MISSING',privateRoute?'Esta mensagem precisa do Filtro Privado, mas a chave privada ainda não foi configurada. A mensagem não foi enviada ao Filtro Compartilhado.':'O Filtro Compartilhado ainda não tem uma chave configurada.',409);
+   if(!key)throw new AppError('ROUTE_KEY_MISSING',privateRoute?'Esta mensagem precisa do Filtro Privado, mas a chave privada ainda não está presente no servidor. A mensagem não foi enviada ao Filtro Compartilhado.':'O Filtro Compartilhado ainda não tem uma chave configurada.',409);
+   if(!s.routingEnabled)throw new AppError('ROUTING_SETUP','A inteligência ainda não foi conectada aos filtros. Abra Configuração no modo desenvolvedor.',409);
    if(!s[route+'Confirmed'])throw new AppError('PROJECT_NOT_CONFIRMED',privateRoute?'Confirme no modo desenvolvedor que o projeto privado está configurado para o tratamento de dados desejado.':'Confirme o projeto de tráfego compartilhado no modo desenvolvedor.',409);
    if(!privateRoute&&!s.sharedBillingAcknowledged)throw new AppError('BILLING_ACK','Confirme no modo desenvolvedor que benefícios/cobrança do projeto compartilhado foram revisados.',409);
    const other=(privateRoute?this.config.sharedApiKey:this.config.privateApiKey)||(s.legacyRoute===(privateRoute?'shared':'private')?this.config.apiKey:'');

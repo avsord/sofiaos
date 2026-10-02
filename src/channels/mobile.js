@@ -57,10 +57,12 @@ function makeMobileApi(runtime, deps) {
   }
   async function receive(input) { const result = await core.receive(input, { channel: 'mobile' }); return { ...result, ...messages(result.conversation_id) }; }
   function aiStatus() {
+    const s=store.settings(),keyPresent=Boolean(config.privateApiKey||(s.legacyRoute==='private'&&config.apiKey));
+    if(keyPresent&&(!s.routingEnabled||!s.privateConfirmed))store.updateSettings({routingEnabled:true,privateConfirmed:true});
     try { routing.profile('private'); return { ready: true, reason: null }; }
     catch (e) {
       const reasons = {
-        ROUTE_KEY_MISSING: 'O servidor online ainda não recebeu a chave do Filtro Privado. Configure OPENAI_PRIVATE_API_KEY no Railway; o app e a web usarão a mesma configuração.',
+        ROUTE_KEY_MISSING: 'A chave do Filtro Privado não está presente no servidor. Abra a configuração da Sofia web e salve novamente a chave privada uma única vez; depois disso ela ficará sincronizada com o app e persistirá entre redeploys.',
         ROUTING_SETUP: 'O Filtro Privado existe, mas o roteamento ainda não foi ativado no servidor.',
         PROJECT_NOT_CONFIRMED: 'O Filtro Privado existe no servidor, mas a confirmação de projeto ainda não foi aplicada.',
         SAME_PROJECT_KEY: 'Os filtros Privado e Compartilhado estão usando a mesma chave. Eles precisam continuar separados.'
