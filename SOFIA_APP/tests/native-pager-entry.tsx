@@ -16,8 +16,8 @@ import type {Entity,Tab} from '../src/lib/types';
 import type {IconName} from '../src/components/Icon';
 const tabs:{id:Tab;label:string;icon:IconName}[]=[{id:'home',label:'Início',icon:'home'},{id:'chat',label:'Conversa',icon:'chat'},{id:'pages',label:'Páginas',icon:'book'},{id:'agenda',label:'Agenda',icon:'calendar'},{id:'apps',label:'Apps',icon:'grid'},{id:'profile',label:'Perfil',icon:'user'}];
 function Fixture(){
- const [tab,setTab]=useState<Tab>('chat'),[epoch,setEpoch]=useState(0),[compact,setCompact]=useState(false),[many,setMany]=useState(false),[keyboard,setKeyboard]=useState(false);
- const pager=useRef<TabPagerHandle>(null),motion=useMemo(()=>createMenuMotion('chat'),[]),win=useWindowDimensions();
+ const [tab,setTab]=useState<Tab>('home'),[epoch,setEpoch]=useState(0),[compact,setCompact]=useState(false),[many,setMany]=useState(false),[keyboard,setKeyboard]=useState(false);
+ const pager=useRef<TabPagerHandle>(null),motion=useMemo(()=>createMenuMotion('home'),[]),win=useWindowDimensions();
  useEffect(()=>{const timer=setTimeout(()=>setMany(true),700);const a=Keyboard.addListener('keyboardDidShow',()=>setKeyboard(true)),b=Keyboard.addListener('keyboardDidHide',()=>setKeyboard(false));return()=>{clearTimeout(timer);a.remove();b.remove();motion.dispose();};},[motion]);
  const api=useMemo(()=>{
   let sequence=0;const rows=new Map<string,Entity>();
@@ -47,7 +47,7 @@ function Fixture(){
    {!keyboard?<View style={styles.tabs}>{tabs.map(item=><MenuTab key={item.id} item={item} selected={tab===item.id} onSelect={select} motion={motion}/>)}</View>:null}
   </View>
   {!keyboard?<View style={styles.controls}>
-   <Pressable accessibilityLabel="qa-remount" onPress={()=>{setTab('chat');setEpoch(v=>v+1);}}><Text>Remount</Text></Pressable>
+   <Pressable accessibilityLabel="qa-remount" onPress={()=>{setTab('home');setEpoch(v=>v+1);}}><Text>Remount</Text></Pressable>
    <Pressable accessibilityLabel="qa-resize" onPress={()=>setCompact(v=>!v)}><Text>Resize</Text></Pressable>
   </View>:null}
  </SafeAreaView></ThemeContext.Provider>;
