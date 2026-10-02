@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Auth, Bootstrap, Conversation, MessagePage, ChatResult, HomeData, Task, AgendaItem, Notice, Profile, Prefs, Catalog, Entity } from './types';
+import type { Auth, Bootstrap, Conversation, MessagePage, ChatResult, HomeData, Task, AgendaItem, Notice, Profile, Prefs, Catalog, Entity, ChatSnapshot } from './types';
 const rawBase = (process.env.EXPO_PUBLIC_API_URL || 'https://sofiaos.up.railway.app').replace(/\/+$/, '');
 const parsedBase = new URL(rawBase);
 if (parsedBase.protocol !== 'https:' || parsedBase.username || parsedBase.password || parsedBase.search || parsedBase.hash || parsedBase.pathname !== '/') throw new Error('Configure a raiz HTTPS do servidor Sofia.');
@@ -51,6 +51,10 @@ export class SofiaApi {
   logout() { return this.request<{ok: boolean}>('/auth/logout', {}); }
   logoutAll() { return this.request<{ok: boolean}>('/auth/logout-all', {}); }
   changePassword(currentPassword: string,newPassword: string,confirmPassword: string) { return this.request<{ok: boolean}>('/auth/change-password', {currentPassword,newPassword,confirmPassword}); }
+  syncChat(id?:string) { return this.request<ChatSnapshot>('/chat-sync'+(id?'?conversation_id='+encodeURIComponent(id):'')); }
+  ensureChat() { return this.request<ChatSnapshot>('/chat-sync/current',{}); }
+  selectChat(id:string) { return this.request<ChatSnapshot>('/chat-sync/select',{conversation_id:id}); }
+  deleteChatMessages(id:string,ids:string[]) { return this.request<{deleted_ids:string[];failed:{id:string;error:string}[]}>('/chat-sync/delete',{conversation_id:id,ids}); }
   conversations(offset = 0) { return this.request<{items: Conversation[]; has_more: boolean; next_offset: number}>('/conversations?offset=' + offset); }
   newConversation(title = 'Conversa com a Sofia') { return this.request<{conversation: Conversation}>('/conversations', {title}); }
   deleteMessage(id: string) { return this.request<{ok:boolean;id:string;conversation_id:string}>('/messages/' + encodeURIComponent(id), {}, 'DELETE'); }
@@ -73,6 +77,8 @@ export class SofiaApi {
   entity(id: string) { return this.request<Entity>('/workspace/entities/' + encodeURIComponent(id)); }
   saveEntity(input: Partial<Entity>) { return this.request<Entity>('/workspace/entities' + (input.id ? '/' + encodeURIComponent(input.id) : ''), input, input.id ? 'PATCH' : 'POST'); }
   deleteEntity(id: string) { return this.request<{ok: boolean}>('/workspace/entities/' + encodeURIComponent(id), undefined, 'DELETE'); }
+  uploadAttachment(id:string,input:{name:string;mime:string;base64:string}) { return this.request<{id:string}>('/workspace/entities/'+encodeURIComponent(id)+'/attachments',input,'POST',60000); }
+  attachmentSource(id:string) { if(!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('Imagem inválida.');return {uri:SITE+'/api/mobile/workspace/attachments/'+encodeURIComponent(id)+'?inline=1',headers:{Authorization:'Bearer '+this.token}}; }
   entityAction(id: string, input: object) { return this.request<any>('/workspace/entities/' + encodeURIComponent(id) + '/action', input); }
   observations(id: string) { return this.request<{items: any[]}>('/workspace/entities/' + encodeURIComponent(id) + '/observations'); }
   observe(id: string, input: object) { return this.request<any>('/workspace/entities/' + encodeURIComponent(id) + '/observations', input); }

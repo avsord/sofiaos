@@ -28,3 +28,5 @@ export type Field = { key: string; label: string; type: string; options?: string
 export type Definition = { label: string; group: string; description?: string; states: string[]; fields: Field[]; private?: boolean };
 export type Entity = { id: string; kind: string; title: string; content: string; area: string; state: string; privacy: string; tags: string[]; data: Record<string, any>; revision: number; updated_at?: string };
 export type Catalog = { catalog: Record<string, Definition>; areas: string[] };
+
+export type ChatSnapshot=Omit<MessagePage,'conversation'> & {conversation:Conversation|null;deleted_ids:string[];current_id:string|null;cursor_revision:number};

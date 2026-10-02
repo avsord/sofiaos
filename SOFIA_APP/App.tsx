@@ -1,5 +1,5 @@
 import React,{Component,ErrorInfo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {View,Text,StatusBar,ActivityIndicator,useColorScheme,AppState,Alert,Keyboard,BackHandler,Linking,StyleSheet} from 'react-native';
+import {View,Text,StatusBar,ActivityIndicator,AccessibilityInfo,useColorScheme,AppState,Alert,Keyboard,BackHandler,Linking,StyleSheet} from 'react-native';
 import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
 import {SofiaApi,readAuth,saveAuth,forgetAuth,readPrefs,savePrefs} from './src/lib/api';
 import type {Auth,Bootstrap,Prefs,Tab,Profile as UserProfile} from './src/lib/types';
@@ -10,6 +10,7 @@ import {Icon,IconName} from './src/components/Icon';
 import {Button,ErrorBanner} from './src/components/UI';
 import {TabPager} from './src/components/TabPager';
 import {MenuTab} from './src/components/MenuTab';
+import {createMenuMotion} from './src/lib/menu-motion';
 import type {TabPagerHandle} from './src/components/TabPager';
 import {Login} from './src/screens/Login';
 import {Home as HomeScreen} from './src/screens/Home';
@@ -33,6 +34,8 @@ function Shell(){
  const system=useColorScheme(),[ready,setReady]=useState(false),[auth,setAuth]=useState<Auth|null>(null),[bootstrap,setBootstrap]=useState<Bootstrap|null>(null),[prefs,setPrefs]=useState<Prefs>({appearance:'system',enterToSend:false,autoSendVoice:true}),[error,setError]=useState(''),[tab,setTab]=useState<Tab>('chat'),[locked,setLocked]=useState(false),[booting,setBooting]=useState(false),[keyboard,setKeyboard]=useState(false),[workspaceDepth,setWorkspaceDepth]=useState(false),[chatEpoch,setChatEpoch]=useState(0);
  const tabHistory=useRef<Tab[]>([]),pager=useRef<TabPagerHandle>(null),navigation=useRef({tab,locked});
  navigation.current={tab,locked};
+ const menuMotion=useMemo(()=>createMenuMotion('chat'),[]);
+ useEffect(()=>{let mounted=true;void AccessibilityInfo.isReduceMotionEnabled().then(value=>{if(mounted)menuMotion.setReducedMotion(value);}).catch(()=>{});const sub=AccessibilityInfo.addEventListener('reduceMotionChanged',value=>menuMotion.setReducedMotion(value));return()=>{mounted=false;sub.remove();menuMotion.dispose();};},[menuMotion]);
  const c=prefs.appearance==='dark'||(prefs.appearance==='system'&&system==='dark')?dark:light;
  const expired=useCallback(()=>{tabHistory.current=[];setAuth(null);setBootstrap(null);setLocked(false);void forgetAuth().catch(()=>{});},[]);
  const api=useMemo(()=>new SofiaApi(auth?.token||'',expired),[auth?.token,expired]);
@@ -68,10 +71,10 @@ function Shell(){
  return <ThemeContext.Provider value={c}><SafeAreaView style={{flex:1,backgroundColor:c.bg}} edges={['top','left','right','bottom']}><StatusBar barStyle={c===dark?'light-content':'dark-content'} backgroundColor={c.bg}/><View style={{flex:1,width:'100%',maxWidth:760,alignSelf:'center',backgroundColor:c.bg}}>
  {!ready?<View style={{flex:1,justifyContent:'center'}}><ActivityIndicator color={c.accent}/></View>:!auth?<Login onLogin={login}/>:!bootstrap?<View style={{flex:1,justifyContent:'center',padding:24,gap:14}}>{booting?<ActivityIndicator color={c.accent}/>:null}<Text style={{fontSize:23,fontWeight:'600',color:c.text}}>Abrindo sua Sofia…</Text>{error?<ErrorBanner text={error}/>:null}<Button title="Tentar novamente" onPress={()=>void boot()} loading={booting}/><Button title="Voltar para o login" secondary onPress={()=>void logout()}/></View>:<><View style={{flex:1}}>
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?0:1}]} pointerEvents={tab==='notifications'?'none':'auto'} accessibilityElementsHidden={tab==='notifications'} importantForAccessibility={tab==='notifications'?'no-hide-descendants':'auto'}>
-  <TabPager ref={pager} activeTab={tab} enabled={!locked&&!keyboard&&tab!=='notifications'} onSelect={navigate}>
+  <TabPager motion={menuMotion} ref={pager} activeTab={tab} enabled={!locked&&!keyboard&&tab!=='notifications'} onSelect={navigate}>
    <Home api={api} bootstrap={bootstrap} navigate={navigate}/>
    <Chat key={'chat-'+chatEpoch} api={api} bootstrap={bootstrap} enterToSend={prefs.enterToSend} autoSendVoice={prefs.autoSendVoice} onLock={setLocked} active={tab==='chat'} onRefreshBootstrap={boot}/>
-   <Pages api={api} active={tab==='pages'}/>
+   <Pages key={bootstrap.profile.email} api={api} active={tab==='pages'} storageScope={bootstrap.profile.email}/>
    <Agenda api={api}/>
    <Workspace api={api} navigate={navigate} onDepthChange={setWorkspaceDepth} active={tab==='apps'}/>
    <Profile api={api} bootstrap={bootstrap} prefs={prefs} onPrefs={changePrefs} onProfile={profile} onLogout={logout} onCheckUpdate={manualUpdate} onChatHistoryCleared={clearChat}/>
@@ -79,7 +82,7 @@ function Shell(){
  </View>
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?1:0,backgroundColor:c.bg}]} pointerEvents={tab==='notifications'?'auto':'none'} accessibilityElementsHidden={tab!=='notifications'} importantForAccessibility={tab==='notifications'?'auto':'no-hide-descendants'}><Notifications api={api} onBack={notificationBack}/></View>
  </View>
- {!keyboard?<View style={{flexDirection:'row',backgroundColor:c.surface,borderTopWidth:1,borderColor:c.line,paddingHorizontal:8,paddingTop:7,paddingBottom:4}}>{tabs.map(item=><MenuTab key={item.id} item={item} selected={tab===item.id} onSelect={navigate}/>)}</View>:null}</>}
+ {!keyboard?<View style={{flexDirection:'row',backgroundColor:c.surface,borderTopWidth:1,borderColor:c.line,paddingHorizontal:8,paddingTop:7,paddingBottom:4}}>{tabs.map(item=><MenuTab motion={menuMotion} key={item.id} item={item} selected={tab===item.id} onSelect={navigate}/>)}</View>:null}</>}
  </View></SafeAreaView></ThemeContext.Provider>;
 }
 export default function App(){return <AppBoundary><SafeAreaProvider><Shell/></SafeAreaProvider></AppBoundary>;}

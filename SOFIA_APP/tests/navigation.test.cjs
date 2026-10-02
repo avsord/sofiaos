@@ -71,11 +71,12 @@ test('notifications are outside the swipe sequence without losing the underlying
 test('Android identity, discovery prefix and version stay compatible',()=>{
   const config=JSON.parse(fs.readFileSync(path.join(root,'app.json'))).expo,pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json')));
   const update=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');
-  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,14);
-  assert.equal(config.version,'0.3.9');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
+  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,15);
+  assert.equal(config.version,'0.3.10');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
 });
-test('Pages still opens the cached entity without a network wait',()=>{
-  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');
-  assert.match(pages,/function open\(page:Entity,push=true\)\{[^\n]*setSelected\(page\);[^\n]*setTitle\(page\.title\);[^\n]*setBlocks\(cachedBlocks\.get\(page\.id\)\|\|parseBlocks\(page\)\)/);
-  assert.ok(!pages.includes('await api.entity(page.id)'));assert.ok(!pages.includes('const fresh=await api.entity(page.id)'));
+test('Pages opens a preloaded entity synchronously without a network wait',()=>{
+ const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');
+ assert.ok(pages.includes('items.forEach(page=>store.open(page))'));
+ const fn=pages.match(/function open\(page:Entity,push=true\)\{([^\n]*)/)[1];
+ assert.ok(fn.includes('setSelectedId(page.id)'));assert.ok(!fn.includes('await '));assert.ok(!fn.includes('api.entity('));
 });

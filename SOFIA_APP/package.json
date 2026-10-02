@@ -1,13 +1,13 @@
 {
   "name": "sofia-app",
-  "version": "0.3.9",
+  "version": "0.3.10",
   "private": true,
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "check": "tsc --noEmit",
-    "test": "node tools/test.cjs && node --test tests/navigation.test.cjs tests/navigation-interaction.test.cjs",
+    "test": "node tools/test.cjs && node --test tests/navigation.test.cjs tests/navigation-interaction.test.cjs tests/menu-motion.test.cjs tests/editor.test.cjs tests/chat-sync.test.cjs",
     "prepare-assets": "node tools/assets.cjs"
   },
   "dependencies": {
@@ -22,7 +22,8 @@
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-svg": "15.15.4"
+    "react-native-svg": "15.15.4",
+    "expo-image-picker": "57.0.20"
   },
   "devDependencies": {
     "@types/react": "~19.2.0",
