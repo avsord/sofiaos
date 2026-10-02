@@ -16,7 +16,7 @@ import {canReparentPage,reparentPatch,reparentedPage} from '../lib/page-hierarch
 const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'null')??fallback;}catch{return fallback;}};
 
 export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;active:boolean;storageScope:string;onDepthChange?:(open:boolean)=>void}){
- const c=useTheme(),[pages,setPages]=useState<Entity[]>([]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>());
+ const c=useTheme(),[pages,setPages]=useState<Entity[]>([]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>()),[hierarchyGesture,setHierarchyGesture]=useState(false);
  const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null);
  const history=useRef<string[]>([]),mounted=useRef(true),expandDisk=useRef(Promise.resolve()),inputRefs=useRef(new Map<string,TextInput>());
  const backX=useRef(new Animated.Value(0)).current,selectedRef=useRef<string|null>(null),paneWidth=useRef(0),backAction=useRef<()=>void>(()=>{});
@@ -55,13 +55,15 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   return()=>{alive=false;mounted.current=false;state.remove();keyboard.remove();void store.flushAll().finally(()=>store.dispose());};
  },[store,key]);
  useEffect(()=>{if(!active){setFocus(null);void store.flushAll();}},[active,store]);
- useEffect(()=>{onDepthChange?.(!!selectedId);if(!selectedId)backX.setValue(0);},[selectedId,onDepthChange,backX]);
+ useEffect(()=>{onDepthChange?.(!!selectedId||hierarchyGesture);if(!selectedId)backX.setValue(0);},[selectedId,hierarchyGesture,onDepthChange,backX]);
  useEffect(()=>()=>onDepthChange?.(false),[onDepthChange]);
  const displayPages=useMemo(()=>pages.map(p=>{const e=store.get(p.id);return e?{...p,title:e.draft.title.trim()||'Sem título',data:{...p.data,...e.draft.appearance}}:p;}),[pages,store,tick]);
  const byId=useMemo(()=>new Map(displayPages.map(p=>[p.id,p])),[displayPages]);
  const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of displayPages){const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const list of m.values())list.sort((a,b)=>a.title.localeCompare(b.title,'pt-BR'));return m;},[displayPages]);
  const entry=selectedId?store.get(selectedId):undefined;
  const emptyBody=entry?pageBodyIsEmpty(entry.draft.blocks):true;
+ const titleIsBlank=entry?!entry.draft.title.trim()||entry.draft.title==='Sem título':true;
+ const showBodyGuide=emptyBody&&titleIsBlank;
  const placeholderColor=c.muted+'80';
  useEffect(()=>{if(active&&focus&&focus!=='title')inputRefs.current.get(focus)?.focus();},[focus,selectedId,active]);
  function toggle(id:string){setExpanded(old=>{const next=toggleExpanded(old,id),value=JSON.stringify([...next]);expandDisk.current=expandDisk.current.catch(()=>{}).then(()=>AsyncStorage.setItem(key+':expanded',value)).catch(()=>{if(mounted.current)setError('Não foi possível guardar a abertura das subpáginas neste aparelho.');});return next;});}
@@ -107,14 +109,14 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   return <View key={b.id} style={{flexDirection:'row',alignItems:'flex-start',gap:b.type==='todo'?7:0}}>
    {b.type==='todo'?<Switch accessibilityLabel="Concluir tarefa" value={!!b.checked} onValueChange={checked=>updateBlock(b,{checked})}/>:prefix?<Text style={{fontSize:heading,lineHeight:heading+9,color:c.muted,paddingTop:4}}>{prefix}</Text>:null}
    <TextInput ref={node=>{if(node)inputRefs.current.set(b.id,node);else inputRefs.current.delete(b.id);}} accessibilityLabel={'Conteúdo do bloco '+(i+1)} value={b.text||''} onChangeText={text=>updateBlock(b,{text,html:''},'text:'+b.id)}
-    onFocus={()=>setFocus(b.id)} onBlur={()=>{if(selectedId)void store.flush(selectedId);}} multiline placeholder={pageBlockHint(b,i,emptyBody,focus===b.id)} placeholderTextColor={placeholderColor}
-    style={{flex:1,minHeight:42,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:4,fontFamily:b.type==='code'?'monospace':undefined,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:8,paddingHorizontal:b.type==='code'?10:0}}/>
+    onFocus={()=>setFocus(b.id)} onBlur={()=>{if(selectedId)void store.flush(selectedId);}} multiline placeholder={pageBlockHint(b,i,showBodyGuide,focus===b.id)} placeholderTextColor={placeholderColor}
+    style={{flex:1,minHeight:(!b.text&&!b.html&&!pageBlockHint(b,i,showBodyGuide,focus===b.id)&&focus!==b.id)?0:42,height:(!b.text&&!b.html&&!pageBlockHint(b,i,showBodyGuide,focus===b.id)&&focus!==b.id)?0:undefined,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:(!b.text&&!b.html&&!pageBlockHint(b,i,showBodyGuide,focus===b.id)&&focus!==b.id)?0:4,fontFamily:b.type==='code'?'monospace':undefined,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:8,paddingHorizontal:b.type==='code'?10:0}}/>
   </View>;
  }
  const listView=<ScrollView style={{flex:1,backgroundColor:c.bg}} contentContainerStyle={{paddingBottom:34}} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>void load(true)} tintColor={c.accent}/>}>
   <View style={{paddingHorizontal:20,paddingTop:18,paddingBottom:12,flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,color:c.text,fontSize:30,fontWeight:'800',letterSpacing:-1}}>Páginas</Text><IconButton name="plus" label="Nova página" filled disabled={!ready} onPress={()=>void create()}/></View>
   {error?<ErrorBanner text={error} onRetry={()=>void load()}/>:null}
-  <View style={{paddingHorizontal:10}}><PageTreeList roots={children.get('')||[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent}/></View>
+  <View style={{paddingHorizontal:10}}><PageTreeList roots={children.get('')||[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onInteractionChange={setHierarchyGesture}/></View>
   {ready&&!pages.length?<Empty icon="book" title="Sua primeira página" body="Toque em + para criar uma página."/>:null}
  </ScrollView>;
  if(!entry)return <View style={{flex:1}} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{listView}</View>;
@@ -149,10 +151,8 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
      <IconButton name="trash" label="Remover bloco selecionado" size={34} onPress={()=>removeBlock(focus)}/>
     </View>:null}
     <Pressable accessibilityLabel="Continuar escrevendo" onPress={()=>{const last=draft.blocks.at(-1);if(last&&['text','heading1','heading2','heading3','bullet','todo','number','quote','code','callout'].includes(last.type)){setFocus(last.id);inputRefs.current.get(last.id)?.focus();}else addBlock();}} style={{minHeight:18}}/>
-    {subpages.length?<View style={{marginTop:6}}>
-     {expanded.has(selected.id)?<><Pressable accessibilityRole="button" accessibilityLabel="Recolher subpáginas" onPress={()=>toggle(selected.id)} style={{width:30,height:30,alignItems:'center',justifyContent:'center',opacity:.55}}><View style={{transform:[{rotate:'90deg'}]}}><Icon name="chevron" color={c.muted} size={14}/></View></Pressable>
-      <PageTreeList roots={subpages} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} compact/>
-     </>:<Pressable accessibilityRole="button" accessibilityLabel="Mostrar subpáginas" onPress={()=>toggle(selected.id)} style={{flexDirection:'row',alignItems:'center',gap:6,minHeight:38,opacity:.65}}><Icon name="chevron" color={c.muted} size={14}/><Text style={{color:c.muted,fontSize:12}}>{subpages.length} {subpages.length===1?'página':'páginas'}</Text></Pressable>}
+    {subpages.length?<View style={{marginTop:2}}>
+      <PageTreeList roots={subpages} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} compact onInteractionChange={setHierarchyGesture}/>
     </View>:null}
    </View>
   </ScrollView>
