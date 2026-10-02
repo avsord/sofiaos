@@ -16,8 +16,8 @@ export async function readAuth(): Promise<Auth | null> {
 export function saveAuth(auth: Auth) { return SecureStore.setItemAsync(AUTH_KEY, JSON.stringify(auth), secureOptions); }
 export function forgetAuth() { return SecureStore.deleteItemAsync(AUTH_KEY); }
 export async function readPrefs(): Promise<Prefs> {
-  try { const p = JSON.parse(await AsyncStorage.getItem(PREFS_KEY) || '{}'); return { appearance: ['system','light','dark'].includes(p.appearance) ? p.appearance : 'system', enterToSend: p.enterToSend === true }; }
-  catch { return { appearance: 'system', enterToSend: false }; }
+  try { const p = JSON.parse(await AsyncStorage.getItem(PREFS_KEY) || '{}'); return { appearance: ['system','light','dark'].includes(p.appearance) ? p.appearance : 'system', enterToSend: p.enterToSend === true, autoSendVoice: p.autoSendVoice !== false }; }
+  catch { return { appearance: 'system', enterToSend: false, autoSendVoice: true }; }
 }
 export function savePrefs(p: Prefs) { return AsyncStorage.setItem(PREFS_KEY, JSON.stringify(p)); }
 export class ApiError extends Error {
@@ -53,6 +53,8 @@ export class SofiaApi {
   changePassword(currentPassword: string,newPassword: string,confirmPassword: string) { return this.request<{ok: boolean}>('/auth/change-password', {currentPassword,newPassword,confirmPassword}); }
   conversations(offset = 0) { return this.request<{items: Conversation[]; has_more: boolean; next_offset: number}>('/conversations?offset=' + offset); }
   newConversation(title = 'Conversa com a Sofia') { return this.request<{conversation: Conversation}>('/conversations', {title}); }
+  deleteMessage(id: string) { return this.request<{ok:boolean;id:string;conversation_id:string}>('/messages/' + encodeURIComponent(id), {}, 'DELETE'); }
+  clearChatHistory() { return this.request<{ok:boolean;conversations:number;messages:number}>('/chat-history', {}, 'DELETE'); }
   history(id: string, before?: number) { return this.request<MessagePage>(`/conversations/${encodeURIComponent(id)}${before ? '?before=' + before : ''}`); }
   chat(data: object) { return this.request<ChatResult>('/messages', data, 'POST', 180000); }
   audio(data: object) { return this.request<ChatResult>('/messages/audio', data, 'POST', 180000); }
