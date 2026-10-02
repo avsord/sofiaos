@@ -8,13 +8,27 @@ from pathlib import Path
 APP=Path(os.environ['SOFIA_QA_APP_ROOT']).resolve()
 OUT=APP/'dist'/'pager-evidence';OUT.mkdir(parents=True,exist_ok=True)
 step=0
+launcher_dialogs=0
 
 def adb(*args):
     return subprocess.check_output(['adb',*args],timeout=30)
 
 def tree():
+    global launcher_dialogs
     adb('shell','uiautomator','dump','/sdcard/sofia-qa.xml')
-    return ET.fromstring(adb('shell','cat','/sdcard/sofia-qa.xml'))
+    root=ET.fromstring(adb('shell','cat','/sdcard/sofia-qa.xml'))
+    # A cold google_apis image can show an ANR for its own Pixel Launcher over
+    # the running fixture. Never dismiss an ANR for Sofia or any unknown app.
+    if any(n.get('text')=="Pixel Launcher isn't responding" for n in root.iter('node')):
+        close=next((n for n in root.iter('node') if n.get('text')=='Close app'),None)
+        if close is None or launcher_dialogs>=2:raise AssertionError('Emulator launcher remains unresponsive')
+        launcher_dialogs+=1
+        shot('emulator-launcher-dialog-'+str(launcher_dialogs),root)
+        x1,y1,x2,y2=bounds(close)
+        adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2))
+        time.sleep(.5)
+        return tree()
+    return root
 
 def bounds(n):
     return list(map(int,re.findall(r'-?\d+',n.get('bounds','')))) if n is not None else []
