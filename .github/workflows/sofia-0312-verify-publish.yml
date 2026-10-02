@@ -43,6 +43,7 @@ jobs:
           test "$(cat SOFIA_APP/dist/SOURCE_COMMIT.txt)" = '409763ea39d556022ac5ffde06ea749d0e260c29'
           echo 'a032d588dd542748da4a383e1022cc60a0df82b5b93d948188cc802c5c5c3488  SOFIA_APP/dist/Sofia-OS.apk' | sha256sum -c -
           rm -rf SOFIA_APP/dist/pager-evidence
+          gh api "repos/$GITHUB_REPOSITORY/contents/tools/qa/native-pager-smoke.py?ref=$GITHUB_SHA" --jq '.content' | base64 --decode > /tmp/native-pager-smoke.py
       - name: Bundle real-component fixture separately, preserving all production source
         working-directory: SOFIA_APP
         run: |
@@ -51,10 +52,6 @@ jobs:
           npm test
           mkdir -p /tmp/qa/assets
           npx expo export:embed --platform android --entry-file ./tests/native-pager-entry.tsx --dev false --bundle-output /tmp/qa/assets/index.android.bundle --assets-dest /tmp/qa/resources
-          # Android's wall-clock input swipe dropped most move samples on the cold emulator.
-          # A longer injected finger path must complete on its FIRST attempt. No app timing changes.
-          cp tools/native-pager-smoke.py /tmp/original-pager-smoke.py
-          sed -i "s/str(y),'350'/str(y),'900'/" tools/native-pager-smoke.py
       - name: Package disposable fixture only with ephemeral certificate
         run: |
           python3 <<'PY'
@@ -86,8 +83,9 @@ jobs:
           script: |
             adb install /tmp/Sofia-qa.apk
             adb logcat -c
+            adb shell settings put secure show_ime_with_hard_keyboard 1
             adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
-            sh -c 'python3 SOFIA_APP/tools/native-pager-smoke.py; result=$?; adb logcat -d -s ReactNativeJS:V AndroidRuntime:E > SOFIA_APP/dist/pager-native.log; exit $result'
+            sh -c 'SOFIA_QA_APP_ROOT="$GITHUB_WORKSPACE/SOFIA_APP" python3 /tmp/native-pager-smoke.py; result=$?; adb logcat -d -s ReactNativeJS:V AndroidRuntime:E > SOFIA_APP/dist/pager-native.log; exit $result'
             adb uninstall com.avsord.sofiaapp
             sh -c 'curl -fsSL "https://github.com/avsord/sofiaos/releases/download/sofia-android-v0.3.11/Sofia-OS.apk" -o /tmp/Sofia-0.3.11.apk && adb install /tmp/Sofia-0.3.11.apk && adb install -r SOFIA_APP/dist/Sofia-OS.apk'
             adb logcat -c
@@ -100,9 +98,8 @@ jobs:
             adb logcat -d -s ReactNativeJS:E AndroidRuntime:E > SOFIA_APP/dist/native-errors.txt
             ! grep -q 'FATAL EXCEPTION' SOFIA_APP/dist/native-errors.txt
             grep -q 'Entrar' SOFIA_APP/dist/login-ui.xml
-      - name: Restore exact production source and verify compatible server
+      - name: Verify exact production source and compatible server
         run: |
-          cp /tmp/original-pager-smoke.py SOFIA_APP/tools/native-pager-smoke.py
           git diff --exit-code -- SOFIA_APP
           curl -fsS --max-time 20 https://sofiaos.up.railway.app/health > /tmp/health.json
           node -e "const h=require('/tmp/health.json');if(!h.ok||Number(h.version.split('.')[0])<141)throw Error('Compatible server not deployed')"
