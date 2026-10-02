@@ -37,3 +37,13 @@ test('Pages opens from cached entity immediately without awaiting api.entity',()
   assert.ok(!pages.includes('await api.entity(page.id)'));
   assert.ok(!pages.includes('const fresh=await api.entity(page.id)'));
 });
+
+
+test('swipe horizontally between main menus without slide animation',()=>{
+  assert.ok(source.includes('PanResponder.create'));
+  assert.ok(source.includes("const order:Tab[]=['home','chat','pages','agenda','apps','profile']"));
+  assert.ok(source.includes('Math.abs(g.dx)>=24'));
+  assert.ok(source.includes('Math.abs(g.dx)<55'));
+  assert.ok(source.includes('...swipe.panHandlers'));
+  assert.ok(!source.includes('translateX'));
+});
