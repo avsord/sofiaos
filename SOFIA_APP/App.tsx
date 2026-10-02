@@ -31,10 +31,10 @@ class AppBoundary extends Component<{children:React.ReactNode},{failed:boolean}>
  render(){return this.state.failed?<View style={{flex:1,backgroundColor:'#F7F6FA',padding:30,justifyContent:'center'}}><Text style={{fontSize:25,fontWeight:'700',color:'#272334'}}>Vamos reabrir a Sofia.</Text><Text style={{marginTop:16,lineHeight:23,color:'#7F7A8D'}}>O aplicativo encontrou um problema. Feche e abra novamente. Mensagens ainda não enviadas podem precisar ser refeitas.</Text></View>:this.props.children;}
 }
 function Shell(){
- const system=useColorScheme(),[ready,setReady]=useState(false),[auth,setAuth]=useState<Auth|null>(null),[bootstrap,setBootstrap]=useState<Bootstrap|null>(null),[prefs,setPrefs]=useState<Prefs>({appearance:'system',enterToSend:false,autoSendVoice:true}),[error,setError]=useState(''),[tab,setTab]=useState<Tab>('chat'),[locked,setLocked]=useState(false),[booting,setBooting]=useState(false),[keyboard,setKeyboard]=useState(false),[workspaceDepth,setWorkspaceDepth]=useState(false),[chatEpoch,setChatEpoch]=useState(0);
+ const system=useColorScheme(),[ready,setReady]=useState(false),[auth,setAuth]=useState<Auth|null>(null),[bootstrap,setBootstrap]=useState<Bootstrap|null>(null),[prefs,setPrefs]=useState<Prefs>({appearance:'system',enterToSend:false,autoSendVoice:true}),[error,setError]=useState(''),[tab,setTab]=useState<Tab>('home'),[locked,setLocked]=useState(false),[booting,setBooting]=useState(false),[keyboard,setKeyboard]=useState(false),[workspaceDepth,setWorkspaceDepth]=useState(false),[chatEpoch,setChatEpoch]=useState(0);
  const tabHistory=useRef<Tab[]>([]),pager=useRef<TabPagerHandle>(null),navigation=useRef({tab,locked});
  navigation.current={tab,locked};
- const menuMotion=useMemo(()=>createMenuMotion('chat'),[]);
+ const menuMotion=useMemo(()=>createMenuMotion('home'),[]);
  useEffect(()=>{let mounted=true;void AccessibilityInfo.isReduceMotionEnabled().then(value=>{if(mounted)menuMotion.setReducedMotion(value);}).catch(()=>{});const sub=AccessibilityInfo.addEventListener('reduceMotionChanged',value=>menuMotion.setReducedMotion(value));return()=>{mounted=false;sub.remove();menuMotion.dispose();};},[menuMotion]);
  const c=prefs.appearance==='dark'||(prefs.appearance==='system'&&system==='dark')?dark:light;
  const expired=useCallback(()=>{tabHistory.current=[];setAuth(null);setBootstrap(null);setLocked(false);void forgetAuth().catch(()=>{});},[]);
@@ -80,7 +80,7 @@ function Shell(){
   if(current.tab!=='home'&&auth){switchTab('home');return true;}return false;
  },[auth,switchTab]);
  useEffect(()=>{const s=BackHandler.addEventListener('hardwareBackPress',()=>tab==='apps'&&workspaceDepth?false:goBack());return()=>s.remove();},[tab,workspaceDepth,goBack]);
- const login=useCallback(async(a:Auth)=>{await saveAuth(a);tabHistory.current=[];setAuth(a);switchTab('chat');setError('');},[switchTab]);
+ const login=useCallback(async(a:Auth)=>{await saveAuth(a);tabHistory.current=[];setAuth(a);switchTab('home');setError('');},[switchTab]);
  const changePrefs=useCallback(async(p:Prefs)=>{await savePrefs(p);setPrefs(p);},[]);
  const logout=useCallback(async()=>{void silenceVoices();let revokeFailed=false;try{await api.logout();}catch{revokeFailed=true;}try{await forgetAuth();}catch{Alert.alert('Armazenamento','Não foi possível apagar a cópia local da sessão. Limpe os dados do aplicativo antes de compartilhar o aparelho.');}tabHistory.current=[];setAuth(null);setBootstrap(null);setLocked(false);if(revokeFailed)Alert.alert('Você saiu deste aparelho','Não foi possível confirmar a revogação no servidor. Use “Encerrar todas as sessões” no site para invalidá-la antes da expiração.');},[api]);
  const profile=useCallback((p:UserProfile)=>setBootstrap(prev=>prev?{...prev,profile:p}:prev),[]);
