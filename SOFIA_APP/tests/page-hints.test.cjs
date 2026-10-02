@@ -32,3 +32,16 @@ test('undo and redo share the right-hand tools group, after the flexible breadcr
  let prev=-1;for(const name of ['undo','redo','plus','trash']){const i=tools.indexOf('name="'+name+'"');assert.ok(i>prev);prev=i;}
  assert.equal((source.match(/name="undo"/g)||[]).length,1);assert.equal((source.match(/name="redo"/g)||[]).length,1);
 });
+
+test('page canvas stays compact and subpages render as inline page rows',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
+ const tree=fs.readFileSync(path.join(__dirname,'../src/components/PageTreeList.tsx'),'utf8');
+ assert.ok(source.includes("height:hasCover?172:32"));
+ assert.ok(source.includes("marginTop:hasCover?-36:0"));
+ assert.ok(source.includes("style={{minHeight:34}}"));
+ assert.ok(source.includes("<PageTreeList roots={subpages}"));
+ assert.ok(!source.includes("Subpáginas ·"));
+ assert.ok(tree.includes("Solte aqui para página principal"));
+ assert.ok(tree.includes("PanResponder.create"));
+ assert.ok(tree.includes("Arrastar página "));
+});
