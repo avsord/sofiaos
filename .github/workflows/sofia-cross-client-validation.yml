@@ -1,0 +1,23 @@
+name: Sofia cross-client validation
+on:
+  push:
+    branches: [sofia-app-android]
+    paths: ['.github/workflows/sofia-cross-client-validation.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cacedb11c360f09d9ca727c21b7f2e0a2e2e97e8
+      - name: Retain tracked backend source, without runtime data or secrets
+        run: git archive --format=zip HEAD -o /tmp/Sofia-backend-source.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sofia-backend-source-for-sync-validation
+          path: /tmp/Sofia-backend-source.zip
+          retention-days: 7
