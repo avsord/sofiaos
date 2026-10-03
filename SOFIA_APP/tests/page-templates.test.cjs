@@ -47,7 +47,10 @@ test('page row drag disables the outer menu pager while active',()=>{
  const tree=fs.readFileSync(path.join(__dirname,'../src/components/PageTreeList.tsx'),'utf8');
  assert.ok(pages.includes('[pageInteraction,setPageInteraction]=useState(false)'));
  assert.ok(pages.includes('onDepthChange?.(!!selectedId||pageInteraction)'));
- assert.ok(pages.includes('pageInteractionRef.current=value;setPageInteraction(value)'));
+ assert.ok(pages.includes('pageInteractionRef.current=value;refreshGuard.current.setActive(value)'));
+ assert.ok(pages.includes('setPageInteraction(value);onDepthChange?.(!!selectedRef.current||value)'));
+ assert.ok(pages.includes('enabled={!pageInteraction&&!selectedId}'));
+ assert.ok(pages.includes('onInteractionChange={changePageInteraction}')); 
  assert.ok(tree.includes('},240)'));
 });
 
