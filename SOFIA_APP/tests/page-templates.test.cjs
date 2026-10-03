@@ -23,7 +23,7 @@ test('Pages + offers blank/template and renders collection blocks in the app',()
  const src=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
  const picker=fs.readFileSync(path.join(__dirname,'../src/components/PageTemplatePicker.tsx'),'utf8');
  const collection=fs.readFileSync(path.join(__dirname,'../src/components/NativeCollectionBlock.tsx'),'utf8');
- assert.ok(src.includes('PageCreateMenu'));assert.ok(src.includes("template_id:preset?.id||''"));assert.ok(src.includes("<NativeCollectionBlock"));
+ assert.ok(src.includes('PageCreateMenu'));assert.ok(!src.includes('template_id:'));assert.ok(src.includes("blocks_json:preset?JSON.stringify(preset.blocks):'[]'"));assert.ok(src.includes("<NativeCollectionBlock"));
  assert.ok(picker.includes('＋ Página em branco'));assert.ok(picker.includes('▦ Usar template'));
  assert.ok(collection.includes('Duplicar coluna'));assert.ok(collection.includes('＋ Coluna'));assert.ok(collection.includes('Cor'));
 });
