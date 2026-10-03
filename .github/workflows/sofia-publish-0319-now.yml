@@ -25,7 +25,7 @@ jobs:
       - name: Checkout exact 0.3.20 source
         uses: actions/checkout@v4
         with:
-          ref: dbc9452c886ca0247d74774e47bf66c4dc2b2233
+          ref: 94f17109b44e92ded3cdfa97f4c7e07ab0eeaab1
           fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
