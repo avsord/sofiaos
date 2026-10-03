@@ -2394,3 +2394,20 @@ body > .user-page-floating-actions[hidden]{display:none!important}
 @media(max-width:760px){
   .mode-user #primaryUserNav .nav>.nav-label{font-size:12px!important}
 }
+
+
+/* v142 — templates oficiais e colunas de quadro totalmente editáveis. */
+.page-create-menu{display:grid;gap:10px;margin:14px 0 4px}
+.page-create-choice{display:grid!important;gap:5px!important;width:100%!important;padding:15px!important;text-align:left!important;border:1px solid var(--line)!important;border-radius:12px!important;background:var(--panel)!important}
+.page-create-choice strong{font-size:14px}.page-create-choice span{font-size:10px;color:var(--muted)}
+.page-create-choice.template-choice{border-color:color-mix(in srgb,var(--accent) 44%,var(--line))!important;background:color-mix(in srgb,var(--accent) 7%,var(--panel))!important}
+.template-card-head{display:flex;align-items:center;gap:10px;margin-bottom:7px}.template-card-head h3{margin:0!important}.template-card-icon{font-size:27px;line-height:1}
+.collection-board-column.custom-status{background:color-mix(in srgb,var(--status-color) 8%,transparent)!important}
+.collection-status-chip.custom-status{border:0!important;background:color-mix(in srgb,var(--status-color) 18%,transparent)!important;color:var(--status-color)!important;cursor:pointer}
+.collection-status-chip.custom-status:hover{background:color-mix(in srgb,var(--status-color) 25%,transparent)!important}
+.collection-column-more{margin-left:auto!important;width:24px!important;min-width:24px!important;height:22px!important;padding:0!important;border:0!important;background:transparent!important;color:var(--muted)!important}
+.collection-column-more:hover{background:color-mix(in srgb,var(--text) 6%,transparent)!important;color:var(--text)!important}
+.collection-add-column{flex:0 0 118px!important;min-height:64px!important;border:1px dashed var(--line)!important;border-radius:9px!important;background:transparent!important;color:var(--muted)!important;font-size:10px!important}
+.collection-add-column:hover{border-color:var(--accent)!important;color:var(--accent)!important;background:color-mix(in srgb,var(--accent) 5%,transparent)!important}
+:root[data-theme="light"] .collection-board-column.custom-status{background:color-mix(in srgb,var(--status-color) 8%,#fff)!important}
+@media(max-width:700px){.template-card-icon{font-size:24px}.collection-add-column{flex-basis:100px!important}}
