@@ -20,7 +20,7 @@ test('a focused empty row still exposes the contextual writing command',()=>{
 });
 test('hints are native placeholders with alpha; user content retains its full color',()=>{
  const source=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
- assert.ok(source.includes('placeholder="Título"'));assert.ok(source.includes("const placeholderColor=c.muted+'80'"));
+ assert.ok(source.includes('placeholder={pageTitleHint('));assert.ok(source.includes("const placeholderColor=c.muted+'80'"));
  assert.equal((source.match(/placeholderTextColor=\{placeholderColor\}/g)||[]).length,2);
  assert.ok(source.includes('value={draft.title===\'Sem título\'?\'\':draft.title}'));
  assert.ok(!source.includes('Salvar agora'));

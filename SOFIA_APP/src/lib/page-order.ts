@@ -37,7 +37,7 @@ export function projectPageDrop(pages:readonly Entity[],source:Entity,rows:reado
  if(pullingOut){
   // Outdent from the source's own parent by the distance represented by the preview.
   const sourceDepth=rows.find(r=>r.page.id===source.id)?.depth??depth;
-  const targetDepth=Math.max(0,sourceDepth-Math.max(1,Math.floor((-dx+6)/PAGE_INDENT)));
+  const targetDepth=Math.max(0,sourceDepth-1);
   while(depth>targetDepth&&parentId){const parent=byId.get(parentId);if(!parent)break;anchor=parent;parentId=pageParentId(parent);depth--;}
  }
  // Blank space below/above a branch follows the closest visible level. This permits

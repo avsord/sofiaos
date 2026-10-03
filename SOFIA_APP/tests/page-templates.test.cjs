@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {PAGE_TEMPLATES,STATUS_COLORS}=load('src/lib/page-templates.ts');
 test('exactly the three official page templates are exposed',()=>{
  assert.equal(Array.from(PAGE_TEMPLATES,x=>x.id).join('|'),'tasks_personal|notes_hub|playlist_links');
- assert.equal(Array.from(PAGE_TEMPLATES,x=>x.title).join('|'),'Tarefas pessoais|Bloco de notas|Lista de reprodução');
+ assert.equal(Array.from(PAGE_TEMPLATES,x=>x.title).join('|'),'Tarefas pessoal|Bloco de nota|Lista de reprodução');
 });
 test('tasks template has editable status columns with colors',()=>{
  const t=PAGE_TEMPLATES[0],collection=t.blocks.find(x=>x.type==='collection');

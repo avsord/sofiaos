@@ -18,11 +18,11 @@ def pos(label,icon=False):
  n=wait(label);x,y,r,b=map(int,re.findall(r'\d+',n.get('bounds')));return (x+15 if icon else (x+r)//2),(y+b)//2
 pid=adb('shell','pidof',pkg).strip();assert pid
 
-def stable(name):
+def stable(name,moves=0):
  assert adb('shell','pidof',pkg).strip()==pid,'App restarted/crashed'
  root=tree();(out/(name+'.xml')).write_text(ET.tostring(root,encoding='unicode'))
  (out/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'))
- wait('QA loads 1 moves 0 deletes 0')
+ wait('QA moves '+str(moves)+' deletes 0')
 def tap(label):
  x,y=pos(label);adb('shell','input','tap',str(x),str(y));time.sleep(.3)
 def hold(label,icon=False):
@@ -39,6 +39,22 @@ x,y=pos('Abrir subpágina Teste filha',True)
 adb('shell','input','motionevent','DOWN',str(x),str(y));time.sleep(.4)
 adb('shell','input','keyevent','3');adb('shell','input','motionevent','UP',str(x),str(y))
 adb('shell','am','start','-W','-n',pkg+'/.MainActivity');time.sleep(.5);stable('cancel-background')
+# Return to root, apply a server-side revision, and wait for the actual Pages poll.
+tap('Voltar')
+tap('QA atualizar remoto')
+wait('Abrir página principal Nome remoto');stable('remote-page-refresh')
+# Drag the icon onto another page: a single hierarchy write, preserving title.
+x,y=pos('Abrir página principal Nome remoto',True)
+tx,ty=pos('Abrir página principal Teste principal',True)
+adb('shell','input','motionevent','DOWN',str(x),str(y));time.sleep(.4)
+for i in range(1,9):
+ adb('shell','input','motionevent','MOVE',str(round(x+(tx-x)*i/8)),str(round(y+(ty-y)*i/8)));time.sleep(.06)
+adb('shell','input','motionevent','UP',str(tx),str(ty));time.sleep(.5)
+wait('Abrir subpágina Nome remoto');stable('icon-drag-one-write',1)
+# Exact MD template names are visible in the real picker.
+tap('Abrir página principal Teste principal');tap('Criar página ou usar template');tap('Usar template de conteúdo')
+for name in ['Tarefas pessoal','Bloco de nota','Lista de reprodução']:wait('Aplicar template '+name)
+stable('three-official-templates',1);tap('Fechar')
 logs=adb('logcat','-d','-s','ReactNativeJS:E','AndroidRuntime:E').decode();(out/'native-errors.txt').write_text(logs)
 assert 'FATAL EXCEPTION' not in logs and 'TypeError' not in logs,logs
-print('PASS: repeated icon/text holds, root/subpage, cancel, process stable, no refresh/move/delete')
+print('PASS: holds root/child, cancel, remote refresh, icon drag exactly once, exact templates, stable process')

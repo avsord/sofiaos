@@ -47,7 +47,7 @@ export class PageEditorStore {
  open(base:Entity):PageEntry {
   let e=this.entries.get(base.id);
   if(!e){const d=pageDraft(base);e={base,baseDraft:clone(d),draft:d,past:[],future:[],version:0,acked:0,state:'saved',error:'',group:'',groupAt:0,firstChange:0};this.entries.set(base.id,e);}
-  else if(e.state==='saved'&&base.revision!==e.base.revision){e.base=base;e.baseDraft=pageDraft(base);e.draft=clone(e.baseDraft);e.past=[];e.future=[];}
+  else if(e.state==='saved'&&base.revision>e.base.revision){e.base=base;e.baseDraft=pageDraft(base);e.draft=clone(e.baseDraft);e.past=[];e.future=[];}
   return e;
  }
  restore(saved:unknown){

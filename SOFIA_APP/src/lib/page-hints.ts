@@ -10,3 +10,7 @@ export function pageBlockHint(block:PageBlock,index:number,emptyBody:boolean,foc
   if(index===0 && emptyBody)return 'Escreva algo…';
   return focused?'Digite / para opções':'';
 }
+
+export function pageTitleHint(emptyBody:boolean,hasChildren:boolean,focused:boolean):string {
+  return focused||(emptyBody&&!hasChildren)?'Título':'';
+}

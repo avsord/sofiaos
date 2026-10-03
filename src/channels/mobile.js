@@ -85,6 +85,10 @@ function makeMobileApi(runtime, deps) {
       clearFailures(req); return send({ ok: true, ...mobileSessions.issue(b.device_name), profile: profile() });
     }
     const session = mobileSessions.require(req);
+    if(p.startsWith('/api/mobile/md/')){
+      rate(session,'md-upgrade',120);
+      if(await require('../core/md-api').makeMdApi(runtime,{bodyJson,json})(req,res,'/api/md/'+p.slice('/api/mobile/md/'.length),m,url))return true;
+    }
     if (p.startsWith('/api/mobile/chat-sync')) {
       if (m !== 'GET') rate(session, 'chat-sync-write', 30);
       if (await chatSync(req, res, p, m, url)) return true;

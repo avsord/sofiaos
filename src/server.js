@@ -39,7 +39,7 @@ async function startServer(options={}) {
     throw e;
   }
   const stop=async()=>{
-    if(stopped)return;stopped=true;clearInterval(timer);runtime.core.shutdown();await runtime.scheduler.stop();runtime.vault.lock();
+    if(stopped)return;stopped=true;clearInterval(timer);runtime[Symbol.for('sofia.md.upgrade')]?.calendar.close();runtime.core.shutdown();await runtime.scheduler.stop();runtime.vault.lock();
     server.close();
     // Abort provider work first; do not start background work or retry during shutdown.
     const deadline=Date.now()+10000;

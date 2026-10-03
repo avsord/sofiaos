@@ -7,9 +7,10 @@ import {useTheme} from '../lib/theme';
 import {errorText} from '../lib/chat-model';
 import {PageEditorStore,newBlock,expandedIds,toggleExpanded} from '../lib/page-editor';
 import type {PageBlock,PageDraft} from '../lib/page-editor';
-import {pageBodyIsEmpty,pageBlockHint} from '../lib/page-hints';
+import {pageBodyIsEmpty,pageBlockHint,pageTitleHint} from '../lib/page-hints';
 import {Empty,ErrorBanner,IconButton,ScreenTitle} from '../components/UI';
 import {PageRefreshGuard} from '../lib/page-gesture';
+import {mergeRemotePages} from '../lib/page-sync';
 import {Icon} from '../components/Icon';
 import {PageCover,PageAppearance,PAGE_COVERS} from '../components/PageAppearance';
 import {PageTreeList} from '../components/PageTreeList';
@@ -25,6 +26,7 @@ const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'
 export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;active:boolean;storageScope:string;onDepthChange?:(open:boolean)=>void}){
  const c=useTheme(),[pages,setPages]=useState<Entity[]>([]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>()),[pageInteraction,setPageInteraction]=useState(false),[pageDragging,setPageDragging]=useState(false);
  const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null),[createParent,setCreateParent]=useState<Entity|null|undefined>(undefined);
+ const refreshFlight=useRef(false),mutationEpoch=useRef(0);
  const history=useRef<string[]>([]),mounted=useRef(true),expandDisk=useRef(Promise.resolve()),inputRefs=useRef(new Map<string,TextInput>());
  const backX=useRef(new Animated.Value(0)).current,selectedRef=useRef<string|null>(null),paneWidth=useRef(0),backAction=useRef<()=>void>(()=>{});
  const pageInteractionRef=useRef(false),refreshGuard=useRef(new PageRefreshGuard());
@@ -54,13 +56,30 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  const key='sofia.native.pages.v1:'+encodeURIComponent(SITE+'|'+storageScope);
  const store=useMemo(()=>new PageEditorStore({save:patch=>api.saveEntity(patch),read:id=>api.entity(id),
   persist:items=>items.length?AsyncStorage.setItem(key+':drafts',JSON.stringify(items)):AsyncStorage.removeItem(key+':drafts'),
-  onSaved:saved=>{if(mounted.current)setPages(prev=>prev.map(p=>p.id===saved.id?saved:p));}
+  onSaved:saved=>{mutationEpoch.current++;if(mounted.current)setPages(prev=>prev.map(p=>p.id===saved.id?saved:p));}
  }),[api,key]);
  useEffect(()=>store.subscribe(()=>setTick(v=>v+1)),[store]);
- async function load(manual=false){if(manual)setRefreshing(true);try{
-  const items:Entity[]=[];for(let offset=0;offset<10000;offset+=100){const r=await api.entities('user_page','',offset);items.push(...r.items.filter(x=>x.state!=='archived'));if(r.items.length<100)break;}
-  if(mounted.current){items.forEach(page=>store.open(page));setPages(items);setError('');}
- }catch(e){if(mounted.current)setError(errorText(e));}finally{if(manual&&mounted.current)setRefreshing(false);}}
+ async function load(manual=false){
+  if(refreshFlight.current||(!manual&&pageInteractionRef.current))return;
+  refreshFlight.current=true;const epoch=mutationEpoch.current;
+  if(manual)setRefreshing(true);
+  try{
+   const items:Entity[]=[];
+   for(let offset=0;offset<10000;offset+=100){const r=await api.entities('user_page','',offset);items.push(...r.items.filter(x=>x.state!=='archived'));if(r.items.length<100)break;if(offset===9900)throw Error('Há mais páginas do que esta sincronização consegue carregar. Nenhuma página foi removida.');}
+   if(mounted.current&&epoch===mutationEpoch.current){
+    items.forEach(page=>store.open(page));
+    setPages(prev=>mergeRemotePages(prev,items.map(p=>{const e=store.get(p.id);return e&&e.base.revision>p.revision?e.base:p;}),id=>{const e=store.get(id);return !!e&&e.state!=='saved';}));setError('');
+   }
+  }catch(e){if(mounted.current)setError(errorText(e));}
+  finally{refreshFlight.current=false;if(manual&&mounted.current)setRefreshing(false);}
+ }
+ const refreshLatest=useRef(load);refreshLatest.current=load;
+ useEffect(()=>{
+  if(!active||!ready)return;
+  const refresh=()=>{if(AppState.currentState==='active'&&!pageInteractionRef.current)void refreshLatest.current();};
+  refresh();const timer=setInterval(refresh,5000),subscription=AppState.addEventListener('change',state=>{if(state==='active')refresh();});
+  return()=>{clearInterval(timer);subscription.remove();};
+ },[active,ready,store]);
  useEffect(()=>{
   mounted.current=true;let alive=true;setReady(false);
   void Promise.all([AsyncStorage.getItem(key+':drafts'),AsyncStorage.getItem(key+':expanded')]).then(async([drafts,branches])=>{
@@ -77,6 +96,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  const byId=useMemo(()=>new Map(displayPages.map(p=>[p.id,p])),[displayPages]);
  const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of displayPages){const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const list of m.values())list.sort(comparePageOrder);return m;},[displayPages]);
  const entry=selectedId?store.get(selectedId):undefined;
+ useEffect(()=>{if(ready&&selectedId&&!byId.has(selectedId)&&store.get(selectedId)?.state==='saved'){history.current=history.current.filter(id=>byId.has(id));setSelectedId(null);setFocus(null);}},[ready,selectedId,byId,store]);
  const emptyBody=entry?pageBodyIsEmpty(entry.draft.blocks):true;
  const hasSubpageContent=!!(selectedId&&(children.get(selectedId)||[]).length);
  const showBodyGuide=emptyBody&&!hasSubpageContent;
@@ -88,7 +108,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   if(movingId||(!drop&&String(page.data?.parent_id||'')===parentId))return;
   if(!canParent(page.id,parentId)){setError('Essa página não pode ser colocada dentro dela mesma ou de uma subpágina dela.');return;}
   const before=pages;
-  setMovingId(page.id);setError('');
+  mutationEpoch.current++;setMovingId(page.id);setError('');
   setPages(old=>old.map(item=>item.id===page.id?reparentedPage(item,parentId):item));
   if(parentId)setExpanded(old=>{const next=new Set(old);next.add(parentId);const value=JSON.stringify([...next]);expandDisk.current=expandDisk.current.catch(()=>{}).then(()=>AsyncStorage.setItem(key+':expanded',value)).catch(()=>{});return next;});
   try{
@@ -96,7 +116,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
    const base=store.get(page.id)?.base||pages.find(item=>item.id===page.id);
    if(!base)throw new Error('Página não encontrada.');
    const result=await api.movePage({id:base.id,revision:base.revision,parentId,kind:drop?.kind||'inside',anchorId:drop?.anchorId||parentId});
-   const savedPages=result.items; savedPages.forEach(saved=>store.open(saved));
+   mutationEpoch.current++;const savedPages=result.items; savedPages.forEach(saved=>store.open(saved));
    if(mounted.current)setPages(old=>old.map(item=>savedPages.find(p=>p.id===item.id)||item));
   }catch(e){if(mounted.current){setPages(before);setError(errorText(e));}}
   finally{if(mounted.current)setMovingId(null);}
@@ -105,13 +125,13 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  function back(){if(selectedId)void store.flush(selectedId);setFocus(null);setAppearance(null);let id=history.current.pop();while(id&&!byId.has(id))id=history.current.pop();if(id)open(byId.get(id)!,false);else setSelectedId(null);} backAction.current=back;
  useEffect(()=>{if(!active)return;const sub=BackHandler.addEventListener('hardwareBackPress',()=>{if(!selectedId)return false;back();return true;});return()=>sub.remove();},[active,selectedId,byId,store]);
  function edit(change:(draft:PageDraft)=>PageDraft,group=''){if(selectedId)store.edit(selectedId,change,group);}
- async function create(parent?:Entity,template?:PageTemplate){try{
+ async function create(parent?:Entity,template?:PageTemplate){mutationEpoch.current++;try{
   const preset=template?freshTemplate(template):null;
   const saved=await api.saveEntity({kind:'user_page',title:'Sem título',content:'',area:parent?.area||'Pessoal',privacy:'private',state:'active',tags:[],data:{
    icon:'',icon_mode:'default',cover_type:'preset',cover_value:PAGE_COVERS[0][1],cover_attachment_id:'',
    purpose:'',layout:'notes',suggested:false,parent_id:parent?.id||'',node_type:parent?'page':'space',blocks_json:preset?JSON.stringify(preset.blocks):'[]'
   }});
-  if(!mounted.current)return;setPages(old=>[...old,saved]);open(saved);
+  if(!mounted.current)return;mutationEpoch.current++;setPages(old=>[...old,saved]);open(saved);
  }catch(e){setError(errorText(e));}}
  function applyTemplate(template:PageTemplate){if(!selectedId)return;const preset=freshTemplate(template);store.edit(selectedId,d=>({...d,blocks:insertTemplateBlocks(d.blocks,preset.blocks)}),'template');setFocus(null);setCreateParent(undefined);void store.flush(selectedId);}
  function updateBlock(block:PageBlock,patch:Partial<PageBlock>,group=''){edit(d=>({...d,blocks:d.blocks.map(b=>b.id===block.id?{...b,...patch}:b)}),group);}
@@ -122,7 +142,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   {text:'Cancelar',style:'cancel'},{text:'Usar versão do site',onPress:()=>void store.resolve(id,false)},{text:'Manter minhas alterações',onPress:()=>void store.resolve(id,true)}]);}
  function confirmDeletePage(page:Entity){const id=page.id;Alert.alert('Excluir página?','Excluir “'+page.title+'” e suas subpáginas também do site?',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{void(async()=>{
   const ids=new Set<string>();const collect=(key:string)=>{if(ids.has(key))return;ids.add(key);for(const p of children.get(key)||[])collect(p.id);};collect(id);
-  await Promise.all([...ids].map(key=>store.flush(key)));await api.deleteEntity(id);for(const key of ids)store.forget(key);
+  await Promise.all([...ids].map(key=>store.flush(key)));await api.deleteEntity(id);mutationEpoch.current++;for(const key of ids)store.forget(key);
   if(mounted.current){history.current=history.current.filter(key=>!ids.has(key));setPages(old=>old.filter(p=>!ids.has(p.id)));if(ids.has(selectedId||''))setSelectedId(null);setFocus(null);}
  })().catch(e=>setError(errorText(e)));}}]);}
  function removePage(){if(entry)confirmDeletePage(entry.base);}
@@ -206,7 +226,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
    </Pressable>
    <View style={{paddingHorizontal:30,marginTop:hasCover?-44:0}}>
     <Pressable accessibilityRole="button" accessibilityLabel="Alterar ícone da página" onPress={()=>setAppearance('icon')} style={{width:78,height:78,alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:58,color:c.text}}>{String(draft.appearance.icon||'📄')}</Text></Pressable>
-    <TextInput accessibilityLabel="Título da página" value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>void store.flush(selected.id)} multiline placeholder="Título" placeholderTextColor={placeholderColor} style={{minHeight:60,fontSize:38,lineHeight:44,fontWeight:'800',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}/>
+    <TextInput accessibilityLabel="Título da página" value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>void store.flush(selected.id)} multiline placeholder={pageTitleHint(emptyBody,hasSubpageContent,focus==='title')} placeholderTextColor={placeholderColor} style={{minHeight:60,fontSize:38,lineHeight:44,fontWeight:'800',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}/>
     {String(selected.data.purpose||'').trim()?<Text style={{fontSize:13,lineHeight:20,color:c.muted,marginBottom:12}}>{String(selected.data.purpose)}</Text>:null}
     <View style={{gap:2}}>{draft.blocks.map(blockView)}</View>
     {focus&&focus!=='title'?<View style={{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:4,paddingVertical:8}}>

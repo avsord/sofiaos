@@ -20,7 +20,7 @@ export const statusColorHex=(id:string)=>STATUS_COLORS.find(x=>x.id===id)?.hex||
 
 export const PAGE_TEMPLATES:PageTemplate[]=[
  {
-  id:'tasks_personal',title:'Tarefas pessoais',description:'Quadro de tarefas com status editáveis.',icon:'✅',
+  id:'tasks_personal',title:'Tarefas pessoal',description:'Quadro de tarefas com status editáveis.',icon:'✅',
   blocks:[block('collection','',{
    title:'',show_title:false,
    properties:[
@@ -32,7 +32,7 @@ export const PAGE_TEMPLATES:PageTemplate[]=[
   })]
  },
  {
-  id:'notes_hub',title:'Bloco de notas',description:'Área limpa para cadernos e notas.',icon:'📝',
+  id:'notes_hub',title:'Bloco de nota',description:'Área limpa para cadernos e notas.',icon:'📝',
   blocks:[
    block('heading2','Cadernos'),
    block('collection','',{

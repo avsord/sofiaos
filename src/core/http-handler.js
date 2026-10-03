@@ -11,7 +11,7 @@ const {OwnerAuth,normalizeEmail}=require('../services/owner-auth');
 const {AccountMailer}=require('../services/account-mailer');
 const {MobileSessions}=require('../services/mobile-sessions');
 const {makeMobileApi}=require('../channels/mobile');
-const STATIC={'/':['index.html','text/html; charset=utf-8'],'/index.html':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8'],'/ui-current.css':['ui-current.css','text/css; charset=utf-8']};
+const STATIC={'/md-page-projection.js':['md-page-projection.js','text/javascript; charset=utf-8'],'/md-upgrade.js':['md-upgrade.js','text/javascript; charset=utf-8'],'/md-upgrade.css':['md-upgrade.css','text/css; charset=utf-8'],'/':['index.html','text/html; charset=utf-8'],'/index.html':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8'],'/ui-current.css':['ui-current.css','text/css; charset=utf-8']};
 const PUBLIC_STATIC={'/login.js':['login.js','text/javascript; charset=utf-8'],'/whatsapp/connect':['whatsapp-connect.html','text/html; charset=utf-8'],'/whatsapp-connect.js':['whatsapp-connect.js','text/javascript; charset=utf-8'],'/whatsapp-connect.css':['whatsapp-connect.css','text/css; charset=utf-8'],'/site':['site.html','text/html; charset=utf-8'],'/terms':['terms.html','text/html; charset=utf-8'],'/data-deletion':['data-deletion.html','text/html; charset=utf-8']};
 function bodyJson(req,limitBytes=65536) {
   if(!/^application\/json(?:;|$)/i.test(req.headers['content-type'] || ''))return Promise.reject(new AppError('CONTENT_TYPE','Use JSON nesta operação.',415));
@@ -103,6 +103,8 @@ function decorateMessages(store,messages){const route=store.db.prepare('SELECT r
 function createHandler(runtime) {
   const {store,core,backups,config,usageService,audioService}=runtime;
   const extra=require('./api45').makeApi45(runtime,{bodyJson,json});
+  const mdApi=require('./md-api').makeMdApi(runtime,{bodyJson,json});
+  const mdCalendar=require('./md-api').getMdRuntime(runtime).calendar;
   const chatSync=require('../services/chat-sync').makeChatSyncApi(store,{bodyJson,json,client:'web',decorateRows:rows=>decorateMessages(store,rows)});
   const token=crypto.randomBytes(32).toString('hex');
   const ownerAuth=runtime.ownerAuth||new OwnerAuth(config,store),accountMailer=runtime.accountMailer||new AccountMailer(config);
@@ -129,6 +131,7 @@ function createHandler(runtime) {
     try {
       if(req.url.length>4096)throw new AppError('URL_TOO_LONG','Endereço grande demais.',414);
       if(!['GET','POST','PATCH','DELETE'].includes(m))throw new AppError('METHOD','Método não suportado.',405);
+      if(await mdCalendar.publicRoute(req,res,p,m,url))return;
       if(await mobileApi(req,res,p,m,url))return;
       if(m==='GET'&&p==='/login'){
         if(railwayEnv()&&validSession(req))return redirect(res,303,'/');
@@ -167,7 +170,7 @@ function createHandler(runtime) {
         revokeWebSessions();mobileSessions.revokeAll();return redirect(res,303,'/login?reset=1');
       }
       if(m==='GET'&&p==='/logout'){if(railwayEnv())clearSession(req,res);return redirect(res,303,railwayEnv()?'/login?logout=1':'/');}
-      if(m==='GET'&&p==='/health')return json(res,200,{ok:true,name:'Sofia OS',version:VERSION,storage:'sqlite-local'});
+      if(m==='GET'&&p==='/health')return json(res,200,{ok:true,name:'Sofia OS',version:VERSION,storage:'sqlite-local',md_upgrade:'0.3.26'});
       if(m==='GET'&&p==='/privacy')return plain(res,200,privacyPage(),'text/html; charset=utf-8');
       if(m==='GET'&&PUBLIC_STATIC[p]){const [file,type]=PUBLIC_STATIC[p];res.setHeader('Content-Type',type);res.end(fs.readFileSync(path.join(config.root,'public',file)));return;}
       if(m==='GET'&&p==='/whatsapp/onboarding-config'){if(!config.metaAppId||!config.metaLoginConfigId)throw new AppError('META_CONFIG_MISSING','Configure META_APP_ID e META_LOGIN_CONFIG_ID no servidor.',503);return json(res,200,{ok:true,appId:config.metaAppId,configId:config.metaLoginConfigId,graphVersion:config.metaGraphVersion,featureType:'whatsapp_business_app_onboarding',sessionInfoVersion:'3'});}
@@ -182,6 +185,7 @@ function createHandler(runtime) {
       if(m==='GET' && p==='/api/usage-status')return json(res,200,{ok:true,usage:await usageService.status()});
       if(m==='GET' && STATIC[p]) {const [f,type]=STATIC[p];res.setHeader('Content-Type',type);res.end(fs.readFileSync(path.join(config.root,'public',f)));return;}
       if(await chatSync(req,res,p,m,url))return;
+      if(await mdApi(req,res,p,m,url))return;
       if(await extra(req,res,p,m,url))return;
       if(m==='GET' && p==='/api/conversations')return json(res,200,{items:store.conversations(limitNumber(url.searchParams.get('limit'),100),limitNumber(url.searchParams.get('offset'),0,1000000))});
       if(m==='POST' && p==='/api/conversations') {const b=await bodyJson(req);const channel=store.settings().privacyMode==='test'?'test':(b.channel==='whatsapp-simulator'?'whatsapp-simulator':'web');return json(res,201,store.createConversation(b.title || 'Chat',channel));}
