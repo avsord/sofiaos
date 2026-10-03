@@ -1,42 +1,17 @@
 'use strict';
-const fs=require('node:fs'),path=require('node:path');
-const {AppError,atomicWrite}=require('../core/util');
+const {AppError}=require('../core/util');
 const {httpsFetch}=require('./http-client');
+const {loadPersistedCredentials,persistCredential,writableCredentialFile}=require('./credential-storage');
 const MODELS_ENDPOINT='https://api.openai.com/v1/models';
 const USAGE_ENDPOINT='https://api.openai.com/v1/organization/usage/completions';
-
 function normalize(route,value){
   if(!['private','shared','admin'].includes(route))throw new AppError('BAD_ROUTE','Destino inválido.');
   if(typeof value!=='string'||!/^sk-[A-Za-z0-9_-]{16,}$/.test(value.trim()))throw new AppError('BAD_KEY','Cole somente a chave completa, sem quebras de linha. Ela não foi salva.');
   return value.trim();
 }
-function credentialFile(config){return path.join(config.dataDir||path.join(config.root,'data'),'runtime-credentials.env');}
-function updateEnvFile(file,varName,key){
-  let text=fs.existsSync(file)?fs.readFileSync(file,'utf8'):'';
-  if(text.length>1024*1024)throw new AppError('BAD_ENV','Arquivo de configuração inesperado.');
-  const lines=text.split(/\r?\n/).filter(l=>!new RegExp('^\\s*'+varName+'\\s*=').test(l));
-  lines.push(varName+'='+key);
-  atomicWrite(file,Buffer.from(lines.join('\n').replace(/\n{3,}/g,'\n\n')+'\n'));
-}
-function loadPersistedCredentials(config){
-  const file=credentialFile(config);if(!fs.existsSync(file))return {private:false,shared:false,admin:false};
-  const text=fs.readFileSync(file,'utf8');if(text.length>1024*1024)throw new AppError('BAD_ENV','Arquivo de configuração inesperado.');
-  const found={};
-  for(const line of text.split(/\r?\n/)){const m=/^\s*(OPENAI_PRIVATE_API_KEY|OPENAI_SHARED_API_KEY|OPENAI_ADMIN_KEY)\s*=\s*(sk-[A-Za-z0-9_-]{16,})\s*$/.exec(line);if(m)found[m[1]]=m[2];}
-  if(!config.privateApiKey&&found.OPENAI_PRIVATE_API_KEY)config.privateApiKey=found.OPENAI_PRIVATE_API_KEY;
-  if(!config.sharedApiKey&&found.OPENAI_SHARED_API_KEY)config.sharedApiKey=found.OPENAI_SHARED_API_KEY;
-  if(!config.adminApiKey&&found.OPENAI_ADMIN_KEY)config.adminApiKey=found.OPENAI_ADMIN_KEY;
-  return {private:Boolean(config.privateApiKey),shared:Boolean(config.sharedApiKey),admin:Boolean(config.adminApiKey)};
-}
-function persist(config,route,key){
-  const varName=route==='private'?'OPENAI_PRIVATE_API_KEY':route==='shared'?'OPENAI_SHARED_API_KEY':'OPENAI_ADMIN_KEY';
-  updateEnvFile(path.join(config.root,'.env'),varName,key);
-  updateEnvFile(credentialFile(config),varName,key);
-  if(route==='private')config.privateApiKey=key;else if(route==='shared')config.sharedApiKey=key;else config.adminApiKey=key;
-}
 function saveCredential(config,route,value){
-  const key=normalize(route,value);persist(config,route,key);
-  return {saved:true,route,validated:false,notice:route==='admin'?'Chave Admin guardada na configuração persistente do servidor.':'Chave guardada na configuração persistente do servidor. A política de compartilhamento do projeto deve ser confirmada manualmente na OpenAI.'};
+  const key=normalize(route,value),result=persistCredential(config,route,key);
+  return {saved:true,route,validated:false,...result,notice:'Chave salva no armazenamento de credenciais do servidor. A política de compartilhamento do projeto deve ser confirmada manualmente na OpenAI.'};
 }
 function validationUrl(route){
   if(route!=='admin')return MODELS_ENDPOINT;
@@ -50,9 +25,7 @@ async function validateCredential(value,fetchImpl=null,timeoutMs=15000,route='pr
   try{
     const signal=AbortSignal.timeout(timeoutMs);
     response=await (fetchImpl||httpsFetch)(validationUrl(route),{method:'GET',redirect:'error',signal,headers:{Authorization:'Bearer '+key,Accept:'application/json'}});
-  }catch(error){
-    throw new AppError('KEY_TEST_NETWORK','Não foi possível validar a chave agora. Nenhuma alteração foi salva. Verifique sua conexão e tente novamente.',503,{cause:error?.message||''});
-  }
+  }catch(error){throw new AppError('KEY_TEST_NETWORK','Não foi possível validar a chave agora. Nenhuma alteração foi salva. Verifique sua conexão e tente novamente.',503);}
   if(response.status===401)throw new AppError('KEY_REJECTED','A OpenAI recusou esta chave. Nenhuma alteração foi salva.',401);
   if(response.status===403)throw new AppError('KEY_PERMISSION',route==='admin'?'A chave existe, mas não tem acesso ao Usage da organização. Use uma chave Admin da organização da OpenAI Platform.':'A chave existe, mas não tem permissão suficiente para o teste de projeto. Use uma chave com permissão All durante a configuração.',403);
   if(!response.ok)throw new AppError('KEY_TEST_FAILED','Não foi possível validar a chave agora (HTTP '+response.status+'). Nenhuma alteração foi salva.',503);
@@ -60,8 +33,9 @@ async function validateCredential(value,fetchImpl=null,timeoutMs=15000,route='pr
 }
 async function saveCredentialValidated(config,route,value,fetchImpl=null){
   const key=normalize(route,value);
+  writableCredentialFile(config);
   await validateCredential(key,fetchImpl,config.apiTimeoutMs?Math.min(config.apiTimeoutMs,20000):15000,route);
-  persist(config,route,key);
-  return {saved:true,validated:true,route,notice:route==='admin'?'Chave Admin validada no Usage da OpenAI e salva no .env local.':'Chave validada pela OpenAI e salva no .env local. Nenhuma mensagem pessoal foi enviada durante este teste.'};
+  const result=persistCredential(config,route,key);
+  return {saved:true,validated:true,route,...result,notice:'Chave validada e salva no armazenamento de credenciais do servidor. Nenhuma conversa pessoal foi enviada durante o teste.'};
 }
 module.exports={saveCredential,validateCredential,saveCredentialValidated,loadPersistedCredentials};
