@@ -1,0 +1,63 @@
+name: Publish Sofia 0.3.16 now
+on:
+  push:
+    branches: [sofia-app-android]
+    paths: ['.github/workflows/sofia-publish-0316-now.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: sofia-publish-0316-now
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SOURCE_RUN: '37094068267'
+      SOURCE_COMMIT: 'd90f3f3a457ccb6c8de0d29fbd97d91f68496610'
+      APK_SHA256: 'aa6ca75c9d3dd71f7c1d81414d37c90a373856aed106953ed20a07527d97aead'
+      APK_SIZE: '49805032'
+      TAG: 'sofia-android-v0.3.16'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout exact 0.3.16 source
+        uses: actions/checkout@v4
+        with:
+          ref: d90f3f3a457ccb6c8de0d29fbd97d91f68496610
+      - name: Download the already compiled 0.3.16 APK
+        uses: actions/download-artifact@v4
+        with:
+          name: Sofia-Android-APK
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 37094068267
+          path: dist
+      - name: Verify exact binary and source
+        run: |
+          test "$(cat dist/SOURCE_COMMIT.txt)" = "$SOURCE_COMMIT"
+          echo "$APK_SHA256  dist/Sofia-OS.apk" | sha256sum -c -
+          test "$(stat -c %s dist/Sofia-OS.apk)" = "$APK_SIZE"
+          test "$(node -p "require('./SOFIA_APP/package.json').version")" = '0.3.16'
+          test "$(node -p "require('./SOFIA_APP/app.json').expo.android.versionCode")" = '21'
+          test "$(node -p "require('./SOFIA_APP/app.json').expo.android.package")" = 'com.avsord.sofiaapp'
+      - name: Refuse to replace an existing 0.3.16 release
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; refusing replacement."
+            exit 1
+          fi
+      - name: Publish 0.3.16 immediately
+        run: |
+          gh release create "$TAG"             dist/Sofia-OS.apk dist/Sofia-OS.apk.sha256 dist/SOURCE_COMMIT.txt             --target "$SOURCE_COMMIT"             --repo "$GITHUB_REPOSITORY"             --latest             --title 'Sofia OS Android 0.3.16'             --notes-file SOFIA_APP/RELEASE_0.3.16.md
+      - name: Confirm public release
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > /tmp/release.json
+          node <<'NODE'
+          const r=require('/tmp/release.json');
+          const a=r.assets.find(x=>x.name==='Sofia-OS.apk');
+          const expected='sha256:aa6ca75c9d3dd71f7c1d81414d37c90a373856aed106953ed20a07527d97aead';
+          if(r.draft||r.prerelease||!r.published_at||!a||a.state!=='uploaded'||a.size!==49805032||a.digest!==expected) throw Error('Release verification failed');
+          console.log('PUBLISHED',r.tag_name,a.browser_download_url,a.digest);
+          NODE

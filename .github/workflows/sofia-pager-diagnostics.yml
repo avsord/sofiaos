@@ -1,0 +1,95 @@
+name: Sofia native pager diagnostics
+on:
+  push:
+    branches: [sofia-app-android]
+    paths: ['.github/workflows/sofia-pager-diagnostics.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: '409763ea39d556022ac5ffde06ea749d0e260c29'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Download unchanged production binary as a native test container
+        run: |
+          gh run download 37035516081 --repo "$GITHUB_REPOSITORY" -n Sofia-Android-APK -D original
+          test "$(cat original/SOURCE_COMMIT.txt)" = '409763ea39d556022ac5ffde06ea749d0e260c29'
+          mkdir -p evidence
+          sha256sum original/Sofia-OS.apk > evidence/production.sha256
+      - name: Instrument only the disposable fixture
+        working-directory: SOFIA_APP
+        run: |
+          npm ci
+          node <<'NODE'
+          const fs=require('node:fs');
+          function edit(p,fn){fs.writeFileSync(p,fn(fs.readFileSync(p,'utf8')));}
+          edit('src/components/TabPager.tsx',s=>s
+            .replace('const w=size.current,m=measured.current;','const w=size.current,m=measured.current;console.info("QA_ALIGN",JSON.stringify({w,m,selected:selection.current.current(),dragging:selection.current.isDragging()}));')
+            .replace('selection.current.select(next);','console.info("QA_SELECT",next);selection.current.select(next);')
+            .replace('const next=event.nativeEvent.layout.width;','const next=event.nativeEvent.layout.width;console.info("QA_PARENT_LAYOUT",next);')
+            .replace('const w=event.nativeEvent.layout.width;','const w=event.nativeEvent.layout.width;console.info("QA_NATIVE_LAYOUT",w);')
+            .replace('if(Math.abs(contentWidth-size.current*TAB_ORDER.length)>1)return;','console.info("QA_CONTENT_LAYOUT",contentWidth);if(Math.abs(contentWidth-size.current*TAB_ORDER.length)>1)return;')
+            .replace('if (latest.current.enabled) {selection.current.beginDrag();','console.info("QA_BEGIN",JSON.stringify(event.nativeEvent),latest.current.enabled);if (latest.current.enabled) {selection.current.beginDrag();')
+            .replace('if (!latest.current.enabled) {goTo','console.info("QA_FINISH",event.nativeEvent.contentOffset.x,selection.current.isDragging());if (!latest.current.enabled) {goTo')
+            .replace('return <View style={styles.fill} onLayout={layout}>','console.info("QA_RENDER",width,readyWidth,enabled);return <View style={styles.fill} onLayout={layout}>'));
+          edit('src/lib/menu-motion.ts',s=>s.replace('lastOffset=event.nativeEvent.contentOffset.x;}','lastOffset=event.nativeEvent.contentOffset.x;console.info("QA_SCROLL",lastOffset);}'));
+          edit('tests/native-pager-entry.tsx',s=>s.replace("<ThemeContext.Provider value={light}><SafeAreaView style={styles.root}>","<ThemeContext.Provider value={light}><SafeAreaView style={styles.root} onTouchStart={e=>console.info('QA_TOUCH_START',e.nativeEvent.pageX,e.nativeEvent.pageY)} onTouchMove={e=>console.info('QA_TOUCH_MOVE',e.nativeEvent.pageX,e.nativeEvent.pageY)} onTouchEnd={e=>console.info('QA_TOUCH_END',e.nativeEvent.pageX,e.nativeEvent.pageY)}>"));
+          NODE
+          mkdir -p /tmp/qa/assets
+          npx expo export:embed --platform android --entry-file ./tests/native-pager-entry.tsx --dev false --bundle-output /tmp/qa/assets/index.android.bundle --assets-dest /tmp/qa/resources
+      - name: Create a disposable diagnostic APK with an ephemeral test certificate
+        run: |
+          python3 <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          with ZipFile('original/Sofia-OS.apk') as src, ZipFile('/tmp/qa-unsigned.apk','w') as dst:
+            for info in src.infolist():
+              if info.filename.startswith('META-INF/'): continue
+              value=Path('/tmp/qa/assets/index.android.bundle').read_bytes() if info.filename=='assets/index.android.bundle' else src.read(info.filename)
+              dst.writestr(info,value)
+          PY
+          BUILD_TOOLS=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          keytool -genkeypair -keystore /tmp/qa-only.jks -alias fixture -storepass fixture-only -keypass fixture-only -dname 'CN=Disposable CI fixture' -keyalg RSA -validity 2
+          "$BUILD_TOOLS/zipalign" -f -P 16 4 /tmp/qa-unsigned.apk /tmp/qa-aligned.apk
+          "$BUILD_TOOLS/apksigner" sign --ks /tmp/qa-only.jks --ks-key-alias fixture --ks-pass pass:fixture-only --key-pass pass:fixture-only --out /tmp/Sofia-qa.apk /tmp/qa-aligned.apk
+          sha256sum -c evidence/production.sha256
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Trace first gesture and compare surface touch targets
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: false
+          script: |
+            adb install /tmp/Sofia-qa.apk
+            adb logcat -c
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            python3 -c 'exec("import subprocess,time,xml.etree.ElementTree as ET\nfrom pathlib import Path\na=lambda *args:subprocess.check_output([\"adb\",*args],timeout=30)\nout=Path(\"evidence\");time.sleep(5)\ndef shot(name):\n a(\"shell\",\"uiautomator\",\"dump\",\"/sdcard/trace.xml\");xml=a(\"shell\",\"cat\",\"/sdcard/trace.xml\");(out/(name+\".xml\")).write_bytes(xml);(out/(name+\".png\")).write_bytes(a(\"exec-out\",\"screencap\",\"-p\"));print(name,[(n.get(\"resource-id\"),n.get(\"selected\"),n.get(\"bounds\")) for n in ET.fromstring(xml).iter(\"node\") if \"qa-surface\" in n.get(\"resource-id\",\"\") or n.get(\"selected\")==\"true\"])\nshot(\"01-start\")\nfor name,y,dur in [(\"02-content-first\",180,350),(\"03-header\",58,350),(\"04-content-slower\",260,700)]:\n a(\"shell\",\"input\",\"swipe\",\"268\",str(y),\"51\",str(y),str(dur));time.sleep(1);shot(name)\na(\"shell\",\"input\",\"tap\",\"85\",\"540\");time.sleep(1);shot(\"05-tap-chat\")\na(\"shell\",\"input\",\"swipe\",\"268\",\"260\",\"51\",\"260\",\"350\");time.sleep(1);shot(\"06-content-after-tap\")\n(out/\"native.log\").write_bytes(a(\"logcat\",\"-d\",\"-s\",\"ReactNativeJS:V\",\"AndroidRuntime:E\"))\nprint((out/\"native.log\").read_text())\n")'
+      - name: Keep synthetic diagnostic evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sofia-pager-diagnostics
+          path: evidence/
+          retention-days: 7

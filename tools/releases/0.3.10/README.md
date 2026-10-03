@@ -1,0 +1,9 @@
+# Sofia 0.3.10 release source transport
+
+The eight numbered parts contain a single Brotli-compressed, base64-encoded JSON archive of two zero-context unified diffs and a before/after SHA-256 manifest. This preserves exact locally tested UTF-8 source while transferring it through the GitHub connector. It is not a runtime dependency and contains no credentials, personal data, executables or network bootstrap scripts.
+
+The SHA-256 of the decompressed JSON is `91d4fb9ffe441531a140842047041b24bb404ce5152e6f8303068223704b5d5c`. `apply.cjs` verifies that hash, validates every destination and every base checksum, preflights `git apply`, and verifies every output checksum. Concurrent edits are rejected, not overwritten. An already applied exact source is a no-op. The ordinary readable sources, tests, documentation and dependency locks are committed by the respective validation jobs before publication.
+
+Scope: 25 Android source/test/config files and 12 server/web/test/config files. Android retains com.avsord.sofiaapp, versionCode 15, the existing signing identity and release prefix sofia-android-v. The app changes include native continuous purple menu motion, automatic page saving and undo/redo, clean contextual editing, cover/icon editing, remembered closed/open subpages, shared chat refresh and long-press multiselect deletion. Server 141.0.0 adds authenticated shared owner conversation selection and deletion reconciliation, without changing password or private-filter settings.
+
+Local checks passed: 66 app model/interaction tests and 148 backend tests. These are not physical-device FPS measurements. CI additionally requires complete TypeScript checking, locked dependencies, APK compilation, install-over-0.3.9/login smoke validation and a deployed server reporting version 141.0.0 before release. The backend job uses main, never the stale backend files retained on the isolated Android branch. No historical documentation is deleted.

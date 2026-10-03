@@ -1,0 +1,84 @@
+name: Sofia cross-client validation
+on:
+  push:
+    branches: [sofia-app-android]
+    paths:
+      - 'tools/releases/0.3.10/**'
+      - '.github/workflows/sofia-cross-client-validation.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: sofia-server-141
+  cancel-in-progress: false
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout verified release input
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: input
+      - name: Checkout current backend without old app-branch server files
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: backend
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply checksum-verified server patch
+        run: node input/tools/releases/0.3.10/apply.cjs backend backend
+      - name: Install locked server dependencies
+        working-directory: backend
+        run: npm ci
+      - name: Test cross-client data, authentication, privacy and regressions
+        working-directory: backend
+        run: |
+          node --check public/app.js
+          node --check src/services/chat-sync.js
+          node --check src/channels/mobile.js
+          node --check src/core/http-handler.js
+          node --test tests/*.test.cjs
+      - name: Publish validated readable source to main without force
+        working-directory: backend
+        run: |
+          BASE=$(git rev-parse HEAD)
+          CURRENT=$(git ls-remote origin refs/heads/main | cut -f1)
+          test "$BASE" = "$CURRENT" || { echo 'Main advanced; refusing to overwrite concurrent changes.'; exit 1; }
+          git config user.name 'Sofia build'
+          git config user.email 'sofia-build@users.noreply.github.com'
+          # Workflow configuration is updated separately through the authorized GitHub connector.
+          # The Actions token has contents permission, not workflows permission.
+          git restore -- .github/workflows/sofia-main-validation.yml
+          git add -- package.json package-lock.json public src tests
+          if ! git diff --cached --quiet; then
+            git commit -m 'release(server): shared owner chat, deletion sync and explicit page expansion v141'
+            git push origin HEAD:refs/heads/main
+          fi
+          git rev-parse HEAD > /tmp/Sofia-server-source-commit.txt
+      - name: Retain exact readable server source
+        if: always()
+        working-directory: backend
+        run: zip -q -r /tmp/Sofia-server-141-source.zip src public tests package.json package-lock.json .github
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sofia-server-141-validated
+          path: |
+            /tmp/Sofia-server-141-source.zip
+            /tmp/Sofia-server-source-commit.txt
+          retention-days: 30
+      - name: Verify deployed server reaches version 141
+        run: |
+          for i in $(seq 1 60); do
+            body=$(curl --silent --show-error --max-time 15 https://sofiaos.up.railway.app/health || true)
+            echo "$body"
+            echo "$body" | grep -q '"version":"141.0.0"' && exit 0
+            sleep 10
+          done
+          echo 'Server deployment is not confirmed. Android release remains gated.'
+          exit 1

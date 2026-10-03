@@ -1,0 +1,71 @@
+name: Sofia 0.3.15 in-app update verification
+on:
+  push:
+    branches: [sofia-app-android]
+    paths: ['.github/workflows/sofia-0315-update-dialog.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require published 0.3.15 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/$GITHUB_REPOSITORY/releases/tags/sofia-android-v0.3.15 > /tmp/release.json
+          node -e "const r=require('/tmp/release.json'),a=r.assets.find(x=>x.name==='Sofia-OS.apk');if(r.draft||r.prerelease||!r.published_at||!a||a.state!=='uploaded'||!a.size)throw Error('0.3.15 not published')"
+          curl -fsSL https://github.com/avsord/sofiaos/releases/download/sofia-android-v0.3.14/Sofia-OS.apk -o /tmp/Sofia-0.3.14.apk
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Verify original 0.3.14 shows Atualizar for 0.3.15
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: false
+          script: |
+            adb install --no-incremental /tmp/Sofia-0.3.14.apk
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            python3 - <<'PY'
+            import re,subprocess,time,xml.etree.ElementTree as ET
+            def adb(*a):return subprocess.check_output(['adb',*a],timeout=25)
+            def dump():
+              adb('shell','uiautomator','dump','/sdcard/u.xml')
+              return ET.fromstring(adb('shell','cat','/sdcard/u.xml'))
+            def bounds(n):
+              return list(map(int,re.findall(r'-?\d+',n.get('bounds',''))))
+            def visible(n):
+              b=bounds(n);return len(b)==4 and b[2]>b[0] and b[3]>b[1]
+            for attempt in range(35):
+              time.sleep(1)
+              root=dump()
+              launcher=next((n for n in root.iter('node') if n.get('text')=="Pixel Launcher isn't responding"),None)
+              if launcher is not None:
+                close=next((n for n in root.iter('node') if n.get('text')=='Close app' and visible(n)),None)
+                if close:
+                  x1,y1,x2,y2=bounds(close);adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2));continue
+              nodes=[n for n in root.iter('node') if n.get('package')=='com.avsord.sofiaapp']
+              texts=[n.get('text','') for n in nodes]
+              button=any(n.get('class')=='android.widget.Button' and n.get('text','').strip().casefold()=='atualizar' and n.get('enabled')=='true' and visible(n) for n in nodes)
+              version=any('Instalada: 0.3.14' in t and 'Disponível: 0.3.15' in t for t in texts)
+              if button and 'Atualização disponível' in texts and version:
+                adb('exec-out','screencap','-p') > open('/tmp/update.png','wb')
+                print('PASS: published 0.3.14 offers 0.3.15 with Atualizar')
+                raise SystemExit(0)
+            adb('exec-out','screencap','-p') > open('/tmp/update-failure.png','wb')
+            raise AssertionError('0.3.14 did not show the 0.3.15 update dialog')
+            PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sofia-0.3.15-update-proof
+          path: /tmp/update*.png
+          retention-days: 14

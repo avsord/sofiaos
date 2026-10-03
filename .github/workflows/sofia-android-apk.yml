@@ -1,0 +1,171 @@
+name: Sofia Android APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [sofia-app-android]
+    paths:
+      - 'SOFIA_APP/**'
+      - 'tools/releases/0.3.12/**'
+      - '.github/workflows/sofia-android-apk.yml'
+permissions:
+  contents: write
+concurrency:
+  group: sofia-android-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    defaults:
+      run:
+        working-directory: SOFIA_APP
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_PUBLIC_API_URL: https://sofiaos.up.railway.app
+    steps:
+      - name: Checkout isolated app branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Apply exact reviewed release source once
+        run: |
+          if [ "$(node -p "require('./package.json').version")" = '0.3.11' ]; then
+            node ../tools/releases/0.3.12/apply.cjs ..
+          fi
+      - name: Apply checked source normalization
+        run: node tools/normalize-source.cjs
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Full TypeScript validation
+        run: npm run check
+      - name: Application, initial layout and updater regression tests
+        run: npm test
+      - name: Persist validated source and lock without overwriting concurrent changes
+        run: |
+          cd ..
+          git config user.name 'Sofia build'
+          git config user.email 'sofia-build@users.noreply.github.com'
+          git add -- SOFIA_APP
+          if ! git diff --cached --quiet; then
+            git commit -m 'build: normalize validated Android version metadata [skip ci]'
+            git push origin HEAD:refs/heads/sofia-app-android
+          fi
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --clean
+      - name: Build standalone internal APK with bundled JavaScript
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a,x86_64
+      - name: Stage production APK and verify no CI fixture was bundled
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/release/app-release.apk dist/Sofia-OS.apk
+          unzip -p dist/Sofia-OS.apk assets/index.android.bundle > /tmp/sofia-production.bundle
+          test -s /tmp/sofia-production.bundle
+          ! grep -aq 'SOFIA_NATIVE_PAGER_FIXTURE_ONLY' /tmp/sofia-production.bundle
+          sha256sum dist/Sofia-OS.apk > dist/Sofia-OS.apk.sha256
+          git rev-parse HEAD > dist/SOURCE_COMMIT.txt
+          printf 'Release-mode bundle; existing signing identity. Separate CI fixture APK is never published.\n' > dist/BUILD_SCOPE.txt
+      - name: Build separate real-component pager fixture with synthetic data only
+        run: |
+          cp index.ts /tmp/sofia-production-index.ts
+          trap 'cp /tmp/sofia-production-index.ts index.ts' EXIT
+          printf "import './tests/native-pager-entry';\n" > index.ts
+          (cd android && ./gradlew :app:assembleRelease --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a,x86_64)
+          cp android/app/build/outputs/apk/release/app-release.apk /tmp/Sofia-pager-qa.apk
+          cp /tmp/sofia-production-index.ts index.ts
+          git diff --exit-code -- index.ts
+          sha256sum -c dist/Sofia-OS.apk.sha256
+      - name: Enable KVM for Android tests
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Native initial pager and editor checks then production upgrade over 0.3.12
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: false
+          script: |
+            adb install /tmp/Sofia-pager-qa.apk
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            python3 SOFIA_APP/tools/native-pager-smoke.py
+            adb uninstall com.avsord.sofiaapp
+            sh -lc 'curl -fsSL "https://github.com/avsord/sofiaos/releases/download/sofia-android-v0.3.12/Sofia-OS.apk" -o /tmp/Sofia-0.3.12.apk && adb install /tmp/Sofia-0.3.12.apk && adb install -r SOFIA_APP/dist/Sofia-OS.apk'
+            adb logcat -c
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            sleep 15
+            adb shell pidof com.avsord.sofiaapp
+            adb shell uiautomator dump /sdcard/sofia-login.xml
+            adb pull /sdcard/sofia-login.xml SOFIA_APP/dist/login-ui.xml
+            adb exec-out screencap -p > SOFIA_APP/dist/login-screen.png
+            adb logcat -d -s ReactNativeJS:E AndroidRuntime:E > SOFIA_APP/dist/native-errors.txt
+            ! grep -q 'FATAL EXCEPTION' SOFIA_APP/dist/native-errors.txt
+            grep -q 'Sofia OS' SOFIA_APP/dist/login-ui.xml
+            grep -q 'Entrar' SOFIA_APP/dist/login-ui.xml
+      - name: Require the compatible chat-sync server before publishing
+        run: |
+          curl --fail --silent --show-error --max-time 20 https://sofiaos.up.railway.app/health > /tmp/sofia-health.json
+          node -e "const h=require('/tmp/sofia-health.json');if(!h.ok||Number(h.version.split('.')[0])<141)throw Error('Compatible server not deployed');console.log(h)"
+      - name: Publish exact tested APK and verify latest discovery
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/publish-release.cjs
+      - name: Verify public update using the exact old 0.3.11 updater and the new one
+        run: |
+          git fetch --depth=1 origin b79f8a564b0282a293b87e571fd7788da0d7f368
+          git show b79f8a564b0282a293b87e571fd7788da0d7f368:SOFIA_APP/src/lib/update.ts > /tmp/sofia-updater-0.3.11.ts
+          node <<'NODE'
+          const fs=require('node:fs'),ts=require('typescript'),vm=require('node:vm');
+          (async()=>{const version=require('./package.json').version;
+          for(const file of ['/tmp/sofia-updater-0.3.11.ts','src/lib/update.ts']){
+            const exports={};const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+            vm.runInNewContext(source,{exports,fetch,AbortController,setTimeout,clearTimeout,Date,Error,Promise});
+            const next=await exports.checkForUpdate({currentVersion:'0.3.11'});if(next?.version!==version)throw Error('Old updater does not offer '+version);console.log(file,'0.3.11 ->',next.version,next.url);
+          }})().catch(error=>{console.error(error);process.exitCode=1;});
+          NODE
+      - name: Verify update dialog inside the published 0.3.12 Android app
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: false
+          script: |
+            adb uninstall com.avsord.sofiaapp || true
+            adb install /tmp/Sofia-0.3.12.apk
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            python3 SOFIA_APP/tools/native-update-smoke.py
+      - name: Upload production APK and native test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sofia-Android-APK
+          path: SOFIA_APP/dist/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Pack exact source and dependency lock
+        if: always()
+        run: |
+          cd ..
+          zip -q -r /tmp/Sofia-app-source.zip SOFIA_APP -x '*/node_modules/*' '*/android/*' '*/.expo/*' '*/dist/*' '*.keystore' '*.jks' '*/__pycache__/*'
+      - name: Retain source build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sofia-app-source-validated
+          path: /tmp/Sofia-app-source.zip
+          retention-days: 30
