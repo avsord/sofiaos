@@ -1,5 +1,5 @@
 import React,{useMemo,useRef,useState} from 'react';
-import {Animated,PanResponder,Pressable,Text,View} from 'react-native';
+import {Animated,Pressable,Text,View} from 'react-native';
 import type {Entity} from '../lib/types';
 import {useTheme} from '../lib/theme';
 import {Icon} from './Icon';
@@ -60,28 +60,35 @@ function TreeRow({page,children,expanded,toggle,onOpen,ancestors,compact,draggin
   if(ancestors.includes(page.id)||ancestors.length>40)return null;
   const kids=children.get(page.id)||[],open=compact?true:expanded.has(page.id),isTarget=targetId===page.id,isDragging=draggingId===page.id;
   const pageLabel=String(page.data?.parent_id||'')?'Abrir subpágina '+page.title:'Abrir página principal '+page.title;
-  const handlers=useMemo(()=>PanResponder.create({
-    onStartShouldSetPanResponder:()=>false,
-    onMoveShouldSetPanResponder:(_e,g)=>Math.abs(g.dx)+Math.abs(g.dy)>7,
-    onMoveShouldSetPanResponderCapture:(_e,g)=>Math.abs(g.dx)+Math.abs(g.dy)>7,
-    onPanResponderGrant:(_e,g)=>{draggingRef.current=true;pan.stopAnimation();pan.setValue({x:g.dx,y:g.dy});onStart(page);},
-    onPanResponderMove:(_e,g)=>{pan.setValue({x:g.dx,y:g.dy});onMove(page,g.moveX,g.moveY);},
-    onPanResponderRelease:(_e,g)=>{onEnd(page,g.moveX,g.moveY,g.dx);draggingRef.current=false;Animated.spring(pan,{toValue:{x:0,y:0},useNativeDriver:true,speed:28,bounciness:4}).start();},
-    onPanResponderTerminate:(_e,g)=>{onEnd(page,g.moveX,g.moveY,g.dx);draggingRef.current=false;Animated.spring(pan,{toValue:{x:0,y:0},useNativeDriver:true,speed:28,bounciness:4}).start();},
-    onPanResponderTerminationRequest:()=>false,
-    onShouldBlockNativeResponder:()=>true
-  }),[page,onStart,onMove,onEnd,pan]);
+  const reset=()=>Animated.spring(pan,{toValue:{x:0,y:0},useNativeDriver:true,speed:28,bounciness:4}).start();
   return <View>
-    <Animated.View {...handlers.panHandlers} ref={node=>register(page.id,node as unknown as View|null)} collapsable={false}
+    <Animated.View ref={node=>register(page.id,node as unknown as View|null)} collapsable={false}
       accessible accessibilityRole="button" accessibilityLabel={pageLabel} accessibilityHint={'Arraste para reorganizar '+page.title}
-      onTouchStart={e=>{touch.current={x:e.nativeEvent.pageX,y:e.nativeEvent.pageY};onInteractionChange?.(true);}}
-      onTouchEnd={e=>{const dx=e.nativeEvent.pageX-touch.current.x,dy=e.nativeEvent.pageY-touch.current.y;if(!draggingRef.current&&Math.abs(dx)+Math.abs(dy)<7)onOpen(page);if(!draggingRef.current)onInteractionChange?.(false);}}
-      onTouchCancel={()=>{if(!draggingRef.current)onInteractionChange?.(false);}}
+      onStartShouldSetResponderCapture={e=>!(kids.length&&!compact&&e.nativeEvent.locationX<32)}
+      onStartShouldSetResponder={e=>!(kids.length&&!compact&&e.nativeEvent.locationX<32)}
+      onResponderGrant={e=>{touch.current={x:e.nativeEvent.pageX,y:e.nativeEvent.pageY};draggingRef.current=false;onInteractionChange?.(true);pan.stopAnimation();pan.setValue({x:0,y:0});}}
+      onResponderMove={e=>{
+        const dx=e.nativeEvent.pageX-touch.current.x,dy=e.nativeEvent.pageY-touch.current.y;
+        if(!draggingRef.current&&Math.abs(dx)+Math.abs(dy)>7){draggingRef.current=true;onStart(page);}
+        if(draggingRef.current){pan.setValue({x:dx,y:dy});onMove(page,e.nativeEvent.pageX,e.nativeEvent.pageY);}
+      }}
+      onResponderRelease={e=>{
+        const dx=e.nativeEvent.pageX-touch.current.x,dy=e.nativeEvent.pageY-touch.current.y;
+        if(draggingRef.current)onEnd(page,e.nativeEvent.pageX,e.nativeEvent.pageY,dx);
+        else if(Math.abs(dx)+Math.abs(dy)<7)onOpen(page);
+        draggingRef.current=false;onInteractionChange?.(false);reset();
+      }}
+      onResponderTerminate={e=>{
+        const dx=e.nativeEvent.pageX-touch.current.x;
+        if(draggingRef.current)onEnd(page,e.nativeEvent.pageX,e.nativeEvent.pageY,dx);
+        draggingRef.current=false;onInteractionChange?.(false);reset();
+      }}
+      onResponderTerminationRequest={()=>false}
       style={{flexDirection:'row',alignItems:'center',paddingLeft:Math.min(ancestors.length,6)*(compact?14:16),borderRadius:9,
         backgroundColor:isTarget?c.accentSoft:'transparent',opacity:isDragging?.55:1,zIndex:isDragging?50:1,elevation:isDragging?16:0,
         transform:[...pan.getTranslateTransform(),{scale:isDragging?1.04:1}]}}>
       {!compact&&kids.length?<Pressable accessibilityRole="button" accessibilityLabel={open?'Recolher subpáginas de '+page.title:'Expandir subpáginas de '+page.title}
-        accessibilityState={{expanded:open}} onPress={e=>{e.stopPropagation();toggle(page.id);}} style={{width:28,minHeight:46,justifyContent:'center',alignItems:'center'}}>
+        accessibilityState={{expanded:open}} onPress={()=>toggle(page.id)} style={{width:28,minHeight:46,justifyContent:'center',alignItems:'center'}}>
         <View style={{transform:[{rotate:open?'90deg':'0deg'}]}}><Icon name="chevron" size={14} color={c.muted}/></View>
       </Pressable>:!compact?<View style={{width:28}}/>:null}
       <Text pointerEvents="none" style={{fontSize:22,color:c.text,width:34,textAlign:'center'}}>{iconFor(page)}</Text>
