@@ -35,3 +35,10 @@ test('page long press exposes delete without making a downward outdent jump stra
  assert.ok(tree.includes('else if(wasChild&&dy>18&&previousLevel!==parentId'));
  assert.ok(tree.includes("const previousLevel=parent?String(parent.data?.parent_id||''):''"));
 });
+
+test('page back swipe reveals the actual previous page instead of the pages list',()=>{
+ const src=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
+ assert.ok(src.includes('const previousBackdrop=previousEntry&&previousPage'));
+ assert.ok(src.includes('{previousBackdrop}'));
+ assert.ok(!src.includes("return <View style={{flex:1,backgroundColor:c.bg}} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>\n  {listView}\n  <Animated.View"));
+});
