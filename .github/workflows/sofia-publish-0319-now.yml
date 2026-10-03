@@ -1,4 +1,4 @@
-name: Publish Sofia 0.3.21 now
+name: Publish Sofia 0.3.22 now
 on:
   push:
     branches: [sofia-app-android]
@@ -22,10 +22,10 @@ jobs:
       EXPO_PUBLIC_API_URL: https://sofiaos.up.railway.app
       GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Checkout exact 0.3.21 source
+      - name: Checkout exact 0.3.22 source
         uses: actions/checkout@v4
         with:
-          ref: ab1b416a2a7219eba07ff771b5e1e5991d277733
+          ref: 312bab1f854dce97baffcc97177c5cdc1ad8f33c
           fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
@@ -42,7 +42,7 @@ jobs:
           npm test
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean
-      - name: Build 0.3.21 release APK
+      - name: Build 0.3.22 release APK
         run: |
           cd android
           chmod +x gradlew
@@ -56,25 +56,25 @@ jobs:
           ! grep -aq 'SOFIA_NATIVE_PAGER_FIXTURE_ONLY' /tmp/sofia-production.bundle
           sha256sum dist/Sofia-OS.apk > dist/Sofia-OS.apk.sha256
           git rev-parse HEAD > dist/SOURCE_COMMIT.txt
-          test "$(node -p "require('./package.json').version")" = '0.3.21'
-          test "$(node -p "require('./app.json').expo.android.versionCode")" = '26'
+          test "$(node -p "require('./package.json').version")" = '0.3.22'
+          test "$(node -p "require('./app.json').expo.android.versionCode")" = '27'
           test "$(node -p "require('./app.json').expo.android.package")" = 'com.avsord.sofiaapp'
           ! grep -q "template_id:" src/screens/Pages.tsx
       - name: Require synchronized site/server v142
         run: |
           curl --fail --silent --show-error --max-time 20 https://sofiaos.up.railway.app/health > /tmp/health.json
           node -e "const h=require('/tmp/health.json');if(!h.ok||h.version!=='142.0.0')throw Error('Site/server v142 is not deployed');console.log(h)"
-      - name: Publish exact 0.3.21 APK
+      - name: Publish exact 0.3.22 APK
         run: node tools/publish-release.cjs
-      - name: Confirm 0.3.19 detects 0.3.21
+      - name: Confirm 0.3.19 detects 0.3.22
         run: |
           node <<'NODE'
           const fs=require('node:fs'),ts=require('typescript'),vm=require('node:vm');
           (async()=>{
             const exports={};const source=ts.transpileModule(fs.readFileSync('src/lib/update.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
             vm.runInNewContext(source,{exports,fetch,AbortController,setTimeout,clearTimeout,Date,Error,Promise});
-            const next=await exports.checkForUpdate({currentVersion:'0.3.20'});
-            if(next?.version!=='0.3.21')throw Error('0.3.20 does not see 0.3.21');
+            const next=await exports.checkForUpdate({currentVersion:'0.3.21'});
+            if(next?.version!=='0.3.22')throw Error('0.3.21 does not see 0.3.22');
             console.log('UPDATE',next.version,next.url);
           })().catch(e=>{console.error(e);process.exitCode=1});
           NODE
@@ -82,7 +82,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Sofia-Android-0.3.21
+          name: Sofia-Android-0.3.22
           path: SOFIA_APP/dist/
           if-no-files-found: warn
           retention-days: 30
