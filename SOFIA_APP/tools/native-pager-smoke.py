@@ -56,16 +56,24 @@ def tap(name,attr='content-desc'):
     _,n=wait(name,attr);x1,y1,x2,y2=bounds(n)
     adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2))
 
+def finger_drag(x1,y1,x2,y2,steps=12):
+    adb('shell','input','motionevent','DOWN',str(x1),str(y1))
+    time.sleep(.12)
+    for i in range(1,steps+1):
+        t=i/steps;x=round(x1+(x2-x1)*t);y=round(y1+(y2-y1)*t)
+        adb('shell','input','motionevent','MOVE',str(x),str(y))
+        time.sleep(.045)
+    adb('shell','input','motionevent','UP',str(x2),str(y2))
+    time.sleep(1.2)
+
 def drag(source,target):
     _,a=wait(source);_,b=wait(target)
     ax1,ay1,ax2,ay2=bounds(a);bx1,by1,bx2,by2=bounds(b)
-    adb('shell','input','swipe',str((ax1+ax2)//2),str((ay1+ay2)//2),str((bx1+bx2)//2),str((by1+by2)//2),'1100')
-    time.sleep(1.2)
+    finger_drag((ax1+ax2)//2,(ay1+ay2)//2,(bx1+bx2)//2,(by1+by2)//2)
 
 def drag_left(source):
     _,a=wait(source);ax1,ay1,ax2,ay2=bounds(a)
-    adb('shell','input','swipe',str((ax1+ax2)//2),str((ay1+ay2)//2),'4',str((ay1+ay2)//2),'1100')
-    time.sleep(1.2)
+    finger_drag((ax1+ax2)//2,(ay1+ay2)//2,4,(ay1+ay2)//2)
 
 def shot(name,root=None):
     (OUT/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'))
