@@ -1,0 +1,36 @@
+name: Sofia MD workspace
+on:
+  push:
+    branches: [work/md-alteracoes-1-10]
+    paths: ['.github/workflows/sofia-md-workspace.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Export tracked source only
+        run: git archive --format=zip HEAD -o /tmp/sofia-md-source.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sofia-md-source
+          path: /tmp/sofia-md-source.zip
+          retention-days: 7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked dependencies for isolated validation
+        run: |
+          npm ci
+          cd SOFIA_APP
+          npm ci
+      - name: Pack dependencies only
+        run: tar czf /tmp/sofia-md-dependencies.tgz node_modules SOFIA_APP/node_modules
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sofia-md-dependencies
+          path: /tmp/sofia-md-dependencies.tgz
+          retention-days: 3
