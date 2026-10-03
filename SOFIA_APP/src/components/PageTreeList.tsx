@@ -40,15 +40,6 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
     if(dragId.current!==page.id)return;
     setTarget(targetAt(page,x,y));
   };
-  const fallbackTarget=(page:Entity,dy:number)=>{
-    if(Math.abs(dy)<18)return null;
-    const measured=[...rects.current.entries()].sort((a,b)=>a[1].y-b[1].y).map(([id])=>id);
-    const ids=measured.length>1?measured:[...rows.current.keys()];
-    const from=ids.indexOf(page.id);if(from<0)return null;
-    const step=Math.max(1,Math.round(Math.abs(dy)/(compact?40:46))),index=Math.max(0,Math.min(ids.length-1,from+(dy>0?step:-step)));
-    const candidate=ids[index];
-    return candidate&&candidate!==page.id&&canParent(page.id,candidate)?candidate:null;
-  };
   const pageById=(id:string)=>{
     for(const p of roots)if(p.id===id)return p;
     for(const list of children.values())for(const p of list)if(p.id===id)return p;
