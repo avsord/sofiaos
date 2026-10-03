@@ -61,6 +61,7 @@ test('writing hint disappears after the page has a real title and blank body sto
 
 test('draggable page rows own touches before the menu pager can steal them',()=>{
  const tree=fs.readFileSync(path.join(__dirname,'../src/components/PageTreeList.tsx'),'utf8');
- assert.ok(tree.includes("onStartShouldSetResponderCapture"));\n assert.ok(tree.includes("onResponderGrant={e=>{touch.current={x:e.nativeEvent.pageX,y:e.nativeEvent.pageY};draggingRef.current=false;onInteractionChange?.(true);"));
+ assert.ok(tree.includes("onStartShouldSetResponderCapture"));
+ assert.ok(tree.includes("onResponderGrant={e=>{touch.current={x:e.nativeEvent.pageX,y:e.nativeEvent.pageY};draggingRef.current=false;onInteractionChange?.(true);"));
  assert.ok(tree.includes("onInteractionChange?.(false)"));
 });
