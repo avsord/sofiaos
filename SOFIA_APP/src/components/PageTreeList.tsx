@@ -13,13 +13,14 @@ type Props={
   onOpen:(page:Entity)=>void;
   onMove:(page:Entity,parentId:string)=>Promise<void>|void;
   canParent:(pageId:string,parentId:string)=>boolean;
+  onDelete?:(page:Entity)=>void;
   compact?:boolean;
   onInteractionChange?:(active:boolean)=>void;
 };
 const iconFor=(page:Entity)=>String(page.data?.icon||'').trim()||'📄';
 const hit=(rect:Rect|null,x:number,y:number)=>!!rect&&x>=rect.x&&x<=rect.x+rect.width&&y>=rect.y&&y<=rect.y+rect.height;
 
-export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canParent,compact=false,onInteractionChange}:Props){
+export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canParent,onDelete,compact=false,onInteractionChange}:Props){
   const rows=useRef(new Map<string,View>()),rects=useRef(new Map<string,Rect>()),listRef=useRef<View|null>(null),listRect=useRef<Rect|null>(null),dragId=useRef('');
   const [dragging,setDragging]=useState<Entity|null>(null),[target,setTarget]=useState<string|null>(null);
   const measureRow=(id:string)=>{
@@ -60,14 +61,14 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
   return <View ref={node=>{listRef.current=node;}} collapsable={false} style={{position:'relative'}}>
     {roots.map(page=><TreeRow key={page.id} page={page} children={children} expanded={expanded} toggle={toggle} onOpen={onOpen}
       ancestors={[]} compact={compact} draggingId={dragging?.id||''} targetId={target||''} register={(id,node)=>{if(node){rows.current.set(id,node);requestAnimationFrame(()=>measureRow(id));}else{rows.current.delete(id);rects.current.delete(id);}}} measure={measureRow}
-      onStart={start} onMove={move} onEnd={finish} onInteractionChange={onInteractionChange}/>)}
+      onStart={start} onMove={move} onEnd={finish} onDelete={onDelete} onInteractionChange={onInteractionChange}/>)}
   </View>;
 }
 
-function TreeRow({page,children,expanded,toggle,onOpen,ancestors,compact,draggingId,targetId,register,measure,onStart,onMove,onEnd,onInteractionChange}:{
+function TreeRow({page,children,expanded,toggle,onOpen,ancestors,compact,draggingId,targetId,register,measure,onStart,onMove,onEnd,onDelete,onInteractionChange}:{
   page:Entity;children:Map<string,Entity[]>;expanded:Set<string>;toggle:(id:string)=>void;onOpen:(page:Entity)=>void;ancestors:string[];compact:boolean;
   draggingId:string;targetId:string;register:(id:string,node:View|null)=>void;measure:(id:string)=>void;onStart:(page:Entity)=>void;onMove:(page:Entity,x:number,y:number)=>void;
-  onEnd:(page:Entity,x:number,y:number,dx:number,dy:number)=>void;onInteractionChange?:(active:boolean)=>void;
+  onEnd:(page:Entity,x:number,y:number,dx:number,dy:number)=>void;onDelete?:(page:Entity)=>void;onInteractionChange?:(active:boolean)=>void;
 }){
   const c=useTheme(),pan=useRef(new Animated.ValueXY()).current,startPoint=useRef({x:0,y:0}),lastPoint=useRef({x:0,y:0}),draggingRef=useRef(false),suppressPress=useRef(false);
   if(ancestors.includes(page.id)||ancestors.length>40)return null;
@@ -85,7 +86,7 @@ function TreeRow({page,children,expanded,toggle,onOpen,ancestors,compact,draggin
       <Pressable accessible accessibilityRole="button" accessibilityLabel={pageLabel} accessibilityHint={'Segure e arraste para reorganizar '+page.title}
         delayLongPress={180} pressRetentionOffset={{top:500,right:500,bottom:500,left:500}}
         onPressIn={e=>{const p={x:e.nativeEvent.pageX,y:e.nativeEvent.pageY};startPoint.current=p;lastPoint.current=p;}}
-        onLongPress={()=>{suppressPress.current=true;draggingRef.current=true;pan.stopAnimation();pan.setValue({x:0,y:0});onStart(page);onInteractionChange?.(true);}}
+        onLongPress={()=>{suppressPress.current=true;if(onDelete)onDelete(page);else{draggingRef.current=true;pan.stopAnimation();pan.setValue({x:0,y:0});onStart(page);onInteractionChange?.(true);}}}
         onTouchMove={e=>{const x=e.nativeEvent.pageX,y=e.nativeEvent.pageY;lastPoint.current={x,y};if(draggingRef.current){const dx=x-startPoint.current.x,dy=y-startPoint.current.y;pan.setValue({x:dx,y:dy});onMove(page,x,y);}}}
         onPressOut={e=>{const x=e.nativeEvent.pageX||lastPoint.current.x,y=e.nativeEvent.pageY||lastPoint.current.y;finishDrag(x,y);}}
         onPress={()=>{if(suppressPress.current){suppressPress.current=false;return;}onOpen(page);}}
@@ -105,6 +106,6 @@ function TreeRow({page,children,expanded,toggle,onOpen,ancestors,compact,draggin
     </View>
     {open?kids.map(child=><TreeRow key={child.id} page={child} children={children} expanded={expanded} toggle={toggle} onOpen={onOpen}
       ancestors={[...ancestors,page.id]} compact={compact} draggingId={draggingId} targetId={targetId} register={register} measure={measure}
-      onStart={onStart} onMove={onMove} onEnd={onEnd} onInteractionChange={onInteractionChange}/>):null}
+      onStart={onStart} onMove={onMove} onEnd={onEnd} onDelete={onDelete} onInteractionChange={onInteractionChange}/>):null}
   </View>;
 }
