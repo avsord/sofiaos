@@ -12,5 +12,7 @@ Correções em Páginas:
 - Arrastar continua disponível: segure e mova.
 - Ao tirar uma página de uma subpágina arrastando para baixo, ela sobe somente um nível na hierarquia.
 - Ela só vira página principal quando for arrastada explicitamente para fora da hierarquia na horizontal.
+- Ao voltar com gesto horizontal, a tela revelada atrás agora é a página anterior real; a lista de Páginas só aparece quando ela é de fato o destino anterior.
+- Remove o flick visual que mostrava a lista de Páginas antes de saltar para a página anterior.
 - Mantém package com.avsord.sofiaapp e atualização por cima da versão instalada.
 - Não redeploya o backend Railway.
