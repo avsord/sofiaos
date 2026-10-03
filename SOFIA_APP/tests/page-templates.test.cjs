@@ -2,13 +2,13 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),load=require('./load-ts.cjs');
 const {PAGE_TEMPLATES,STATUS_COLORS}=load('src/lib/page-templates.ts');
 test('exactly the three official page templates are exposed',()=>{
- assert.deepEqual(PAGE_TEMPLATES.map(x=>x.id),['tasks_personal','notes_hub','playlist_links']);
- assert.deepEqual(PAGE_TEMPLATES.map(x=>x.title),['Tarefas pessoal','Bloco de nota','Lista de reprodução']);
+ assert.equal(Array.from(PAGE_TEMPLATES,x=>x.id).join('|'),'tasks_personal|notes_hub|playlist_links');
+ assert.equal(Array.from(PAGE_TEMPLATES,x=>x.title).join('|'),'Tarefas pessoal|Bloco de nota|Lista de reprodução');
 });
 test('tasks template has editable status columns with colors',()=>{
  const t=PAGE_TEMPLATES[0],collection=t.blocks.find(x=>x.type==='collection');
  const status=collection.data.properties.find(x=>x.key==='status');
- assert.deepEqual(status.options,['Não iniciada','Prioridade']);
+ assert.equal(Array.from(status.options).join('|'),'Não iniciada|Prioridade');
  assert.equal(status.option_colors['Não iniciada'],'gray');assert.equal(status.option_colors['Prioridade'],'red');
  assert.equal(collection.data.views[0].type,'board');assert.equal(collection.data.views[0].group_by,'status');
  assert.ok(STATUS_COLORS.some(x=>x.id==='blue'));assert.ok(STATUS_COLORS.some(x=>x.id==='green'));
