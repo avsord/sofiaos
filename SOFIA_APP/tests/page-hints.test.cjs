@@ -66,4 +66,6 @@ test('draggable page rows own touches and keep stable native geometry while movi
  assert.ok(tree.includes("const measureRow=(id:string)"));
  assert.ok(tree.includes("onLayout={()=>measure(page.id)}"));
  assert.ok(tree.includes("register={register} measure={measure}"));
+ assert.ok(tree.includes("const fallbackTarget=(page:Entity,dy:number)"));
+ assert.ok(tree.includes("direct??fallbackTarget(page,dy)"));
 });
