@@ -94,23 +94,25 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  function edit(change:(draft:PageDraft)=>PageDraft,group=''){if(selectedId)store.edit(selectedId,change,group);}
  async function create(parent?:Entity,template?:PageTemplate){try{
   const preset=template?freshTemplate(template):null;
-  const saved=await api.saveEntity({kind:'user_page',title:preset?.title||'Sem título',content:'',area:parent?.area||'Pessoal',privacy:'private',state:'active',tags:[],data:{
-   icon:preset?.icon||'',icon_mode:preset?'emoji':'default',cover_type:preset?.cover_type??'preset',cover_value:preset?.cover_value??PAGE_COVERS[0][1],cover_attachment_id:'',
+  const saved=await api.saveEntity({kind:'user_page',title:'Sem título',content:'',area:parent?.area||'Pessoal',privacy:'private',state:'active',tags:[],data:{
+   icon:'',icon_mode:'default',cover_type:'preset',cover_value:PAGE_COVERS[0][1],cover_attachment_id:'',
    purpose:'',layout:'notes',suggested:false,parent_id:parent?.id||'',node_type:parent?'page':'space',blocks_json:preset?JSON.stringify(preset.blocks):'[]'
   }});
   if(!mounted.current)return;setPages(old=>[...old,saved]);open(saved);
  }catch(e){setError(errorText(e));}}
+ function applyTemplate(template:PageTemplate){if(!selectedId)return;const preset=freshTemplate(template);store.edit(selectedId,d=>({...d,blocks:preset.blocks}),'template');setFocus(null);setCreateParent(undefined);void store.flush(selectedId);}
  function updateBlock(block:PageBlock,patch:Partial<PageBlock>,group=''){edit(d=>({...d,blocks:d.blocks.map(b=>b.id===block.id?{...b,...patch}:b)}),group);}
  function removeBlock(id:string){edit(d=>{const blocks=d.blocks.filter(b=>b.id!==id);return {...d,blocks:blocks.length?blocks:[newBlock()]};});setFocus(null);}
  function addBlock(){const block=newBlock();edit(d=>{const blocks=[...d.blocks],i=blocks.findIndex(b=>b.id===focus);blocks.splice(i>=0?i+1:blocks.length,0,block);return {...d,blocks};});setFocus(block.id);}
  function formatBlock(type:string){if(!entry)return;const id=focus&&focus!=='title'?focus:entry.draft.blocks.at(-1)?.id;if(!id)return;edit(d=>({...d,blocks:d.blocks.map(b=>b.id===id?{...b,type,...(b.text==='/'?{text:'',html:''}:{})}:b)}));}
  function resolveConflict(){if(!selectedId)return;const id=selectedId;Alert.alert('A página mudou no site','Seu rascunho local foi preservado. Qual versão deve continuar?',[
   {text:'Cancelar',style:'cancel'},{text:'Usar versão do site',onPress:()=>void store.resolve(id,false)},{text:'Manter minhas alterações',onPress:()=>void store.resolve(id,true)}]);}
- function removePage(){if(!entry)return;const id=entry.base.id;Alert.alert('Excluir página?','A página e suas subpáginas serão removidas também do site.',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{void(async()=>{
+ function confirmDeletePage(page:Entity){const id=page.id;Alert.alert('Excluir página?','A página e suas subpáginas serão removidas também do site.',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{void(async()=>{
   const ids=new Set<string>();const collect=(key:string)=>{if(ids.has(key))return;ids.add(key);for(const p of children.get(key)||[])collect(p.id);};collect(id);
   await Promise.all([...ids].map(key=>store.flush(key)));await api.deleteEntity(id);for(const key of ids)store.forget(key);
-  if(mounted.current){history.current=history.current.filter(key=>!ids.has(key));setPages(old=>old.filter(p=>!ids.has(p.id)));setSelectedId(null);setFocus(null);}
+  if(mounted.current){history.current=history.current.filter(key=>!ids.has(key));setPages(old=>old.filter(p=>!ids.has(p.id)));if(ids.has(selectedId||''))setSelectedId(null);setFocus(null);}
  })().catch(e=>setError(errorText(e)));}}]);}
+ function removePage(){if(entry)confirmDeletePage(entry.base);}
  function blockView(b:PageBlock,i:number){
   if(b.type==='divider')return <Pressable key={b.id} accessibilityLabel="Divisor" onLongPress={()=>removeBlock(b.id)} style={{paddingVertical:14}}><View style={{height:1,backgroundColor:c.line}}/></Pressable>;
   if(b.type==='image'&&b.data?.attachment_id)return <View key={b.id} style={{marginVertical:8}}><Image source={api.attachmentSource(String(b.data.attachment_id))} style={{width:'100%',height:210,borderRadius:8}} resizeMode="contain"/>{b.data.caption?<Text style={{color:c.muted,fontSize:12}}>{String(b.data.caption)}</Text>:null}</View>;
@@ -128,11 +130,11 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  const listView=<ScrollView style={{flex:1,backgroundColor:c.bg}} contentContainerStyle={{paddingBottom:34}} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>void load(true)} tintColor={c.accent}/>}>
   <View style={{paddingHorizontal:20,paddingTop:18,paddingBottom:12,flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,color:c.text,fontSize:30,fontWeight:'800',letterSpacing:-1}}>Páginas</Text><IconButton name="plus" label="Criar página" filled disabled={!ready} onPress={()=>setCreateParent(null)}/></View>
   {error?<ErrorBanner text={error} onRetry={()=>void load()}/>:null}
-  <View style={{paddingHorizontal:10}}><PageTreeList roots={children.get('')||[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent}/></View>
+  <View style={{paddingHorizontal:10}}><PageTreeList roots={children.get('')||[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage}/></View>
   {ready&&!pages.length?<Empty icon="book" title="Sua primeira página" body="Toque em + para criar uma página."/>:null}
  </ScrollView>;
  const createPicker=<PageCreateMenu visible={createParent!==undefined} parentTitle={createParent?.title} onClose={()=>setCreateParent(undefined)}
-  onBlank={()=>void create(createParent||undefined)} onTemplate={template=>void create(createParent||undefined,template)}/>;
+  onBlank={()=>void create(createParent||undefined)} onTemplate={template=>selectedId?applyTemplate(template):void create(undefined,template)}/>;
  if(!entry)return <View style={{flex:1}} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{listView}{createPicker}</View>;
  const draft=entry.draft,selected={...entry.base,data:{...entry.base.data,...draft.appearance}},subpages=children.get(selected.id)||[];
  const path:Entity[]=[];let cur:Entity|undefined=selected;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&path.length<40){seen.add(cur.id);path.unshift(cur);cur=byId.get(String(cur.data?.parent_id||''));}
@@ -166,7 +168,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
     </View>:null}
     <Pressable accessibilityLabel="Continuar escrevendo" onPress={()=>{const last=draft.blocks.at(-1);if(last&&['text','heading1','heading2','heading3','bullet','todo','number','quote','code','callout'].includes(last.type)){setFocus(last.id);inputRefs.current.get(last.id)?.focus();}else addBlock();}} style={{minHeight:18}}/>
     {subpages.length?<View style={{marginTop:2}}>
-      <PageTreeList roots={subpages} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} compact/>
+      <PageTreeList roots={subpages} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} compact/>
     </View>:null}
    </View>
   </ScrollView>
