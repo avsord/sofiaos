@@ -18,11 +18,11 @@ def pos(label,icon=False):
  n=wait(label);x,y,r,b=map(int,re.findall(r'\d+',n.get('bounds')));return (x+15 if icon else (x+r)//2),(y+b)//2
 pid=adb('shell','pidof',pkg).strip();assert pid
 
-def stable(name,moves=0):
+def stable(name,moves=0,check_counters=True):
  assert adb('shell','pidof',pkg).strip()==pid,'App restarted/crashed'
  root=tree();(out/(name+'.xml')).write_text(ET.tostring(root,encoding='unicode'))
  (out/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'))
- wait('QA moves '+str(moves)+' deletes 0')
+ if check_counters:wait('QA moves '+str(moves)+' deletes 0')
 def tap(label):
  x,y=pos(label);adb('shell','input','tap',str(x),str(y));time.sleep(.3)
 def hold(label,icon=False):
@@ -54,7 +54,7 @@ wait('Abrir subpágina Nome remoto');stable('icon-drag-one-write',1)
 # Exact MD template names are visible in the real picker.
 tap('Abrir página principal Teste principal');tap('Criar página ou usar template');tap('Usar template de conteúdo')
 for name in ['Tarefas pessoal','Bloco de nota','Lista de reprodução']:wait('Aplicar template '+name)
-stable('three-official-templates',1);tap('Fechar')
+stable('three-official-templates',1,False);tap('Fechar');stable('templates-dismissed',1)
 logs=adb('logcat','-d','-s','ReactNativeJS:E','AndroidRuntime:E').decode();(out/'native-errors.txt').write_text(logs)
 assert 'FATAL EXCEPTION' not in logs and 'TypeError' not in logs,logs
 print('PASS: holds root/child, cancel, remote refresh, icon drag exactly once, exact templates, stable process')
