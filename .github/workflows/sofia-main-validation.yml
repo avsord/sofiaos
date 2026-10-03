@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'src/**'
+      - 'public/**'
       - 'tests/**'
       - 'package.json'
       - 'package-lock.json'
