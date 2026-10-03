@@ -1,0 +1,44 @@
+name: Sofia MD workbench
+on:
+  push:
+    branches: [work/sofia-md-20261003]
+    paths: ['.github/workflows/sofia-md-workbench.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Export tracked source only
+        run: |
+          mkdir -p evidence
+          git archive HEAD --format=zip -o evidence/android-source.zip
+          git fetch --depth=1 origin main
+          git archive FETCH_HEAD --format=zip -o evidence/main-source.zip
+          git rev-parse HEAD > evidence/ANDROID_BASE.txt
+          git rev-parse FETCH_HEAD > evidence/MAIN_BASE.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sofia-MD-source
+          path: evidence/
+          retention-days: 7
+      - name: Install locked app dependencies for offline validation
+        working-directory: SOFIA_APP
+        run: npm ci
+      - name: Export dependencies without credentials or personal data
+        run: |
+          tar -czf /tmp/sofia-md-node-deps.tar.gz -C SOFIA_APP node_modules
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sofia-MD-dependencies
+          path: /tmp/sofia-md-node-deps.tar.gz
+          retention-days: 3
