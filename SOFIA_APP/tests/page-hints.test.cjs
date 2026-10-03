@@ -43,8 +43,8 @@ test('page canvas stays compact and subpages render as inline page rows',()=>{
  assert.ok(source.includes("<PageTreeList roots={subpages}"));
  assert.ok(!source.includes("Subpáginas ·"));
  assert.ok(!tree.includes("Solte aqui para página principal"));
- assert.ok(tree.includes("onStartShouldSetResponderCapture"));
- assert.ok(tree.includes("accessibilityHint={'Arraste para reorganizar '+page.title}"));
+ assert.ok(tree.includes("delayLongPress={180}"));
+ assert.ok(tree.includes("accessibilityHint={'Segure e arraste para reorganizar '+page.title}"));
  assert.ok(tree.includes("dx<-30"));
  assert.ok(tree.includes("Abrir subpágina "));
  assert.ok(tree.includes("Abrir página principal "));
@@ -61,8 +61,9 @@ test('writing hint disappears after the page has a real title and blank body sto
 
 test('draggable page rows own touches and keep stable native geometry while moving',()=>{
  const tree=fs.readFileSync(path.join(__dirname,'../src/components/PageTreeList.tsx'),'utf8');
- assert.ok(tree.includes("onStartShouldSetResponderCapture"));
- assert.ok(tree.includes("onResponderGrant={e=>{touch.current={x:e.nativeEvent.pageX,y:e.nativeEvent.pageY};draggingRef.current=false;"));
+ assert.ok(tree.includes("delayLongPress={180}"));
+ assert.ok(tree.includes("onLongPress={()=>{suppressPress.current=true;draggingRef.current=true;"));
+ assert.ok(tree.includes("onTouchMove={e=>"));
  assert.ok(tree.includes("const measureRow=(id:string)"));
  assert.ok(tree.includes("onLayout={()=>measure(page.id)}"));
  assert.ok(tree.includes("register={register} measure={measure}"));
