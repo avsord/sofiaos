@@ -39,9 +39,18 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
     if(dragId.current!==page.id)return;
     setTarget(targetAt(page,x,y));
   };
-  const finish=(page:Entity,x:number,y:number,dx:number)=>{
+  const fallbackTarget=(page:Entity,dy:number)=>{
+    if(Math.abs(dy)<18)return null;
+    const measured=[...rects.current.entries()].sort((a,b)=>a[1].y-b[1].y).map(([id])=>id);
+    const ids=measured.length>1?measured:[...rows.current.keys()];
+    const from=ids.indexOf(page.id);if(from<0)return null;
+    const step=Math.max(1,Math.round(Math.abs(dy)/(compact?40:46))),index=Math.max(0,Math.min(ids.length-1,from+(dy>0?step:-step)));
+    const candidate=ids[index];
+    return candidate&&candidate!==page.id&&canParent(page.id,candidate)?candidate:null;
+  };
+  const finish=(page:Entity,x:number,y:number,dx:number,dy:number)=>{
     if(dragId.current!==page.id)return;
-    const next=targetAt(page,x,y),wasChild=!!String(page.data?.parent_id||'');
+    const direct=targetAt(page,x,y),next=direct??fallbackTarget(page,dy),wasChild=!!String(page.data?.parent_id||'');
     // Notion-like outdent: dragging a child left/outside removes its parent.
     const outdented=wasChild&&(dx<-30||!hit(listRect.current,x,y));
     dragId.current='';setDragging(null);setTarget(null);onInteractionChange?.(false);
@@ -58,7 +67,7 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
 function TreeRow({page,children,expanded,toggle,onOpen,ancestors,compact,draggingId,targetId,register,measure,onStart,onMove,onEnd,onInteractionChange}:{
   page:Entity;children:Map<string,Entity[]>;expanded:Set<string>;toggle:(id:string)=>void;onOpen:(page:Entity)=>void;ancestors:string[];compact:boolean;
   draggingId:string;targetId:string;register:(id:string,node:View|null)=>void;measure:(id:string)=>void;onStart:(page:Entity)=>void;onMove:(page:Entity,x:number,y:number)=>void;
-  onEnd:(page:Entity,x:number,y:number,dx:number)=>void;onInteractionChange?:(active:boolean)=>void;
+  onEnd:(page:Entity,x:number,y:number,dx:number,dy:number)=>void;onInteractionChange?:(active:boolean)=>void;
 }){
   const c=useTheme(),pan=useRef(new Animated.ValueXY()).current,touch=useRef({x:0,y:0}),draggingRef=useRef(false);
   if(ancestors.includes(page.id)||ancestors.length>40)return null;
@@ -78,13 +87,13 @@ function TreeRow({page,children,expanded,toggle,onOpen,ancestors,compact,draggin
       }}
       onResponderRelease={e=>{
         const dx=e.nativeEvent.pageX-touch.current.x,dy=e.nativeEvent.pageY-touch.current.y;
-        if(draggingRef.current)onEnd(page,e.nativeEvent.pageX,e.nativeEvent.pageY,dx);
+        if(draggingRef.current)onEnd(page,e.nativeEvent.pageX,e.nativeEvent.pageY,dx,dy);
         else if(Math.abs(dx)+Math.abs(dy)<7)onOpen(page);
         draggingRef.current=false;reset();
       }}
       onResponderTerminate={e=>{
-        const dx=e.nativeEvent.pageX-touch.current.x;
-        if(draggingRef.current)onEnd(page,e.nativeEvent.pageX,e.nativeEvent.pageY,dx);
+        const dx=e.nativeEvent.pageX-touch.current.x,dy=e.nativeEvent.pageY-touch.current.y;
+        if(draggingRef.current)onEnd(page,e.nativeEvent.pageX,e.nativeEvent.pageY,dx,dy);
         draggingRef.current=false;reset();
       }}
       onResponderTerminationRequest={()=>false}
