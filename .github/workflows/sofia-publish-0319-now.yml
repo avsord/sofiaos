@@ -1,0 +1,87 @@
+name: Publish Sofia 0.3.19 now
+on:
+  push:
+    branches: [sofia-app-android]
+    paths: ['.github/workflows/sofia-publish-0319-now.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: sofia-publish-0319-now
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: SOFIA_APP
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_PUBLIC_API_URL: https://sofiaos.up.railway.app
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout exact 0.3.19 source
+        uses: actions/checkout@v4
+        with:
+          ref: 1e52ca290691e2e153832d6837cec756363adfe6
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Validate templates, TypeScript and regressions
+        run: |
+          npm run check
+          npm test
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --clean
+      - name: Build 0.3.19 release APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a,x86_64
+      - name: Stage exact production APK
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/release/app-release.apk dist/Sofia-OS.apk
+          unzip -p dist/Sofia-OS.apk assets/index.android.bundle > /tmp/sofia-production.bundle
+          test -s /tmp/sofia-production.bundle
+          ! grep -aq 'SOFIA_NATIVE_PAGER_FIXTURE_ONLY' /tmp/sofia-production.bundle
+          sha256sum dist/Sofia-OS.apk > dist/Sofia-OS.apk.sha256
+          git rev-parse HEAD > dist/SOURCE_COMMIT.txt
+          test "$(node -p "require('./package.json').version")" = '0.3.19'
+          test "$(node -p "require('./app.json').expo.android.versionCode")" = '24'
+          test "$(node -p "require('./app.json').expo.android.package")" = 'com.avsord.sofiaapp'
+      - name: Require synchronized site/server v142
+        run: |
+          curl --fail --silent --show-error --max-time 20 https://sofiaos.up.railway.app/health > /tmp/health.json
+          node -e "const h=require('/tmp/health.json');if(!h.ok||h.version!=='142.0.0')throw Error('Site/server v142 is not deployed');console.log(h)"
+      - name: Publish exact 0.3.19 APK
+        run: node tools/publish-release.cjs
+      - name: Confirm 0.3.18 detects 0.3.19
+        run: |
+          node <<'NODE'
+          const fs=require('node:fs'),ts=require('typescript'),vm=require('node:vm');
+          (async()=>{
+            const exports={};const source=ts.transpileModule(fs.readFileSync('src/lib/update.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+            vm.runInNewContext(source,{exports,fetch,AbortController,setTimeout,clearTimeout,Date,Error,Promise});
+            const next=await exports.checkForUpdate({currentVersion:'0.3.18'});
+            if(next?.version!=='0.3.19')throw Error('0.3.18 does not see 0.3.19');
+            console.log('UPDATE',next.version,next.url);
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE
+      - name: Upload APK evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sofia-Android-0.3.19
+          path: SOFIA_APP/dist/
+          if-no-files-found: warn
+          retention-days: 30
