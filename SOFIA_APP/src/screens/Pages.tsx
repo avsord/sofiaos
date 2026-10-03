@@ -62,7 +62,8 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of displayPages){const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const list of m.values())list.sort((a,b)=>a.title.localeCompare(b.title,'pt-BR'));return m;},[displayPages]);
  const entry=selectedId?store.get(selectedId):undefined;
  const emptyBody=entry?pageBodyIsEmpty(entry.draft.blocks):true;
- const showBodyGuide=emptyBody;
+ const hasSubpageContent=!!(selectedId&&(children.get(selectedId)||[]).length);
+ const showBodyGuide=emptyBody&&!hasSubpageContent;
  const placeholderColor=c.muted+'80';
  useEffect(()=>{if(active&&focus&&focus!=='title')inputRefs.current.get(focus)?.focus();},[focus,selectedId,active]);
  function toggle(id:string){setExpanded(old=>{const next=toggleExpanded(old,id),value=JSON.stringify([...next]);expandDisk.current=expandDisk.current.catch(()=>{}).then(()=>AsyncStorage.setItem(key+':expanded',value)).catch(()=>{if(mounted.current)setError('Não foi possível guardar a abertura das subpáginas neste aparelho.');});return next;});}
@@ -149,7 +150,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
      {([['text','Texto'],['heading2','Título'],['bullet','Lista'],['todo','Tarefa'],['divider','Divisor']] as const).map(([type,label])=><Pressable key={type} accessibilityRole="button" onPress={()=>formatBlock(type)} style={{paddingHorizontal:9,paddingVertical:9,borderRadius:8,backgroundColor:c.input}}><Text style={{fontSize:11,color:c.muted}}>{label}</Text></Pressable>)}
      <IconButton name="trash" label="Remover bloco selecionado" size={34} onPress={()=>removeBlock(focus)}/>
     </View>:null}
-    <Pressable accessibilityLabel="Continuar escrevendo" onPress={()=>{const last=draft.blocks.at(-1);if(last&&['text','heading1','heading2','heading3','bullet','todo','number','quote','code','callout'].includes(last.type)){setFocus(last.id);inputRefs.current.get(last.id)?.focus();}else addBlock();}} style={{minHeight:subpages.length&&emptyBody&&!showBodyGuide?0:18}}/>
+    <Pressable accessibilityLabel="Continuar escrevendo" onPress={()=>{const last=draft.blocks.at(-1);if(last&&['text','heading1','heading2','heading3','bullet','todo','number','quote','code','callout'].includes(last.type)){setFocus(last.id);inputRefs.current.get(last.id)?.focus();}else addBlock();}} style={{minHeight:18}}/>
     {subpages.length?<View style={{marginTop:2}}>
       <PageTreeList roots={subpages} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} compact/>
     </View>:null}
