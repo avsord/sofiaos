@@ -74,8 +74,9 @@ function TreeRow({page,children,expanded,toggle,onOpen,ancestors,compact,draggin
   return <View>
     <Animated.View {...handlers.panHandlers} ref={node=>register(page.id,node as unknown as View|null)} collapsable={false}
       accessible accessibilityRole="button" accessibilityLabel={pageLabel} accessibilityHint={'Arraste para reorganizar '+page.title}
-      onTouchStart={e=>{touch.current={x:e.nativeEvent.pageX,y:e.nativeEvent.pageY};}}
-      onTouchEnd={e=>{const dx=e.nativeEvent.pageX-touch.current.x,dy=e.nativeEvent.pageY-touch.current.y;if(!draggingRef.current&&Math.abs(dx)+Math.abs(dy)<7)onOpen(page);}}
+      onTouchStart={e=>{touch.current={x:e.nativeEvent.pageX,y:e.nativeEvent.pageY};onInteractionChange?.(true);}}
+      onTouchEnd={e=>{const dx=e.nativeEvent.pageX-touch.current.x,dy=e.nativeEvent.pageY-touch.current.y;if(!draggingRef.current&&Math.abs(dx)+Math.abs(dy)<7)onOpen(page);if(!draggingRef.current)onInteractionChange?.(false);}}
+      onTouchCancel={()=>{if(!draggingRef.current)onInteractionChange?.(false);}}
       style={{flexDirection:'row',alignItems:'center',paddingLeft:Math.min(ancestors.length,6)*(compact?14:16),borderRadius:9,
         backgroundColor:isTarget?c.accentSoft:'transparent',opacity:isDragging?.55:1,zIndex:isDragging?50:1,elevation:isDragging?16:0,
         transform:[...pan.getTranslateTransform(),{scale:isDragging?1.04:1}]}}>
