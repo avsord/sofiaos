@@ -86,14 +86,14 @@ function TreeRow({page,children,expanded,toggle,onOpen,ancestors,compact,draggin
         if(draggingRef.current){pan.setValue({x:dx,y:dy});onMove(page,e.nativeEvent.pageX,e.nativeEvent.pageY);}
       }}
       onResponderRelease={e=>{
-        const dx=e.nativeEvent.pageX-touch.current.x,dy=e.nativeEvent.pageY-touch.current.y;
-        if(draggingRef.current)onEnd(page,e.nativeEvent.pageX,e.nativeEvent.pageY,dx,dy);
-        else if(Math.abs(dx)+Math.abs(dy)<7)onOpen(page);
+        const dx=e.nativeEvent.pageX-touch.current.x,dy=e.nativeEvent.pageY-touch.current.y,moved=Math.abs(dx)+Math.abs(dy)>=7;
+        if(draggingRef.current||moved){if(!draggingRef.current)onStart(page);onEnd(page,e.nativeEvent.pageX,e.nativeEvent.pageY,dx,dy);}
+        else onOpen(page);
         draggingRef.current=false;reset();
       }}
       onResponderTerminate={e=>{
-        const dx=e.nativeEvent.pageX-touch.current.x,dy=e.nativeEvent.pageY-touch.current.y;
-        if(draggingRef.current)onEnd(page,e.nativeEvent.pageX,e.nativeEvent.pageY,dx,dy);
+        const dx=e.nativeEvent.pageX-touch.current.x,dy=e.nativeEvent.pageY-touch.current.y,moved=Math.abs(dx)+Math.abs(dy)>=7;
+        if(draggingRef.current||moved){if(!draggingRef.current)onStart(page);onEnd(page,e.nativeEvent.pageX,e.nativeEvent.pageY,dx,dy);}
         draggingRef.current=false;reset();
       }}
       onResponderTerminationRequest={()=>false}
