@@ -58,7 +58,7 @@ def tap(name,attr='content-desc'):
 
 def finger_drag(x1,y1,x2,y2,steps=12):
     adb('shell','input','motionevent','DOWN',str(x1),str(y1))
-    time.sleep(.12)
+    time.sleep(.35)
     for i in range(1,steps+1):
         t=i/steps;x=round(x1+(x2-x1)*t);y=round(y1+(y2-y1)*t)
         adb('shell','input','motionevent','MOVE',str(x),str(y))
