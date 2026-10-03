@@ -38,7 +38,7 @@ test('page canvas stays compact and subpages render as inline page rows',()=>{
  const tree=fs.readFileSync(path.join(__dirname,'../src/components/PageTreeList.tsx'),'utf8');
  assert.ok(source.includes("height:hasCover?190:28"));
  assert.ok(source.includes("marginTop:hasCover?-44:0"));
- assert.ok(source.includes("style={{minHeight:subpages.length&&emptyBody&&!showBodyGuide?0:18}}"));
+ assert.ok(source.includes("style={{minHeight:18}}"));
  assert.ok(source.includes('fontSize:58'));
  assert.ok(source.includes("<PageTreeList roots={subpages}"));
  assert.ok(!source.includes("Subpáginas ·"));
@@ -52,7 +52,7 @@ test('page canvas stays compact and subpages render as inline page rows',()=>{
 
 test('writing hint disappears after the page has a real title and blank body stops reserving vertical space',()=>{
  const source=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
- assert.ok(source.includes("const showBodyGuide=emptyBody;"));
+ assert.ok(source.includes("const showBodyGuide=emptyBody&&!hasSubpageContent;"));
  assert.ok(source.includes("height:(!b.text&&!b.html&&!pageBlockHint(b,i,showBodyGuide,focus===b.id)&&focus!==b.id)?0:undefined"));
  assert.ok(source.includes("marginTop:2"));
  assert.ok(!source.includes('accessibilityLabel="Recolher subpáginas"'));
@@ -73,9 +73,19 @@ test('draggable page rows own touches and keep stable native geometry while movi
 
 test('body guide remains visible after the title is filled until the body itself has content',()=>{
  const source=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
- assert.ok(source.includes("const showBodyGuide=emptyBody;"));
+ assert.ok(source.includes("const showBodyGuide=emptyBody&&!hasSubpageContent;"));
  assert.ok(!source.includes("emptyBody&&titleIsBlank"));
  assert.equal(pageBlockHint(blank,0,true,false),'Escreva algo…');
  assert.equal(pageBlockHint({...blank,text:'Texto'},0,false,false),'');
  assert.equal(pageBlockHint(blank,1,false,true),'Digite / para opções');
+});
+
+test('subpages count as visible content: hide the initial body guide but keep a tappable writing area',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
+ assert.ok(source.includes("const hasSubpageContent=!!(selectedId&&(children.get(selectedId)||[]).length);"));
+ assert.ok(source.includes("const showBodyGuide=emptyBody&&!hasSubpageContent;"));
+ assert.ok(source.includes('accessibilityLabel="Continuar escrevendo"'));
+ assert.ok(source.includes("style={{minHeight:18}}"));
+ assert.equal(pageBlockHint(blank,0,false,false),'');
+ assert.equal(pageBlockHint(blank,0,false,true),'Digite / para opções');
 });
