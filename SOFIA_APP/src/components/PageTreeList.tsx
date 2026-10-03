@@ -93,10 +93,10 @@ function TreeRow({page,children,expanded,toggle,onOpen,ancestors,compact,draggin
     <View ref={node=>register(page.id,node)} collapsable={false} onLayout={()=>measure(page.id)}
       style={{paddingLeft:Math.min(ancestors.length,6)*(compact?14:16),borderRadius:9,backgroundColor:isTarget?c.accentSoft:'transparent'}}>
       <Pressable accessible accessibilityRole="button" accessibilityLabel={pageLabel} accessibilityHint={'Segure para opções ou arraste para reorganizar '+page.title}
-        delayLongPress={180} pressRetentionOffset={{top:500,right:500,bottom:500,left:500}}
+        delayLongPress={140} pressRetentionOffset={{top:700,right:700,bottom:700,left:700}}
         onPressIn={e=>{const p={x:e.nativeEvent.pageX,y:e.nativeEvent.pageY};startPoint.current=p;lastPoint.current=p;}}
         onLongPress={()=>{suppressPress.current=true;setShowDelete(!!onDelete);draggingRef.current=true;pan.stopAnimation();pan.setValue({x:0,y:0});onStart(page);onInteractionChange?.(true);}}
-        onTouchMove={e=>{const x=e.nativeEvent.pageX,y=e.nativeEvent.pageY;lastPoint.current={x,y};if(draggingRef.current){const dx=x-startPoint.current.x,dy=y-startPoint.current.y;if(Math.abs(dx)>8||Math.abs(dy)>8)setShowDelete(false);pan.setValue({x:dx,y:dy});onMove(page,x,y);}}}
+        onTouchMove={e=>{const x=e.nativeEvent.pageX,y=e.nativeEvent.pageY;lastPoint.current={x,y};if(draggingRef.current){const dx=x-startPoint.current.x,dy=y-startPoint.current.y;if(Math.abs(dx)>5||Math.abs(dy)>5)setShowDelete(false);pan.setValue({x:dx,y:dy});onMove(page,x,y);}}}
         onPressOut={e=>{const x=e.nativeEvent.pageX||lastPoint.current.x,y=e.nativeEvent.pageY||lastPoint.current.y;finishDrag(x,y);}}
         onPress={()=>{if(suppressPress.current){suppressPress.current=false;return;}onOpen(page);}}
         style={{flexDirection:'row',alignItems:'center',borderRadius:9}}>
