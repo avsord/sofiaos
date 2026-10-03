@@ -52,7 +52,7 @@ test('page canvas stays compact and subpages render as inline page rows',()=>{
 
 test('writing hint disappears after the page has a real title and blank body stops reserving vertical space',()=>{
  const source=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
- assert.ok(source.includes("const showBodyGuide=emptyBody&&titleIsBlank"));
+ assert.ok(source.includes("const showBodyGuide=emptyBody;"));
  assert.ok(source.includes("height:(!b.text&&!b.html&&!pageBlockHint(b,i,showBodyGuide,focus===b.id)&&focus!==b.id)?0:undefined"));
  assert.ok(source.includes("marginTop:2"));
  assert.ok(!source.includes('accessibilityLabel="Recolher subpáginas"'));
@@ -69,4 +69,13 @@ test('draggable page rows own touches and keep stable native geometry while movi
  assert.ok(tree.includes("register={register} measure={measure}"));
  assert.ok(tree.includes("const fallbackTarget=(page:Entity,dy:number)"));
  assert.ok(tree.includes("direct??fallbackTarget(page,dy)"));
+});
+
+test('body guide remains visible after the title is filled until the body itself has content',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
+ assert.ok(source.includes("const showBodyGuide=emptyBody;"));
+ assert.ok(!source.includes("emptyBody&&titleIsBlank"));
+ assert.equal(pageBlockHint(blank,0,true,false),'Escreva algo…');
+ assert.equal(pageBlockHint({...blank,text:'Texto'},0,false,false),'');
+ assert.equal(pageBlockHint(blank,1,false,true),'Digite / para opções');
 });
