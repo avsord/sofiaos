@@ -28,12 +28,11 @@ test('Pages + offers blank/template and renders collection blocks in the app',()
  assert.ok(collection.includes('Duplicar coluna'));assert.ok(collection.includes('＋ Coluna'));assert.ok(collection.includes('Cor'));
 });
 
-test('page long press exposes delete without making a downward outdent jump straight to root',()=>{
+test('stationary long press exposes a named delete action without reparenting',()=>{
  const tree=fs.readFileSync(path.join(__dirname,'../src/components/PageTreeList.tsx'),'utf8');
- assert.ok(tree.includes('setShowDelete(!!onDelete)'));
- assert.ok(tree.includes("else if(wasChild&&outsideHorizontal&&canParent(page.id,''))"));
- assert.ok(tree.includes('else if(wasChild&&dy>18&&previousLevel!==parentId'));
- assert.ok(tree.includes("const previousLevel=parent?String(parent.data?.parent_id||''):''"));
+ assert.ok(tree.includes('if(!d.moved){setContext(d.page.id);return;}'));
+ assert.ok(tree.includes('Excluir “{p.title}”'));assert.ok(tree.includes('onDelete(p)'));
+ assert.ok(tree.includes('if(cancelled)return;'));
 });
 
 test('page back swipe reveals the actual previous page instead of the pages list',()=>{
@@ -48,6 +47,15 @@ test('page row drag disables the outer menu pager while active',()=>{
  const tree=fs.readFileSync(path.join(__dirname,'../src/components/PageTreeList.tsx'),'utf8');
  assert.ok(pages.includes('[pageInteraction,setPageInteraction]=useState(false)'));
  assert.ok(pages.includes('onDepthChange?.(!!selectedId||pageInteraction)'));
- assert.ok(pages.includes('onInteractionChange={setPageInteraction}'));
- assert.ok(tree.includes('delayLongPress={140}'));
+ assert.ok(pages.includes('pageInteractionRef.current=value;setPageInteraction(value)'));
+ assert.ok(tree.includes('},240)'));
+});
+
+
+test('MD8: insertion retains written content and replaces only the untouched guide',()=>{
+ const {insertTemplateBlocks}=load('src/lib/page-templates.ts');
+ const written=[{id:'user',type:'text',text:'Minha anotação'}],incoming=[{id:'template',type:'collection',data:{rows:[]}}];
+ const result=insertTemplateBlocks(written,incoming);assert.equal(result.length,2);assert.equal(result[0].text,'Minha anotação');assert.equal(written.length,1);assert.equal(incoming.length,1);
+ result[1].data.rows.push({id:'local'});assert.equal(incoming[0].data.rows.length,0);
+ assert.equal(insertTemplateBlocks([{id:'guide',type:'text',text:''}],incoming).length,1);
 });

@@ -1,6 +1,7 @@
 import React from 'react';
 import Svg, { Path } from 'react-native-svg';
 const paths = {
+ settings:'M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1 1-3zm-1 9a4 4 0 1 0 8 0 4 4 0 0 0-8 0',
  undo:'M3 10h10a7 7 0 0 1 7 7v3M3 10l6-6M3 10l6 6', redo:'M21 10H11a7 7 0 0 0-7 7v3M21 10l-6-6M21 10l-6 6', image:'M3 3h18v18H3V3zm0 13 6-6 6 6 3-3 3 3M15 7h1', copy:'M8 8h13v13H8V8zM3 16V3h13',
  home:'M3 10l9-7 9 7v10H3V10zm6 10v-7h6v7', chat:'M4 4h16v12H9l-5 4V4z',
  calendar:'M4 5h16v16H4V5zm0 5h16M8 3v4m8-4v4M8 14h2m4 0h2m-8 4h2',

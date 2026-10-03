@@ -10,6 +10,7 @@ import {Icon,IconName} from './src/components/Icon';
 import {Button,ErrorBanner} from './src/components/UI';
 import {TabPager} from './src/components/TabPager';
 import {MenuTab} from './src/components/MenuTab';
+import {NotificationProvider} from './src/components/NotificationCenter';
 import {createMenuMotion} from './src/lib/menu-motion';
 import type {TabPagerHandle} from './src/components/TabPager';
 import {Login} from './src/screens/Login';
@@ -24,7 +25,7 @@ import {APP_VERSION,checkForUpdate} from './src/lib/update';
 
 // Keep screen instances and unchanged screen trees across menu taps and swipes.
 const Home=React.memo(HomeScreen),Chat=React.memo(ChatScreen),Agenda=React.memo(AgendaScreen),Notifications=React.memo(NotificationsScreen),Profile=React.memo(ProfileScreen),Workspace=React.memo(WorkspaceScreen),Pages=React.memo(PagesScreen);
-const tabs:{id:Tab;label:string;icon:IconName}[]=[{id:'home',label:'Início',icon:'home'},{id:'chat',label:'Conversa',icon:'chat'},{id:'pages',label:'Páginas',icon:'book'},{id:'agenda',label:'Agenda',icon:'calendar'},{id:'apps',label:'Apps',icon:'grid'},{id:'profile',label:'Perfil',icon:'user'}];
+const tabs:{id:Tab;label:string;icon:IconName}[]=[{id:'home',label:'Início',icon:'home'},{id:'chat',label:'Conversa',icon:'chat'},{id:'pages',label:'Páginas',icon:'book'},{id:'agenda',label:'Agenda',icon:'calendar'},{id:'apps',label:'Apps',icon:'grid'},{id:'profile',label:'Ajustes',icon:'settings'}];
 class AppBoundary extends Component<{children:React.ReactNode},{failed:boolean}>{
  state={failed:false};static getDerivedStateFromError(){return {failed:true};}
  componentDidCatch(_e:Error,_info:ErrorInfo){/* No personal data in logs. */}
@@ -32,13 +33,14 @@ class AppBoundary extends Component<{children:React.ReactNode},{failed:boolean}>
 }
 function Shell(){
  const system=useColorScheme(),[ready,setReady]=useState(false),[auth,setAuth]=useState<Auth|null>(null),[bootstrap,setBootstrap]=useState<Bootstrap|null>(null),[prefs,setPrefs]=useState<Prefs>({appearance:'system',enterToSend:false,autoSendVoice:true}),[error,setError]=useState(''),[tab,setTab]=useState<Tab>('home'),[locked,setLocked]=useState(false),[booting,setBooting]=useState(false),[keyboard,setKeyboard]=useState(false),[workspaceDepth,setWorkspaceDepth]=useState(false),[pagesDepth,setPagesDepth]=useState(false),[chatEpoch,setChatEpoch]=useState(0);
+ const [agendaTarget,setAgendaTarget]=useState<{date:string;id?:string;nonce:number}>({date:'',nonce:0});
  const tabHistory=useRef<Tab[]>([]),pager=useRef<TabPagerHandle>(null),navigation=useRef({tab,locked});
  navigation.current={tab,locked};
  const menuMotion=useMemo(()=>createMenuMotion('home'),[]);
  useEffect(()=>{let mounted=true;void AccessibilityInfo.isReduceMotionEnabled().then(value=>{if(mounted)menuMotion.setReducedMotion(value);}).catch(()=>{});const sub=AccessibilityInfo.addEventListener('reduceMotionChanged',value=>menuMotion.setReducedMotion(value));return()=>{mounted=false;sub.remove();menuMotion.dispose();};},[menuMotion]);
  const c=prefs.appearance==='dark'||(prefs.appearance==='system'&&system==='dark')?dark:light;
  const expired=useCallback(()=>{tabHistory.current=[];setAuth(null);setBootstrap(null);setLocked(false);void forgetAuth().catch(()=>{});},[]);
- const api=useMemo(()=>new SofiaApi(auth?.token||'',expired),[auth?.token,expired]);
+ const api=useMemo(()=>new SofiaApi(auth?.token||'',expired,auth?.profile?.email||'anonymous'),[auth?.token,auth?.profile?.email,expired]);
  const checkingUpdate=useRef(false),lastUpdateCheck=useRef(0),lastUpdatePrompt=useRef('');
  const checkUpdate=useCallback(async(manual=false)=>{
   if(checkingUpdate.current)return;
@@ -49,7 +51,7 @@ function Shell(){
    if(!update){if(manual)Alert.alert('Sofia OS '+APP_VERSION,'Você já está na versão mais recente.');return;}
    if(!manual&&(AppState.currentState!=='active'||navigation.current.locked||lastUpdatePrompt.current===update.version))return;
    lastUpdatePrompt.current=update.version;
-   Alert.alert('Atualização disponível',`Instalada: ${APP_VERSION}\nDisponível: ${update.version}\nO Android pedirá sua confirmação para instalar.`,[{text:'Depois',style:'cancel'},{text:'Atualizar',onPress:()=>{void Linking.openURL(update.url).catch(()=>Alert.alert('Atualizações','Não foi possível abrir o instalador. Tente novamente no Perfil.'));}}]);
+   Alert.alert('Atualização disponível',`Instalada: ${APP_VERSION}\nDisponível: ${update.version}\nO Android pedirá sua confirmação para instalar.`,[{text:'Depois',style:'cancel'},{text:'Atualizar',onPress:()=>{void Linking.openURL(update.url).catch(()=>Alert.alert('Atualizações','Não foi possível abrir o instalador. Tente novamente em Ajustes.'));}}]);
   }catch(e){if(manual)Alert.alert('Atualizações',errorText(e));}
   finally{checkingUpdate.current=false;}
  },[]);
@@ -73,6 +75,7 @@ function Shell(){
   if(current.locked){pager.current?.goTo(current.tab);Alert.alert('Sua conversa','Pare a gravação ou aguarde a resposta antes de trocar de aba.');return;}
   tabHistory.current=[...tabHistory.current,current.tab].slice(-30);switchTab(next);
  },[switchTab]);
+ const openAgenda=useCallback((date:string,id?:string)=>{setAgendaTarget({date,id,nonce:Date.now()});navigate('agenda');},[navigate]);
  const goBack=useCallback(()=>{
   const current=navigation.current;
   if(current.locked){Alert.alert('Sua conversa','Pare a gravação ou aguarde a resposta.');return true;}
@@ -87,14 +90,14 @@ function Shell(){
  const manualUpdate=useCallback(()=>checkUpdate(true),[checkUpdate]);
  const clearChat=useCallback(()=>setChatEpoch(v=>v+1),[]);
  const notificationBack=useCallback(()=>{void goBack();},[goBack]);
- return <ThemeContext.Provider value={c}><SafeAreaView style={{flex:1,backgroundColor:c.bg}} edges={['top','left','right','bottom']}><StatusBar barStyle={c===dark?'light-content':'dark-content'} backgroundColor={c.bg}/><View style={{flex:1,width:'100%',maxWidth:760,alignSelf:'center',backgroundColor:c.bg}}>
+ return <ThemeContext.Provider value={c}><NotificationProvider api={api} enabled={!!auth}><SafeAreaView style={{flex:1,backgroundColor:c.bg}} edges={['top','left','right','bottom']}><StatusBar barStyle={c===dark?'light-content':'dark-content'} backgroundColor={c.bg}/><View style={{flex:1,width:'100%',maxWidth:760,alignSelf:'center',backgroundColor:c.bg}}>
  {!ready?<View style={{flex:1,justifyContent:'center'}}><ActivityIndicator color={c.accent}/></View>:!auth?<Login onLogin={login}/>:!bootstrap?<View style={{flex:1,justifyContent:'center',padding:24,gap:14}}>{booting?<ActivityIndicator color={c.accent}/>:null}<Text style={{fontSize:23,fontWeight:'600',color:c.text}}>Abrindo sua Sofia…</Text>{error?<ErrorBanner text={error}/>:null}<Button title="Tentar novamente" onPress={()=>void boot()} loading={booting}/><Button title="Voltar para o login" secondary onPress={()=>void logout()}/></View>:<><View style={{flex:1}}>
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?0:1}]} pointerEvents={tab==='notifications'?'none':'auto'} accessibilityElementsHidden={tab==='notifications'} importantForAccessibility={tab==='notifications'?'no-hide-descendants':'auto'}>
-  <TabPager motion={menuMotion} ref={pager} activeTab={tab} enabled={!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)} onSelect={navigate}>
-   <Home api={api} bootstrap={bootstrap} navigate={navigate}/>
+  <TabPager motion={menuMotion} ref={pager} activeTab={tab} enabled={!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)&&!(tab==='apps'&&workspaceDepth)} onSelect={navigate}>
+   <Home api={api} bootstrap={bootstrap} navigate={navigate} onOpenAgenda={openAgenda} active={tab==='home'}/>
    <Chat key={'chat-'+chatEpoch} api={api} bootstrap={bootstrap} enterToSend={prefs.enterToSend} autoSendVoice={prefs.autoSendVoice} onLock={setLocked} active={tab==='chat'} onRefreshBootstrap={boot}/>
    <Pages key={bootstrap.profile.email} api={api} active={tab==='pages'} storageScope={bootstrap.profile.email} onDepthChange={setPagesDepth}/>
-   <Agenda api={api}/>
+   <Agenda api={api} target={agendaTarget} active={tab==='agenda'}/>
    <Workspace api={api} navigate={navigate} onDepthChange={setWorkspaceDepth} active={tab==='apps'}/>
    <Profile api={api} bootstrap={bootstrap} prefs={prefs} onPrefs={changePrefs} onProfile={profile} onLogout={logout} onCheckUpdate={manualUpdate} onChatHistoryCleared={clearChat}/>
   </TabPager>
@@ -102,6 +105,6 @@ function Shell(){
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?1:0,backgroundColor:c.bg}]} pointerEvents={tab==='notifications'?'auto':'none'} accessibilityElementsHidden={tab!=='notifications'} importantForAccessibility={tab==='notifications'?'auto':'no-hide-descendants'}><Notifications api={api} onBack={notificationBack}/></View>
  </View>
  {!keyboard?<View style={{flexDirection:'row',backgroundColor:c.surface,borderTopWidth:1,borderColor:c.line,paddingHorizontal:8,paddingTop:7,paddingBottom:4}}>{tabs.map(item=><MenuTab motion={menuMotion} key={item.id} item={item} selected={tab===item.id} onSelect={navigate}/>)}</View>:null}</>}
- </View></SafeAreaView></ThemeContext.Provider>;
+ </View></SafeAreaView></NotificationProvider></ThemeContext.Provider>;
 }
 export default function App(){return <AppBoundary><SafeAreaProvider><Shell/></SafeAreaProvider></AppBoundary>;}

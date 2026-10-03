@@ -13,9 +13,11 @@ import {Icon} from '../components/Icon';
 import {PageCover,PageAppearance,PAGE_COVERS} from '../components/PageAppearance';
 import {PageTreeList} from '../components/PageTreeList';
 import {canReparentPage,reparentPatch,reparentedPage} from '../lib/page-hierarchy';
+import {comparePageOrder} from '../lib/page-order';
+import type {PageDrop} from '../lib/page-order';
 import {PageCreateMenu} from '../components/PageTemplatePicker';
 import {NativeCollectionBlock} from '../components/NativeCollectionBlock';
-import {freshTemplate} from '../lib/page-templates';
+import {freshTemplate,insertTemplateBlocks} from '../lib/page-templates';
 import type {PageTemplate} from '../lib/page-templates';
 const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'null')??fallback;}catch{return fallback;}};
 
@@ -24,10 +26,11 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null),[createParent,setCreateParent]=useState<Entity|null|undefined>(undefined);
  const history=useRef<string[]>([]),mounted=useRef(true),expandDisk=useRef(Promise.resolve()),inputRefs=useRef(new Map<string,TextInput>());
  const backX=useRef(new Animated.Value(0)).current,selectedRef=useRef<string|null>(null),paneWidth=useRef(0),backAction=useRef<()=>void>(()=>{});
+ const pageInteractionRef=useRef(false);pageInteractionRef.current=pageInteraction;
  selectedRef.current=selectedId;
  const pageBackResponder=useMemo(()=>PanResponder.create({
-  onMoveShouldSetPanResponder:(_e,g)=>!!selectedRef.current&&g.dx>8&&Math.abs(g.dx)>Math.abs(g.dy)*1.15,
-  onMoveShouldSetPanResponderCapture:(_e,g)=>!!selectedRef.current&&g.dx>8&&Math.abs(g.dx)>Math.abs(g.dy)*1.15,
+  onMoveShouldSetPanResponder:(_e,g)=>!pageInteractionRef.current&&!!selectedRef.current&&g.dx>8&&Math.abs(g.dx)>Math.abs(g.dy)*1.15,
+  onMoveShouldSetPanResponderCapture:(_e,g)=>!pageInteractionRef.current&&!!selectedRef.current&&g.dx>8&&Math.abs(g.dx)>Math.abs(g.dy)*1.15,
   onPanResponderGrant:()=>backX.stopAnimation(),
   onPanResponderMove:(_e,g)=>backX.setValue(Math.max(0,Math.min(paneWidth.current||420,g.dx))),
   onPanResponderRelease:(_e,g)=>{
@@ -63,7 +66,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  useEffect(()=>()=>onDepthChange?.(false),[onDepthChange]);
  const displayPages=useMemo(()=>pages.map(p=>{const e=store.get(p.id);return e?{...p,title:e.draft.title.trim()||'Sem título',data:{...p.data,...e.draft.appearance}}:p;}),[pages,store,tick]);
  const byId=useMemo(()=>new Map(displayPages.map(p=>[p.id,p])),[displayPages]);
- const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of displayPages){const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const list of m.values())list.sort((a,b)=>a.title.localeCompare(b.title,'pt-BR'));return m;},[displayPages]);
+ const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of displayPages){const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const list of m.values())list.sort(comparePageOrder);return m;},[displayPages]);
  const entry=selectedId?store.get(selectedId):undefined;
  const emptyBody=entry?pageBodyIsEmpty(entry.draft.blocks):true;
  const hasSubpageContent=!!(selectedId&&(children.get(selectedId)||[]).length);
@@ -72,8 +75,8 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  useEffect(()=>{if(active&&focus&&focus!=='title')inputRefs.current.get(focus)?.focus();},[focus,selectedId,active]);
  function toggle(id:string){setExpanded(old=>{const next=toggleExpanded(old,id),value=JSON.stringify([...next]);expandDisk.current=expandDisk.current.catch(()=>{}).then(()=>AsyncStorage.setItem(key+':expanded',value)).catch(()=>{if(mounted.current)setError('Não foi possível guardar a abertura das subpáginas neste aparelho.');});return next;});}
  function canParent(pageId:string,parentId:string){return canReparentPage(displayPages,pageId,parentId);}
- async function movePage(page:Entity,parentId:string){
-  if(movingId||String(page.data?.parent_id||'')===parentId)return;
+ async function movePage(page:Entity,parentId:string,drop?:PageDrop){
+  if(movingId||(!drop&&String(page.data?.parent_id||'')===parentId))return;
   if(!canParent(page.id,parentId)){setError('Essa página não pode ser colocada dentro dela mesma ou de uma subpágina dela.');return;}
   const before=pages;
   setMovingId(page.id);setError('');
@@ -83,8 +86,9 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
    await store.flush(page.id);
    const base=store.get(page.id)?.base||pages.find(item=>item.id===page.id);
    if(!base)throw new Error('Página não encontrada.');
-   const saved=await api.saveEntity(reparentPatch(base,parentId));store.open(saved);
-   if(mounted.current)setPages(old=>old.map(item=>item.id===saved.id?saved:item));
+   const result=await api.movePage({id:base.id,revision:base.revision,parentId,kind:drop?.kind||'inside',anchorId:drop?.anchorId||parentId});
+   const savedPages=result.items; savedPages.forEach(saved=>store.open(saved));
+   if(mounted.current)setPages(old=>old.map(item=>savedPages.find(p=>p.id===item.id)||item));
   }catch(e){if(mounted.current){setPages(before);setError(errorText(e));}}
   finally{if(mounted.current)setMovingId(null);}
  }
@@ -100,14 +104,14 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   }});
   if(!mounted.current)return;setPages(old=>[...old,saved]);open(saved);
  }catch(e){setError(errorText(e));}}
- function applyTemplate(template:PageTemplate){if(!selectedId)return;const preset=freshTemplate(template);store.edit(selectedId,d=>({...d,blocks:preset.blocks}),'template');setFocus(null);setCreateParent(undefined);void store.flush(selectedId);}
+ function applyTemplate(template:PageTemplate){if(!selectedId)return;const preset=freshTemplate(template);store.edit(selectedId,d=>({...d,blocks:insertTemplateBlocks(d.blocks,preset.blocks)}),'template');setFocus(null);setCreateParent(undefined);void store.flush(selectedId);}
  function updateBlock(block:PageBlock,patch:Partial<PageBlock>,group=''){edit(d=>({...d,blocks:d.blocks.map(b=>b.id===block.id?{...b,...patch}:b)}),group);}
  function removeBlock(id:string){edit(d=>{const blocks=d.blocks.filter(b=>b.id!==id);return {...d,blocks:blocks.length?blocks:[newBlock()]};});setFocus(null);}
  function addBlock(){const block=newBlock();edit(d=>{const blocks=[...d.blocks],i=blocks.findIndex(b=>b.id===focus);blocks.splice(i>=0?i+1:blocks.length,0,block);return {...d,blocks};});setFocus(block.id);}
  function formatBlock(type:string){if(!entry)return;const id=focus&&focus!=='title'?focus:entry.draft.blocks.at(-1)?.id;if(!id)return;edit(d=>({...d,blocks:d.blocks.map(b=>b.id===id?{...b,type,...(b.text==='/'?{text:'',html:''}:{})}:b)}));}
  function resolveConflict(){if(!selectedId)return;const id=selectedId;Alert.alert('A página mudou no site','Seu rascunho local foi preservado. Qual versão deve continuar?',[
   {text:'Cancelar',style:'cancel'},{text:'Usar versão do site',onPress:()=>void store.resolve(id,false)},{text:'Manter minhas alterações',onPress:()=>void store.resolve(id,true)}]);}
- function confirmDeletePage(page:Entity){const id=page.id;Alert.alert('Excluir página?','A página e suas subpáginas serão removidas também do site.',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{void(async()=>{
+ function confirmDeletePage(page:Entity){const id=page.id;Alert.alert('Excluir página?','Excluir “'+page.title+'” e suas subpáginas também do site?',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{void(async()=>{
   const ids=new Set<string>();const collect=(key:string)=>{if(ids.has(key))return;ids.add(key);for(const p of children.get(key)||[])collect(p.id);};collect(id);
   await Promise.all([...ids].map(key=>store.flush(key)));await api.deleteEntity(id);for(const key of ids)store.forget(key);
   if(mounted.current){history.current=history.current.filter(key=>!ids.has(key));setPages(old=>old.filter(p=>!ids.has(p.id)));if(ids.has(selectedId||''))setSelectedId(null);setFocus(null);}
@@ -139,10 +143,11 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
     style={{flex:1,minHeight:(!b.text&&!b.html&&!pageBlockHint(b,i,showBodyGuide,focus===b.id)&&focus!==b.id)?0:42,height:(!b.text&&!b.html&&!pageBlockHint(b,i,showBodyGuide,focus===b.id)&&focus!==b.id)?0:undefined,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:(!b.text&&!b.html&&!pageBlockHint(b,i,showBodyGuide,focus===b.id)&&focus!==b.id)?0:4,fontFamily:b.type==='code'?'monospace':undefined,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:8,paddingHorizontal:b.type==='code'?10:0}}/>
   </View>;
  }
- const listView=<ScrollView style={{flex:1,backgroundColor:c.bg}} contentContainerStyle={{paddingBottom:34}} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>void load(true)} tintColor={c.accent}/>}>
+ const listView=<ScrollView scrollEnabled={!pageInteraction} style={{flex:1,backgroundColor:c.bg}} contentContainerStyle={{paddingBottom:34}} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>void load(true)} tintColor={c.accent}/>}>
   <View style={{paddingHorizontal:20,paddingTop:18,paddingBottom:12,flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,color:c.text,fontSize:30,fontWeight:'800',letterSpacing:-1}}>Páginas</Text><IconButton name="plus" label="Criar página" filled disabled={!ready} onPress={()=>setCreateParent(null)}/></View>
+  {api.mdLocalOnly?<Text style={{paddingHorizontal:20,paddingBottom:8,color:c.muted,fontSize:10}}>Ordem salva neste aparelho. A hierarquia e o conteúdo continuam sincronizados.</Text>:null}
   {error?<ErrorBanner text={error} onRetry={()=>void load()}/>:null}
-  <View style={{paddingHorizontal:10}}><PageTreeList roots={children.get('')||[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={setPageInteraction}/></View>
+  <View style={{paddingHorizontal:10}}><PageTreeList roots={children.get('')||[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={value=>{pageInteractionRef.current=value;setPageInteraction(value);}}/></View>
   {ready&&!pages.length?<Empty icon="book" title="Sua primeira página" body="Toque em + para criar uma página."/>:null}
  </ScrollView>;
  const createPicker=<PageCreateMenu visible={createParent!==undefined} parentTitle={createParent?.title} onClose={()=>setCreateParent(undefined)}
@@ -186,7 +191,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
    </View>
   </View>
   {error?<ErrorBanner text={error}/>:null}{entry.error?<ErrorBanner text={entry.error} onRetry={entry.state==='conflict'?resolveConflict:()=>void store.flush(selected.id)}/>:null}
-  <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingBottom:60}}>
+  <ScrollView scrollEnabled={!pageInteraction} keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingBottom:60}}>
    <Pressable accessibilityRole="button" accessibilityLabel={hasCover?'Alterar capa':'Adicionar capa'} onPress={()=>setAppearance('cover')} style={{height:hasCover?190:28,overflow:'hidden',backgroundColor:hasCover?c.accentSoft:'transparent'}}>
     {hasCover?<PageCover data={draft.appearance} api={api}/>:<View style={{alignSelf:'flex-end',padding:12,opacity:.55}}><Icon name="image" size={20} color={c.muted}/></View>}
    </Pressable>
@@ -202,7 +207,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
     </View>:null}
     <Pressable accessibilityLabel="Continuar escrevendo" onPress={()=>{const last=draft.blocks.at(-1);if(last&&['text','heading1','heading2','heading3','bullet','todo','number','quote','code','callout'].includes(last.type)){setFocus(last.id);inputRefs.current.get(last.id)?.focus();}else addBlock();}} style={{minHeight:18}}/>
     {subpages.length?<View style={{marginTop:2}}>
-      <PageTreeList roots={subpages} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={setPageInteraction} compact/>
+      <PageTreeList roots={subpages} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={value=>{pageInteractionRef.current=value;setPageInteraction(value);}} compact/>
     </View>:null}
    </View>
   </ScrollView>

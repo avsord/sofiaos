@@ -1,3 +1,5 @@
+export type CalendarState={configured:boolean;connected:boolean;syncing?:boolean;last_sync?:string;error?:string;calendar_name?:string;calendar_id?:string;warnings?:string[];conflicts?:{id:string;reason:string}[];calendars?:{id:string;summary:string;accessRole:string}[]};
+import {LegacyMdAdapter} from './legacy-md';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Auth, Bootstrap, Conversation, MessagePage, ChatResult, HomeData, Task, AgendaItem, Notice, Profile, Prefs, Catalog, Entity, ChatSnapshot } from './types';
@@ -24,7 +26,9 @@ export class ApiError extends Error {
   constructor(message: string, public code: string, public status: number, public data?: Record<string, unknown>) { super(message); this.name = 'ApiError'; }
 }
 export class SofiaApi {
-  constructor(private token = '', private onExpired: () => void = () => {}) {}
+  private readonly md:LegacyMdAdapter;
+  constructor(private token = '', private onExpired: () => void = () => {},scope='anonymous') {this.md=new LegacyMdAdapter(this.request.bind(this),AsyncStorage,scope);}
+  get mdLocalOnly(){return this.md.localOnly;}
   private async request<T>(path: string, body?: unknown, method = body === undefined ? 'GET' : 'POST', timeout = 20000): Promise<T> {
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), timeout);
     try {
@@ -33,10 +37,6 @@ export class SofiaApi {
         body: body === undefined ? undefined : JSON.stringify(body), redirect: 'error' });
       let data: Record<string, any>;
       try { data = await response.json(); } catch { throw new ApiError('O servidor não retornou dados válidos. A API móvel da Sofia precisa estar publicada.', 'INVALID_RESPONSE', response.status); }
-      if (!response.ok && path === '/auth/login' && (response.status === 404 || response.status === 405 || data.code === 'AUTH_REQUIRED')) throw new ApiError('O servidor ainda precisa receber a API móvel da Sofia. Não é um erro da sua senha.', 'MOBILE_API_NOT_PUBLISHED', response.status);
-      if (!response.ok && path === '/auth/login' && (response.status === 404 || response.status === 405 || data.code === 'AUTH_REQUIRED')) throw new ApiError('O servidor ainda precisa receber a API móvel da Sofia. Não é um erro da sua senha.', 'MOBILE_API_NOT_PUBLISHED', response.status);
-      if (!response.ok && path === '/auth/login' && (response.status === 404 || response.status === 405 || data.code === 'AUTH_REQUIRED')) throw new ApiError('O servidor ainda precisa receber a API móvel da Sofia. Não é um erro da sua senha.', 'MOBILE_API_NOT_PUBLISHED', response.status);
-      if (!response.ok && path === '/auth/login' && (response.status === 404 || response.status === 405 || data.code === 'AUTH_REQUIRED')) throw new ApiError('O servidor ainda precisa receber a API móvel da Sofia. Não é um erro da sua senha.', 'MOBILE_API_NOT_PUBLISHED', response.status);
       if (!response.ok && path === '/auth/login' && (response.status === 404 || response.status === 405 || data.code === 'AUTH_REQUIRED')) throw new ApiError('O servidor ainda precisa receber a API móvel da Sofia. Não é um erro da sua senha.', 'MOBILE_API_NOT_PUBLISHED', response.status);
       if (!response.ok) { if (response.status === 401 && path !== '/auth/login') this.onExpired(); throw new ApiError(data.error || 'Não foi possível concluir.', data.code || 'HTTP_ERROR', response.status, data); }
       return data as T;
@@ -63,6 +63,14 @@ export class SofiaApi {
   chat(data: object) { return this.request<ChatResult>('/messages', data, 'POST', 180000); }
   audio(data: object) { return this.request<ChatResult>('/messages/audio', data, 'POST', 180000); }
   home() { return this.request<HomeData>('/home'); }
+  movePage(input:{id:string;revision:number;parentId:string;kind:string;anchorId:string}) { return this.md.move(input); }
+  allNotifications(offset=0) { return this.md.notices(offset); }
+  clearNotification(id:string) { return this.md.clear(id); }
+  async calendarStatus():Promise<CalendarState> { if(!await this.md.supports())return {configured:false,connected:false}; return this.request<CalendarState>('/md/calendar/status'); }
+  calendarConnect() { return this.request<{url:string}>('/md/calendar/connect',{}); }
+  calendarDisconnect() { return this.request<{ok:boolean}>('/md/calendar/disconnect',{}); }
+  calendarSync() { return this.request<{ok:boolean}>('/md/calendar/sync',{},'POST',90000); }
+  calendarSelect(id:string) { return this.request<{ok:boolean}>('/md/calendar/select',{id}); }
   tasks() { return this.request<{items: Task[]}>('/tasks'); }
   taskState(task: Task, state: 'done' | 'todo') { return this.request<{item: Task}>('/tasks/' + encodeURIComponent(task.id), { state, revision: task.revision }, 'PATCH'); }
   saveTask(task: Partial<Task>) { return this.request<{item: Task}>('/tasks' + (task.id ? '/' + encodeURIComponent(task.id) : ''), task, task.id ? 'PATCH' : 'POST'); }
@@ -73,9 +81,9 @@ export class SofiaApi {
   markRead(id: string) { return this.request<{ok: boolean}>('/notifications/' + encodeURIComponent(id) + '/read', {}); }
   profile(name: string) { return this.request<{profile: Profile}>('/profile', {name}, 'PATCH'); }
   catalog() { return this.request<Catalog>('/workspace/catalog'); }
-  entities(kind: string, q = '', offset = 0) { return this.request<{items: Entity[]}>('/workspace/entities?limit=100&kind=' + encodeURIComponent(kind) + '&q=' + encodeURIComponent(q) + '&offset=' + offset); }
-  entity(id: string) { return this.request<Entity>('/workspace/entities/' + encodeURIComponent(id)); }
-  saveEntity(input: Partial<Entity>) { return this.request<Entity>('/workspace/entities' + (input.id ? '/' + encodeURIComponent(input.id) : ''), input, input.id ? 'PATCH' : 'POST'); }
+  async entities(kind: string, q = '', offset = 0) { const result=await this.request<{items:Entity[]}>('/workspace/entities?limit=100&kind='+encodeURIComponent(kind)+'&q='+encodeURIComponent(q)+'&offset='+offset);return kind==='user_page'?{...result,items:await this.md.decorate(result.items)}:result; }
+  async entity(id: string) { const item=await this.request<Entity>('/workspace/entities/'+encodeURIComponent(id));return item.kind==='user_page'?(await this.md.decorate([item]))[0]:item; }
+  async saveEntity(input: Partial<Entity>) { const body=input.data?await this.md.clean(input):input;const saved=await this.request<Entity>('/workspace/entities'+(input.id?'/'+encodeURIComponent(input.id):''),body,input.id?'PATCH':'POST');return saved.kind==='user_page'?(await this.md.decorate([saved]))[0]:saved; }
   deleteEntity(id: string) { return this.request<{ok: boolean}>('/workspace/entities/' + encodeURIComponent(id), undefined, 'DELETE'); }
   uploadAttachment(id:string,input:{name:string;mime:string;base64:string}) { return this.request<{id:string}>('/workspace/entities/'+encodeURIComponent(id)+'/attachments',input,'POST',60000); }
   attachmentSource(id:string) { if(!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('Imagem inválida.');return {uri:SITE+'/api/mobile/workspace/attachments/'+encodeURIComponent(id)+'?inline=1',headers:{Authorization:'Bearer '+this.token}}; }

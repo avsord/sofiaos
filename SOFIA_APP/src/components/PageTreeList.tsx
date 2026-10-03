@@ -1,115 +1,60 @@
-import React,{useRef,useState} from 'react';
+import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {Animated,Pressable,Text,View} from 'react-native';
 import type {Entity} from '../lib/types';
 import {useTheme} from '../lib/theme';
 import {Icon} from './Icon';
+import {PAGE_INDENT,dropLineY,projectPageDrop} from '../lib/page-order';
+import type {PageDrop,PageRect} from '../lib/page-order';
 
-type Rect={x:number;y:number;width:number;height:number};
-type Props={
-  roots:Entity[];
-  children:Map<string,Entity[]>;
-  expanded:Set<string>;
-  toggle:(id:string)=>void;
-  onOpen:(page:Entity)=>void;
-  onMove:(page:Entity,parentId:string)=>Promise<void>|void;
-  canParent:(pageId:string,parentId:string)=>boolean;
-  onDelete?:(page:Entity)=>void;
-  compact?:boolean;
-  onInteractionChange?:(active:boolean)=>void;
-};
-const iconFor=(page:Entity)=>String(page.data?.icon||'').trim()||'📄';
-const hit=(rect:Rect|null,x:number,y:number)=>!!rect&&x>=rect.x&&x<=rect.x+rect.width&&y>=rect.y&&y<=rect.y+rect.height;
-
+type Props={roots:Entity[];children:Map<string,Entity[]>;expanded:Set<string>;toggle:(id:string)=>void;onOpen:(page:Entity)=>void;
+ onMove:(page:Entity,parentId:string,drop?:PageDrop)=>Promise<void>|void;canParent:(pageId:string,parentId:string)=>boolean;onDelete?:(page:Entity)=>void;compact?:boolean;onInteractionChange?:(active:boolean)=>void};
+type Visible={page:Entity;depth:number;hasChildren:boolean;open:boolean};
 export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canParent,onDelete,compact=false,onInteractionChange}:Props){
-  const rows=useRef(new Map<string,View>()),rects=useRef(new Map<string,Rect>()),listRef=useRef<View|null>(null),listRect=useRef<Rect|null>(null),dragId=useRef('');
-  const [dragging,setDragging]=useState<Entity|null>(null),[target,setTarget]=useState<string|null>(null);
-  const measureRow=(id:string)=>{
-    const node=rows.current.get(id);
-    node?.measureInWindow((x,y,width,height)=>{if(width>0&&height>0)rects.current.set(id,{x,y,width,height});});
-  };
-  const measureAll=()=>{
-    rows.current.forEach((_node,id)=>measureRow(id));
-    listRef.current?.measureInWindow((x,y,width,height)=>{listRect.current=width>0&&height>0?{x,y,width,height}:null;});
-  };
-  const targetAt=(page:Entity,x:number,y:number)=>{
-    for(const [id,rect] of rects.current)if(id!==page.id&&hit(rect,x,y)&&canParent(page.id,id))return id;
-    return null;
-  };
-  const start=(page:Entity)=>{dragId.current=page.id;measureAll();setDragging(page);setTarget(null);onInteractionChange?.(true);};
-  const move=(page:Entity,x:number,y:number)=>{
-    if(dragId.current!==page.id)return;
-    setTarget(targetAt(page,x,y));
-  };
-  const pageById=(id:string)=>{
-    for(const p of roots)if(p.id===id)return p;
-    for(const list of children.values())for(const p of list)if(p.id===id)return p;
-    return undefined;
-  };
-  const finish=(page:Entity,x:number,y:number,dx:number,dy:number)=>{
-    if(dragId.current!==page.id)return;
-    const direct=targetAt(page,x,y),parentId=String(page.data?.parent_id||''),wasChild=!!parentId,rect=listRect.current;
-    // Vertical drag out of a nested group only climbs one hierarchy level.
-    // Becoming a root page requires an explicit horizontal drag outside the hierarchy.
-    const outsideHorizontal=!!rect&&(x<rect.x-12||x>rect.x+rect.width+12);
-    const parent=wasChild?pageById(parentId):undefined;
-    const previousLevel=parent?String(parent.data?.parent_id||''):'';
-    dragId.current='';setDragging(null);setTarget(null);onInteractionChange?.(false);
-    if(direct!==null&&canParent(page.id,direct))void onMove(page,direct);
-    else if(wasChild&&outsideHorizontal&&canParent(page.id,''))void onMove(page,'');
-    else if(wasChild&&dy>18&&previousLevel!==parentId&&canParent(page.id,previousLevel))void onMove(page,previousLevel);
-  };
-  return <View ref={node=>{listRef.current=node;}} collapsable={false} style={{position:'relative'}}>
-    {roots.map(page=><TreeRow key={page.id} page={page} children={children} expanded={expanded} toggle={toggle} onOpen={onOpen}
-      ancestors={[]} compact={compact} draggingId={dragging?.id||''} targetId={target||''} register={(id,node)=>{if(node){rows.current.set(id,node);requestAnimationFrame(()=>measureRow(id));}else{rows.current.delete(id);rects.current.delete(id);}}} measure={measureRow}
-      onStart={start} onMove={move} onEnd={finish} onDelete={onDelete} onInteractionChange={onInteractionChange}/>)}
-  </View>;
+ const c=useTheme(),host=useRef<View|null>(null),nodes=useRef(new Map<string,View>()),rects=useRef<PageRect[]>([]),origin=useRef({x:0,y:0,width:0});
+ const drag=useRef<{page:Entity;startX:number;startY:number;lastX:number;lastY:number;dx:number;dy:number;moved:boolean;drop:PageDrop|null}|null>(null);
+ const [ghost,setGhost]=useState<Visible|null>(null),[drop,setDrop]=useState<PageDrop|null>(null),[context,setContext]=useState<string|null>(null),[geometry,setGeometry]=useState(0);
+ const pan=useRef(new Animated.ValueXY()).current;
+ const all=useMemo(()=>[...new Map([...roots,...[...children.values()].flat()].map(p=>[p.id,p])).values()],[roots,children]);
+ const visible=useMemo(()=>{const result:Visible[]=[];const walk=(items:Entity[],depth:number,path:Set<string>)=>{for(const page of items){if(path.has(page.id)||depth>40)continue;const kids=children.get(page.id)||[],open=compact||expanded.has(page.id);result.push({page,depth,hasChildren:!!kids.length,open});if(open)walk(kids,depth+1,new Set([...path,page.id]));}};walk(roots,0,new Set());return result;},[roots,children,expanded,compact]);
+ const latest=useRef({all,visible,onMove,onOpen,onDelete,onInteractionChange,canParent});latest.current={all,visible,onMove,onOpen,onDelete,onInteractionChange,canParent};
+ function measure(){
+  const ids=new Set(latest.current.visible.map(r=>r.page.id));rects.current=rects.current.filter(r=>ids.has(r.page.id));
+  host.current?.measureInWindow((x,y,width)=>{origin.current={x,y,width};setGeometry(v=>v+1);});
+  for(const row of latest.current.visible)nodes.current.get(row.page.id)?.measureInWindow((x,y,width,height)=>{if(height<=0)return;const next={...row,x,y,width,height};rects.current=[...rects.current.filter(r=>r.page.id!==row.page.id),next];});
+ }
+ useEffect(()=>{const frame=requestAnimationFrame(measure);return()=>cancelAnimationFrame(frame);},[visible]);
+ useEffect(()=>()=>latest.current.onInteractionChange?.(false),[]);
+ function begin(row:Visible,x:number,y:number){measure();setContext(null);pan.setValue({x:0,y:0});drag.current={page:row.page,startX:x,startY:y,lastX:x,lastY:y,dx:0,dy:0,moved:false,drop:null};setGhost(row);setDrop(null);latest.current.onInteractionChange?.(true);}
+ function move(x:number,y:number){const d=drag.current;if(!d)return;d.dx=x-d.startX;d.dy=y-d.startY;d.lastX=x;d.lastY=y;if(Math.abs(d.dx)+Math.abs(d.dy)>5)d.moved=true;pan.setValue({x:d.dx,y:d.dy});if(!d.moved)return;d.drop=projectPageDrop(latest.current.all,d.page,rects.current,x,y,d.dx);setDrop(d.drop);}
+ function end(cancelled=false){const d=drag.current;if(!d)return;drag.current=null;setGhost(null);setDrop(null);pan.setValue({x:0,y:0});latest.current.onInteractionChange?.(false);
+  if(cancelled)return;if(!d.moved){setContext(d.page.id);return;}
+  if(d.drop&&latest.current.canParent(d.page.id,d.drop.parentId))void latest.current.onMove(d.page,d.drop.parentId,d.drop);
+ }
+ const line=drop?dropLineY(drop,rects.current):null,ghostRect=ghost?rects.current.find(r=>r.page.id===ghost.page.id):null;
+ return <View ref={host} collapsable={false} onLayout={measure} style={{position:'relative'}}>
+  {visible.map(row=>{const p=row.page,target=drop?.kind==='inside'&&drop.anchorId===p.id,isSource=ghost?.page.id===p.id;return <View key={p.id}>
+   <View ref={node=>{if(node)nodes.current.set(p.id,node);else nodes.current.delete(p.id);}} collapsable={false} style={{flexDirection:'row',alignItems:'center',paddingLeft:row.depth*PAGE_INDENT,borderRadius:9,backgroundColor:target?c.accentSoft:'transparent',borderWidth:1,borderColor:target?c.accent:'transparent',opacity:isSource?.3:1}}>
+    {!compact?<Pressable disabled={!row.hasChildren} accessibilityLabel={(row.open?'Recolher':'Expandir')+' subpáginas de '+p.title} accessibilityState={{expanded:row.open}} onPress={()=>toggle(p.id)} style={{width:28,height:46,alignItems:'center',justifyContent:'center'}}>{row.hasChildren?<View style={{transform:[{rotate:row.open?'90deg':'0deg'}]}}><Icon name="chevron" size={14} color={c.muted}/></View>:null}</Pressable>:null}
+    <PageRow page={p} compact={compact} onOpen={()=>onOpen(p)} onHold={(x,y)=>begin(row,x,y)} onMove={move} onEnd={()=>end()} onCancel={()=>end(true)}/>
+   </View>
+   {context===p.id&&onDelete?<View style={{flexDirection:'row',justifyContent:'flex-end',gap:8,padding:6}}><Pressable accessibilityLabel={'Excluir página '+p.title} onPress={()=>{setContext(null);onDelete(p);}} style={{padding:12,borderRadius:9,backgroundColor:c.input}}><Text style={{color:c.danger}}>Excluir “{p.title}”</Text></Pressable><Pressable accessibilityLabel="Fechar ações da página" onPress={()=>setContext(null)} style={{padding:12}}><Text style={{color:c.muted}}>Cancelar</Text></Pressable></View>:null}
+  </View>;})}
+  {line!=null&&drop?<View pointerEvents="none" accessibilityLabel={'Soltar '+(drop.kind==='before'?'antes':'depois')+' no nível '+drop.depth} style={{position:'absolute',top:line-origin.current.y-1.5,left:drop.depth*PAGE_INDENT+(compact?0:28),right:6,height:3,borderRadius:2,backgroundColor:c.accent,zIndex:99}}/>:null}
+  {ghost&&ghostRect?<Animated.View pointerEvents="none" style={{position:'absolute',top:ghostRect.y-origin.current.y,left:ghost.depth*PAGE_INDENT+(compact?0:28),right:4,backgroundColor:c.surface,borderRadius:9,paddingHorizontal:8,elevation:10,zIndex:100,transform:pan.getTranslateTransform()}}><View style={{flexDirection:'row',alignItems:'center',minHeight:compact?40:46,gap:8}}><Text style={{fontSize:22}}>{String(ghost.page.data?.icon||'📄')}</Text><Text numberOfLines={1} style={{flex:1,fontSize:16,fontWeight:'600',color:c.text}}>{ghost.page.title}</Text></View></Animated.View>:null}
+ </View>;
 }
-
-function TreeRow({page,children,expanded,toggle,onOpen,ancestors,compact,draggingId,targetId,register,measure,onStart,onMove,onEnd,onDelete,onInteractionChange}:{
-  page:Entity;children:Map<string,Entity[]>;expanded:Set<string>;toggle:(id:string)=>void;onOpen:(page:Entity)=>void;ancestors:string[];compact:boolean;
-  draggingId:string;targetId:string;register:(id:string,node:View|null)=>void;measure:(id:string)=>void;onStart:(page:Entity)=>void;onMove:(page:Entity,x:number,y:number)=>void;
-  onEnd:(page:Entity,x:number,y:number,dx:number,dy:number)=>void;onDelete?:(page:Entity)=>void;onInteractionChange?:(active:boolean)=>void;
-}){
-  const c=useTheme(),pan=useRef(new Animated.ValueXY()).current,startPoint=useRef({x:0,y:0}),lastPoint=useRef({x:0,y:0}),draggingRef=useRef(false),suppressPress=useRef(false),[showDelete,setShowDelete]=useState(false);
-  if(ancestors.includes(page.id)||ancestors.length>40)return null;
-  const kids=children.get(page.id)||[],open=compact?true:expanded.has(page.id),isTarget=targetId===page.id,isDragging=draggingId===page.id;
-  const pageLabel=String(page.data?.parent_id||'')?'Abrir subpágina '+page.title:'Abrir página principal '+page.title;
-  const reset=()=>Animated.spring(pan,{toValue:{x:0,y:0},useNativeDriver:true,speed:28,bounciness:4}).start();
-  const finishDrag=(x:number,y:number)=>{
-    if(!draggingRef.current)return;
-    const dx=x-startPoint.current.x,dy=y-startPoint.current.y;
-    onEnd(page,x,y,dx,dy);draggingRef.current=false;onInteractionChange?.(false);reset();
-  };
-  return <View>
-    <View ref={node=>register(page.id,node)} collapsable={false} onLayout={()=>measure(page.id)}
-      style={{paddingLeft:Math.min(ancestors.length,6)*(compact?14:16),borderRadius:9,backgroundColor:isTarget?c.accentSoft:'transparent'}}>
-      <Pressable accessible accessibilityRole="button" accessibilityLabel={pageLabel} accessibilityHint={'Segure para opções ou arraste para reorganizar '+page.title}
-        delayLongPress={140} pressRetentionOffset={{top:700,right:700,bottom:700,left:700}}
-        onPressIn={e=>{const p={x:e.nativeEvent.pageX,y:e.nativeEvent.pageY};startPoint.current=p;lastPoint.current=p;}}
-        onLongPress={()=>{suppressPress.current=true;setShowDelete(!!onDelete);draggingRef.current=true;pan.stopAnimation();pan.setValue({x:0,y:0});onStart(page);onInteractionChange?.(true);}}
-        onTouchMove={e=>{const x=e.nativeEvent.pageX,y=e.nativeEvent.pageY;lastPoint.current={x,y};if(draggingRef.current){const dx=x-startPoint.current.x,dy=y-startPoint.current.y;if(Math.abs(dx)>5||Math.abs(dy)>5)setShowDelete(false);pan.setValue({x:dx,y:dy});onMove(page,x,y);}}}
-        onPressOut={e=>{const x=e.nativeEvent.pageX||lastPoint.current.x,y=e.nativeEvent.pageY||lastPoint.current.y;finishDrag(x,y);}}
-        onPress={()=>{if(suppressPress.current){suppressPress.current=false;return;}onOpen(page);}}
-        style={{flexDirection:'row',alignItems:'center',borderRadius:9}}>
-        <Animated.View pointerEvents="box-none" style={{flex:1,flexDirection:'row',alignItems:'center',opacity:isDragging?.55:1,zIndex:isDragging?50:1,elevation:isDragging?16:0,
-          transform:[...pan.getTranslateTransform(),{scale:isDragging?1.04:1}]}}>
-          {!compact&&kids.length?<Pressable accessibilityRole="button" accessibilityLabel={open?'Recolher subpáginas de '+page.title:'Expandir subpáginas de '+page.title}
-            accessibilityState={{expanded:open}} onPress={e=>{e.stopPropagation();toggle(page.id);}} style={{width:28,minHeight:46,justifyContent:'center',alignItems:'center'}}>
-            <View style={{transform:[{rotate:open?'90deg':'0deg'}]}}><Icon name="chevron" size={14} color={c.muted}/></View>
-          </Pressable>:!compact?<View style={{width:28}}/>:null}
-          <Text pointerEvents="none" style={{fontSize:22,color:c.text,width:34,textAlign:'center'}}>{iconFor(page)}</Text>
-          <View pointerEvents="none" style={{flex:1,minHeight:compact?40:46,justifyContent:'center',paddingRight:10,paddingLeft:6}}>
-            <Text numberOfLines={1} style={{fontSize:16,color:c.text,fontWeight:ancestors.length?'400':'600'}}>{page.title}</Text>
-          </View>
-        </Animated.View>
-      </Pressable>
-      {showDelete&&onDelete?<Pressable accessibilityRole="button" accessibilityLabel={'Excluir página '+page.title} onPress={()=>{setShowDelete(false);onDelete(page);}}
-        style={{alignSelf:'flex-end',marginRight:10,marginBottom:6,paddingHorizontal:12,paddingVertical:7,borderRadius:9,backgroundColor:c.input}}>
-        <Text style={{fontSize:12,fontWeight:'700',color:c.danger}}>Excluir</Text>
-      </Pressable>:null}
-    </View>
-    {open?kids.map(child=><TreeRow key={child.id} page={child} children={children} expanded={expanded} toggle={toggle} onOpen={onOpen}
-      ancestors={[...ancestors,page.id]} compact={compact} draggingId={draggingId} targetId={targetId} register={register} measure={measure}
-      onStart={onStart} onMove={onMove} onEnd={onEnd} onDelete={onDelete} onInteractionChange={onInteractionChange}/>):null}
-  </View>;
+function PageRow({page,compact,onOpen,onHold,onMove,onEnd,onCancel}:{page:Entity;compact:boolean;onOpen:()=>void;onHold:(x:number,y:number)=>void;onMove:(x:number,y:number)=>void;onEnd:()=>void;onCancel:()=>void}){
+ const c=useTheme(),point=useRef({x:0,y:0}),held=useRef(false),moved=useRef(false),timer=useRef<ReturnType<typeof setTimeout>|null>(null);
+ const latest=useRef({onOpen,onHold,onMove,onEnd,onCancel});latest.current={onOpen,onHold,onMove,onEnd,onCancel};
+ const stopTimer=()=>{if(timer.current)clearTimeout(timer.current);timer.current=null;};
+ useEffect(()=>()=>{stopTimer();if(held.current)latest.current.onCancel();},[]);
+ return <View style={{flex:1,minHeight:compact?40:46,flexDirection:'row',alignItems:'center',gap:8,paddingRight:10}} accessible accessibilityRole="button" accessibilityLabel={(page.data?.parent_id?'Abrir subpágina ':'Abrir página principal ')+page.title} accessibilityHint="Segure para excluir ou arraste para reorganizar" onAccessibilityTap={()=>latest.current.onOpen()}
+  onStartShouldSetResponder={()=>true}
+  onResponderGrant={e=>{stopTimer();point.current={x:e.nativeEvent.pageX,y:e.nativeEvent.pageY};held.current=false;moved.current=false;timer.current=setTimeout(()=>{timer.current=null;held.current=true;latest.current.onHold(point.current.x,point.current.y);},240);}}
+  onResponderMove={e=>{const x=e.nativeEvent.pageX,y=e.nativeEvent.pageY;if(Math.abs(x-point.current.x)+Math.abs(y-point.current.y)>7)moved.current=true;if(held.current)latest.current.onMove(x,y);else if(moved.current)stopTimer();}}
+  onResponderRelease={e=>{stopTimer();if(held.current){latest.current.onMove(e.nativeEvent.pageX,e.nativeEvent.pageY);latest.current.onEnd();}else if(!moved.current)latest.current.onOpen();held.current=false;}}
+  onResponderTerminationRequest={()=>!held.current}
+  onResponderTerminate={()=>{stopTimer();if(held.current)latest.current.onCancel();held.current=false;}}>
+  <Text style={{fontSize:22,color:c.text,width:30,textAlign:'center'}}>{String(page.data?.icon||'').trim()||'📄'}</Text><Text numberOfLines={1} style={{flex:1,fontSize:16,color:c.text,fontWeight:compact?'500':'600'}}>{page.title}</Text>
+ </View>;
 }

@@ -43,9 +43,9 @@ test('page canvas stays compact and subpages render as inline page rows',()=>{
  assert.ok(source.includes("<PageTreeList roots={subpages}"));
  assert.ok(!source.includes("Subpáginas ·"));
  assert.ok(!tree.includes("Solte aqui para página principal"));
- assert.ok(tree.includes("delayLongPress={140}"));
- assert.ok(tree.includes("accessibilityHint={'Segure para opções ou arraste para reorganizar '+page.title}"));
- assert.ok(tree.includes("outsideHorizontal"));
+ assert.ok(tree.includes("},240)"));
+ assert.ok(tree.includes('accessibilityHint="Segure para excluir ou arraste para reorganizar"'));
+ assert.ok(tree.includes("projectPageDrop("));
  assert.ok(tree.includes("Abrir subpágina "));
  assert.ok(tree.includes("Abrir página principal "));
 });
@@ -59,16 +59,12 @@ test('writing hint disappears after the page has a real title and blank body sto
  assert.ok(!source.includes('accessibilityLabel="Mostrar subpáginas"'));
 });
 
-test('draggable page rows own touches and keep stable native geometry while moving',()=>{
+test('draggable rows retain static geometry while a separate ghost follows the finger',()=>{
  const tree=fs.readFileSync(path.join(__dirname,'../src/components/PageTreeList.tsx'),'utf8');
- assert.ok(tree.includes("delayLongPress={140}"));
- assert.ok(tree.includes("onLongPress={()=>{suppressPress.current=true;setShowDelete(!!onDelete);draggingRef.current=true;"));
- assert.ok(tree.includes("onTouchMove={e=>"));
- assert.ok(tree.includes("const measureRow=(id:string)"));
- assert.ok(tree.includes("onLayout={()=>measure(page.id)}"));
- assert.ok(tree.includes("register={register} measure={measure}"));
- assert.ok(tree.includes("const direct=targetAt(page,x,y)"));
- assert.ok(tree.includes("else if(wasChild&&dy>18&&previousLevel!==parentId"));
+ assert.ok(tree.includes('onResponderTerminationRequest={()=>!held.current}'));
+ assert.ok(tree.includes('onResponderTerminate='));assert.ok(tree.includes('latest.current.onCancel()'));
+ assert.ok(tree.includes('nodes.current.set(p.id,node)'));assert.ok(tree.includes('transform:pan.getTranslateTransform()'));
+ assert.ok(tree.includes('if(cancelled)return;'));assert.ok(tree.includes('dropLineY(drop,rects.current)'));
 });
 
 test('body guide remains visible after the title is filled until the body itself has content',()=>{

@@ -72,3 +72,10 @@ export function freshTemplate(template:PageTemplate):PageTemplate{
  clone.blocks=clone.blocks.map(b=>({...b,id:id(),data:{...(b.data||{}),rows:Array.isArray(b.data?.rows)?b.data.rows.map((r:any)=>({...r,id:id()})):b.data?.rows}}));
  return clone;
 }
+
+/** Insert structure without erasing personal content. A single untouched guide block is replaced. */
+export function insertTemplateBlocks(existing:readonly PageBlock[],incoming:readonly PageBlock[]):PageBlock[]{
+ const blank=existing.length===1&&existing[0].type==='text'&&!existing[0].text&&!existing[0].html;
+ const added=JSON.parse(JSON.stringify(incoming)) as PageBlock[];
+ return blank?added:[...existing,...added];
+}

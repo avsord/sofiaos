@@ -1,3 +1,12 @@
+'use strict';
 const fs=require('node:fs'),path=require('node:path');
-const icon='iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAMAAADVRocKAAAASFBMVEX////39f7l4fvLwfefju+Baex/Z+1+Zux9Zex8ZOx6Yut3Xup2XOl0W+l0WulzWulzWehyWOhxWOhyV+hxV+hwVuhuU+dsUefc8f7uAAAEkElEQVR42u2a7ZKkKgyGURTkS+EY9f7vdKF724aWILZzfmztUrU1NTvTPJDAm5AMcf/zIP8Afw4AAJyzox/28c38kwAAq6XgjDHuR/gipLaB+BMAcFpyNkhlnkv3a7ejlgPjUju4C5jBSD+TeVoo/n9wo4dIc7YPUjaN5kyitvCWU5yrGb4FgGKDLq8QwIhelTyOA8DwwVT4EUbBNFwGgJOlj30uRaDuRgCgmZzn6tvkjangCgAkM3DlvsLIJFwADOKyJIDk1QCLrebMTBPUAGBC7XlC0Dm7HgFj9ek5nqYMgRzt8+38D8J0CvjSPruVbBkAg7wxf/A0hxIApLg1f5jhY4UJYNbsNKydyTPw1MbpDphBP7is27ZYY0a3bNu2LijHpm4gpe29x7rJrqPtc1Dadb1atxXybhgAARiGRZatpy1JRhMw+fUAjw86SX6AWMfQhuQG3bK/nyyUYFuL5peUkCsAEJGfIwDiYRix+TGAm/rMDmaNbGBD50cB8RbImQeWvrkM8IJ5BIzIEdq694StP59h0LYpA6LVkrM7sOzns+38FVtXf+G2ZejCucUBapecfQcHGXwdod1C3TbH91p3tNvQi88+d2A4nLigtelvwLpqXJGETgGohdZ+t9AyH5Mnd2qjF4AjMvcGNP12QbYt+y8BWEyno1NKuRfR2mQM2BgD0FsWO5k0tOMQpLoG8Lpr5FSo6YeIdr1YEKVOnCATgEBDfXzRIoreTvbxsgkp+zgkCm1OJVralxGWJQDkmj1s1OXFqKF6LRFYcopKwX5DCKTtS4TfayblU/ok9C1CkEshuxgjwMiLp2I1XR5B8S3AoOsBPuqbXaMTP+BGugYI0raZ/ghBBfsyIHxk2QPB2wtLHcCyWhHzgcBGDmnVUuVkxy4IpU/DdkM1fKk6plAALKVEo+mXqotWkAorj5IQAYalTiqERl9F1KvOh3i+AS0qkq8YfCbXYFuvOr2LGZEP0FP0Idd4wAmAR8oS8vWQtfh/kXLgiYtMAs47hCKAh0A/0y4aR6BuRUOmSYP+K4TigKzaWUB9/Jm2IN4qA9ANzJ9pi8OcUATgYvqOwWepYwlACy9Odkx+MRt1NI9oOzy1yCW/WHL6eGAeZLppO1lI9F5SmjxA8DeyV9BF+GBA6f6M9TevlFNMmQfI2+/oO9zPORpjH09yqK0nRI/AfqypkNdUrG1/6Rl7ryBCnKvwwrUxMaSUoPmPbAEGBUgxRKgfIHzUpEiqUNN9QKGc4zPp+0ZKDXQsqcnbJTUBxaIgv+cGOBTljmVNfaesac7KmuEQG7jhYDOfAcD03xLmKbN9ktvmd1bKf5DkSlxflZfzxfd8g8Ly66cVJLO5MgDWYuH2WovFYk0TrEmkLpnpcpPosSQ+1ra5pgHfMCk5TdQgwMrSbkkpPqreI05ajZPsZakpW26WOsW4cniz1CeETLqvm6WPObRgQtlDrIfQihWnzdS6hrWfiAul7TOpCCxrlOQe7M477zUtd4B5VHIIrfbBj9BzH6QaXVXPvfaPBl6tdj/GKTTEa2/Jvz/c+AsAvwD5byoDMJFuMgAAAABJRU5ErkJggg==';
-const dir=path.join(__dirname,'../assets');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'icon.png'),Buffer.from(icon,'base64'));
+async function main(){
+const sharp=require('sharp');
+for(const [source,target] of [['icon-master.svg','icon.png'],['adaptive-foreground.svg','adaptive-foreground.png']]){
+ await sharp(fs.readFileSync(path.join(__dirname,'../assets',source)),{density:384}).resize(1024,1024).png().toFile(path.join(__dirname,'../assets',target));
+ const bytes=fs.readFileSync(path.join(__dirname,'../assets',target));
+ if(bytes.readUInt32BE(16)!==1024||bytes.readUInt32BE(20)!==1024)throw Error('Invalid icon size');
+}
+console.log('Sofia vector-derived icon assets: 1024px verified');
+}
+main().catch(e=>{console.error(e.message);process.exitCode=1;});
