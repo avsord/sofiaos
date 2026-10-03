@@ -42,3 +42,12 @@ test('page back swipe reveals the actual previous page instead of the pages list
  assert.ok(src.includes('{previousBackdrop}'));
  assert.ok(!src.includes("return <View style={{flex:1,backgroundColor:c.bg}} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>\n  {listView}\n  <Animated.View"));
 });
+
+test('page row drag disables the outer menu pager while active',()=>{
+ const pages=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
+ const tree=fs.readFileSync(path.join(__dirname,'../src/components/PageTreeList.tsx'),'utf8');
+ assert.ok(pages.includes('[pageInteraction,setPageInteraction]=useState(false)'));
+ assert.ok(pages.includes('onDepthChange?.(!!selectedId||pageInteraction)'));
+ assert.ok(pages.includes('onInteractionChange={setPageInteraction}'));
+ assert.ok(tree.includes('delayLongPress={140}'));
+});
