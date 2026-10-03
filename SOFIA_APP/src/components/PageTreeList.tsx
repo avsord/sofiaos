@@ -49,14 +49,23 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
     const candidate=ids[index];
     return candidate&&candidate!==page.id&&canParent(page.id,candidate)?candidate:null;
   };
+  const pageById=(id:string)=>{
+    for(const p of roots)if(p.id===id)return p;
+    for(const list of children.values())for(const p of list)if(p.id===id)return p;
+    return undefined;
+  };
   const finish=(page:Entity,x:number,y:number,dx:number,dy:number)=>{
     if(dragId.current!==page.id)return;
-    const direct=targetAt(page,x,y),next=direct??fallbackTarget(page,dy),wasChild=!!String(page.data?.parent_id||'');
-    // Notion-like outdent: dragging a child left/outside removes its parent.
-    const outdented=wasChild&&(dx<-30||!hit(listRect.current,x,y));
+    const direct=targetAt(page,x,y),parentId=String(page.data?.parent_id||''),wasChild=!!parentId,rect=listRect.current;
+    // Vertical drag out of a nested group only climbs one hierarchy level.
+    // Becoming a root page requires an explicit horizontal drag outside the hierarchy.
+    const outsideHorizontal=!!rect&&(x<rect.x-12||x>rect.x+rect.width+12);
+    const parent=wasChild?pageById(parentId):undefined;
+    const previousLevel=parent?String(parent.data?.parent_id||''):'';
     dragId.current='';setDragging(null);setTarget(null);onInteractionChange?.(false);
-    if(next!==null&&canParent(page.id,next))void onMove(page,next);
-    else if(outdented&&canParent(page.id,''))void onMove(page,'');
+    if(direct!==null&&canParent(page.id,direct))void onMove(page,direct);
+    else if(wasChild&&outsideHorizontal&&canParent(page.id,''))void onMove(page,'');
+    else if(wasChild&&dy>18&&previousLevel!==parentId&&canParent(page.id,previousLevel))void onMove(page,previousLevel);
   };
   return <View ref={node=>{listRef.current=node;}} collapsable={false} style={{position:'relative'}}>
     {roots.map(page=><TreeRow key={page.id} page={page} children={children} expanded={expanded} toggle={toggle} onOpen={onOpen}
@@ -70,7 +79,7 @@ function TreeRow({page,children,expanded,toggle,onOpen,ancestors,compact,draggin
   draggingId:string;targetId:string;register:(id:string,node:View|null)=>void;measure:(id:string)=>void;onStart:(page:Entity)=>void;onMove:(page:Entity,x:number,y:number)=>void;
   onEnd:(page:Entity,x:number,y:number,dx:number,dy:number)=>void;onDelete?:(page:Entity)=>void;onInteractionChange?:(active:boolean)=>void;
 }){
-  const c=useTheme(),pan=useRef(new Animated.ValueXY()).current,startPoint=useRef({x:0,y:0}),lastPoint=useRef({x:0,y:0}),draggingRef=useRef(false),suppressPress=useRef(false);
+  const c=useTheme(),pan=useRef(new Animated.ValueXY()).current,startPoint=useRef({x:0,y:0}),lastPoint=useRef({x:0,y:0}),draggingRef=useRef(false),suppressPress=useRef(false),[showDelete,setShowDelete]=useState(false);
   if(ancestors.includes(page.id)||ancestors.length>40)return null;
   const kids=children.get(page.id)||[],open=compact?true:expanded.has(page.id),isTarget=targetId===page.id,isDragging=draggingId===page.id;
   const pageLabel=String(page.data?.parent_id||'')?'Abrir subpágina '+page.title:'Abrir página principal '+page.title;
@@ -83,11 +92,11 @@ function TreeRow({page,children,expanded,toggle,onOpen,ancestors,compact,draggin
   return <View>
     <View ref={node=>register(page.id,node)} collapsable={false} onLayout={()=>measure(page.id)}
       style={{paddingLeft:Math.min(ancestors.length,6)*(compact?14:16),borderRadius:9,backgroundColor:isTarget?c.accentSoft:'transparent'}}>
-      <Pressable accessible accessibilityRole="button" accessibilityLabel={pageLabel} accessibilityHint={'Segure e arraste para reorganizar '+page.title}
+      <Pressable accessible accessibilityRole="button" accessibilityLabel={pageLabel} accessibilityHint={'Segure para opções ou arraste para reorganizar '+page.title}
         delayLongPress={180} pressRetentionOffset={{top:500,right:500,bottom:500,left:500}}
         onPressIn={e=>{const p={x:e.nativeEvent.pageX,y:e.nativeEvent.pageY};startPoint.current=p;lastPoint.current=p;}}
-        onLongPress={()=>{suppressPress.current=true;if(onDelete)onDelete(page);else{draggingRef.current=true;pan.stopAnimation();pan.setValue({x:0,y:0});onStart(page);onInteractionChange?.(true);}}}
-        onTouchMove={e=>{const x=e.nativeEvent.pageX,y=e.nativeEvent.pageY;lastPoint.current={x,y};if(draggingRef.current){const dx=x-startPoint.current.x,dy=y-startPoint.current.y;pan.setValue({x:dx,y:dy});onMove(page,x,y);}}}
+        onLongPress={()=>{suppressPress.current=true;setShowDelete(!!onDelete);draggingRef.current=true;pan.stopAnimation();pan.setValue({x:0,y:0});onStart(page);onInteractionChange?.(true);}}
+        onTouchMove={e=>{const x=e.nativeEvent.pageX,y=e.nativeEvent.pageY;lastPoint.current={x,y};if(draggingRef.current){const dx=x-startPoint.current.x,dy=y-startPoint.current.y;if(Math.abs(dx)>8||Math.abs(dy)>8)setShowDelete(false);pan.setValue({x:dx,y:dy});onMove(page,x,y);}}}
         onPressOut={e=>{const x=e.nativeEvent.pageX||lastPoint.current.x,y=e.nativeEvent.pageY||lastPoint.current.y;finishDrag(x,y);}}
         onPress={()=>{if(suppressPress.current){suppressPress.current=false;return;}onOpen(page);}}
         style={{flexDirection:'row',alignItems:'center',borderRadius:9}}>
@@ -103,6 +112,10 @@ function TreeRow({page,children,expanded,toggle,onOpen,ancestors,compact,draggin
           </View>
         </Animated.View>
       </Pressable>
+      {showDelete&&onDelete?<Pressable accessibilityRole="button" accessibilityLabel={'Excluir página '+page.title} onPress={()=>{setShowDelete(false);onDelete(page);}}
+        style={{alignSelf:'flex-end',marginRight:10,marginBottom:6,paddingHorizontal:12,paddingVertical:7,borderRadius:9,backgroundColor:c.input}}>
+        <Text style={{fontSize:12,fontWeight:'700',color:c.danger}}>Excluir</Text>
+      </Pressable>:null}
     </View>
     {open?kids.map(child=><TreeRow key={child.id} page={child} children={children} expanded={expanded} toggle={toggle} onOpen={onOpen}
       ancestors={[...ancestors,page.id]} compact={compact} draggingId={draggingId} targetId={targetId} register={register} measure={measure}
