@@ -1,4 +1,4 @@
-import React,{useMemo,useRef,useState} from 'react';
+import React,{useRef,useState} from 'react';
 import {Animated,Pressable,Text,View} from 'react-native';
 import type {Entity} from '../lib/types';
 import {useTheme} from '../lib/theme';
