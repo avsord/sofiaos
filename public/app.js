@@ -633,8 +633,8 @@ const DEFAULT_PAGE_ICON='📄';
 const DEFAULT_PAGE_COVER_TYPE='preset';
 const DEFAULT_PAGE_COVER_VALUE='linear-gradient(135deg,#d9d2ff,#b8aaff)';
 const DEFAULT_PAGE_COVER_ATTACHMENT_ID='';
-function userPageData(page={}){const d={icon:'',icon_mode:'default',cover_type:DEFAULT_PAGE_COVER_TYPE,cover_value:DEFAULT_PAGE_COVER_VALUE,cover_attachment_id:DEFAULT_PAGE_COVER_ATTACHMENT_ID,purpose:'',layout:'notes',suggested:false,parent_id:'',node_type:'space',blocks_json:'[]',...(page.data||{})};if(!d.icon)d.icon_mode='default';else if(!['emoji','icon','upload'].includes(d.icon_mode))d.icon_mode='emoji';return d;}
-const USER_PAGE_DATA_KEYS=['icon','icon_mode','cover_type','cover_value','cover_attachment_id','purpose','layout','suggested','parent_id','node_type','blocks_json'];
+function userPageData(page={}){const d={icon:'',icon_mode:'default',cover_type:DEFAULT_PAGE_COVER_TYPE,cover_value:DEFAULT_PAGE_COVER_VALUE,cover_attachment_id:DEFAULT_PAGE_COVER_ATTACHMENT_ID,purpose:'',layout:'notes',suggested:false,parent_id:'',node_type:'space',template_id:'',blocks_json:'[]',...(page.data||{})};if(!d.icon)d.icon_mode='default';else if(!['emoji','icon','upload'].includes(d.icon_mode))d.icon_mode='emoji';return d;}
+const USER_PAGE_DATA_KEYS=['icon','icon_mode','cover_type','cover_value','cover_attachment_id','purpose','layout','suggested','parent_id','node_type','template_id','blocks_json'];
 function userPagePersistedData(pageOrData={},overrides={}){const source=pageOrData&&Object.prototype.hasOwnProperty.call(pageOrData,'data')?userPageData(pageOrData):userPageData({data:pageOrData||{}}),clean={};for(const key of USER_PAGE_DATA_KEYS)clean[key]=source[key];for(const [key,value] of Object.entries(overrides||{}))if(USER_PAGE_DATA_KEYS.includes(key))clean[key]=value;return clean;}
 function pageDisplayIcon(page){const d=page?.data!==undefined?userPageData(page):page||{};return d.icon||DEFAULT_PAGE_ICON;}
 function userPageDescendants(pageId){
@@ -663,14 +663,14 @@ async function loadUserPages(){
     const treeControls=el('div','space-tree-controls');
     const expand=btn(children.length?(expanded?'⌄':'›'):'',()=>children.length&&setPageTreeExpanded(page.id,!expanded),'space-tree-expander'+(children.length&&!expanded?' is-collapsed':''));expand.disabled=!children.length;expand.classList.toggle('is-collapsed',!!children.length&&!expanded);expand.setAttribute('aria-label',children.length?(expanded?'Recolher subpáginas':'Expandir subpáginas'):'Sem subpáginas');
     const iconMode=data.icon?(data.icon_mode==='icon'?'icon':'emoji'):'default';const b=btn('',()=>{state.selectedUserPage=page;setTab('userpage');},'nav mini-nav space-tree-button'+(state.selectedUserPage?.id===page.id?' active':''));b.append(el('span','nav-icon space-tree-page-icon page-icon-mode-'+iconMode,pageDisplayIcon(data)),el('span','nav-label space-tree-page-title',page.title));b.title=depth?'Página dentro de '+(state.userPages.find(x=>x.id===data.parent_id)?.title||'outra página'):'Página';
-    const add=btn('＋',e=>editUserPage(null,page),'space-tree-add');add.title='Criar subpágina em '+page.title;add.setAttribute('aria-label','Criar subpágina em '+page.title);
+    const add=btn('＋',()=>showPageCreateMenu(page),'space-tree-add');add.title='Criar subpágina em '+page.title;add.setAttribute('aria-label','Criar subpágina em '+page.title);
     treeControls.append(expand,b,add);row.append(treeControls);host.append(row);
     if(expanded)for(const child of children)renderNode(child,depth+1);
   };
   for(const root of roots)renderNode(root,0);
   if(!state.userPages.length)host.append(el('p','hint','Nenhuma página criada. Comece do zero quando quiser.'));
 }
-$('addUserPage').onclick=()=>editUserPage();
+$('addUserPage').onclick=()=>showPageCreateMenu();
 function setParticularMenuExpanded(expanded){
   const host=$('userPagesNav'),toggle=$('particularMenuCollapse');if(!host||!toggle)return;
   const wasOpen=toggle.getAttribute('aria-expanded')==='true',open=Boolean(expanded);host.hidden=!open;toggle.setAttribute('aria-expanded',open?'true':'false');
@@ -827,7 +827,8 @@ function normalizeCollection(block){
       key:String(p.key||('field'+i)).replace(/[^a-z0-9_-]/gi,'_').slice(0,40),
       label:String(p.label||p.key||'Campo').slice(0,80),
       type:['text','select','url','date','tags','checkbox'].includes(p.type)?p.type:'text',
-      options:Array.isArray(p.options)?p.options.map(x=>String(x).slice(0,80)).slice(0,30):[]
+      options:Array.isArray(p.options)?p.options.map(x=>String(x).slice(0,80)).slice(0,30):[],
+      option_colors:p.option_colors&&typeof p.option_colors==='object'&&!Array.isArray(p.option_colors)?Object.fromEntries(Object.entries(p.option_colors).slice(0,30).map(([k,v])=>[String(k).slice(0,80),String(v).slice(0,20)])):{}
     })),
     views:views.slice(0,12).map((v,i)=>({
       id:String(v.id||('view'+i)).slice(0,40),label:String(v.label||'Visualização').slice(0,80),
@@ -861,14 +862,37 @@ function collectionEditor(block,row,prop){
 function filteredCollectionRows(d,view){let rows=[...d.rows];if(view?.filter_key){const wanted=view.filter_value;rows=rows.filter(r=>wanted===true||wanted===false?Boolean(r.values?.[view.filter_key])===Boolean(wanted):String(r.values?.[view.filter_key]??'')===String(wanted??''));}if(view?.sort_by){const dir=view.sort_dir==='asc'?1:-1;rows.sort((a,b)=>String(a.values?.[view.sort_by]??'').localeCompare(String(b.values?.[view.sort_by]??''),'pt-BR',{numeric:true})*dir);}return rows;}
 function renderCollectionTable(block,d,wrap,view=null){const rows=filteredCollectionRows(d,view),table=el('table','collection-table'),thead=el('thead'),hr=el('tr');for(const p of d.properties){const th=el('th');const h=btn(p.label,()=>editCollectionProperty(block,p.key),'collection-property-header');h.title='Configurar '+p.label;th.append(h);hr.append(th);}hr.append(el('th','collection-row-actions',''));thead.append(hr);const tbody=el('tbody');for(const row of rows){const tr=el('tr');for(const p of d.properties){const td=el('td');td.append(collectionEditor(block,row,p));tr.append(td);}const actions=el('td','collection-row-actions');actions.append(btn('×',()=>{d.rows=d.rows.filter(x=>x.id!==row.id);syncCollectionSource(block,d);renderNotionPage(state.selectedUserPage);queueUserPageSave();},'collection-delete-row'));tr.append(actions);tbody.append(tr);}table.append(thead,tbody);wrap.append(table);}
 function collectionStatusClass(value){const key=String(value||'').toLocaleLowerCase('pt-BR');if(key.includes('prioridade'))return 'status-priority';if(key.includes('conclu'))return 'status-done';return 'status-neutral';}
+const COLLECTION_STATUS_COLORS={gray:'#8e8e93',red:'#e05a5a',orange:'#d9822b',yellow:'#c9a227',green:'#42a56b',teal:'#2d9c9c',blue:'#4285d4',purple:'#8b67d5',pink:'#d66aa6'};
+const COLLECTION_STATUS_COLOR_OPTIONS=[['gray','Cinza'],['red','Vermelho'],['orange','Laranja'],['yellow','Amarelo'],['green','Verde'],['teal','Turquesa'],['blue','Azul'],['purple','Roxo'],['pink','Rosa']];
+function collectionOptionName(base,options,exclude=''){let name=String(base||'Nova coluna').trim().slice(0,60)||'Nova coluna',n=2;const used=options.filter(x=>x!==exclude);if(!used.includes(name))return name;while(used.includes(name+' '+n))n++;return name+' '+n;}
+function collectionOptionColor(prop,value){return COLLECTION_STATUS_COLORS[String(prop?.option_colors?.[value]||'gray')]||COLLECTION_STATUS_COLORS.gray;}
+function styleCollectionStatus(node,prop,value){const color=collectionOptionColor(prop,value);node.classList.add('custom-status');node.style.setProperty('--status-color',color);return node;}
+function editCollectionBoardGroup(block,propKey,value=null){
+  const d=normalizeCollection(block),prop=d.properties.find(p=>p.key===propKey);if(!prop)return;prop.options=prop.options||[];prop.option_colors=prop.option_colors||{};
+  const exists=value!==null&&prop.options.includes(value),fields=[
+    {name:'name',label:'Nome da coluna',value:exists?value:'',required:true,max:60},
+    {name:'color',label:'Cor',type:'select',value:exists?(prop.option_colors[value]||'gray'):'gray',options:COLLECTION_STATUS_COLOR_OPTIONS}
+  ];
+  if(exists)fields.push({name:'duplicate',label:'Duplicar esta coluna',type:'checkbox',value:false},{name:'remove',label:'Excluir esta coluna',type:'checkbox',value:false});
+  editor(exists?'Configurar coluna':'Nova coluna',fields,async v=>{
+    const next=normalizeCollection(block),p=next.properties.find(x=>x.key===propKey);if(!p)return;p.options=p.options||[];p.option_colors=p.option_colors||{};
+    if(exists&&v.remove){p.options=p.options.filter(x=>x!==value);delete p.option_colors[value];for(const row of next.rows)if(String(row.values?.[p.key]||'')===value)row.values[p.key]='';}
+    else if(exists&&v.duplicate){const name=collectionOptionName(v.name+' cópia',p.options);p.options.push(name);p.option_colors[name]=v.color||'gray';}
+    else if(exists){const name=collectionOptionName(v.name,p.options,value);p.options=p.options.map(x=>x===value?name:x);for(const row of next.rows)if(String(row.values?.[p.key]||'')===value)row.values[p.key]=name;delete p.option_colors[value];p.option_colors[name]=v.color||'gray';}
+    else{const name=collectionOptionName(v.name,p.options);p.options.push(name);p.option_colors[name]=v.color||'gray';}
+    syncCollectionSource(block,next,{schema:true});renderNotionPage(state.selectedUserPage);queueUserPageSave();
+  });
+}
 function renderCollectionBoard(block,d,view,wrap){
   const group=d.properties.find(p=>p.key===view.group_by)||d.properties.find(p=>p.type==='select');if(!group){wrap.append(el('p','hint','Adicione uma propriedade de seleção para usar a visualização em quadro.'));return;}
   const hasUngrouped=d.rows.some(r=>!String(r.values?.[group.key]||''));const groups=[...(group.options||[]),...(hasUngrouped?['Sem grupo']:[])],board=el('div','collection-board notion-board');
-  for(const g of groups){const statusClass=collectionStatusClass(g),col=el('section','collection-board-column '+statusClass),rows=filteredCollectionRows(d,view).filter(r=>(String(r.values?.[group.key]||'')||'Sem grupo')===g);const title=el('div','collection-board-title');title.append(el('span','collection-status-chip '+statusClass,g),el('span','collection-status-count',String(rows.length)));col.append(title);
+  for(const g of groups){const statusClass=collectionStatusClass(g),col=el('section','collection-board-column '+statusClass),rows=filteredCollectionRows(d,view).filter(r=>(String(r.values?.[group.key]||'')||'Sem grupo')===g);if(g!=='Sem grupo')styleCollectionStatus(col,group,g);
+    const title=el('div','collection-board-title'),chip=g==='Sem grupo'?el('span','collection-status-chip '+statusClass,g):btn(g,()=>editCollectionBoardGroup(block,group.key,g),'collection-status-chip '+statusClass);if(g!=='Sem grupo')styleCollectionStatus(chip,group,g);title.append(chip,el('span','collection-status-count',String(rows.length)));if(g!=='Sem grupo'){const more=btn('•••',()=>editCollectionBoardGroup(block,group.key,g),'collection-column-more');more.title='Configurar '+g;title.append(more);}col.append(title);
     col.addEventListener('dragover',e=>{e.preventDefault();col.classList.add('drop-target');});col.addEventListener('dragleave',()=>col.classList.remove('drop-target'));col.addEventListener('drop',e=>{e.preventDefault();col.classList.remove('drop-target');const id=e.dataTransfer.getData('text/sofia-collection-row'),row=d.rows.find(x=>x.id===id);if(row){row.values[group.key]=g==='Sem grupo'?'':g;touchCollectionRow(row,d);syncCollectionSource(block,d);renderNotionPage(state.selectedUserPage);queueUserPageSave();}});
     const nameProp=d.properties.find(p=>p.key==='name')||d.properties[0];for(const row of rows){const card=el('article','collection-board-card');card.draggable=true;card.tabIndex=0;card.addEventListener('dragstart',e=>e.dataTransfer.setData('text/sofia-collection-row',row.id));card.append(el('strong','',String(row.values?.[nameProp?.key]||'Sem título')));for(const p of d.properties.filter(p=>p.key!==nameProp?.key&&p.key!==group.key).slice(0,2)){const raw=row.values?.[p.key],value=p.type==='checkbox'?(raw?'Sim':''):String(raw||'');if(value)card.append(el('small','',p.label+': '+value));}card.addEventListener('click',()=>openCollectionPage(block,row));card.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openCollectionPage(block,row);}});col.append(card);}
     col.append(btn('＋ Nova página',()=>{const seed={[group.key]:g==='Sem grupo'?'':g};const row=addCollectionRow(block,seed),rowId=row.id;setTimeout(()=>{const latest=normalizeCollection(block).rows.find(x=>x.id===rowId);if(latest)openCollectionPage(block,latest);},0);},'collection-add-card'));board.append(col);
-  }wrap.append(board);
+  }
+  board.append(btn('＋ Coluna',()=>editCollectionBoardGroup(block,group.key,null),'collection-add-column'));wrap.append(board);
 }
 function editCollectionRow(block,row){const d=normalizeCollection(block),fields=d.properties.map(p=>({name:p.key,label:p.label,type:p.type==='select'?'select':p.type==='date'?'date':p.type==='url'?'url':p.type==='checkbox'?'checkbox':'text',value:p.type==='checkbox'?Boolean(row.values?.[p.key]):String(row.values?.[p.key]||''),options:p.type==='select'?[['','Sem valor'],...(p.options||[]).map(x=>[x,x])]:undefined,max:2000}));editor('Editar item',fields,async values=>{for(const p of d.properties)row.values[p.key]=p.type==='checkbox'?Boolean(values[p.key]):(values[p.key]||'');touchCollectionRow(row,d);syncCollectionSource(block,d);renderNotionPage(state.selectedUserPage);queueUserPageSave();});}
 function renderCollectionList(block,d,wrap,gallery=false,view=null){const grid=el('div',gallery?'collection-gallery':'collection-list'),nameProp=d.properties.find(p=>p.key==='name')||d.properties[0];for(const row of filteredCollectionRows(d,view)){const card=el('article',gallery?'collection-gallery-card':'collection-list-row');card.append(el('strong','',String(row.values?.[nameProp?.key]||'Sem título')));for(const p of d.properties.filter(p=>p.key!==nameProp?.key).slice(0,gallery?4:2)){const raw=row.values?.[p.key],value=p.type==='checkbox'?(raw?'Sim':''):String(raw||'');if(value)card.append(el('small','',p.label+': '+value));}card.onclick=()=>editCollectionRow(block,row);grid.append(card);}wrap.append(grid);}
@@ -946,15 +970,29 @@ function updatePageInlineToolbar(){
   const rect=ctx.range.getBoundingClientRect(),width=Math.min(560,window.innerWidth-24);toolbar.style.width='max-content';toolbar.style.maxWidth=width+'px';toolbar.style.left=Math.max(12,Math.min(window.innerWidth-width-12,rect.left+rect.width/2-width/2))+'px';toolbar.style.top=Math.max(8,rect.top-52)+'px';toolbar.hidden=false;
 }
 const PAGE_TEMPLATES=[
-  {id:'ideas_database',title:'Banco de ideias / anotações',description:'Tabela principal com visualizações no topo, mantendo o ícone atual da página.',blocks:[['collection','',{title:'',show_title:false,properties:[{key:'name',label:'Nome',type:'text'},{key:'created',label:'Criado',type:'date'}],views:[{id:'all',label:'Todas as anotações',type:'table'},{id:'course',label:'Por curso',type:'table'},{id:'literature',label:'Literatura 455',type:'table'},{id:'simple',label:'Lista simples',type:'list'}],active_view:'all',rows:[]}]]},
-  {id:'tasks_board',title:'Tarefas em quadro',description:'Kanban compacto no padrão Notion: Não iniciada, Prioridade e Concluído.',blocks:[['collection','',{title:'',show_title:false,properties:[{key:'name',label:'Nome',type:'text'},{key:'status',label:'Status',type:'select',options:['Não iniciada','Prioridade','Concluído']}],views:[{id:'board',label:'Visualização em quadro',type:'board',group_by:'status'}],active_view:'board',rows:[]}]]},
-  {id:'pages_directory',title:'Páginas / notas',description:'Estrutura no padrão Notion com Guidance, Pinned Notes e páginas recentes que abrem em uma página/modal.',blocks:[
-    ['toggle','Guidance',{details:'Use esta área para orientações, links e contexto desta coleção.'}],
-    ['collection','',{title:'Pinned Notes',show_title:false,source_id:'pages_directory_notes',properties:[{key:'name',label:'Nome',type:'text'},{key:'note_label',label:'Note Label',type:'select',options:['Comandos','Addons','Vídeos','Referência']},{key:'pin',label:'Pin',type:'checkbox'},{key:'created',label:'Criado',type:'date'},{key:'updated',label:'Atualizado',type:'date'}],views:[{id:'pinned',label:'📌 Pinned Notes',type:'pages',filter_key:'pin',filter_value:true,sort_by:'updated',sort_dir:'desc'}],active_view:'pinned',rows:[]}],
-    ['text','Clique em “Nova página” para criar uma nota. Cada item abre como página, com propriedades e conteúdo editável.'],
-    ['collection','',{title:'Notas',show_title:false,source_id:'pages_directory_notes',properties:[{key:'name',label:'Nome',type:'text'},{key:'note_label',label:'Note Label',type:'select',options:['Comandos','Addons','Vídeos','Referência']},{key:'pin',label:'Pin',type:'checkbox'},{key:'created',label:'Criado',type:'date'},{key:'updated',label:'Atualizado',type:'date'}],views:[{id:'recent',label:'✺ Recently Added',type:'pages',sort_by:'created',sort_dir:'desc'},{id:'updated',label:'✺ Recently Updated',type:'pages',sort_by:'updated',sort_dir:'desc'}],active_view:'recent',rows:[]}]
+  {id:'tasks_personal',title:'Tarefas pessoal',description:'Quadro de tarefas com colunas de status editáveis: nome, cor, duplicação e novas colunas.',icon:'🧏',cover_type:'',cover_value:'',blocks:[
+    ['collection','',{title:'',show_title:false,properties:[
+      {key:'name',label:'Nome',type:'text'},
+      {key:'status',label:'Status',type:'select',options:['Não iniciada','Prioridade'],option_colors:{'Não iniciada':'gray','Prioridade':'red'}}
+    ],views:[{id:'board',label:'Visualização em quadro',type:'board',group_by:'status'}],active_view:'board',rows:[]}]
+  ]},
+  {id:'notes_hub',title:'Bloco de nota',description:'Cadernos e notas em uma página limpa no estilo da referência.',icon:'📖',cover_type:'',cover_value:'',blocks:[
+    ['heading2','Cadernos',{}],
+    ['collection','',{title:'Cadernos',show_title:false,properties:[{key:'name',label:'Nome',type:'text'}],views:[{id:'main',label:'Principais',type:'pages'}],active_view:'main',rows:[]}],
+    ['collection','',{title:'Notas',show_title:false,properties:[{key:'name',label:'Nome',type:'text'}],views:[{id:'notes',label:'Notas',type:'list'}],active_view:'notes',rows:[
+      {id:'notes-db',values:{name:'Notas - db'},page_content:''},{id:'meditacoes',values:{name:'Meditações'},page_content:''}
+    ]}]
+  ]},
+  {id:'playlist_links',title:'Lista de reprodução',description:'Guidance + gerenciador de links com nome, URL, categoria e data.',icon:'▶️',cover_type:'preset',cover_value:'linear-gradient(135deg,#102b75,#173b98)',blocks:[
+    ['callout','Quick-capture new links using Notion Web Clipper',{icon:'➤'}],
+    ['callout','Guidance',{icon:'ℹ️'}],
+    ['collection','',{title:'Link Manager',show_title:false,properties:[
+      {key:'name',label:'Name',type:'text'},{key:'url',label:'URL',type:'url'},
+      {key:'category',label:'Category',type:'select',options:['Vídeo','Artigo','Curso','Referência'],option_colors:{'Vídeo':'blue','Artigo':'green','Curso':'purple','Referência':'gray'}},
+      {key:'created',label:'Created',type:'date'}
+    ],views:[{id:'links',label:'Link Manager',type:'table',sort_by:'created',sort_dir:'desc'}],active_view:'links',rows:[]}]
   ]}
-];
+]
 function templateBlocks(template){return template.blocks.map(item=>{const [type,text,data]=item;return newPageBlock(type,{text:text||'',data:data?structuredClone(data):(type==='table'?{rows:[['Item','Valor'],['','']]}:{})});});}
 const PAGE_EMOJIS=[...'😀 😃 😄 😁 😆 😅 😂 😊 🙂 🙃 😉 😌 😍 🥰 😘 😎 🤓 🧐 🤔 🤩 🥳 😴 🤖 👻 💀 ❤️ 🧡 💛 💚 💙 💜 🤍 🤎 🖤 💡 🔥 ✨ ⭐ 🌟 ⚡ ☀️ 🌙 ☁️ 🌈 🌱 🌿 🌵 🌲 🌊 🪨 🧪 ⚗️ 🔬 🧬 🧠 👁️ 🎯 🧭 🗺️ 🚀 ✈️ 🚗 🚲 🏠 🏢 🏗️ 💼 🧰 🛠️ ⚙️ 🔧 🔨 💻 🖥️ ⌨️ 📱 📷 🎥 🎬 🎞️ 🎨 🖌️ ✏️ 📝 📌 📍 📅 🗓️ ⏰ ⌚ 📚 📖 🔖 📁 📂 🗂️ 📦 🧾 📊 📈 📉 💰 💳 🛒 🛍️ 🎁 💊 🩺 🧴 🥗 ☕ 🍵 🍎 🎵 🎧 🎤 🎹 🎸 🎮 🏋️ 🧘 ⚽ 🏆 🎓 🧑‍💻 🔗 🔎 🔐 🔒 🔓 ✅ ☑️ ❌ ⚠️ ℹ️ ❓ 💬 🗨️ 📣 📡 🧩 ♟️ 🎲 🧱 💎 🪄 🧿'.split(' ')];
 const PAGE_ICONS=[...'♡ ♥ ☆ ★ ○ ● ◌ ◉ ◎ ◇ ◆ □ ■ △ ▲ ▽ ▼ ◁ ◀ ▷ ▶ ✓ ✔ ✕ × + − ± ≡ ∞ ∑ ∆ ∇ ⌂ ⌘ ⌁ ⌗ ⎋ ⏱ ⚑ ⚐ ⚙ ⚡ ☀ ☾ ☁ ☂ ☰ ☷ ▦ ▤ ▥ ⊞ ⊟ ⊕ ⊗ ↖ ↑ ↗ ← → ↙ ↓ ↘ ↔ ↕ ↳ ↪ ⇄ ⇧ ⇩ ⤴ ⤵ ✎ ✐ ✚ ✦ ✧ ✪ ❖ ☑ ☐ ☒ ♫ ♪ ♬ ✉ ☎ ⌚ ⚒ ⚔ ♟ ♜ ♞ ♝ ♛ ♚ ⛳ ⚓ ⚗ ⚖ ⚕ ⚛ ⚙ ⎈ ◐ ◑ ◒ ◓ ⬡ ⬢ ⬣ ◈ ◊ ⌑ ⎔ ⎚'.split(' ')];
@@ -988,7 +1026,21 @@ function showPageCoverPicker(){
 }
 function pageCoverStyle(data){if(data.cover_type==='preset'&&String(data.cover_value||'').startsWith('linear-gradient('))return data.cover_value;return '';}
 function pageCoverUrl(data){return data.cover_type==='attachment'&&data.cover_attachment_id?'/api/attachments/'+encodeURIComponent(data.cover_attachment_id)+'?inline=1':'';}
-function showPageTemplates(){recordDialog.replaceChildren();const h=el('div','dialog-title');h.append(el('h3','','Templates de página'),btn('×',()=>recordDialog.close(),'icon-button'));recordDialog.append(h,el('p','hint','Templates alteram somente a estrutura e os blocos. O ícone/emoticon atual da página é sempre preservado e tudo continua livre e editável.'));const grid=el('div','template-grid');for(const t of PAGE_TEMPLATES){const c=el('article','template-card');c.append(el('h3','',t.title),el('p','',t.description));const a=el('div','button-row');a.append(btn('Inserir',()=>{state.userPageBlocks.push(...templateBlocks(t));if(!state.userPageBlocks.length)state.userPageBlocks=[newPageBlock('text')];recordDialog.close();renderNotionPage(state.selectedUserPage);queueUserPageSave();},'primary'));c.append(a);grid.append(c);}recordDialog.append(grid);recordDialog.showModal();}
+async function createUserPageFromTemplate(template,parent=null){
+  const blocks=templateBlocks(template),parentId=parent?.id||'',saved=await api('/api/entities',{method:'POST',body:{kind:'user_page',title:template.title,content:'',area:parent?.area||'Pessoal',privacy:'private',state:'active',tags:[],data:userPagePersistedData({},{icon:template.icon||'',icon_mode:template.icon?'emoji':'default',cover_type:template.cover_type||'',cover_value:template.cover_value||'',cover_attachment_id:'',purpose:'',layout:'notes',suggested:false,parent_id:parentId,node_type:parentId?'page':'space',template_id:template.id,blocks_json:JSON.stringify(blocks)})}});
+  state.selectedUserPage=saved;await loadUserPages();await setTab('userpage');notify('Página criada com o template '+template.title+'.');
+}
+function showPageCreateMenu(parent=null){
+  recordDialog.replaceChildren();const h=el('div','dialog-title');h.append(el('h3','',parent?'Criar subpágina':'Criar página'),btn('×',()=>recordDialog.close(),'icon-button'));recordDialog.append(h);
+  if(parent)recordDialog.append(el('p','hint','Dentro de '+parent.title));
+  const menu=el('div','page-create-menu');const blank=btn('',()=>{recordDialog.close();editUserPage(null,parent);},'page-create-choice');blank.append(el('strong','','＋ Página em branco'),el('span','','Começar sem estrutura pronta.'));
+  const templates=btn('',()=>{recordDialog.close();showPageTemplates({create:true,parent});},'page-create-choice template-choice');templates.append(el('strong','','▦ Usar template'),el('span','','Tarefas pessoal, Bloco de nota ou Lista de reprodução.'));
+  menu.append(blank,templates);recordDialog.append(menu);recordDialog.showModal();
+}
+function showPageTemplates({create=false,parent=null}={}){
+  recordDialog.replaceChildren();const h=el('div','dialog-title');h.append(el('h3','',create?'Criar com template':'Templates de página'),btn('×',()=>recordDialog.close(),'icon-button'));recordDialog.append(h,el('p','hint',create?'Escolha uma estrutura pronta. Depois tudo continua editável.':'Insere a estrutura do template na página atual. Ícone e capa existentes são preservados.'));
+  const grid=el('div','template-grid');for(const t of PAGE_TEMPLATES){const c=el('article','template-card'),head=el('div','template-card-head');head.append(el('span','template-card-icon',t.icon),el('h3','',t.title));c.append(head,el('p','',t.description));const a=el('div','button-row');a.append(btn(create?'Criar':'Inserir',async()=>{if(create){recordDialog.close();await createUserPageFromTemplate(t,parent);return;}state.userPageBlocks.push(...templateBlocks(t));if(!state.userPageBlocks.length)state.userPageBlocks=[newPageBlock('text')];recordDialog.close();renderNotionPage(state.selectedUserPage);queueUserPageSave();},'primary'));c.append(a);grid.append(c);}recordDialog.append(grid);recordDialog.showModal();
+}
 function renderNotionPage(page){
   if(!page)return;const body=$('userPageBody');body.replaceChildren();const data=userPageData(page);
   const coverPreset=pageCoverStyle(data),coverUrl=pageCoverUrl(data);if(coverPreset||coverUrl){const cover=el('div','notion-page-cover');cover.tabIndex=0;cover.title='Clique para alterar a capa';cover.setAttribute('aria-label','Alterar capa da página');cover.onclick=e=>{if(e.target.closest('.notion-cover-action'))return;showPageCoverPicker();};cover.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();showPageCoverPicker();}};if(coverPreset)cover.style.background=coverPreset;if(coverUrl){cover.style.backgroundImage='url("'+coverUrl.replace(/"/g,'')+'")';cover.classList.add('image-cover');}const change=btn('Alterar capa',showPageCoverPicker,'notion-cover-action');cover.append(change);body.append(cover);}
@@ -1045,9 +1097,9 @@ async function resetUserPageToDefault(){
   state.userPageBlocks=emptyBlocks;state.selectedUserPage=saved;const index=state.userPages.findIndex(x=>x.id===saved.id);if(index>=0)state.userPages[index]=saved;
   renderUserPageBreadcrumb(saved);renderNotionPage(saved);resetUserPageHistory();await loadUserPages();notify('Página restaurada ao modo default.');
 }
-function showUserPageActions(){if(!state.selectedUserPage)return;recordDialog.replaceChildren();const h=el('div','dialog-title');h.append(el('h3','','Mais ações'),btn('×',()=>recordDialog.close(),'icon-button'));recordDialog.append(h);const menu=el('div','page-actions-list');menu.append(btn('Configurar página',()=>{recordDialog.close();editUserPage(state.selectedUserPage);},'block-more-action'),btn('Criar subpágina',()=>{recordDialog.close();editUserPage(null,state.selectedUserPage);},'block-more-action'),btn('Templates de página',()=>{recordDialog.close();showPageTemplates();},'block-more-action'),btn('Alterar ícone',()=>{recordDialog.close();showPageIconPicker();},'block-more-action'),btn('Editar capa',()=>{recordDialog.close();showPageCoverPicker();},'block-more-action'),btn('Modo default',async()=>{recordDialog.close();await resetUserPageToDefault();},'block-more-action'),btn('Excluir página e subpáginas',async()=>{recordDialog.close();await deleteRecord(state.selectedUserPage);},'block-more-action danger-text'));recordDialog.append(menu);recordDialog.showModal();}
+function showUserPageActions(){if(!state.selectedUserPage)return;recordDialog.replaceChildren();const h=el('div','dialog-title');h.append(el('h3','','Mais ações'),btn('×',()=>recordDialog.close(),'icon-button'));recordDialog.append(h);const menu=el('div','page-actions-list');menu.append(btn('Configurar página',()=>{recordDialog.close();editUserPage(state.selectedUserPage);},'block-more-action'),btn('Criar subpágina',()=>{recordDialog.close();showPageCreateMenu(state.selectedUserPage);},'block-more-action'),btn('Templates de página',()=>{recordDialog.close();showPageTemplates();},'block-more-action'),btn('Alterar ícone',()=>{recordDialog.close();showPageIconPicker();},'block-more-action'),btn('Editar capa',()=>{recordDialog.close();showPageCoverPicker();},'block-more-action'),btn('Modo default',async()=>{recordDialog.close();await resetUserPageToDefault();},'block-more-action'),btn('Excluir página e subpáginas',async()=>{recordDialog.close();await deleteRecord(state.selectedUserPage);},'block-more-action danger-text'));recordDialog.append(menu);recordDialog.showModal();}
 $('editUserPage').onclick=()=>state.selectedUserPage&&editUserPage(state.selectedUserPage);
-$('addSubPage').onclick=()=>state.selectedUserPage&&editUserPage(null,state.selectedUserPage);
+$('addSubPage').onclick=()=>state.selectedUserPage&&showPageCreateMenu(state.selectedUserPage);
 $('deleteUserPage').onclick=showUserPageActions;
 
 function applyOptionalNavigation(){const lists=$('navWidgetLists'),library=$('navWidgetLibrary');if(lists)lists.hidden=false;if(library)library.hidden=false;}
