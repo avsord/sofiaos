@@ -1092,7 +1092,7 @@ async function resetUserPageToDefault(){
   if(!state.selectedUserPage)return;const data=userPageData(state.selectedUserPage),hasContent=state.userPageBlocks.some(pageBlockHasContent)||hasCustomPageVisuals(data);
   if(hasContent){const ok=await uiConfirm('Esta ação remove o conteúdo, o template, a capa e o ícone personalizado desta página. O título será preservado. Deseja voltar ao modo default?',{title:'Voltar ao modo default',confirmLabel:'Voltar ao default'});if(!ok)return;}
   clearTimeout(state.userPageSaveTimer);const page=state.selectedUserPage,emptyBlocks=[newPageBlock('text')];state.selectedImageBlockId='';
-  const defaultData=userPagePersistedData(data,{icon:'',icon_mode:'default',cover_type:DEFAULT_PAGE_COVER_TYPE,cover_value:DEFAULT_PAGE_COVER_VALUE,cover_attachment_id:DEFAULT_PAGE_COVER_ATTACHMENT_ID,purpose:'',layout:'notes',suggested:false,blocks_json:JSON.stringify(emptyBlocks)});
+  const defaultData=userPagePersistedData(data,{icon:'',icon_mode:'default',cover_type:DEFAULT_PAGE_COVER_TYPE,cover_value:DEFAULT_PAGE_COVER_VALUE,cover_attachment_id:DEFAULT_PAGE_COVER_ATTACHMENT_ID,purpose:'',layout:'notes',suggested:false,template_id:'',blocks_json:JSON.stringify(emptyBlocks)});
   const saved=await api('/api/entities/'+page.id,{method:'PATCH',body:{kind:'user_page',title:page.title,content:'',area:page.area,privacy:page.privacy,state:page.state,revision:page.revision,data:defaultData,tags:page.tags||[]}});
   state.userPageBlocks=emptyBlocks;state.selectedUserPage=saved;const index=state.userPages.findIndex(x=>x.id===saved.id);if(index>=0)state.userPages[index]=saved;
   renderUserPageBreadcrumb(saved);renderNotionPage(saved);resetUserPageHistory();await loadUserPages();notify('Página restaurada ao modo default.');
