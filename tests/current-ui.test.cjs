@@ -6,14 +6,14 @@ const path=require('node:path');
 const root=path.join(__dirname,'..');
 const read=rel=>fs.readFileSync(path.join(root,rel),'utf8');
 
-test('v141: identidade e cache atuais estão alinhados',()=>{
+test('v142: identidade e cache atuais estão alinhados',()=>{
   const cfg=read('src/config/sofia.js'),html=read('public/index.html'),pkg=JSON.parse(read('package.json'));
-  assert.ok(cfg.includes("const VERSION = '141.0.0'"));
-  assert.ok(html.includes('Sofia OS · v141'));
-  assert.ok(html.includes('/ui-current.css?v=141'));
-  assert.ok(html.includes('/app.js?v=141'));
-  assert.ok(html.includes('Core v141 · AVSORD Technology'));
-  assert.equal(pkg.version,'1.89.0');
+  assert.ok(cfg.includes("const VERSION = '142.0.0'"));
+  assert.ok(html.includes('Sofia OS · v142'));
+  assert.ok(html.includes('/ui-current.css?v=142'));
+  assert.ok(html.includes('/app.js?v=142'));
+  assert.ok(html.includes('Core v142 · AVSORD Technology'));
+  assert.equal(pkg.version,'1.90.0');
 });
 
 test('v141: subpáginas sem preferência começam fechadas',()=>{
@@ -239,4 +239,29 @@ test('v141: web permite apagar mensagem individual e limpar histórico sincroniz
   assert.ok(handler.includes("m==='DELETE'&&match"));
   assert.ok(store.includes('deleteMessage(messageId)'));
   assert.ok(store.includes('clearChatHistory()'));
+});
+
+
+test('v142: templates oficiais substituem os antigos e o + oferece duas funções',()=>{
+  const app=read('public/app.js'),css=read('public/style.css');
+  for(const id of ["tasks_personal","notes_hub","playlist_links"])assert.ok(app.includes("id:'"+id+"'"));
+  for(const title of ['Tarefas pessoal','Bloco de nota','Lista de reprodução'])assert.ok(app.includes("title:'"+title+"'"));
+  for(const old of ['ideas_database','pages_directory'])assert.ok(!app.includes("id:'"+old+"'"));
+  assert.ok(app.includes('function showPageCreateMenu(parent=null)'));
+  assert.ok(app.includes('＋ Página em branco'));
+  assert.ok(app.includes('▦ Usar template'));
+  assert.ok(app.includes("$('addUserPage').onclick=()=>showPageCreateMenu()"));
+  assert.ok(app.includes("showPageCreateMenu(state.selectedUserPage)"));
+  assert.ok(css.includes('.page-create-choice'));
+});
+
+test('v142: quadro de tarefas permite criar, renomear, colorir e duplicar colunas',()=>{
+  const app=read('public/app.js'),css=read('public/style.css');
+  assert.ok(app.includes('COLLECTION_STATUS_COLORS'));
+  assert.ok(app.includes('function editCollectionBoardGroup'));
+  assert.ok(app.includes("label:'Duplicar esta coluna'"));
+  assert.ok(app.includes("btn('＋ Coluna'"));
+  assert.ok(app.includes('option_colors'));
+  assert.ok(css.includes('.collection-board-column.custom-status'));
+  assert.ok(css.includes('.collection-add-column'));
 });
