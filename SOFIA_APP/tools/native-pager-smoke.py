@@ -85,7 +85,7 @@ def page(id):
 def swipe(direction):
     vp=viewport(tree())
     if not vp:raise AssertionError('No visible native pager viewport for gesture')
-    x1,y1,x2,y2=vp;left=x1+int((x2-x1)*.36);right=x1+int((x2-x1)*.92);y=y1+int((y2-y1)*.33)
+    x1,y1,x2,y2=vp;left=x1+int((x2-x1)*.36);right=x1+int((x2-x1)*.92);y=y1+int((y2-y1)*.72)
     start,end=(right,left) if direction=='left' else (left,right)
     # Duration of injected finger movement only; production motion stays unchanged.
     adb('shell','input','swipe',str(start),str(y),str(end),str(y),'900')
