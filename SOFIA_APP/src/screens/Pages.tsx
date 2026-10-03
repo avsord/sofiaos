@@ -113,6 +113,18 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   if(mounted.current){history.current=history.current.filter(key=>!ids.has(key));setPages(old=>old.filter(p=>!ids.has(p.id)));if(ids.has(selectedId||''))setSelectedId(null);setFocus(null);}
  })().catch(e=>setError(errorText(e)));}}]);}
  function removePage(){if(entry)confirmDeletePage(entry.base);}
+ function staticBlockView(b:PageBlock,i:number){
+  if(b.type==='divider')return <View key={b.id} style={{paddingVertical:14}}><View style={{height:1,backgroundColor:c.line}}/></View>;
+  if(b.type==='image'&&b.data?.attachment_id)return <View key={b.id} style={{marginVertical:8}}><Image source={api.attachmentSource(String(b.data.attachment_id))} style={{width:'100%',height:210,borderRadius:8}} resizeMode="contain"/></View>;
+  if(b.type==='collection')return <NativeCollectionBlock key={b.id} block={b} onChange={()=>{}}/>;
+  if(['image','file','table','bookmark'].includes(b.type))return <View key={b.id} style={{padding:12,borderRadius:8,backgroundColor:c.input,marginVertical:5}}><Text style={{color:c.text,fontSize:13}}>{b.text||({table:'Tabela',image:'Imagem',file:'Arquivo',bookmark:'Link'} as Record<string,string>)[b.type]}</Text></View>;
+  const heading=b.type==='heading1'?30:b.type==='heading2'?24:b.type==='heading3'?20:16;
+  const prefix=b.type==='bullet'?'• ':b.type==='number'?String(i+1)+'. ':b.type==='quote'?'│ ':b.type==='callout'?'💡 ':'';
+  return <View key={b.id} style={{flexDirection:'row',alignItems:'flex-start',gap:b.type==='todo'?7:0,minHeight:34}}>
+   {b.type==='todo'?<Text style={{fontSize:18,color:c.muted,paddingTop:2}}>{b.checked?'☑':'☐'}</Text>:prefix?<Text style={{fontSize:heading,lineHeight:heading+9,color:c.muted,paddingTop:4}}>{prefix}</Text>:null}
+   <Text style={{flex:1,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:4,fontFamily:b.type==='code'?'monospace':undefined}}>{b.text||''}</Text>
+  </View>;
+ }
  function blockView(b:PageBlock,i:number){
   if(b.type==='divider')return <Pressable key={b.id} accessibilityLabel="Divisor" onLongPress={()=>removeBlock(b.id)} style={{paddingVertical:14}}><View style={{height:1,backgroundColor:c.line}}/></Pressable>;
   if(b.type==='image'&&b.data?.attachment_id)return <View key={b.id} style={{marginVertical:8}}><Image source={api.attachmentSource(String(b.data.attachment_id))} style={{width:'100%',height:210,borderRadius:8}} resizeMode="contain"/>{b.data.caption?<Text style={{color:c.muted,fontSize:12}}>{String(b.data.caption)}</Text>:null}</View>;
@@ -137,9 +149,31 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   onBlank={()=>void create(createParent||undefined)} onTemplate={template=>selectedId?applyTemplate(template):void create(undefined,template)}/>;
  if(!entry)return <View style={{flex:1}} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{listView}{createPicker}</View>;
  const draft=entry.draft,selected={...entry.base,data:{...entry.base.data,...draft.appearance}},subpages=children.get(selected.id)||[];
+ const previousId=[...history.current].reverse().find(id=>byId.has(id))||null;
+ const previousEntry=previousId?store.get(previousId):undefined;
+ const previousPage=previousId?byId.get(previousId):undefined;
  const path:Entity[]=[];let cur:Entity|undefined=selected;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&path.length<40){seen.add(cur.id);path.unshift(cur);cur=byId.get(String(cur.data?.parent_id||''));}
  const status=entry.state==='saving'?'Salvando…':entry.state==='pending'?'Sincronizando…':entry.state==='error'?'Não salvo':entry.state==='conflict'?'Conflito':selected.privacy==='private'?'Particular':selected.area;
  const hasCover=!!draft.appearance.cover_type;
+ const previousBackdrop=previousEntry&&previousPage?(()=>{
+  const pd=previousEntry.draft,pp={...previousPage,data:{...previousPage.data,...pd.appearance}},pc=!!pd.appearance.cover_type,psubs=children.get(pp.id)||[];
+  return <View pointerEvents="none" style={{flex:1,backgroundColor:c.bg}}>
+   <View style={{minHeight:54,flexDirection:'row',alignItems:'center',paddingHorizontal:4,borderBottomWidth:1,borderColor:c.line,backgroundColor:c.surface}}>
+    <IconButton name="back" label="Voltar" size={34} disabled onPress={()=>{}}/>
+    <View style={{flex:1,minWidth:0,paddingHorizontal:5}}><Text numberOfLines={1} style={{color:c.text,fontSize:15,fontWeight:'700'}}>{pp.title}</Text><Text style={{color:c.muted,fontSize:9,marginTop:3}}>{pp.privacy==='private'?'Particular':pp.area}</Text></View>
+   </View>
+   <ScrollView scrollEnabled={false} contentContainerStyle={{paddingBottom:60}}>
+    <View style={{height:pc?190:28,overflow:'hidden',backgroundColor:pc?c.accentSoft:'transparent'}}>{pc?<PageCover data={pd.appearance} api={api}/>:null}</View>
+    <View style={{paddingHorizontal:30,marginTop:pc?-44:0}}>
+     <View style={{width:78,height:78,alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:58,color:c.text}}>{String(pd.appearance.icon||'📄')}</Text></View>
+     <Text style={{minHeight:60,fontSize:38,lineHeight:44,fontWeight:'800',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}>{pd.title==='Sem título'?'':pd.title}</Text>
+     {String(pp.data.purpose||'').trim()?<Text style={{fontSize:13,lineHeight:20,color:c.muted,marginBottom:12}}>{String(pp.data.purpose)}</Text>:null}
+     <View style={{gap:2}}>{pd.blocks.map(staticBlockView)}</View>
+     {psubs.length?<View style={{marginTop:2}}><PageTreeList roots={psubs} children={children} expanded={expanded} toggle={()=>{}} onOpen={()=>{}} onMove={()=>{}} canParent={()=>false} compact/></View>:null}
+    </View>
+   </ScrollView>
+  </View>;
+ })():listView;
  const editor=<View style={{flex:1,backgroundColor:c.bg}}>
   <View style={{minHeight:54,flexDirection:'row',alignItems:'center',paddingHorizontal:4,borderBottomWidth:1,borderColor:c.line,backgroundColor:c.surface}}>
    <IconButton name="back" label="Voltar" size={34} onPress={back}/>
@@ -175,7 +209,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   {appearance?<PageAppearance key={selected.id+appearance} api={api} pageId={selected.id} kind={appearance} onClose={()=>setAppearance(null)} onApply={patch=>{store.edit(selected.id,d=>({...d,appearance:{...d.appearance,...patch}}));void store.flush(selected.id);}}/>:null}
  </View>;
  return <View style={{flex:1,backgroundColor:c.bg}} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>
-  {listView}
+  {previousBackdrop}
   <Animated.View {...pageBackResponder.panHandlers} style={{position:'absolute',left:0,right:0,top:0,bottom:0,backgroundColor:c.bg,transform:[{translateX:backX}]}}>
    {editor}
   </Animated.View>
