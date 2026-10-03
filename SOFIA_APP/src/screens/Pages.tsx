@@ -62,8 +62,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of displayPages){const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const list of m.values())list.sort((a,b)=>a.title.localeCompare(b.title,'pt-BR'));return m;},[displayPages]);
  const entry=selectedId?store.get(selectedId):undefined;
  const emptyBody=entry?pageBodyIsEmpty(entry.draft.blocks):true;
- const titleIsBlank=entry?!entry.draft.title.trim()||entry.draft.title==='Sem título':true;
- const showBodyGuide=emptyBody&&titleIsBlank;
+ const showBodyGuide=emptyBody;
  const placeholderColor=c.muted+'80';
  useEffect(()=>{if(active&&focus&&focus!=='title')inputRefs.current.get(focus)?.focus();},[focus,selectedId,active]);
  function toggle(id:string){setExpanded(old=>{const next=toggleExpanded(old,id),value=JSON.stringify([...next]);expandDisk.current=expandDisk.current.catch(()=>{}).then(()=>AsyncStorage.setItem(key+':expanded',value)).catch(()=>{if(mounted.current)setError('Não foi possível guardar a abertura das subpáginas neste aparelho.');});return next;});}
