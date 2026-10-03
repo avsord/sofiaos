@@ -7,7 +7,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: sofia-publish-0320-now
+  group: sofia-publish-0322-now
   cancel-in-progress: false
 jobs:
   publish:
@@ -25,7 +25,7 @@ jobs:
       - name: Checkout exact 0.3.22 source
         uses: actions/checkout@v4
         with:
-          ref: 312bab1f854dce97baffcc97177c5cdc1ad8f33c
+          ref: ea36b0829ed7340dfa1efd0f145cedfd64823080
           fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
@@ -66,7 +66,7 @@ jobs:
           node -e "const h=require('/tmp/health.json');if(!h.ok||h.version!=='142.0.0')throw Error('Site/server v142 is not deployed');console.log(h)"
       - name: Publish exact 0.3.22 APK
         run: node tools/publish-release.cjs
-      - name: Confirm 0.3.19 detects 0.3.22
+      - name: Confirm 0.3.21 detects 0.3.22
         run: |
           node <<'NODE'
           const fs=require('node:fs'),ts=require('typescript'),vm=require('node:vm');
