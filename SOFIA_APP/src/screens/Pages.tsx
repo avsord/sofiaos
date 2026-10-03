@@ -96,7 +96,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   const preset=template?freshTemplate(template):null;
   const saved=await api.saveEntity({kind:'user_page',title:preset?.title||'Sem título',content:'',area:parent?.area||'Pessoal',privacy:'private',state:'active',tags:[],data:{
    icon:preset?.icon||'',icon_mode:preset?'emoji':'default',cover_type:preset?.cover_type??'preset',cover_value:preset?.cover_value??PAGE_COVERS[0][1],cover_attachment_id:'',
-   purpose:'',layout:'notes',suggested:false,parent_id:parent?.id||'',node_type:parent?'page':'space',template_id:preset?.id||'',blocks_json:preset?JSON.stringify(preset.blocks):'[]'
+   purpose:'',layout:'notes',suggested:false,parent_id:parent?.id||'',node_type:parent?'page':'space',blocks_json:preset?JSON.stringify(preset.blocks):'[]'
   }});
   if(!mounted.current)return;setPages(old=>[...old,saved]);open(saved);
  }catch(e){setError(errorText(e));}}
