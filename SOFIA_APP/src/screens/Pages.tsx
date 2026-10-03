@@ -27,11 +27,11 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null),[createParent,setCreateParent]=useState<Entity|null|undefined>(undefined);
  const history=useRef<string[]>([]),mounted=useRef(true),expandDisk=useRef(Promise.resolve()),inputRefs=useRef(new Map<string,TextInput>());
  const backX=useRef(new Animated.Value(0)).current,selectedRef=useRef<string|null>(null),paneWidth=useRef(0),backAction=useRef<()=>void>(()=>{});
- const pageInteractionRef=useRef(false),refreshGuard=useRef(new PageRefreshGuard()),refreshControl=useRef<RefreshControl|null>(null);
+ const pageInteractionRef=useRef(false),refreshGuard=useRef(new PageRefreshGuard());
  function changePageInteraction(value:boolean){
   pageInteractionRef.current=value;refreshGuard.current.setActive(value);
-  // Updating the native control immediately also covers a queued JS refresh event.
-  if(value)refreshControl.current?.setNativeProps({enabled:false});
+  // RefreshControl is a composite component: its ref has no setNativeProps.
+  // The synchronous guard rejects queued refresh callbacks; enabled controls native UI.
   setPageInteraction(value);onDepthChange?.(!!selectedRef.current||value);
  }
  function endPageTouch(){if(!pageInteractionRef.current)return;changePageInteraction(false);setPageDragging(false);}
@@ -152,7 +152,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
     style={{flex:1,minHeight:(!b.text&&!b.html&&!pageBlockHint(b,i,showBodyGuide,focus===b.id)&&focus!==b.id)?0:42,height:(!b.text&&!b.html&&!pageBlockHint(b,i,showBodyGuide,focus===b.id)&&focus!==b.id)?0:undefined,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:(!b.text&&!b.html&&!pageBlockHint(b,i,showBodyGuide,focus===b.id)&&focus!==b.id)?0:4,fontFamily:b.type==='code'?'monospace':undefined,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:8,paddingHorizontal:b.type==='code'?10:0}}/>
   </View>;
  }
- const listView=<ScrollView scrollEnabled={!pageDragging} style={{flex:1,backgroundColor:c.bg}} contentContainerStyle={{paddingBottom:34}} refreshControl={<RefreshControl ref={refreshControl} enabled={!pageInteraction&&!selectedId} refreshing={refreshing} onRefresh={refreshPages} tintColor={c.accent}/>}>
+ const listView=<ScrollView scrollEnabled={!pageDragging} style={{flex:1,backgroundColor:c.bg}} contentContainerStyle={{paddingBottom:34}} refreshControl={<RefreshControl enabled={!pageInteraction&&!selectedId} refreshing={refreshing} onRefresh={refreshPages} tintColor={c.accent}/>}>
   <ScreenTitle title="Páginas" eyebrow="IDEIAS · NOTAS · SEUS ESPAÇOS" right={<IconButton name="plus" label="Criar página" filled disabled={!ready} onPress={()=>setCreateParent(null)}/>}/>
   {api.mdLocalOnly?<Text style={{paddingHorizontal:20,paddingBottom:8,color:c.muted,fontSize:10}}>Ordem salva neste aparelho. A hierarquia e o conteúdo continuam sincronizados.</Text>:null}
   {error?<ErrorBanner text={error} onRetry={()=>void load()}/>:null}
