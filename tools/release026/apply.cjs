@@ -5,3 +5,5 @@ for(const f of files){if(!/^(SOFIA_APP|src|public|tests|tools|docs)\//.test(f.pa
 const p='SOFIA_APP/package-lock.json',lock=JSON.parse(fs.readFileSync(p));if(!['0.3.25','0.3.26'].includes(lock.version))throw Error('Wrong baseline');lock.version=lock.packages[''].version='0.3.26';fs.writeFileSync(p,JSON.stringify(lock,null,2)+'\n');console.log('Applied',files.length,'verified files');
 
 {const p='tools/md-web-smoke.cjs';fs.writeFileSync(p,fs.readFileSync(p,'utf8').replace('const [b,p]=await Promise.all',"await page.locator('.md-notice-popup').evaluate(async el=>{await Promise.all(el.getAnimations().map(a=>a.finished));});\n  const [b,p]=await Promise.all"));}
+
+{const p='SOFIA_APP/tools/native-page-touch-smoke.py';fs.writeFileSync(p,fs.readFileSync(p,'utf8').replace('def stable(name,moves=0):','def stable(name,moves=0,check_counters=True):').replace(" wait('QA moves '+str(moves)+' deletes 0')"," if check_counters:wait('QA moves '+str(moves)+' deletes 0')").replace("stable('three-official-templates',1);tap('Fechar')","stable('three-official-templates',1,False);tap('Fechar');stable('templates-dismissed',1)"));}
