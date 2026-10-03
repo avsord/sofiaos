@@ -58,3 +58,9 @@ test('writing hint disappears after the page has a real title and blank body sto
  assert.ok(!source.includes('accessibilityLabel="Recolher subpáginas"'));
  assert.ok(!source.includes('accessibilityLabel="Mostrar subpáginas"'));
 });
+
+test('draggable page rows own touches before the menu pager can steal them',()=>{
+ const tree=fs.readFileSync(path.join(__dirname,'../src/components/PageTreeList.tsx'),'utf8');
+ assert.ok(tree.includes("onTouchStart={e=>{touch.current={x:e.nativeEvent.pageX,y:e.nativeEvent.pageY};onInteractionChange?.(true);}}"));
+ assert.ok(tree.includes("onInteractionChange?.(false)"));
+});
