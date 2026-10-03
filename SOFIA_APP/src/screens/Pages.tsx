@@ -16,7 +16,7 @@ import {canReparentPage,reparentPatch,reparentedPage} from '../lib/page-hierarch
 const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'null')??fallback;}catch{return fallback;}};
 
 export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;active:boolean;storageScope:string;onDepthChange?:(open:boolean)=>void}){
- const c=useTheme(),[pages,setPages]=useState<Entity[]>([]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>()),[hierarchyGesture,setHierarchyGesture]=useState(false);
+ const c=useTheme(),[pages,setPages]=useState<Entity[]>([]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>());
  const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null);
  const history=useRef<string[]>([]),mounted=useRef(true),expandDisk=useRef(Promise.resolve()),inputRefs=useRef(new Map<string,TextInput>());
  const backX=useRef(new Animated.Value(0)).current,selectedRef=useRef<string|null>(null),paneWidth=useRef(0),backAction=useRef<()=>void>(()=>{});
@@ -55,7 +55,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   return()=>{alive=false;mounted.current=false;state.remove();keyboard.remove();void store.flushAll().finally(()=>store.dispose());};
  },[store,key]);
  useEffect(()=>{if(!active){setFocus(null);void store.flushAll();}},[active,store]);
- useEffect(()=>{onDepthChange?.(!!selectedId||hierarchyGesture);if(!selectedId)backX.setValue(0);},[selectedId,hierarchyGesture,onDepthChange,backX]);
+ useEffect(()=>{onDepthChange?.(!!selectedId);if(!selectedId)backX.setValue(0);},[selectedId,onDepthChange,backX]);
  useEffect(()=>()=>onDepthChange?.(false),[onDepthChange]);
  const displayPages=useMemo(()=>pages.map(p=>{const e=store.get(p.id);return e?{...p,title:e.draft.title.trim()||'Sem título',data:{...p.data,...e.draft.appearance}}:p;}),[pages,store,tick]);
  const byId=useMemo(()=>new Map(displayPages.map(p=>[p.id,p])),[displayPages]);
@@ -116,7 +116,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  const listView=<ScrollView style={{flex:1,backgroundColor:c.bg}} contentContainerStyle={{paddingBottom:34}} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>void load(true)} tintColor={c.accent}/>}>
   <View style={{paddingHorizontal:20,paddingTop:18,paddingBottom:12,flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,color:c.text,fontSize:30,fontWeight:'800',letterSpacing:-1}}>Páginas</Text><IconButton name="plus" label="Nova página" filled disabled={!ready} onPress={()=>void create()}/></View>
   {error?<ErrorBanner text={error} onRetry={()=>void load()}/>:null}
-  <View style={{paddingHorizontal:10}}><PageTreeList roots={children.get('')||[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onInteractionChange={setHierarchyGesture}/></View>
+  <View style={{paddingHorizontal:10}}><PageTreeList roots={children.get('')||[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent}/></View>
   {ready&&!pages.length?<Empty icon="book" title="Sua primeira página" body="Toque em + para criar uma página."/>:null}
  </ScrollView>;
  if(!entry)return <View style={{flex:1}} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{listView}</View>;
@@ -152,7 +152,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
     </View>:null}
     <Pressable accessibilityLabel="Continuar escrevendo" onPress={()=>{const last=draft.blocks.at(-1);if(last&&['text','heading1','heading2','heading3','bullet','todo','number','quote','code','callout'].includes(last.type)){setFocus(last.id);inputRefs.current.get(last.id)?.focus();}else addBlock();}} style={{minHeight:subpages.length&&emptyBody&&!showBodyGuide?0:18}}/>
     {subpages.length?<View style={{marginTop:2}}>
-      <PageTreeList roots={subpages} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} compact onInteractionChange={setHierarchyGesture}/>
+      <PageTreeList roots={subpages} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} compact/>
     </View>:null}
    </View>
   </ScrollView>
