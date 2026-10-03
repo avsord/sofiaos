@@ -13,11 +13,15 @@ import {Icon} from '../components/Icon';
 import {PageCover,PageAppearance,PAGE_COVERS} from '../components/PageAppearance';
 import {PageTreeList} from '../components/PageTreeList';
 import {canReparentPage,reparentPatch,reparentedPage} from '../lib/page-hierarchy';
+import {PageCreateMenu} from '../components/PageTemplatePicker';
+import {NativeCollectionBlock} from '../components/NativeCollectionBlock';
+import {freshTemplate} from '../lib/page-templates';
+import type {PageTemplate} from '../lib/page-templates';
 const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'null')??fallback;}catch{return fallback;}};
 
 export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;active:boolean;storageScope:string;onDepthChange?:(open:boolean)=>void}){
  const c=useTheme(),[pages,setPages]=useState<Entity[]>([]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>());
- const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null);
+ const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null),[createParent,setCreateParent]=useState<Entity|null|undefined>(undefined);
  const history=useRef<string[]>([]),mounted=useRef(true),expandDisk=useRef(Promise.resolve()),inputRefs=useRef(new Map<string,TextInput>());
  const backX=useRef(new Animated.Value(0)).current,selectedRef=useRef<string|null>(null),paneWidth=useRef(0),backAction=useRef<()=>void>(()=>{});
  selectedRef.current=selectedId;
@@ -88,7 +92,14 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  function back(){if(selectedId)void store.flush(selectedId);setFocus(null);setAppearance(null);let id=history.current.pop();while(id&&!byId.has(id))id=history.current.pop();if(id)open(byId.get(id)!,false);else setSelectedId(null);} backAction.current=back;
  useEffect(()=>{if(!active)return;const sub=BackHandler.addEventListener('hardwareBackPress',()=>{if(!selectedId)return false;back();return true;});return()=>sub.remove();},[active,selectedId,byId,store]);
  function edit(change:(draft:PageDraft)=>PageDraft,group=''){if(selectedId)store.edit(selectedId,change,group);}
- async function create(parent?:Entity){try{const saved=await api.saveEntity({kind:'user_page',title:'Sem título',content:'',area:parent?.area||'Pessoal',privacy:'private',state:'active',tags:[],data:{icon:'',icon_mode:'default',cover_type:'preset',cover_value:PAGE_COVERS[0][1],cover_attachment_id:'',purpose:'',layout:'notes',suggested:false,parent_id:parent?.id||'',node_type:parent?'page':'space',blocks_json:'[]'}});if(!mounted.current)return;setPages(old=>[...old,saved]);open(saved);}catch(e){setError(errorText(e));}}
+ async function create(parent?:Entity,template?:PageTemplate){try{
+  const preset=template?freshTemplate(template):null;
+  const saved=await api.saveEntity({kind:'user_page',title:preset?.title||'Sem título',content:'',area:parent?.area||'Pessoal',privacy:'private',state:'active',tags:[],data:{
+   icon:preset?.icon||'',icon_mode:preset?'emoji':'default',cover_type:preset?.cover_type??'preset',cover_value:preset?.cover_value??PAGE_COVERS[0][1],cover_attachment_id:'',
+   purpose:'',layout:'notes',suggested:false,parent_id:parent?.id||'',node_type:parent?'page':'space',template_id:preset?.id||'',blocks_json:preset?JSON.stringify(preset.blocks):'[]'
+  }});
+  if(!mounted.current)return;setPages(old=>[...old,saved]);open(saved);
+ }catch(e){setError(errorText(e));}}
  function updateBlock(block:PageBlock,patch:Partial<PageBlock>,group=''){edit(d=>({...d,blocks:d.blocks.map(b=>b.id===block.id?{...b,...patch}:b)}),group);}
  function removeBlock(id:string){edit(d=>{const blocks=d.blocks.filter(b=>b.id!==id);return {...d,blocks:blocks.length?blocks:[newBlock()]};});setFocus(null);}
  function addBlock(){const block=newBlock();edit(d=>{const blocks=[...d.blocks],i=blocks.findIndex(b=>b.id===focus);blocks.splice(i>=0?i+1:blocks.length,0,block);return {...d,blocks};});setFocus(block.id);}
@@ -103,7 +114,8 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  function blockView(b:PageBlock,i:number){
   if(b.type==='divider')return <Pressable key={b.id} accessibilityLabel="Divisor" onLongPress={()=>removeBlock(b.id)} style={{paddingVertical:14}}><View style={{height:1,backgroundColor:c.line}}/></Pressable>;
   if(b.type==='image'&&b.data?.attachment_id)return <View key={b.id} style={{marginVertical:8}}><Image source={api.attachmentSource(String(b.data.attachment_id))} style={{width:'100%',height:210,borderRadius:8}} resizeMode="contain"/>{b.data.caption?<Text style={{color:c.muted,fontSize:12}}>{String(b.data.caption)}</Text>:null}</View>;
-  if(['image','file','table','collection','bookmark'].includes(b.type))return <View key={b.id} style={{padding:12,borderRadius:8,backgroundColor:c.input,marginVertical:5}}><Text style={{color:c.text,fontSize:13}}>{b.text||({table:'Tabela',collection:'Banco de dados',image:'Imagem',file:'Arquivo',bookmark:'Link'} as Record<string,string>)[b.type]}</Text><Text style={{color:c.muted,fontSize:11,marginTop:4}}>Bloco preservado; edição completa no site.</Text></View>;
+  if(b.type==='collection')return <NativeCollectionBlock key={b.id} block={b} onChange={(data,group)=>updateBlock(b,{data},group)}/>;
+  if(['image','file','table','bookmark'].includes(b.type))return <View key={b.id} style={{padding:12,borderRadius:8,backgroundColor:c.input,marginVertical:5}}><Text style={{color:c.text,fontSize:13}}>{b.text||({table:'Tabela',image:'Imagem',file:'Arquivo',bookmark:'Link'} as Record<string,string>)[b.type]}</Text><Text style={{color:c.muted,fontSize:11,marginTop:4}}>Bloco preservado; edição completa no site.</Text></View>;
   const heading=b.type==='heading1'?30:b.type==='heading2'?24:b.type==='heading3'?20:16;
   const prefix=b.type==='bullet'?'• ':b.type==='number'?String(i+1)+'. ':b.type==='quote'?'│ ':b.type==='callout'?'💡 ':'';
   return <View key={b.id} style={{flexDirection:'row',alignItems:'flex-start',gap:b.type==='todo'?7:0}}>
@@ -114,12 +126,14 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   </View>;
  }
  const listView=<ScrollView style={{flex:1,backgroundColor:c.bg}} contentContainerStyle={{paddingBottom:34}} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>void load(true)} tintColor={c.accent}/>}>
-  <View style={{paddingHorizontal:20,paddingTop:18,paddingBottom:12,flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,color:c.text,fontSize:30,fontWeight:'800',letterSpacing:-1}}>Páginas</Text><IconButton name="plus" label="Nova página" filled disabled={!ready} onPress={()=>void create()}/></View>
+  <View style={{paddingHorizontal:20,paddingTop:18,paddingBottom:12,flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,color:c.text,fontSize:30,fontWeight:'800',letterSpacing:-1}}>Páginas</Text><IconButton name="plus" label="Criar página" filled disabled={!ready} onPress={()=>setCreateParent(null)}/></View>
   {error?<ErrorBanner text={error} onRetry={()=>void load()}/>:null}
   <View style={{paddingHorizontal:10}}><PageTreeList roots={children.get('')||[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent}/></View>
   {ready&&!pages.length?<Empty icon="book" title="Sua primeira página" body="Toque em + para criar uma página."/>:null}
  </ScrollView>;
- if(!entry)return <View style={{flex:1}} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{listView}</View>;
+ const createPicker=<PageCreateMenu visible={createParent!==undefined} parentTitle={createParent?.title} onClose={()=>setCreateParent(undefined)}
+  onBlank={()=>void create(createParent||undefined)} onTemplate={template=>void create(createParent||undefined,template)}/>;
+ if(!entry)return <View style={{flex:1}} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{listView}{createPicker}</View>;
  const draft=entry.draft,selected={...entry.base,data:{...entry.base.data,...draft.appearance}},subpages=children.get(selected.id)||[];
  const path:Entity[]=[];let cur:Entity|undefined=selected;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&path.length<40){seen.add(cur.id);path.unshift(cur);cur=byId.get(String(cur.data?.parent_id||''));}
  const status=entry.state==='saving'?'Salvando…':entry.state==='pending'?'Sincronizando…':entry.state==='error'?'Não salvo':entry.state==='conflict'?'Conflito':selected.privacy==='private'?'Particular':selected.area;
@@ -131,7 +145,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
    <View testID="page-tools-right" style={{flexDirection:'row',alignItems:'center',flexShrink:0}}>
     <IconButton name="undo" label="Desfazer" size={34} disabled={!entry.past.length} onPress={()=>store.undo(selected.id)}/>
     <IconButton name="redo" label="Refazer" size={34} disabled={!entry.future.length} onPress={()=>store.redo(selected.id)}/>
-    <IconButton name="plus" label="Criar subpágina" size={34} onPress={()=>void create(selected)}/>
+    <IconButton name="plus" label="Criar página ou usar template" size={34} onPress={()=>setCreateParent(selected)}/>
     <IconButton name="trash" label="Excluir página" size={34} onPress={removePage}/>
    </View>
   </View>
@@ -163,5 +177,6 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   <Animated.View {...pageBackResponder.panHandlers} style={{position:'absolute',left:0,right:0,top:0,bottom:0,backgroundColor:c.bg,transform:[{translateX:backX}]}}>
    {editor}
   </Animated.View>
+  {createPicker}
  </View>;
 }
