@@ -93,8 +93,9 @@ jobs:
         working-directory: SOFIA_APP
         run: |
           set -euo pipefail
-          mkdir -p dist /tmp/sofia-baseline
+          mkdir -p dist /tmp/sofia-baseline /tmp/sofia-baseline025
           gh release download sofia-android-v0.3.27 --repo "$GITHUB_REPOSITORY" --pattern Sofia-OS.apk --dir /tmp/sofia-baseline
+          gh release download sofia-android-v0.3.25 --repo "$GITHUB_REPOSITORY" --pattern Sofia-OS.apk --dir /tmp/sofia-baseline025
           cp android/app/build/outputs/apk/release/app-release.apk dist/Sofia-OS.apk
           SDK_TOOLS="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -1)"
           "$SDK_TOOLS/apksigner" verify --verbose --print-certs /tmp/sofia-baseline/Sofia-OS.apk > /tmp/baseline-signature.txt
@@ -140,6 +141,13 @@ jobs:
           target: google_apis
           disable-animations: false
           script: |
+            adb install /tmp/sofia-baseline025/Sofia-OS.apk
+            adb install -r SOFIA_APP/dist/Sofia-OS.apk
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            sleep 10
+            adb shell pidof com.avsord.sofiaapp > SOFIA_APP/dist/upgrade-from-025.txt
+            test -s SOFIA_APP/dist/upgrade-from-025.txt
+            adb uninstall com.avsord.sofiaapp
             adb install /tmp/sofia-baseline/Sofia-OS.apk
             adb install -r SOFIA_APP/dist/Sofia-OS.apk
             adb logcat -c
