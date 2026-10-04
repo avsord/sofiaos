@@ -132,9 +132,11 @@ test('resizing waits for matching geometry and preserves the selected page',()=>
 test('late stale content callbacks cannot break subsequent direct menu taps',()=>{
  const p=pager();p.scroll.onContentSizeChange(0,0);p.scroll.onLayout({nativeEvent:{layout:{width:0}}});p.ref.current.goTo('apps');assert.equal(p.commands.at(-1).x,1600);
 });
-test('existing native swipe speed and no-animation tap behavior are unchanged',()=>{
- const p=pager();assert.equal(p.scroll.decelerationRate,'fast');assert.equal(p.scroll.disableIntervalMomentum,true);
+test('native full-page snapping is the only snap policy, and taps remain immediate',()=>{
+ const p=pager();assert.equal(p.scroll.decelerationRate,'fast');assert.equal(p.scroll.pagingEnabled,true);assert.equal(p.scroll.snapToInterval,undefined);assert.equal(p.scroll.disableIntervalMomentum,undefined);
  p.ref.current.goTo('home');assert.equal(p.commands.at(-1).animated,false);
 });
 
 test('old momentum cannot end a new touch or pull it back',()=>{const p=pager();p.scroll.onScrollBeginDrag(end(400));p.scroll.onScrollEndDrag({...end(680,.8),timeStamp:20});p.scroll.onScrollBeginDrag({...end(650),timeStamp:30});p.scroll.onMomentumScrollEnd({...end(800),timeStamp:25});assert.equal(p.selected.length,0);assert.equal(p.commands.length,0);p.scroll.onScrollEndDrag({...end(430,-.8),timeStamp:40});p.scroll.onMomentumScrollEnd({...end(800),timeStamp:25});assert.equal(p.selected.length,0);p.scroll.onMomentumScrollEnd({...end(0),timeStamp:50});assert.deepEqual(p.selected,['home']);});
+
+test('settling a native swipe and subsequent layout callbacks do not issue a second scroll command',()=>{const p=pager();p.scroll.onScrollBeginDrag(end(400));p.scroll.onScrollEndDrag(end(680,.5));p.scroll.onMomentumScrollEnd(end(800));assert.deepEqual(p.selected,['pages']);assert.equal(p.commands.length,0);p.render({activeTab:'pages'});p.scroll.onContentSizeChange(2400,700);p.scroll.onLayout({nativeEvent:{layout:{width:400}}});assert.equal(p.commands.length,0);p.ref.current.goTo('profile');assert.deepEqual(p.commands,[{x:2000,y:0,animated:false}]);});

@@ -34,6 +34,8 @@ adb('shell','settings','put','secure','show_ime_with_hard_keyboard','1')
 wait('Início');pid=adb('shell','pidof',pkg).strip();assert pid
 # Fast interrupted gestures and taps; the last settled menu must not roll back.
 record=subprocess.Popen(['adb','shell','screenrecord','--time-limit','25','/sdcard/menu-motion.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+for repeat in range(2):
+ swipe(620,850,100,850,600);swipe(100,850,620,850,600)
 for repeat in range(3):
  swipe(620,850,100,850,100);swipe(100,850,620,850,100)
 time.sleep(1)
@@ -70,11 +72,32 @@ root=tree();daynode=next(n for n in root.iter('node') if n.get('content-desc',''
 x,y,r,b=box(daynode);adb('shell','input','tap',str((x+r)//2),str((y+b)//2));wait('Compromisso de amanha');snapshot('02-agenda-day-selection')
 # Popup comes from the actual bell and dates are grouped.
 bell=box(wait('Notificações: 2 não lidas'));tap('Notificações: 2 não lidas');wait('Hoje');wait('Ontem');popup=box(wait('notification-popover'));assert popup[1]>=bell[3],(bell,popup);snapshot('03-bell-anchor')
+# Record the real modal surface: its dim layer must not pulse while opening/closing.
+bell_record=subprocess.Popen(['adb','shell','screenrecord','--time-limit','25','/sdcard/bell-motion.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+time.sleep(.5)
+for cycle in range(3):
+ back();time.sleep(.4);tap('Notificações: 2 não lidas');wait('notification-popover');snapshot('03b-bell-stable-'+str(cycle))
+bell_record.wait(timeout=30);adb('pull','/sdcard/bell-motion.mp4',str(out/'bell-motion.mp4'))
+# A fixed background strip below the popover is only covered by the scrim.
+raw=subprocess.check_output(['ffmpeg','-v','error','-i',str(out/'bell-motion.mp4'),'-vf','crop=14:30:4:1400,scale=1:1','-f','rawvideo','-pix_fmt','gray','-'])
+values=list(raw);assert values and min(values)>90,(min(values) if values else None)
+cut=(min(values)+max(values))/2;states=[v<cut for v in values];transitions=sum(a!=b for a,b in zip(states,states[1:]));assert 4<=transitions<=6,('backdrop pulsed',transitions,min(values),max(values))
+(out/'bell-backdrop-luminance.json').write_text(json.dumps({'frames':len(values),'min':min(values),'max':max(values),'transitions':transitions,'passed':True}))
 tap('Marcar como lida: Lembrete da agenda');tap('Ver todas as notificações');wait('ATIVIDADES · AVISOS');wait('Agenda · 1');snapshot('04-notification-center');back()
 # Settings split, appearance, real version, and configured state visible.
 tap('Perfil');wait('Perfil do usuário');wait('E-MAIL DE LOGIN');snapshot('05-profile-first');tap('Configurações do aplicativo');wait('Versão instalada 0.3.33');tap('Escuro');snapshot('06-settings-dark');tap('Claro')
 # Apps goes back exactly to Apps; hardware back does not jump to Home.
 tap('Apps');wait('Seus espaços');tap('Tarefas');wait('Nova tarefa');snapshot('07-tasks');back();wait('Seus espaços');snapshot('08-apps-back')
+# Apps with slow responses preserve their confirmed rows/empty message on reentry.
+from PIL import Image,ImageChops
+import io
+for module,label,stem in [('Biblioteca','Livro preservado','library'),('Listas','Nenhum registro aqui','empty-list')]:
+ tap(module);wait(label);snapshot('08b-'+stem+'-loaded');reference=Image.open(io.BytesIO(adb('exec-out','screencap','-p'))).convert('RGB');back();wait('Seus espaços')
+ coords=box(wait(module));adb('shell','input','tap',str((coords[0]+coords[2])//2),str((coords[1]+coords[3])//2))
+ metrics=[]
+ for frame_id in range(3):
+  pixels=adb('exec-out','screencap','-p');(out/f'08c-{stem}-return-{frame_id}.png').write_bytes(pixels);frame=Image.open(io.BytesIO(pixels)).convert('RGB');crop=(0,280,720,1300);diff=ImageChops.difference(reference.crop(crop),frame.crop(crop));fraction=sum(max(p)>12 for p in diff.getdata())/(720*1020);metrics.append(fraction);assert fraction<.015,(module,'content flashed',fraction)
+ wait(label);(out/(stem+'-reentry-pixels.json')).write_text(json.dumps(metrics));back();wait('Seus espaços')
 # Real tree and parent navigation, opening grandchild directly from root.
 tap('Páginas');wait('Abrir página principal Teste principal');tap('Expandir subpáginas de Teste principal');tap('Expandir subpáginas de Teste filha');tap('Abrir subpágina Teste neta');wait('Título da página');snapshot('09-direct-grandchild');back();wait('Abrir subpágina Teste neta');root=snapshot('10-back-to-parent');assert find(root,'Título da página').get('text')=='Teste filha'
 back();wait('Abrir subpágina Teste filha');root=snapshot('11-back-to-grandparent');assert find(root,'Título da página').get('text')=='Teste principal';back();wait('Criar página')

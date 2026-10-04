@@ -4,6 +4,10 @@
 - Início e Agenda voltam automaticamente para hoje ao trocar de menu.
 - Compromissos com repetição semanal, mensal ou anual, edição da série e indicação na agenda.
 - Alertas locais da agenda no Android, com permissão, antecedência e cancelamento após edição/exclusão sincronizada.
+- Conversa acompanha mensagens novas, respostas longas e abertura/fechamento do teclado.
+- Módulos dos Apps preservam registros e estados vazios confirmados ao reabrir; respostas antigas não substituem a categoria atual.
+- Arraste entre menus usa uma única paginação nativa, sem comando extra de reposicionamento ao concluir.
+- Fundo escurecido do sino permanece estável; o painel abre após a janela estar pronta.
 - Editores inteiros sem transparência de entrada; Apps reiniciado antes de aparecer.
 
 Google Agenda em produção continua dependente das credenciais OAuth e da atualização segura do servidor. Instalar os plugins Google no ChatGPT não configura a Sofia. Servidor preservado sem reinício.

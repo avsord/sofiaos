@@ -30,18 +30,20 @@ export function NotificationBell({onViewAll}:{onViewAll:()=>void}){
  const c=useTheme(),n=useNotifications(),screen=useWindowDimensions(),insets=useSafeAreaInsets();
  const [open,setOpen]=useState(false),[anchor,setAnchor]=useState<BellAnchor>({x:screen.width-66,y:insets.top+20,width:44,height:44});
  const reduced=useReducedMotion();
- const bell=useRef<View|null>(null),motion=useRef(new Animated.Value(0)).current,closing=useRef(false);
+ const bell=useRef<View|null>(null),motion=useRef(new Animated.Value(0)).current,closing=useRef(false),opening=useRef(false);
  const layout=notificationPopoverLayout(anchor,screen,insets);
- function reveal(){closing.current=false;motion.setValue(0);setOpen(true);void n.refresh();}
- function show(){if(bell.current)bell.current.measureInWindow((x,y,width,height)=>{setAnchor({x,y,width,height});reveal();});else reveal();}
- function close(after?:()=>void){if(closing.current)return;closing.current=true;Animated.timing(motion,{toValue:0,duration:reduced?0:180,easing:MOTION_EASE,useNativeDriver:true}).start(({finished})=>{if(finished){setOpen(false);closing.current=false;after?.();}});}
- useEffect(()=>{if(!open)return;const animation=Animated.timing(motion,{toValue:1,duration:reduced?0:220,easing:MOTION_EASE,useNativeDriver:true});animation.start();return()=>animation.stop();},[open,motion,reduced]);
+ function reveal(){closing.current=false;motion.stopAnimation();motion.setValue(0);setOpen(true);void n.refresh();}
+ function show(){if(opening.current)return;opening.current=true;if(bell.current)bell.current.measureInWindow((x,y,width,height)=>{setAnchor({x,y,width,height});reveal();});else reveal();}
+ function close(after?:()=>void){if(closing.current)return;closing.current=true;motion.stopAnimation();Animated.timing(motion,{toValue:0,duration:reduced?0:180,easing:MOTION_EASE,useNativeDriver:true}).start(({finished})=>{if(finished){setOpen(false);closing.current=false;opening.current=false;after?.();}});}
+ function animateShown(){if(closing.current)return;Animated.timing(motion,{toValue:1,duration:reduced?0:220,easing:MOTION_EASE,useNativeDriver:true}).start();}
+ useEffect(()=>()=>motion.stopAnimation(),[motion]);
  useEffect(()=>{if(open)bell.current?.measureInWindow((x,y,width,height)=>setAnchor({x,y,width,height}));},[screen.width,screen.height,open]);
  return <><View ref={bell} collapsable={false}>
   <Pressable testID="notification-bell" accessibilityRole="button" accessibilityLabel={'Notificações: '+n.unread+' não lidas'} onPress={show} style={{width:44,height:44,alignItems:'center',justifyContent:'center'}}><Icon name="bell" color={c.text}/>{n.unread>0?<View style={{position:'absolute',right:0,top:0,minWidth:18,height:18,borderRadius:9,backgroundColor:c.accent,alignItems:'center',justifyContent:'center',paddingHorizontal:3}}><Text style={{color:'#fff',fontSize:10,fontWeight:'700'}}>{n.unread>99?'99+':n.unread}</Text></View>:null}</Pressable>
- </View><Modal visible={open} transparent statusBarTranslucent navigationBarTranslucent animationType="none" onRequestClose={()=>close()}>
+ </View><Modal visible={open} transparent hardwareAccelerated statusBarTranslucent navigationBarTranslucent animationType="none" onShow={animateShown} onRequestClose={()=>close()}>
   <View style={{flex:1}}>
-   <Animated.View style={{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:'#00000044',opacity:motion}}><Pressable accessibilityLabel="Fechar notificações" onPress={()=>close()} style={{flex:1}}/></Animated.View>
+   {/* Keep one stable dim layer for the whole native window lifetime. Only the card animates. */}
+   <View testID="notification-backdrop" style={{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:'#00000044'}}><Pressable accessibilityLabel="Fechar notificações" onPress={()=>close()} style={{flex:1}}/></View>
    <Animated.View testID="notification-popover" accessibilityViewIsModal style={{position:'absolute',...layout,backgroundColor:c.bg,borderWidth:1,borderColor:c.line,borderRadius:20,padding:14,gap:10,elevation:14,shadowColor:'#000',shadowOffset:{width:0,height:5},shadowOpacity:.18,shadowRadius:16,opacity:motion,transform:[{translateY:motion.interpolate({inputRange:[0,1],outputRange:[-18,0]})}]}}>
     <View style={{flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,fontSize:20,fontWeight:'700',color:c.text}}>Notificações</Text><IconButton name="close" label="Fechar notificações" onPress={()=>close()}/></View>
     <ScrollView nestedScrollEnabled style={{flex:1}} contentContainerStyle={{paddingBottom:10}}><NotificationList/></ScrollView>

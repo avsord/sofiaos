@@ -1,3 +1,5 @@
+import * as QA_Notifications from 'expo-notifications';
+import {notificationWarning} from './src/lib/agenda-notifications';
 // SOFIA_FULL_APP_FIXTURE_ONLY: actual production App and screens; synthetic transport only.
 import React,{useEffect,useState} from 'react';
 import {View,Text,Pressable} from 'react-native';
@@ -10,14 +12,15 @@ const expires_at='2050-01-01T00:00:00Z';
 const make=(id:string,title:string,parent=''):Entity=>({id,title,kind:'user_page',content:'',area:'Pessoal',state:'active',privacy:'private',tags:[],revision:1,data:{parent_id:parent,icon:'📄',blocks_json:'[]'}});
 let pages=[make('parent','Teste principal'),make('other','Outra pagina'),make('child','Teste filha','parent'),make('grandchild','Teste neta','child')];
 const longParent=make('long-parent','Pagina longa');longParent.data={...longParent.data,cover_type:'color',cover_value:'#DAD2FF',blocks_json:JSON.stringify([{id:'long-body',type:'text',text:Array.from({length:28},(_,i)=>'Linha '+(i+1)+' da pagina longa.').join('\n')}])};pages.push(longParent,make('long-child','Filha da pagina longa','long-parent'));
-let moves=0,deletes=0,uploads=0,taskDelay=1600;
+let qaNotificationState:any={},moves=0,deletes=0,uploads=0,taskDelay=1600;
+setInterval(()=>{void Promise.all([QA_Notifications.getPermissionsAsync(),QA_Notifications.getAllScheduledNotificationsAsync()]).then(([permission,alarms])=>{qaNotificationState={permission,alarms,warning:notificationWarning};}).catch(e=>{qaNotificationState={error:String(e)};});},700);
 const today=new Date();today.setHours(10,0,0,0);const tomorrow=new Date(today);tomorrow.setDate(tomorrow.getDate()+1);
 const events:Entity[]=[{...make('native-notice','Notificacao nativa Sofia'),kind:'commitment',state:'planned',data:{start_at:new Date(Date.now()+20000).toISOString()}},{...make('event1','Consulta de hoje'),kind:'commitment',data:{start_at:today.toISOString()}},{...make('event2','Compromisso de amanha'),kind:'commitment',data:{start_at:tomorrow.toISOString()}}];
 let notices=[{id:'notice1',title:'Lembrete da agenda',body:'Seu compromisso está confirmado.',state:'unread',category:'agenda',created_at:new Date().toISOString()},{id:'notice2',title:'Preço acompanhado',body:'O histórico de preço foi atualizado.',state:'unread',category:'price',created_at:new Date(Date.now()-86400000).toISOString()}];
 const tasks:import('./src/lib/types').Task[]=['important','medium','light','none'].map((priority_level,i)=>({id:'filter'+i,title:['Projeto urgente','Estudar curso','Organizar casa','Ler livro'][i],area:i<2?'Trabalho':'Pessoal',priority_level,state:'todo',revision:1}));
 const conversation={id:'chatqa',title:'Conversa de teste',channel:'mobile',created_at:today.toISOString(),updated_at:today.toISOString()};
 const messages:import('./src/lib/types').Message[]=[{id:'msg1',role:'user',content:'Mensagem preservada',status:'sent',created_at:today.toISOString()},{id:'msg2',role:'assistant',content:'Resposta preservada',status:'sent',created_at:today.toISOString()}];
-const catalog={catalog:{commitment:{label:'Compromisso',group:'flow',states:['planned','confirmed'],fields:[{key:'start_at',label:'Início',type:'datetime'}]},user_page:{label:'Página',group:'knowledge',states:['active'],fields:[]},monitor:{label:'Monitoramento',group:'flow',states:['active'],fields:[]}},areas:['Pessoal']};
+const catalog={catalog:{book:{label:'Livro',group:'library',states:['reading'],fields:[]},list_collection:{label:'Lista',group:'flow',states:['active'],fields:[]},commitment:{label:'Compromisso',group:'flow',states:['planned','confirmed'],fields:[{key:'start_at',label:'Início',type:'datetime'}]},user_page:{label:'Página',group:'knowledge',states:['active'],fields:[]},monitor:{label:'Monitoramento',group:'flow',states:['active'],fields:[]}},areas:['Pessoal']};
 const response=(data:unknown,status=200)=>Promise.resolve(new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}}));
 globalThis.fetch=(async(input:any,init:any={})=>{
  const u=new URL(String(input)),p=u.pathname.replace('/api/mobile',''),method=init.method||'GET',body=init.body?JSON.parse(init.body):{};
@@ -39,7 +42,7 @@ globalThis.fetch=(async(input:any,init:any={})=>{
  if(p.endsWith('/observations'))return response({items:[{id:'o1',total_cents:19900,observed_at:new Date(Date.now()-86400000).toISOString()},{id:'o2',total_cents:17900,observed_at:new Date().toISOString()}]});
  if(p==='/workspace/entities'){
   if(method==='POST'){const item={...make('created'+Date.now(),body.title),...body};(item.kind==='user_page'?pages:events).push(item);return response(item);}
-  const kind=u.searchParams.get('kind');return response({items:kind==='user_page'?pages.slice(Number(u.searchParams.get('offset')||0),Number(u.searchParams.get('offset')||0)+100):kind==='monitor'?[{...make('monitorqa','Produto acompanhado'),kind:'monitor',data:{currency:'BRL'}}]:[]});
+  const kind=u.searchParams.get('kind');if(kind==='book'||kind==='list_collection'){await new Promise(r=>setTimeout(r,1600));return response({items:kind==='book'?[{...make('bookqa','Livro preservado'),kind:'book',state:'reading'}]:[]});}return response({items:kind==='user_page'?pages.slice(Number(u.searchParams.get('offset')||0),Number(u.searchParams.get('offset')||0)+100):kind==='monitor'?[{...make('monitorqa','Produto acompanhado'),kind:'monitor',data:{currency:'BRL'}}]:[]});
  }
  if(p.startsWith('/workspace/entities/')&&p.endsWith('/attachments')&&method==='POST'){if(!body.name||!body.base64)throw Error('Empty attachment');uploads++;return response({id:'attachment-qa-'+uploads});}
  if(p.startsWith('/workspace/entities/')){
@@ -59,4 +62,4 @@ globalThis.fetch=(async(input:any,init:any={})=>{
  if(p==='/profile')return response({profile:{...profile,...body}});
  return response({error:'Unmapped synthetic route '+p},404);
 }) as typeof fetch;
-export default function App(){const [ready,setReady]=useState(false),[tick,setTick]=useState(0);useEffect(()=>{void saveAuth({token:'q'.repeat(43),token_type:'Bearer',expires_at,profile}).then(()=>setReady(true));const id=setInterval(()=>setTick(x=>x+1),200);return()=>clearInterval(id);},[]);return <View style={{flex:1}}><Text accessibilityLabel={'QA moves '+moves+' deletes '+deletes}>SOFIA_FULL_APP_FIXTURE_ONLY</Text><Pressable accessibilityLabel="QA atualizar remoto" onPress={()=>{pages=pages.map(x=>x.id==='other'?{...x,title:'Nome remoto',revision:x.revision+1}:x);}}><Text accessibilityLabel={'QA uploads '+uploads}>Atualizar remoto</Text></Pressable><View style={{flex:1}}>{ready?<ProductionApp/>:null}</View></View>;}
+export default function App(){const [ready,setReady]=useState(false),[tick,setTick]=useState(0);useEffect(()=>{void saveAuth({token:'q'.repeat(43),token_type:'Bearer',expires_at,profile}).then(()=>setReady(true));const id=setInterval(()=>setTick(x=>x+1),200);return()=>clearInterval(id);},[]);return <View style={{flex:1}}><Text accessibilityLabel={'QA moves '+moves+' deletes '+deletes}>SOFIA_FULL_APP_FIXTURE_ONLY</Text><Text style={{fontSize:8}} accessibilityLabel={'QA notifications '+JSON.stringify(qaNotificationState)}>QA alertas</Text><Pressable accessibilityLabel="QA atualizar remoto" onPress={()=>{pages=pages.map(x=>x.id==='other'?{...x,title:'Nome remoto',revision:x.revision+1}:x);}}><Text accessibilityLabel={'QA uploads '+uploads}>Atualizar remoto</Text></Pressable><View style={{flex:1}}>{ready?<ProductionApp/>:null}</View></View>;}

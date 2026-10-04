@@ -13,3 +13,25 @@ test('notification plan uses offsets, future instances, opt-out, and stable iden
 
 const {ChatScrollIntent}=load('src/lib/chat-scroll.ts',{'react':{},'react-native':{}});
 test('chat keeps following large reply growth and keyboard resize, pauses only for deliberate upward scroll',()=>{const s=new ChatScrollIntent();s.position(900,2400,500);assert.equal(s.following,true);s.position(900,2400,250);assert.equal(s.following,true);s.begin();s.position(700,2400,500);s.end();assert.equal(s.following,false);s.position(700,2800,500);assert.equal(s.following,false);s.follow();s.position(700,3200,500);assert.equal(s.following,true);s.begin();s.position(2700,3200,500);s.end();assert.equal(s.following,true);s.pause();s.position(0,4000,500);assert.equal(s.following,false);});
+
+test('chat end offset follows the measured viewport when the keyboard shrinks it without new content',()=>{const s=new ChatScrollIntent();s.position(2600,4000,1400);assert.equal(s.endOffset,2600);s.viewportHeight=700;assert.equal(s.endOffset,3300);s.position(2600,4000,700);assert.equal(s.following,true);assert.equal(s.endOffset,3300);s.begin();s.position(2000,4000,700);s.end();assert.equal(s.following,false);s.follow();s.contentHeight=4600;assert.equal(s.endOffset,3900);});
+
+test('native keyboard resize and automatic momentum keep the latest reply visible; real drag still pauses',()=>{
+ const frames=new Map(),commands=[];let seq=0;const flush=()=>{for(let round=0;frames.size&&round<6;round++){const pending=[...frames.values()];frames.clear();pending.forEach(f=>f());}};
+ const {useChatAutoscroll}=load('src/lib/chat-scroll.ts',{'react':{useRef:x=>({current:x}),useLayoutEffect:f=>f(),useEffect:f=>f()},'react-native':{Keyboard:{addListener:()=>({remove(){}})}}},{requestAnimationFrame:f=>{frames.set(++seq,f);return seq;},cancelAnimationFrame:id=>frames.delete(id)});
+ const h=useChatAutoscroll({current:{scrollToOffset:o=>commands.push(o.offset),scrollToEnd:()=>{}}},true);h.onContentSizeChange(400,4000);h.onLayout({nativeEvent:{layout:{height:1400}}});flush();assert.equal(commands.at(-1),2600);
+ h.onLayout({nativeEvent:{layout:{height:700}}});h.onMomentumScrollBegin();h.onScroll({nativeEvent:{contentOffset:{y:2600},contentSize:{height:4000},layoutMeasurement:{height:700}}});flush();assert.equal(commands.at(-1),3300);
+ h.onScrollBeginDrag();const up={nativeEvent:{contentOffset:{y:2000},contentSize:{height:4000},layoutMeasurement:{height:700}}};h.onScroll(up);h.onScrollEndDrag(up);h.onMomentumScrollBegin();h.onMomentumScrollEnd(up);const count=commands.length;h.onContentSizeChange(400,5000);flush();assert.equal(commands.length,count);h.follow();flush();assert.equal(commands.at(-1),4300);
+});
+
+const {WorkspaceRecords}=load('src/lib/workspace-records.ts',{'react':{},'./chat-model':{errorText:e=>e.message}});
+test('module rows and confirmed empty state stay mounted during a slow refresh and reentry',async()=>{
+ const cache=new WorkspaceRecords(),pending=[],api={entities:()=>new Promise(resolve=>pending.push(resolve))};
+ assert.equal(cache.view('book','').loaded,false);const first=cache.load(api,'book','',()=>{});assert.equal(cache.view('book','').loaded,false);pending.shift()({items:[{id:'book1',title:'Livro'}]});await first;
+ const refresh=cache.load(api,'book','',()=>{});assert.equal(cache.view('book','').items[0].id,'book1');assert.equal(cache.view('book','').loaded,true);assert.equal(cache.view('course','').loaded,false);assert.equal(cache.view('book','').items.length,1);pending.shift()({items:[]});await refresh;
+ const emptyRefresh=cache.load(api,'book','',()=>{});assert.equal(cache.view('book','').loaded,true);assert.equal(cache.view('book','').items.length,0);pending.shift()({items:[]});await emptyRefresh;
+});
+test('late module responses cannot replace another category or a newer request',async()=>{
+ const cache=new WorkspaceRecords(),pending=[],api={entities:kind=>new Promise(resolve=>pending.push({kind,resolve}))};const old=cache.load(api,'book','',()=>{}),other=cache.load(api,'course','',()=>{}),fresh=cache.load(api,'book','',()=>{});
+ pending[2].resolve({items:[{id:'new'}]});await fresh;pending[1].resolve({items:[{id:'course1'}]});await other;pending[0].resolve({items:[{id:'stale'}]});await old;assert.equal(cache.view('book','').items[0].id,'new');assert.equal(cache.view('course','').items[0].id,'course1');assert.equal(cache.view('book','query').loaded,false);
+});
