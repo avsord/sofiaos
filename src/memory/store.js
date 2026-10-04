@@ -32,6 +32,7 @@ class Store {
     migrate82(this.db,filename,this.db.prepare('PRAGMA user_version').get().user_version);
     migrate85(this.db,filename,this.db.prepare('PRAGMA user_version').get().user_version);
     migrate119(this.db,filename,this.db.prepare('PRAGMA user_version').get().user_version);
+    const taskColumns=new Set(this.db.prepare('PRAGMA table_info(task_details)').all().map(c=>c.name));for(const name of ['start_at','end_at'])if(!taskColumns.has(name))this.db.exec('ALTER TABLE task_details ADD COLUMN '+name+" TEXT NOT NULL DEFAULT ''");
     this.db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(entity_id UNINDEXED,owner UNINDEXED,kind UNINDEXED,conversation_id UNINDEXED,title,content,tokenize='unicode61 remove_diacritics 2');`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS voice_messages(message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,mime TEXT NOT NULL,duration_ms INTEGER NOT NULL DEFAULT 0,transcript TEXT NOT NULL,languages_json TEXT NOT NULL DEFAULT '[]',blob BLOB NOT NULL,created_at TEXT NOT NULL) STRICT;`);
     const priorPrivateTotalRow=this.db.prepare('SELECT value FROM settings WHERE key=?').get('privateUsageTotalUSD');
@@ -125,8 +126,8 @@ class Store {
       this.audit('message.deleted',m.id);return {ok:true,id:m.id,conversation_id:m.conversation_id};
     });
   }
-  clearChatHistory() {
-    const conversations=this.db.prepare("SELECT id FROM conversations WHERE owner=? AND state<>'deleted' AND channel IN ('web','mobile','test')").all(OWNER);
+  clearChatHistory(selectedIds=null) {
+    const conversations=this.db.prepare("SELECT id FROM conversations WHERE owner=? AND state<>'deleted' AND channel IN ('web','mobile','test')").all(OWNER).filter(c=>!selectedIds||selectedIds.includes(c.id));
     return this.tx(()=>{
       let messages=0;
       for(const conv of conversations){
@@ -305,8 +306,8 @@ class Store {
   }
   checkpoints(conversationId) { this.conversation(conversationId); return this.db.prepare('SELECT * FROM checkpoints WHERE conversation_id=? ORDER BY rowid DESC LIMIT 100').all(conversationId); }
   taskView(row){if(!row)return row;let notifications=[];try{notifications=JSON.parse(row.notifications_json||'[]');if(!Array.isArray(notifications))notifications=[];}catch{}const {notifications_json,...rest}=row;return {...rest,description:row.description||'',location:row.location||'',color:row.color||'default',priority_level:row.priority_level||((row.priority)?'important':'none'),notifications,calendar_provider:row.calendar_provider||'local',external_calendar_id:row.external_calendar_id||'',external_event_id:row.external_event_id||'',sync_state:row.sync_state||'local'};}
-  tasks() { return this.db.prepare("SELECT t.*,COALESCE(d.description,'') AS description,COALESCE(d.location,'') AS location,COALESCE(d.color,'default') AS color,COALESCE(d.priority_level,CASE WHEN t.priority=1 THEN 'important' ELSE 'none' END) AS priority_level,COALESCE(d.notifications_json,'[]') AS notifications_json,COALESCE(d.calendar_provider,'local') AS calendar_provider,COALESCE(d.external_calendar_id,'') AS external_calendar_id,COALESCE(d.external_event_id,'') AS external_event_id,COALESCE(d.sync_state,'local') AS sync_state FROM tasks t LEFT JOIN task_details d ON d.task_id=t.id WHERE t.owner=? ORDER BY t.priority DESC,t.updated_at DESC,t.rowid DESC").all(OWNER).map(r=>this.taskView(r)); }
-  task(taskId) { const t=this.db.prepare("SELECT t.*,COALESCE(d.description,'') AS description,COALESCE(d.location,'') AS location,COALESCE(d.color,'default') AS color,COALESCE(d.priority_level,CASE WHEN t.priority=1 THEN 'important' ELSE 'none' END) AS priority_level,COALESCE(d.notifications_json,'[]') AS notifications_json,COALESCE(d.calendar_provider,'local') AS calendar_provider,COALESCE(d.external_calendar_id,'') AS external_calendar_id,COALESCE(d.external_event_id,'') AS external_event_id,COALESCE(d.sync_state,'local') AS sync_state FROM tasks t LEFT JOIN task_details d ON d.task_id=t.id WHERE t.id=? AND t.owner=?").get(taskId,OWNER); if (!t) throw new AppError('NOT_FOUND','Tarefa não encontrada.',404); return this.taskView(t); }
+  tasks() { return this.db.prepare("SELECT t.*,COALESCE(d.start_at,t.due_at,'') AS start_at,COALESCE(d.end_at,'') AS end_at,COALESCE(d.description,'') AS description,COALESCE(d.location,'') AS location,COALESCE(d.color,'default') AS color,COALESCE(d.priority_level,CASE WHEN t.priority=1 THEN 'important' ELSE 'none' END) AS priority_level,COALESCE(d.notifications_json,'[]') AS notifications_json,COALESCE(d.calendar_provider,'local') AS calendar_provider,COALESCE(d.external_calendar_id,'') AS external_calendar_id,COALESCE(d.external_event_id,'') AS external_event_id,COALESCE(d.sync_state,'local') AS sync_state FROM tasks t LEFT JOIN task_details d ON d.task_id=t.id WHERE t.owner=? ORDER BY t.priority DESC,t.updated_at DESC,t.rowid DESC").all(OWNER).map(r=>this.taskView(r)); }
+  task(taskId) { const t=this.db.prepare("SELECT t.*,COALESCE(d.start_at,t.due_at,'') AS start_at,COALESCE(d.end_at,'') AS end_at,COALESCE(d.description,'') AS description,COALESCE(d.location,'') AS location,COALESCE(d.color,'default') AS color,COALESCE(d.priority_level,CASE WHEN t.priority=1 THEN 'important' ELSE 'none' END) AS priority_level,COALESCE(d.notifications_json,'[]') AS notifications_json,COALESCE(d.calendar_provider,'local') AS calendar_provider,COALESCE(d.external_calendar_id,'') AS external_calendar_id,COALESCE(d.external_event_id,'') AS external_event_id,COALESCE(d.sync_state,'local') AS sync_state FROM tasks t LEFT JOIN task_details d ON d.task_id=t.id WHERE t.id=? AND t.owner=?").get(taskId,OWNER); if (!t) throw new AppError('NOT_FOUND','Tarefa não encontrada.',404); return this.taskView(t); }
   saveTask(input, taskId) {
     const title=cleanText(input.title,'Tarefa',300), area=cleanText(input.area || 'Geral','Área',80), state=input.state || 'todo'; rejectSecrets(title);
     const description=cleanText(input.description ?? '', 'Descrição', 8000, true), location=cleanText(input.location ?? '', 'Local', 300, true);
@@ -317,6 +318,9 @@ class Store {
     if (!['todo','scheduled','pending','doing','waiting','done','cancelled'].includes(state)) throw new AppError('BAD_STATE','Estado de tarefa inválido.');
     let due=null;
     if (input.due_at) { const value=Date.parse(input.due_at); if (!Number.isFinite(value) || !/[zZ]|[+-]\d\d:\d\d$/.test(input.due_at)) throw new AppError('BAD_DATE','Data inválida: informe data, horário e fuso.'); due=new Date(value).toISOString(); }
+    const previous=taskId?this.task(taskId):null;const start=input.start_at===undefined?(previous?.start_at||due||''):String(input.start_at||''),end=input.end_at===undefined?(previous?.end_at||''):String(input.end_at||'');
+    for(const value of [start,end])if(value&&(!Number.isFinite(Date.parse(value))||!/[zZ]|[+-]\d\d:\d\d$/.test(value)))throw new AppError('BAD_DATE','Selecione uma data e horário válidos.');
+    if(end&&(!start||Date.parse(end)<Date.parse(start)))throw new AppError('BAD_DATE','O fim precisa ser depois do início.');if(start)due=new Date(start).toISOString();
     const source=this.source(input.source_id);
     return this.tx(() => {
       const old=taskId ? this.task(taskId) : null;
@@ -326,6 +330,7 @@ class Store {
       if (old) this.db.prepare('UPDATE tasks SET title=?,area=?,state=?,priority=?,due_at=?,original_due_at=?,source_id=?,revision=?,updated_at=? WHERE id=?').run(title,area,state,priorityFlag,due,old.original_due_at || due,source,revision,now(),t);
       else this.db.prepare('INSERT INTO tasks(id,owner,title,area,state,priority,due_at,original_due_at,source_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(t,OWNER,title,area,state,priorityFlag,due,due,source,now(),now());
       this.db.prepare("INSERT INTO task_details(task_id,description,location,color,priority_level,notifications_json,calendar_provider,external_calendar_id,external_event_id,sync_state) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(task_id) DO UPDATE SET description=excluded.description,location=excluded.location,color=excluded.color,priority_level=excluded.priority_level,notifications_json=excluded.notifications_json,calendar_provider=excluded.calendar_provider,external_calendar_id=excluded.external_calendar_id,external_event_id=excluded.external_event_id,sync_state=excluded.sync_state").run(t,description,location,color,priorityLevel,JSON.stringify(notifications),provider,externalCalendarId,externalEventId,syncState);
+      this.db.prepare('UPDATE task_details SET start_at=?,end_at=? WHERE task_id=?').run(start,end,t);
       const inherited=this.privacyOf('message',source);if(input.privacy==='local'||inherited==='local')this.annotate('task',t,'local');else if(input.privacy==='shared'||inherited==='shared')this.annotate('task',t,'shared');else if(input.privacy==='private'||inherited==='private')this.annotate('task',t,'private');
       const task=this.task(t);this.db.prepare('INSERT INTO task_versions VALUES (?,?,?,?,?)').run(id(),t,revision,JSON.stringify(task),now());this.audit(old?'task.updated':'task.created',t);return task;
     });
@@ -346,7 +351,7 @@ class Store {
         const fields=this.db.prepare(`PRAGMA table_info(${table})`).all().map(c=>c.name);
         const insert=this.db.prepare(`INSERT INTO ${table} (${fields.join(',')}) VALUES (${fields.map(()=>'?').join(',')})`);
         for (const sourceRow of snapshot.tables[table]) {
-          const row=sourceRow&&typeof sourceRow==='object'?{...sourceRow}:sourceRow;if(table==='task_details'&&row){if(row.priority_level===undefined)row.priority_level='none';if(row.calendar_provider===undefined)row.calendar_provider='local';if(row.external_calendar_id===undefined)row.external_calendar_id='';if(row.external_event_id===undefined)row.external_event_id='';if(row.sync_state===undefined)row.sync_state='local';}
+          const row=sourceRow&&typeof sourceRow==='object'?{...sourceRow}:sourceRow;if(table==='task_details'&&row){if(row.start_at===undefined)row.start_at='';if(row.end_at===undefined)row.end_at='';if(row.priority_level===undefined)row.priority_level='none';if(row.calendar_provider===undefined)row.calendar_provider='local';if(row.external_calendar_id===undefined)row.external_calendar_id='';if(row.external_event_id===undefined)row.external_event_id='';if(row.sync_state===undefined)row.sync_state='local';}
           if (!row || typeof row!=='object' || Object.keys(row).length!==fields.length || fields.some(k=>!(k in row))) throw new AppError('BAD_BACKUP','Estrutura de backup inválida.');
           if ('owner' in row && row.owner!==OWNER) throw new AppError('BAD_BACKUP','Este backup não pertence ao perfil local suportado.');
           if(table==='attachments'){

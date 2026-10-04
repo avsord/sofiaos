@@ -1,7 +1,7 @@
 export type BellAnchor={x:number;y:number;width:number;height:number};
 export function notificationPopoverLayout(anchor:BellAnchor,screen:{width:number;height:number},insets:{top:number;bottom:number}){
- const margin=16,width=Math.max(1,Math.min(400,screen.width-margin*2));
- const left=Math.max(margin,Math.min(screen.width-margin-width,anchor.x+anchor.width-width));
+ const margin=16,width=Math.max(1,screen.width-margin*2);
+ const left=margin;
  // Start below the bell, not in the centre. Clamp only in very short/landscape windows.
  const top=Math.max(insets.top+8,Math.min(anchor.y+anchor.height+8,screen.height-insets.bottom-180));
  const height=Math.max(1,Math.min(560,screen.height-insets.bottom-top-margin));

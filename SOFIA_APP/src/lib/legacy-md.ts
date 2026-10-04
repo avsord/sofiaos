@@ -44,5 +44,5 @@ export class LegacyMdAdapter{
   return {items:plan.siblings.map(p=>{const value=p.id===moved.id?moved:p;return {...value,data:{...value.data,sort_order:this.order[p.id]}};})};
  }
  async notices(offset=0){if(await this.supports())return this.call<{items:Notice[];next_offset:number|null;unread:number}>('/md/notifications?offset='+offset);await this.load();if(offset===0)this.snapshot=(await this.call<{items:Notice[]}>('/notifications')).items;const items=this.snapshot.filter(n=>!this.dismissed.has(n.id));return {items:items.slice(offset,offset+100),next_offset:items.length>offset+100?offset+100:null,unread:items.filter(n=>n.state==='unread').length};}
- async clear(id:string){if(await this.supports())return this.call<{ok:boolean}>('/md/notifications/'+encodeURIComponent(id),{},'DELETE');await this.load();const old=new Set(this.dismissed);if(id==='all'){const d=await this.call<{items:Notice[]}>('/notifications');for(const n of d.items)this.dismissed.add(n.id);}else this.dismissed.add(id);try{await this.persist();}catch(e){this.dismissed=old;throw e;}return {ok:true};}
+ async clear(id:string){if(await this.supports())return this.call<{ok:boolean}>('/md/notifications/'+encodeURIComponent(id),{},'DELETE');throw Error('Limpar notificações em todos os dispositivos aguarda a atualização do servidor. Nenhum aviso foi apagado.');}
 }

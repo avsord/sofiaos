@@ -35,18 +35,18 @@ test('024 actual row callbacks: tap opens once, held cancellation never moves th
 function descendants(node){return node&&typeof node==='object'?[node,...(Array.isArray(node.props?.children)?node.props.children:[node.props?.children]).flat(Infinity).flatMap(descendants)]:[];}
 test('024 rendered mini agenda: equal halves, same row, selecting day updates events in place',()=>{
  const h=hooks(),dashboard=load('src/lib/dashboard.ts'),opened=[];
- const {MiniAgenda}=compile('src/components/DashboardWidgets.tsx',{'react':h.React,'react/jsx-runtime':jsx,'react-native':{Alert:{},Modal:'Modal',Pressable:'Pressable',ScrollView:'ScrollView',Text:'Text',View:'View'},'react-native-svg':{},'../lib/dashboard':dashboard,'../lib/theme':{useTheme:()=>({})},'./UI':{Button:'Button',IconButton:'IconButton'}});
+ const {MiniAgenda}=compile('src/components/DashboardWidgets.tsx',{'react':h.React,'react/jsx-runtime':jsx,'react-native':{Alert:{},Modal:'Modal',Pressable:'Pressable',ScrollView:'ScrollView',Text:'Text',View:'View'},'react-native-svg':{},'../lib/dashboard':dashboard,'../lib/theme':{useTheme:()=>({})},'./UI':{Button:'Button',IconButton:'IconButton'},'./MonthSwipe':{MonthSwipe:'MonthSwipe'}});
  const today=new Date(),day=dashboard.localDateKey(today),tomorrow=new Date(today.getFullYear(),today.getMonth(),today.getDate()===1?2:1),other=dashboard.localDateKey(tomorrow);
  const items=[{id:'a',title:'Hoje teste',date:day},{id:'b',title:'Outra data teste',date:other}];
  const render=()=>h.render(()=>MiniAgenda({items,onOpen:d=>opened.push(d),onItem:i=>opened.push(i.id)}));
  let nodes=descendants(render()),row=nodes.find(n=>n.props?.testID==='agenda-split-row');assert.equal(row.props.style.flexDirection,'row');
- const halves=nodes.filter(n=>['agenda-calendar-half','agenda-items-half'].includes(n.props?.testID));assert.equal(halves.length,2);halves.forEach(n=>assert.equal(n.props.style.width,'50%'));
+ const halves=nodes.filter(n=>['agenda-calendar-half','agenda-items-half'].includes(n.props?.testID));assert.equal(halves.length,2);assert.equal(halves[0].props.testID,'agenda-items-half');assert.equal(halves[1].props.testID,'agenda-calendar-half');halves.forEach(n=>assert.equal(n.props.style.width,'50%'));
  assert.ok(nodes.some(n=>n.props?.accessibilityLabel==='Hoje teste'));assert.ok(!nodes.some(n=>n.props?.accessibilityLabel==='Outra data teste'));
  nodes.find(n=>n.props?.testID==='agenda-day-'+other).props.onPress();nodes=descendants(render());assert.ok(nodes.some(n=>n.props?.accessibilityLabel==='Outra data teste'));assert.ok(!nodes.some(n=>n.props?.accessibilityLabel==='Hoje teste'));assert.deepEqual(opened,[]);
  const list=nodes.find(n=>n.props?.testID==='agenda-day-items');assert.equal(list.props.nestedScrollEnabled,true);assert.equal(list.props.style.height,190);
 });
 test('024 popover: top follows actual bell across mobile/tablet widths, never screen centre',()=>{
- for(const width of [320,360,400,768,1200]){const anchor={x:width-80,y:48,width:44,height:44};const r=layout.notificationPopoverLayout(anchor,{width,height:900},{top:24,bottom:24});assert.equal(r.top,100);assert.ok(r.left>=16);assert.ok(r.left+r.width<=width-16);assert.ok(r.top+r.height<=876);assert.ok(r.width<=400);}
+ for(const width of [320,360,400,768,1200]){const anchor={x:width-80,y:48,width:44,height:44};const r=layout.notificationPopoverLayout(anchor,{width,height:900},{top:24,bottom:24});assert.equal(r.top,100);assert.ok(r.left>=16);assert.ok(r.left+r.width<=width-16);assert.ok(r.top+r.height<=876);assert.equal(r.width,width-32);assert.equal(r.left,16);}
 });
 test('024 popover: short windows are bounded and date headings use calendar days',()=>{
  const r=layout.notificationPopoverLayout({x:300,y:680,width:44,height:44},{width:360,height:740},{top:24,bottom:24});assert.ok(r.top+r.height<=700);assert.ok(r.top>=32);
@@ -57,5 +57,5 @@ test('024 wiring: native refresh disabled independently of scroll; pending/held 
 });
 test('024 identity: native manifest, npm and updater agree; package, scheme and release prefix retained',()=>{
  const config=JSON.parse(fs.readFileSync(path.join(root,'app.json'),'utf8')).expo,pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8')),lock=JSON.parse(fs.readFileSync(path.join(root,'package-lock.json'),'utf8'));
- const updater=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');assert.equal(config.version,'0.3.27');assert.equal(pkg.version,config.version);assert.equal(lock.version,config.version);assert.equal(lock.packages[''].version,config.version);assert.equal(config.android.versionCode,32);assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.scheme,'sofiaapp');assert.ok(updater.includes("APP_VERSION = '0.3.27'"));assert.ok(updater.includes("RELEASE_PREFIX = 'sofia-android-v'"));
+ const updater=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');assert.equal(config.version,'0.3.28');assert.equal(pkg.version,config.version);assert.equal(lock.version,config.version);assert.equal(lock.packages[''].version,config.version);assert.equal(config.android.versionCode,33);assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.scheme,'sofiaapp');assert.ok(updater.includes("APP_VERSION = '0.3.28'"));assert.ok(updater.includes("RELEASE_PREFIX = 'sofia-android-v'"));
 });

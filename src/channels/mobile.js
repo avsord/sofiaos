@@ -125,7 +125,7 @@ function makeMobileApi(runtime, deps) {
     if (p === '/api/mobile/conversations' && m === 'GET') {
       const offset = Math.max(0, Math.min(100000, Number(url.searchParams.get('offset')) || 0));
       const rows = store.db.prepare(`SELECT * FROM conversations WHERE owner=? AND state='active'
-        AND channel IN ('mobile','web','test') ORDER BY updated_at DESC,rowid DESC LIMIT 51 OFFSET ?`).all(OWNER, Math.trunc(offset));
+        AND channel IN ('mobile','web','test') AND EXISTS (SELECT 1 FROM messages WHERE messages.conversation_id=conversations.id AND messages.status<>'deleted') ORDER BY updated_at DESC,rowid DESC LIMIT 51 OFFSET ?`).all(OWNER, Math.trunc(offset));
       return send({ items: rows.slice(0, 50), has_more: rows.length > 50, next_offset: offset + 50 });
     }
     if (p === '/api/mobile/conversations' && m === 'POST') {

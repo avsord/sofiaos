@@ -70,7 +70,7 @@ test('MD2: both native icon sources are real 1024x1024 PNGs and vector masters e
 });
 test('MD3/6/10: short settings label, gear, shared notices and nested Apps gate are present',()=>{
  const source=fs.readFileSync(path.join(__dirname,'../App.tsx'),'utf8');
- assert.ok(source.includes("label:'Ajustes',icon:'settings'"));assert.ok(source.includes('NotificationProvider'));assert.ok(source.includes("tab==='apps'&&workspaceDepth"));
+ assert.ok(source.includes("label:'Perfil',icon:'user'"));assert.ok(source.includes('NotificationProvider'));assert.ok(source.includes("tab==='apps'&&workspaceDepth"));
  const workspace=fs.readFileSync(path.join(__dirname,'../src/screens/Workspace.tsx'),'utf8');assert.ok(workspace.includes('InternalBackGesture'));assert.ok(workspace.includes('NotificationBell'));
 });
 

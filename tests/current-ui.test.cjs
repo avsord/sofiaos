@@ -238,7 +238,7 @@ test('v141: web permite apagar mensagem individual e limpar histórico sincroniz
   assert.ok(handler.includes("p==='/api/chat-history'"));
   assert.ok(handler.includes("m==='DELETE'&&match"));
   assert.ok(store.includes('deleteMessage(messageId)'));
-  assert.ok(store.includes('clearChatHistory()'));
+  assert.ok(store.includes('clearChatHistory(selectedIds=null)'));
 });
 
 

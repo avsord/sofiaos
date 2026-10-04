@@ -61,7 +61,10 @@ function makeMdApi(runtime,{bodyJson,json}){
  return async function mdApi(req,res,p,m,url){
   if(!p.startsWith('/api/md/'))return false;
   const send=value=>{json(res,200,value);return true;};
-  if(p==='/api/md/capabilities'&&m==='GET')return send({version:1,page_order:true,notifications_paged:true,google_calendar:service.calendar.status().configured});
+  if(p==='/api/md/capabilities'&&m==='GET')return send({version:2,task_intervals:true,dashboard_widgets:true,conversation_delete:true,notifications_unread:true,page_order:true,notifications_paged:true,google_calendar:service.calendar.status().configured});
+  if(p==='/api/md/conversations'&&m==='DELETE'){const b=await bodyJson(req,8192);if(!Array.isArray(b.ids)||!b.ids.length||b.ids.length>50)throw new AppError('BAD_SELECTION','Selecione de 1 a 50 conversas.');b.ids.forEach(validId);return send(store.clearChatHistory([...new Set(b.ids)]));}
+  if(p==='/api/md/dashboard'&&m==='GET')return send({widgets:store.settings().homeWidgets});
+  if(p==='/api/md/dashboard'&&m==='PATCH'){const b=await bodyJson(req,8192);if(!Array.isArray(b.widgets)||b.widgets.some(x=>!['monitoring','tasks','priorities','study','notifications'].includes(x)))throw new AppError('BAD_WIDGETS','Widgets inválidos.');store.updateSettings({homeWidgets:b.widgets});return send({widgets:store.settings().homeWidgets});}
   if(p==='/api/md/pages/move'&&m==='POST')return send(service.move(await bodyJson(req,8192)));
   if(p==='/api/md/notifications'&&m==='GET'){
    const offset=Number(url.searchParams.get('offset')||0);if(!Number.isSafeInteger(offset)||offset<0||offset>1000000)throw new AppError('BAD_PAGE','Página inválida.');
@@ -70,6 +73,7 @@ function makeMdApi(runtime,{bodyJson,json}){
    return send({items:rows.slice(0,100),next_offset:rows.length>100?offset+100:null,unread});
   }
   const notification=p.match(/^\/api\/md\/notifications\/([\w-]+)$/);
+  if(notification&&m==='PATCH'){const b=await bodyJson(req,2048);if(!['read','unread'].includes(b.state))throw new AppError('BAD_STATE','Estado inválido.');validId(notification[1]);store.db.prepare("UPDATE notifications SET state=? WHERE id=? AND (entity_id IS NULL OR entity_id='' OR entity_id NOT IN (SELECT id FROM entities) OR entity_id IN (SELECT id FROM entities WHERE owner=?))").run(b.state,notification[1],OWNER);return send({ok:true});}
   if(notification&&m==='DELETE'){
    if(notification[1]==='all')store.db.prepare("DELETE FROM notifications WHERE entity_id IS NULL OR entity_id='' OR entity_id NOT IN (SELECT id FROM entities) OR entity_id IN (SELECT id FROM entities WHERE owner=?)").run(OWNER);
    else {validId(notification[1]);store.db.prepare("DELETE FROM notifications WHERE id=? AND (entity_id IS NULL OR entity_id='' OR entity_id NOT IN (SELECT id FROM entities) OR entity_id IN (SELECT id FROM entities WHERE owner=?))").run(notification[1],OWNER);}

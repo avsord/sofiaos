@@ -18,6 +18,7 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
  const visible=useMemo(()=>{const result:Visible[]=[];const walk=(items:Entity[],depth:number,path:Set<string>)=>{for(const page of items){if(path.has(page.id)||depth>40)continue;const kids=children.get(page.id)||[],open=compact||expanded.has(page.id);result.push({page,depth,hasChildren:!!kids.length,open});if(open)walk(kids,depth+1,new Set([...path,page.id]));}};walk(roots,0,new Set());return result;},[roots,children,expanded,compact]);
  const latest=useRef({all,visible,onMove,onOpen,onDelete,onInteractionChange,onDragChange,canParent});latest.current={all,visible,onMove,onOpen,onDelete,onInteractionChange,onDragChange,canParent};
  function measure(){
+  if(drag.current)return;
   const ids=new Set(latest.current.visible.map(r=>r.page.id));rects.current=rects.current.filter(r=>ids.has(r.page.id));
   host.current?.measureInWindow((x,y,width)=>{origin.current={x,y,width};setGeometry(v=>v+1);});
   for(const row of latest.current.visible)nodes.current.get(row.page.id)?.measureInWindow((x,y,width,height)=>{if(height<=0)return;const next={...row,x,y,width,height};rects.current=[...rects.current.filter(r=>r.page.id!==row.page.id),next];});
@@ -32,7 +33,7 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
  }
  const line=drop?dropLineY(drop,rects.current):null,ghostRect=ghost?rects.current.find(r=>r.page.id===ghost.page.id):null;
  return <View ref={host} collapsable={false} onLayout={measure} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)latest.current.onInteractionChange?.(false);}} onTouchCancel={()=>{end(true);latest.current.onInteractionChange?.(false);}} style={{position:'relative'}}>
-  {visible.map(row=>{const p=row.page,target=drop?.kind==='inside'&&drop.anchorId===p.id,isSource=ghost?.page.id===p.id;return <View key={p.id}>
+  {visible.map(row=>{const p=row.page,target=drop?.kind==='inside'&&drop.anchorId===p.id,isSource=ghost?.page.id===p.id;return <View key={p.id} style={{marginTop:drop?.kind==='before'&&drop.anchorId===p.id?46:0,marginBottom:drop?.kind==='after'&&drop.anchorId===p.id?46:0}}>
    <View ref={node=>{if(node)nodes.current.set(p.id,node);else nodes.current.delete(p.id);}} collapsable={false} style={{flexDirection:'row',alignItems:'center',paddingLeft:row.depth*PAGE_INDENT,borderRadius:9,backgroundColor:target?c.accentSoft:'transparent',borderWidth:1,borderColor:target?c.accent:'transparent',opacity:isSource?.3:1}}>
     {!compact?<Pressable disabled={!row.hasChildren} accessibilityLabel={(row.open?'Recolher':'Expandir')+' subpáginas de '+p.title} accessibilityState={{expanded:row.open}} onPress={()=>toggle(p.id)} style={{width:28,height:46,alignItems:'center',justifyContent:'center'}}>{row.hasChildren?<View style={{transform:[{rotate:row.open?'90deg':'0deg'}]}}><Icon name="chevron" size={14} color={c.muted}/></View>:null}</Pressable>:null}
     <PageRow page={p} compact={compact} onTouchStart={()=>latest.current.onInteractionChange?.(true)} onOpen={()=>onOpen(p)} onHold={(x,y)=>begin(row,x,y)} onMove={move} onEnd={()=>end()} onCancel={()=>end(true)}/>

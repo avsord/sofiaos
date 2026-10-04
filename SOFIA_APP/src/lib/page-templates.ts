@@ -32,35 +32,21 @@ export const PAGE_TEMPLATES:PageTemplate[]=[
   })]
  },
  {
-  id:'notes_hub',title:'Bloco de nota',description:'Área limpa para cadernos e notas.',icon:'📝',
-  blocks:[
-   block('heading2','Cadernos'),
-   block('collection','',{
-    title:'Cadernos',show_title:false,
-    properties:[{key:'name',label:'Nome',type:'text',options:[]}],
-    views:[{id:'main',label:'Cadernos',type:'pages',group_by:'',filter_key:'',filter_value:'',sort_by:'',sort_dir:'desc'}],
-    active_view:'main',rows:[]
-   }),
-   block('collection','',{
-    title:'Notas',show_title:false,
-    properties:[{key:'name',label:'Nome',type:'text',options:[]}],
-    views:[{id:'notes',label:'Notas',type:'list',group_by:'',filter_key:'',filter_value:'',sort_by:'',sort_dir:'desc'}],
-    active_view:'notes',rows:[]
-   })
-  ]
+  id:'notes_hub',title:'Anotações',description:'Cadernos com folhas próprias e edição livre.',icon:'📝',
+  blocks:[block('collection','',{title:'Anotações',show_title:true,mode:'notebooks',notebooks:[],properties:[{key:'name',label:'Nome',type:'text'}],views:[{id:'notebooks',label:'Anotações',type:'pages'}],active_view:'notebooks',rows:[]})]
  },
  {
-  id:'playlist_links',title:'Lista de reprodução',description:'Tabela simples para organizar links.',icon:'🔗',
+  id:'playlist_links',title:'Coleção',description:'Campos livres para organizar o que você quiser.',icon:'🔗',
   blocks:[
    block('collection','',{
     title:'',show_title:false,
     properties:[
      {key:'name',label:'Nome',type:'text',options:[]},
-     {key:'url',label:'URL',type:'url',options:[]},
-     {key:'category',label:'Categoria',type:'select',options:['Vídeo','Artigo','Curso','Referência'],option_colors:{Vídeo:'blue',Artigo:'green',Curso:'purple','Referência':'gray'}},
+          {key:'category',label:'Categoria',type:'text',placeholder:'Adicionar…'},
+     {key:'description',label:'Descrição',type:'text',placeholder:'Adicionar…'},
      {key:'created',label:'Criado em',type:'date',options:[]}
     ],
-    views:[{id:'links',label:'Links',type:'table',group_by:'',filter_key:'',filter_value:'',sort_by:'created',sort_dir:'desc'}],
+    views:[{id:'links',label:'Coleção',type:'table',group_by:'',filter_key:'',filter_value:'',sort_by:'created',sort_dir:'desc'}],
     active_view:'links',rows:[]
    })
   ]
