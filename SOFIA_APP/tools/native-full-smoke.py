@@ -67,6 +67,10 @@ node=wait('Não iniciada');x,y,r,b=box(node);swipe((x+r)//2,(y+b)//2,(x+r)//2+18
 # Empty page: hint, body editor, autosave and undo/redo.
 back();tap('Criar página');tap('Criar página em branco');wait('Título da página');snapshot('18-empty-page')
 tap('Título da página');adb('shell','input','text','Minha%spagina');back();time.sleep(1);snapshot('19-autosave-title');tap('Desfazer');time.sleep(.8);tap('Refazer');time.sleep(.8);snapshot('20-undo-redo');back();wait('Abrir página principal Minha pagina');snapshot('21-saved-title-in-tree')
+# Notebook flows use production components and persist through the page autosave API.
+tap('Abrir página principal Minha pagina');tap('Criar página ou usar template');tap('Usar template de conteúdo');tap('Aplicar template Anotações');tap('Novo caderno');tap('Nome do caderno');adb('shell','input','text','Trabalho');back();tap('Criar caderno');wait('Abrir caderno Trabalho');snapshot('21d-notebook-created')
+tap('Abrir caderno Trabalho');tap('Nova folha');tap('Título da folha');adb('shell','input','text','Reuniao');back();tap('Conteúdo da folha');adb('shell','input','text','Conteudo%spreservado');back();time.sleep(1);snapshot('21e-leaf-edited')
+tap('Ações da folha');tap('Duplicar');wait('Título da folha');snapshot('21f-leaf-duplicate');back();wait('Abrir folha Reuniao');back();back();wait('Criar página')
 # Apps repeated tap returns to root, then editor shows visual dates safely below status bar.
 tap('Apps');tap('Tarefas');wait('Nova tarefa');tap('Apps');wait('Seus espaços');snapshot('21b-apps-reset')
 tap('Agenda');tap('Criar item na data selecionada');wait('Criar · Compromisso');tap('Início');wait('Confirmar data e horário');snapshot('21c-date-picker');back();back()
