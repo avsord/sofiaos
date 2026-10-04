@@ -20,7 +20,7 @@ export const statusColorHex=(id:string)=>STATUS_COLORS.find(x=>x.id===id)?.hex||
 
 export const PAGE_TEMPLATES:PageTemplate[]=[
  {
-  id:'tasks_personal',title:'Tarefas pessoal',description:'Quadro de tarefas com status editáveis.',icon:'✅',
+  id:'tasks_personal',title:'Quadro de tarefas',description:'Quadro de tarefas com status editáveis.',icon:'✅',
   blocks:[block('collection','',{
    title:'',show_title:false,
    properties:[
@@ -32,8 +32,8 @@ export const PAGE_TEMPLATES:PageTemplate[]=[
   })]
  },
  {
-  id:'notes_hub',title:'Anotações',description:'Cadernos com folhas próprias e edição livre.',icon:'📝',
-  blocks:[block('collection','',{title:'Anotações',show_title:true,mode:'notebooks',notebooks:[],properties:[{key:'name',label:'Nome',type:'text'}],views:[{id:'notebooks',label:'Anotações',type:'pages'}],active_view:'notebooks',rows:[]})]
+  id:'notes_hub',title:'Notas',description:'Pastas com notas e edição livre.',icon:'📝',
+  blocks:[block('collection','',{title:'Notas',show_title:true,mode:'notebooks',notebooks:[],properties:[{key:'name',label:'Nome',type:'text'}],views:[{id:'notebooks',label:'Notas',type:'pages'}],active_view:'notebooks',rows:[]})]
  },
  {
   id:'playlist_links',title:'Coleção',description:'Campos livres para organizar o que você quiser.',icon:'🔗',

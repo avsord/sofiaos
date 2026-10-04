@@ -12,14 +12,18 @@ export function tabAtOffset(offset: number, width: number): Tab | null {
 export function createPagerSelection(initial: Tab = 'chat') {
   let selected: Tab = tabIndex(initial)>=0?initial:'chat';
   let dragging = false;
+  let touching = false, releasedAt = 0;
   return {
     current: () => selected,
     isDragging: () => dragging,
-    select(next: Tab) { dragging = false; if (tabIndex(next) >= 0) selected = next; },
-    beginDrag() { dragging = true; },
-    cancelDrag() { dragging = false; },
-    finishDrag(offset: number, width: number): Tab | null {
-      if (!dragging) return null;
+    select(next: Tab) { dragging = false; touching = false; if (tabIndex(next) >= 0) selected = next; },
+    beginDrag() { dragging = true; touching = true; releasedAt = 0; },
+    release(time=0) { touching = false; releasedAt = time; },
+    canFinish(time=0) { return dragging && !touching && (!time || !releasedAt || time>=releasedAt); },
+    cancelDrag() { dragging = false; touching = false; },
+    finishDrag(offset: number, width: number,time=0): Tab | null {
+      if (!dragging || touching || (time && releasedAt && time<releasedAt)) return null;
+      if(width<=0||Math.abs(offset-Math.round(offset/width)*width)>1) return null;
       dragging = false;
       const next = tabAtOffset(offset, width);
       if (!next || next === selected) return null;

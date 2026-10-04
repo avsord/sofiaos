@@ -37,7 +37,7 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
   useImperativeHandle(ref,() => ({goTo}),[goTo]);
   // The motion owner survives login/bootstrap; a fresh pager must not inherit its old tab.
   useLayoutEffect(() => {motion.reset(selection.current.current());},[motion]);
-  useLayoutEffect(() => {goTo(activeTab);},[activeTab,goTo]);
+  useLayoutEffect(() => {if(activeTab!==selection.current.current())goTo(activeTab);},[activeTab,goTo]);
   useLayoutEffect(() => {if (!enabled) {selection.current.cancelDrag();align();}},[enabled,align]);
   const layout = useCallback((event: LayoutChangeEvent) => {
     const next=event.nativeEvent.layout.width;
@@ -64,12 +64,15 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
   },[motion]);
   const finish = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (!latest.current.enabled) {goTo(latest.current.activeTab);return;}
-    if (!selection.current.isDragging()) return;
-    const next = selection.current.finishDrag(event.nativeEvent.contentOffset.x,size.current);
+    if (!selection.current.canFinish(event.timeStamp)) return;
+    const x=event.nativeEvent.contentOffset.x,w=size.current;
+    if(w<=0||Math.abs(x-Math.round(x/w)*w)>1)return;
+    const next = selection.current.finishDrag(x,w,event.timeStamp);
     motion.settle(selection.current.current(),event.nativeEvent.contentOffset.x);
     if (next) latest.current.onSelect(next);
   },[goTo,motion]);
   const endDrag = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    selection.current.release(event.timeStamp);
     const x = event.nativeEvent.contentOffset.x, w = size.current;
     const velocity = event.nativeEvent.velocity?.x;
     if (w > 0 && velocity !== undefined && Math.abs(velocity) < 0.01 && Math.abs(x - Math.round(x/w)*w) < 0.5) finish(event);

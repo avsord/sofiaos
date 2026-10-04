@@ -12,7 +12,7 @@ export function menuWeightRange(index:number) {
   const inputRange=Array.from({length:65},(_,i)=>index-1+i/32);
   return {inputRange,outputRange:inputRange.map(p=>menuWeight(p,index)),extrapolate:'clamp' as const};
 }
-export const MENU_SPRING={stiffness:420,damping:30,mass:0.8,overshootClamping:false,
+export const MENU_SPRING={stiffness:300,damping:30,mass:0.85,overshootClamping:true,
   restDisplacementThreshold:0.001,restSpeedThreshold:0.001,useNativeDriver:true,isInteraction:false} as const;
 
 /** One native scroll signal drives the pill, icon and caption, without React frames. */
@@ -66,7 +66,8 @@ export function createMenuMotion(initial:Tab='chat') {
     settle(tab:Tab,offset:number) {
       // The purple label has already followed the native scroll to this point.
       // Keep the same graph; do not start a second, delayed selection animation.
-      selected=tab;lastOffset=offset;dragging=false;
+      selected=tab;lastOffset=offset;dragging=false;tracking=false;
+      taps.forEach((tap,i)=>tap.setValue(TAB_ORDER[i]===tab?1:0));live.setValue(0);
     },
     setReducedMotion(enabled:boolean) {
       reduced=enabled;motionAmount.setValue(enabled?0:1);

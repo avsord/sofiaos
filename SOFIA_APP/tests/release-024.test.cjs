@@ -17,7 +17,7 @@ const jsx={jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})};
 function compile(file,deps,extra='',globals={}){const exports={};const code=ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{fileName:file,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;vm.runInNewContext(code+extra,{exports,require:n=>{assert.ok(n in deps,'Unexpected '+n);return deps[n];},Date,Map,Set,...globals});return exports;}
 function row(){const h=hooks(),calls=[],timers=new Map();let seq=0;
  const native={View:'View',Text:'Text',Pressable:'Pressable',Animated:{}};
- const exports=compile('src/components/PageTreeList.tsx',{'react':h.React,'react/jsx-runtime':jsx,'react-native':native,'../lib/theme':{useTheme:()=>({text:'text'})},'./Icon':{Icon:'Icon'},'../lib/page-order':{}},'\nexports.PageRowTest=PageRow;',{setTimeout:fn=>{timers.set(++seq,fn);return seq;},clearTimeout:id=>timers.delete(id)});
+ const exports=compile('src/components/PageTreeList.tsx',{'react':h.React,'react/jsx-runtime':jsx,'react-native':native,'../lib/theme':{useTheme:()=>({text:'text'})},'./Icon':{Icon:'Icon'},'../lib/motion':{useReducedMotion:()=>false},'../lib/page-order':{}},'\nexports.PageRowTest=PageRow;',{setTimeout:fn=>{timers.set(++seq,fn);return seq;},clearTimeout:id=>timers.delete(id)});
  const props={page:{id:'page',title:'Enjoythevoid',data:{icon:'🖤'}},compact:false,onTouchStart:()=>calls.push('touch'),onOpen:()=>calls.push('open'),onHold:()=>calls.push('hold'),onMove:()=>calls.push('move'),onEnd:()=>calls.push('end'),onCancel:()=>calls.push('cancel')};
  const view=h.render(()=>exports.PageRowTest(props));return {p:view.props,calls,tick:()=>{const jobs=[...timers.values()];timers.clear();jobs.forEach(f=>f());}};
 }
@@ -35,7 +35,7 @@ test('024 actual row callbacks: tap opens once, held cancellation never moves th
 function descendants(node){return node&&typeof node==='object'?[node,...(Array.isArray(node.props?.children)?node.props.children:[node.props?.children]).flat(Infinity).flatMap(descendants)]:[];}
 test('024 rendered mini agenda: equal halves, same row, selecting day updates events in place',()=>{
  const h=hooks(),dashboard=load('src/lib/dashboard.ts'),opened=[];
- const {MiniAgenda}=compile('src/components/DashboardWidgets.tsx',{'react':h.React,'react/jsx-runtime':jsx,'react-native':{Alert:{},Modal:'Modal',Pressable:'Pressable',ScrollView:'ScrollView',Text:'Text',View:'View'},'react-native-svg':{},'../lib/dashboard':dashboard,'../lib/theme':{useTheme:()=>({})},'./UI':{Button:'Button',IconButton:'IconButton'},'./MonthSwipe':{MonthSwipe:'MonthSwipe'}});
+ const {MiniAgenda}=compile('src/components/DashboardWidgets.tsx',{'react':h.React,'react/jsx-runtime':jsx,'react-native':{Alert:{},Modal:'Modal',Pressable:'Pressable',ScrollView:'ScrollView',Text:'Text',View:'View'},'react-native-svg':{},'../lib/dashboard':dashboard,'../lib/theme':{useTheme:()=>({})},'./UI':{Button:'Button',IconButton:'IconButton'},'./MotionModal':{MotionModal:'MotionModal'},'./MonthSwipe':{MonthSwipe:'MonthSwipe'}});
  const today=new Date(),day=dashboard.localDateKey(today),tomorrow=new Date(today.getFullYear(),today.getMonth(),today.getDate()===1?2:1),other=dashboard.localDateKey(tomorrow);
  const items=[{id:'a',title:'Hoje teste',date:day},{id:'b',title:'Outra data teste',date:other}];
  const render=()=>h.render(()=>MiniAgenda({items,onOpen:d=>opened.push(d),onItem:i=>opened.push(i.id)}));
@@ -57,5 +57,5 @@ test('024 wiring: native refresh disabled independently of scroll; pending/held 
 });
 test('024 identity: native manifest, npm and updater agree; package, scheme and release prefix retained',()=>{
  const config=JSON.parse(fs.readFileSync(path.join(root,'app.json'),'utf8')).expo,pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8')),lock=JSON.parse(fs.readFileSync(path.join(root,'package-lock.json'),'utf8'));
- const updater=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');assert.equal(config.version,'0.3.29');assert.equal(pkg.version,config.version);assert.equal(lock.version,config.version);assert.equal(lock.packages[''].version,config.version);assert.equal(config.android.versionCode,34);assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.scheme,'sofiaapp');assert.ok(updater.includes("APP_VERSION = '0.3.29'"));assert.ok(updater.includes("RELEASE_PREFIX = 'sofia-android-v'"));
+ const updater=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');assert.equal(config.version,'0.3.30');assert.equal(pkg.version,config.version);assert.equal(lock.version,config.version);assert.equal(lock.packages[''].version,config.version);assert.equal(config.android.versionCode,35);assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.scheme,'sofiaapp');assert.ok(updater.includes("APP_VERSION = '0.3.30'"));assert.ok(updater.includes("RELEASE_PREFIX = 'sofia-android-v'"));
 });

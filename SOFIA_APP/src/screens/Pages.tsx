@@ -1,5 +1,8 @@
+import {KeyboardViewport} from '../components/KeyboardViewport';
+import {KeyboardToolbar} from '../components/KeyboardToolbar';
+import {MOTION_EASE,useKeyboardVisible,useReducedMotion} from '../lib/motion';
 import {legacyMovePlan} from '../lib/legacy-md';
-import React,{useEffect,useMemo,useRef,useState} from 'react';
+import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {View,Text,ScrollView,TextInput,Pressable,Switch,Alert,RefreshControl,BackHandler,AppState,Keyboard,Image,Animated,PanResponder,Dimensions} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {SofiaApi,SITE} from '../lib/api';
@@ -26,6 +29,8 @@ import type {PageTemplate} from '../lib/page-templates';
 const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'null')??fallback;}catch{return fallback;}};
 
 export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;active:boolean;storageScope:string;onDepthChange?:(open:boolean)=>void}){
+ const keyboardVisible=useKeyboardVisible(),reduced=useReducedMotion(),reducedRef=useRef(reduced);reducedRef.current=reduced;
+ const backCommitted=useRef(false);
  const c=useTheme(),[pages,setPages]=useState<Entity[]>([]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>()),[pageInteraction,setPageInteraction]=useState(false),[pageDragging,setPageDragging]=useState(false);
  const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null),[createParent,setCreateParent]=useState<Entity|null|undefined>(undefined);
  const refreshFlight=useRef(false),mutationEpoch=useRef(0),moveBusy=useRef(false),pendingPosition=useRef(new Map<string,Record<string,any>>());
@@ -43,16 +48,16 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  selectedRef.current=selectedId;
  const editingRef=useRef(false);editingRef.current=!!focus;
  const pageBackResponder=useMemo(()=>PanResponder.create({
-  onMoveShouldSetPanResponder:(_e,g)=>!!selectedRef.current&&shouldBeginPageBack(g,paneWidth.current||Dimensions.get('window').width,Dimensions.get('window').width,editingRef.current,pageInteractionRef.current),
-  onMoveShouldSetPanResponderCapture:(_e,g)=>!!selectedRef.current&&shouldBeginPageBack(g,paneWidth.current||Dimensions.get('window').width,Dimensions.get('window').width,editingRef.current,pageInteractionRef.current),
+  onMoveShouldSetPanResponder:(_e,g)=>!!selectedRef.current&&!backCommitted.current&&shouldBeginPageBack(g,paneWidth.current||Dimensions.get('window').width,Dimensions.get('window').width,editingRef.current,pageInteractionRef.current),
+  onMoveShouldSetPanResponderCapture:(_e,g)=>!!selectedRef.current&&!backCommitted.current&&shouldBeginPageBack(g,paneWidth.current||Dimensions.get('window').width,Dimensions.get('window').width,editingRef.current,pageInteractionRef.current),
   onPanResponderGrant:()=>backX.stopAnimation(),
   onPanResponderMove:(_e,g)=>backX.setValue(Math.max(0,Math.min(paneWidth.current||420,g.dx))),
   onPanResponderRelease:(_e,g)=>{
    const width=paneWidth.current||420,leave=g.dx>width*.28||g.vx>.65;
-   if(leave)Animated.timing(backX,{toValue:width,duration:150,useNativeDriver:true}).start(({finished})=>{if(finished){backAction.current();backX.setValue(0);}});
-   else Animated.spring(backX,{toValue:0,useNativeDriver:true,speed:28,bounciness:3}).start();
+   if(leave){backCommitted.current=true;Animated.timing(backX,{toValue:width,duration:reducedRef.current?0:200,easing:MOTION_EASE,useNativeDriver:true}).start(({finished})=>{if(finished)backAction.current();else backCommitted.current=false;});}
+   else Animated.spring(backX,{toValue:0,useNativeDriver:true,stiffness:300,damping:32,mass:.9,overshootClamping:true}).start();
   },
-  onPanResponderTerminate:()=>Animated.spring(backX,{toValue:0,useNativeDriver:true,speed:28,bounciness:3}).start(),
+  onPanResponderTerminate:()=>Animated.spring(backX,{toValue:0,useNativeDriver:true,stiffness:300,damping:32,mass:.9,overshootClamping:true}).start(),
   onPanResponderTerminationRequest:()=>false,
   onShouldBlockNativeResponder:()=>true
  }),[backX]);
@@ -93,7 +98,8 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   return()=>{alive=false;mounted.current=false;state.remove();keyboard.remove();void store.flushAll().finally(()=>store.dispose());};
  },[store,key]);
  useEffect(()=>{if(!active){endPageTouch();setFocus(null);void store.flushAll();}},[active,store]);
- useEffect(()=>{onDepthChange?.(!!selectedId||pageInteraction);if(!selectedId)backX.setValue(0);},[selectedId,pageInteraction,onDepthChange,backX]);
+ useLayoutEffect(()=>{backX.stopAnimation();backX.setValue(0);backCommitted.current=false;},[selectedId,backX]);
+ useEffect(()=>{onDepthChange?.(!!selectedId||pageInteraction);},[selectedId,pageInteraction,onDepthChange,backX]);
  useEffect(()=>()=>onDepthChange?.(false),[onDepthChange]);
  const displayPages=useMemo(()=>pages.map(p=>{const e=store.get(p.id);return e?{...p,title:e.draft.title.trim()||'Sem título',data:{...p.data,...e.draft.appearance}}:p;}),[pages,store,tick]);
  const byId=useMemo(()=>new Map(displayPages.map(p=>[p.id,p])),[displayPages]);
@@ -235,23 +241,24 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
     <TextInput accessibilityLabel="Título da página" value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>void store.flush(selected.id)} multiline placeholder={pageTitleHint(emptyBody,hasSubpageContent,focus==='title')} placeholderTextColor={placeholderColor} style={{minHeight:60,fontSize:38,lineHeight:44,fontWeight:'800',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}/>
     {String(selected.data.purpose||'').trim()?<Text style={{fontSize:13,lineHeight:20,color:c.muted,marginBottom:12}}>{String(selected.data.purpose)}</Text>:null}
     <View style={{gap:2}}>{draft.blocks.map(blockView)}</View>
-    {focus&&focus!=='title'?<View style={{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:4,paddingVertical:8}}>
-     <IconButton name="plus" label="Adicionar bloco" size={34} onPress={addBlock}/>
-     {([['text','Texto'],['heading2','Título'],['bullet','Lista'],['todo','Tarefa'],['divider','Divisor']] as const).map(([type,label])=><Pressable key={type} accessibilityRole="button" onPress={()=>formatBlock(type)} style={{paddingHorizontal:9,paddingVertical:9,borderRadius:8,backgroundColor:c.input}}><Text style={{fontSize:11,color:c.muted}}>{label}</Text></Pressable>)}
-     <IconButton name="trash" label="Remover bloco selecionado" size={34} onPress={()=>{const b=entry.draft.blocks.find(b=>b.id===focus);if(b)confirmRemoveBlock(b);}}/>
-    </View>:null}
     <Pressable accessibilityLabel="Continuar escrevendo" onPress={()=>{const last=draft.blocks.at(-1);if(last&&['text','heading1','heading2','heading3','bullet','todo','number','quote','code','callout'].includes(last.type)){setFocus(last.id);inputRefs.current.get(last.id)?.focus();}else addBlock();}} style={{minHeight:18}}/>
     {subpages.length?<View style={{marginTop:2}}>
       <PageTreeList roots={subpages} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={changePageInteraction} onDragChange={setPageDragging} compact/>
     </View>:null}
    </View>
   </ScrollView>
+  <KeyboardToolbar visible={keyboardVisible&&!!focus&&focus!=='title'} testID="page-format-toolbar"><View style={{backgroundColor:c.surface,borderTopWidth:1,borderColor:c.line}}><ScrollView horizontal keyboardShouldPersistTaps="always" showsHorizontalScrollIndicator={false}>    <View style={{flexDirection:'row',alignItems:'center',flexWrap:'nowrap',gap:4,paddingVertical:8}}>
+     <IconButton name="plus" label="Adicionar bloco" size={34} onPress={addBlock}/>
+     {([['text','Texto'],['heading2','Título'],['bullet','Lista'],['todo','Tarefa'],['divider','Divisor']] as const).map(([type,label])=><Pressable key={type} accessibilityRole="button" onPress={()=>formatBlock(type)} style={{paddingHorizontal:9,paddingVertical:9,borderRadius:8,backgroundColor:c.input}}><Text style={{fontSize:11,color:c.muted}}>{label}</Text></Pressable>)}
+     <IconButton name="trash" label="Remover bloco selecionado" size={34} onPress={()=>{const b=entry.draft.blocks.find(b=>b.id===focus);if(b)confirmRemoveBlock(b);}}/>
+    </View>
+</ScrollView></View></KeyboardToolbar>
   {appearance?<PageAppearance key={selected.id+appearance} api={api} pageId={selected.id} kind={appearance} onClose={()=>setAppearance(null)} onApply={patch=>{store.edit(selected.id,d=>({...d,appearance:{...d.appearance,...patch}}));void store.flush(selected.id);}}/>:null}
  </View>;
  return <View style={{flex:1,backgroundColor:c.bg}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>
   <View style={{flex:1}} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">{previousBackdrop}</View>
   <Animated.View {...pageBackResponder.panHandlers} style={{position:'absolute',left:0,right:0,top:0,bottom:0,backgroundColor:c.bg,transform:[{translateX:backX}]}}>
-   {editor}
+   <KeyboardViewport>{editor}</KeyboardViewport>
   </Animated.View>
   {createPicker}
  </View>;

@@ -14,5 +14,7 @@ test('resizing, short returned swipes and notification overlays preserve a valid
 test('reset reconciles a newly mounted pager without changing the approved spring',()=>{
  const f=fixture();f.motion.select('profile');f.advance(1);f.motion.reset('chat');
  assert.equal(f.read(f.motion.weights[1]),1);assert.equal(f.read(f.motion.weights[5]),0);assert.equal(f.read(f.motion.scrollX),400);
- assert.equal(f.MENU_SPRING.stiffness,420);assert.equal(f.MENU_SPRING.damping,30);assert.equal(f.MENU_SPRING.mass,.8);
+ assert.equal(f.MENU_SPRING.stiffness,300);assert.equal(f.MENU_SPRING.damping,30);assert.equal(f.MENU_SPRING.mass,.85);
 });
+
+test('late native events cannot reverse a settled menu highlight',()=>{const f=fixture();f.motion.beginDrag(400);f.motion.onScroll(event(800));f.motion.settle('pages',800);f.motion.onScroll(event(450));assert.equal(f.read(f.motion.weights[2]),1);assert.equal(f.read(f.motion.weights[1]),0);f.motion.beginDrag(800);f.motion.onScroll(event(600));assert.equal(f.read(f.motion.weights[2]),.5);});

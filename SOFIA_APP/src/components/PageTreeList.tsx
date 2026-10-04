@@ -1,4 +1,5 @@
-import React,{useEffect,useMemo,useRef,useState} from 'react';
+import {MOTION_EASE,useReducedMotion} from '../lib/motion';
+import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Animated,Pressable,Text,View} from 'react-native';
 import type {Entity} from '../lib/types';
 import {useTheme} from '../lib/theme';
@@ -35,13 +36,13 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
  const ghostRect=ghost?rects.current.find(r=>r.page.id===ghost.page.id):null,rawLine=drop?dropLineY(drop,rects.current):null;
  const line=rawLine!=null&&ghostRect&&drop?.kind!=='inside'&&ghostRect.y<rawLine?rawLine-ghostRect.height:rawLine;
  return <View ref={host} collapsable={false} onLayout={measure} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)latest.current.onInteractionChange?.(false);}} onTouchCancel={()=>{end(true);latest.current.onInteractionChange?.(false);}} style={{position:'relative'}}>
-  {visible.map(row=>{const p=row.page,target=drop?.kind==='inside'&&drop.anchorId===p.id,isSource=ghost?.page.id===p.id;return <View key={p.id} style={{transform:[{translateY:previewShift(p.id)}]}}>
+  {visible.map(row=>{const p=row.page,target=drop?.kind==='inside'&&drop.anchorId===p.id,isSource=ghost?.page.id===p.id;return <ShiftRow key={p.id} offset={previewShift(p.id)} dragging={!!ghost}>
    <View ref={node=>{if(node)nodes.current.set(p.id,node);else nodes.current.delete(p.id);}} collapsable={false} style={{flexDirection:'row',alignItems:'center',paddingLeft:row.depth*PAGE_INDENT,borderRadius:9,backgroundColor:target?c.accentSoft:'transparent',borderWidth:1,borderColor:target?c.accent:'transparent',opacity:isSource?0:1}}>
     {!compact?<Pressable disabled={!row.hasChildren} accessibilityLabel={(row.open?'Recolher':'Expandir')+' subpáginas de '+p.title} accessibilityState={{expanded:row.open}} onPress={()=>toggle(p.id)} style={{width:28,height:46,alignItems:'center',justifyContent:'center'}}>{row.hasChildren?<View style={{transform:[{rotate:row.open?'90deg':'0deg'}]}}><Icon name="chevron" size={14} color={c.muted}/></View>:null}</Pressable>:null}
     <PageRow page={p} compact={compact} onTouchStart={()=>latest.current.onInteractionChange?.(true)} onOpen={()=>onOpen(p)} onHold={(x,y)=>begin(row,x,y)} onMove={move} onEnd={()=>end()} onCancel={()=>end(true)}/>
    </View>
    {context===p.id&&onDelete?<View style={{flexDirection:'row',justifyContent:'flex-end',gap:8,padding:6}}><Pressable accessibilityLabel={'Excluir página '+p.title} onPress={()=>{setContext(null);onDelete(p);}} style={{padding:12,borderRadius:9,backgroundColor:c.input}}><Text style={{color:c.danger}}>Excluir “{p.title}”</Text></Pressable><Pressable accessibilityLabel="Fechar ações da página" onPress={()=>setContext(null)} style={{padding:12}}><Text style={{color:c.muted}}>Cancelar</Text></Pressable></View>:null}
-  </View>;})}
+  </ShiftRow>;})}
   {line!=null&&drop?<View pointerEvents="none" accessibilityLabel={'Soltar '+(drop.kind==='before'?'antes':'depois')+' no nível '+drop.depth} style={{position:'absolute',top:line-origin.current.y-1.5,left:drop.depth*PAGE_INDENT+(compact?0:28),right:6,height:3,borderRadius:2,backgroundColor:c.accent,zIndex:99}}/>:null}
   {ghost&&ghostRect?<Animated.View pointerEvents="none" style={{position:'absolute',top:ghostRect.y-origin.current.y,left:ghost.depth*PAGE_INDENT+(compact?0:28),right:4,backgroundColor:c.surface,borderRadius:9,paddingHorizontal:8,elevation:10,zIndex:100,transform:pan.getTranslateTransform()}}><View style={{flexDirection:'row',alignItems:'center',minHeight:compact?40:46,gap:8}}><Text style={{fontSize:22}}>{String(ghost.page.data?.icon||'📄')}</Text><Text numberOfLines={1} style={{flex:1,fontSize:16,fontWeight:'600',color:c.text}}>{ghost.page.title}</Text></View></Animated.View>:null}
  </View>;
@@ -62,3 +63,5 @@ function PageRow({page,compact,onOpen,onHold,onMove,onEnd,onCancel,onTouchStart}
   <Text style={{fontSize:22,color:c.text,width:30,textAlign:'center'}}>{String(page.data?.icon||'').trim()||'📄'}</Text><Text numberOfLines={1} style={{flex:1,fontSize:16,color:c.text,fontWeight:compact?'500':'600'}}>{page.title}</Text>
  </View>;
 }
+
+function ShiftRow({offset,children,dragging}:{offset:number;children:React.ReactNode;dragging:boolean}){const reduced=useReducedMotion(),shift=useRef(new Animated.Value(offset)).current;useLayoutEffect(()=>{if(!dragging){shift.stopAnimation();shift.setValue(0);return;}const animation=Animated.timing(shift,{toValue:offset,duration:reduced?0:160,easing:MOTION_EASE,useNativeDriver:true,isInteraction:false});animation.start();return()=>animation.stop();},[offset,reduced,shift,dragging]);return <Animated.View style={{transform:[{translateY:shift}]}}>{children}</Animated.View>;}

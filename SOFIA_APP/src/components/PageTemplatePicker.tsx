@@ -22,7 +22,7 @@ export function PageCreateMenu({visible,parentTitle,onClose,onBlank,onTemplate}:
       </Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="Usar template de conteúdo" onPress={()=>setMode('templates')} style={{padding:16,borderRadius:14,backgroundColor:c.accentSoft,borderWidth:1,borderColor:c.accent}}>
        <Text style={{fontSize:17,fontWeight:'700',color:c.accent}}>▦ Usar template</Text>
-       <Text style={{fontSize:12,color:c.muted,marginTop:5}}>Tarefas pessoal, Anotações ou Coleção.</Text>
+       <Text style={{fontSize:12,color:c.muted,marginTop:5}}>Quadro de tarefas, Notas ou Coleção.</Text>
       </Pressable>
     </View>:<ScrollView style={{maxHeight:520}} contentContainerStyle={{gap:10,paddingBottom:10}}>
       {PAGE_TEMPLATES.map(template=><Pressable key={template.id} accessibilityRole="button" accessibilityLabel={'Aplicar template '+template.title}

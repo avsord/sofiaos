@@ -55,7 +55,7 @@ test('notification overlay cannot capture touches or accessibility focus while h
 test('both swipe directions map to the adjacent menu and clamp at the ends',()=>{
   assert.equal(tabAtOffset(0,400),'home');assert.equal(tabAtOffset(400,400),'chat');assert.equal(tabAtOffset(800,400),'pages');
   assert.equal(tabAtOffset(-500,400),'home');assert.equal(tabAtOffset(10000,400),'profile');
-  const state=createPagerSelection('chat');state.beginDrag();assert.equal(state.finishDrag(800,400),'pages');state.beginDrag();assert.equal(state.finishDrag(400,400),'chat');
+  const state=createPagerSelection('chat');state.beginDrag();state.release();assert.equal(state.finishDrag(800,400),'pages');state.beginDrag();state.release();assert.equal(state.finishDrag(400,400),'chat');
 });
 test('invalid or unmeasured layouts never choose a menu',()=>{
   for(const [x,w] of [[0,0],[20,-1],[NaN,400],[Infinity,400],[500,NaN],[500,Infinity]])assert.equal(tabAtOffset(x,w),null);
@@ -69,7 +69,7 @@ test('repeated fast menu taps win over stale native momentum events',()=>{
   for(let i=0;i<100;i++){state.beginDrag();const next=TAB_ORDER[i%TAB_ORDER.length];state.select(next);assert.equal(state.finishDrag(2000,400),null);assert.equal(state.current(),next);}
 });
 test('short drag returning to its starting page does not add navigation history',()=>{
-  const state=createPagerSelection('chat');state.beginDrag();assert.equal(state.finishDrag(401,400),null);assert.equal(state.current(),'chat');
+  const state=createPagerSelection('chat');state.beginDrag();state.release();assert.equal(state.finishDrag(401,400),null);assert.equal(state.current(),'chat');
 });
 test('notifications are outside the swipe sequence without losing the underlying page',()=>{
   const state=createPagerSelection('pages');state.beginDrag();state.select('notifications');assert.equal(state.current(),'pages');assert.equal(state.finishDrag(1200,400),null);
@@ -77,8 +77,8 @@ test('notifications are outside the swipe sequence without losing the underlying
 test('Android identity, discovery prefix and version stay compatible',()=>{
   const config=JSON.parse(fs.readFileSync(path.join(root,'app.json'))).expo,pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json')));
   const update=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');
-  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,34);
-  assert.equal(config.version,'0.3.29');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
+  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,35);
+  assert.equal(config.version,'0.3.30');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
 });
 test('Pages opens a preloaded entity synchronously without a network wait',()=>{
  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');

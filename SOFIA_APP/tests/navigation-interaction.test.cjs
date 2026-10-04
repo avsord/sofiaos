@@ -76,7 +76,7 @@ test('a menu tap interrupts a drag immediately and stale momentum cannot revert 
  const p=pager();p.scroll.onScrollBeginDrag(end(400));p.ref.current.goTo('profile');assert.deepEqual(p.commands,[{x:2000,y:0,animated:false}]);p.scroll.onMomentumScrollEnd(end(800));assert.equal(p.selected.length,0);
 });
 test('settled swipe in either direction updates selection without an extra animation',()=>{
- const p=pager();p.scroll.onScrollBeginDrag(end(400));p.scroll.onMomentumScrollEnd(end(800));p.render({activeTab:'pages'});p.scroll.onScrollBeginDrag(end(400));p.scroll.onMomentumScrollEnd(end(400));assert.deepEqual(p.selected,['pages','chat']);assert.ok(p.commands.every(c=>c.animated===false));
+ const p=pager();p.scroll.onScrollBeginDrag(end(400));p.scroll.onScrollEndDrag(end(700,.5));p.scroll.onMomentumScrollEnd(end(800));p.render({activeTab:'pages'});p.scroll.onScrollBeginDrag(end(400));p.scroll.onScrollEndDrag(end(410,.5));p.scroll.onMomentumScrollEnd(end(400));assert.deepEqual(p.selected,['pages','chat']);assert.ok(p.commands.every(c=>c.animated===false));
 });
 test('stationary release on a page works even without a later momentum event',()=>{
  const p=pager();p.scroll.onScrollBeginDrag(end(400));p.scroll.onScrollEndDrag(end(800));assert.deepEqual(p.selected,['pages']);
@@ -136,3 +136,5 @@ test('existing native swipe speed and no-animation tap behavior are unchanged',(
  const p=pager();assert.equal(p.scroll.decelerationRate,'fast');assert.equal(p.scroll.disableIntervalMomentum,true);
  p.ref.current.goTo('home');assert.equal(p.commands.at(-1).animated,false);
 });
+
+test('old momentum cannot end a new touch or pull it back',()=>{const p=pager();p.scroll.onScrollBeginDrag(end(400));p.scroll.onScrollEndDrag({...end(680,.8),timeStamp:20});p.scroll.onScrollBeginDrag({...end(650),timeStamp:30});p.scroll.onMomentumScrollEnd({...end(800),timeStamp:25});assert.equal(p.selected.length,0);assert.equal(p.commands.length,0);p.scroll.onScrollEndDrag({...end(430,-.8),timeStamp:40});p.scroll.onMomentumScrollEnd({...end(800),timeStamp:25});assert.equal(p.selected.length,0);p.scroll.onMomentumScrollEnd({...end(0),timeStamp:50});assert.deepEqual(p.selected,['home']);});
