@@ -86,8 +86,7 @@ for label in ['Apps','Perfil','Páginas','Agenda']:tap(label)
 assert days(tree())==agenda_days
 snapshot('agenda-month-retained');calendar_stress('agenda');tap('Voltar para hoje');assert days(tree())!=agenda_days
 # Isolated slow transport ensures navigation does not blank the task list while fetching.
-# The synthetic seed control is behind the edge-to-edge status bar, so reveal it only for setup.
-adb('shell','settings','put','global','policy_control','immersive.status=*');time.sleep(.5);tap('QA preparar tarefas');adb('shell','settings','put','global','policy_control','null');time.sleep(.5);tap('Apps');assert find(tree(),'Conexões') is None;tap('Tarefas');wait('Editar tarefa Projeto urgente');wait('Editar tarefa Ler livro')
+tap('Apps');assert find(tree(),'Conexões') is None;tap('Tarefas');wait('Editar tarefa Projeto urgente');wait('Editar tarefa Ler livro')
 snapshot('tasks-priority-symbols')
 record=subprocess.Popen(['adb','shell','screenrecord','--time-limit','180','/sdcard/tasks032.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 row=box(wait('task-row-filter0'));reference=Image.open(io.BytesIO(adb('exec-out','screencap','-p'))).convert('RGB');metrics=[]

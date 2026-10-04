@@ -2,14 +2,14 @@ name: Sofia Android 0.3.32 acceptance recheck
 on:
   push:
     branches: [work/sofia-native-030]
-    paths: [.github/workflows/sofia-native-032-recheck.yml, tools/release032/native-032-smoke.py]
+    paths: [.github/workflows/sofia-native-032-recheck.yml, tools/release032/native-032-smoke.py, tools/release032/full-app.tsx.fixture]
 permissions:
   contents: write
   actions: read
 jobs:
   acceptance:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 55
     env:
       CI: '1'
       EXPO_NO_TELEMETRY: '1'
@@ -22,6 +22,7 @@ jobs:
       - name: Preserve revised test setup and use exact built source
         run: |
           cp tools/release032/native-032-smoke.py /tmp/native-032-smoke.py
+          cp tools/release032/full-app.tsx.fixture /tmp/full-app.tsx.fixture
           git rev-parse HEAD > /tmp/QA_COMMIT.txt
           git checkout --detach fbec831626845bf18b6b648e3ee257321b16bc7f
       - uses: actions/download-artifact@v4
@@ -37,6 +38,7 @@ jobs:
           test "$(cat dist/SOURCE_COMMIT.txt)" = "$(git rev-parse HEAD)"
           cp /tmp/native-032-smoke.py dist/native-032-smoke.py
           cp /tmp/QA_COMMIT.txt dist/QA_COMMIT.txt
+          cp /tmp/full-app.tsx.fixture dist/QA-fixture.tsx.fixture
           mv dist/release032-evidence dist/attempt-1-release032-evidence
       - uses: actions/setup-node@v4
         with:
@@ -45,6 +47,28 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build only QA transport with predefined task categories
+        working-directory: SOFIA_APP
+        run: |
+          set -euo pipefail
+          npm ci
+          npm install --prefix /tmp/sofia-icon-tools --no-save --package-lock=false sharp@0.34.1
+          NODE_PATH=/tmp/sofia-icon-tools/node_modules npm run prepare-assets
+          cp App.tsx ProductionApp.tsx
+          cp /tmp/full-app.tsx.fixture App.tsx
+          npm run check
+          npx expo prebuild --platform android --clean --no-install
+          cd android
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon --max-workers=2 -PreactNativeArchitectures=x86_64
+          cd ..
+          cp android/app/build/outputs/apk/release/app-release.apk dist/QA-ONLY-full-fixture.apk
+          cp /tmp/QA_COMMIT.txt dist/QA_BUILD_COMMIT.txt
+          cp ProductionApp.tsx App.tsx
+          rm ProductionApp.tsx
+          git restore -- assets
+          sha256sum --check dist/Sofia-OS.apk.sha256
       - name: Install screenshot comparison tool
         run: python3 -m pip install Pillow==12.3.0
       - name: Enable KVM
@@ -66,7 +90,6 @@ jobs:
             adb logcat -c
             adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
             cd SOFIA_APP && python3 /tmp/native-032-smoke.py
-            adb shell settings put global policy_control null
             adb shell am force-stop com.avsord.sofiaapp
             adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
             cd SOFIA_APP && python3 tools/native-full-smoke.py
