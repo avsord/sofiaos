@@ -7,12 +7,14 @@ export type Bootstrap = {
   capabilities: { text: boolean; voice_notes: boolean; notifications_push: boolean; multi_user: boolean; e2ee: boolean; workspace?: boolean };
 };
 export type VoiceDraft = { uri: string; duration: number };
+export type AttachmentDraft={uri:string;name:string;mime:string;size:number;entityId?:string;attachmentId?:string};
 export type Message = {
   id: string; sequence?: number; conversation_id?: string; client_id?: string;
   role: 'user' | 'assistant'; content: string; created_at: string; status: string;
   error_code?: string | null; error?: string;
   voice?: { mime: string; duration_ms: number; audio_url: string } | null;
   localVoice?: VoiceDraft;
+  localAttachments?: AttachmentDraft[];
 };
 export type Conversation = { id: string; title: string; channel: string; created_at: string; updated_at: string };
 export type MessagePage = { conversation?: Conversation; messages: Message[]; has_more: boolean };

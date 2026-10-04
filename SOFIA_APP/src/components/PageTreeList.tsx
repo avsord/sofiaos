@@ -20,8 +20,8 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
  function measure(){
   if(drag.current)return;
   const ids=new Set(latest.current.visible.map(r=>r.page.id));rects.current=rects.current.filter(r=>ids.has(r.page.id));
-  host.current?.measureInWindow((x,y,width)=>{origin.current={x,y,width};setGeometry(v=>v+1);});
-  for(const row of latest.current.visible)nodes.current.get(row.page.id)?.measureInWindow((x,y,width,height)=>{if(height<=0)return;const next={...row,x,y,width,height};rects.current=[...rects.current.filter(r=>r.page.id!==row.page.id),next];});
+  host.current?.measureInWindow((x,y,width)=>{if(drag.current)return;origin.current={x,y,width};setGeometry(v=>v+1);});
+  for(const row of latest.current.visible)nodes.current.get(row.page.id)?.measureInWindow((x,y,width,height)=>{if(drag.current||height<=0)return;const next={...row,x,y,width,height};rects.current=[...rects.current.filter(r=>r.page.id!==row.page.id),next];});
  }
  useEffect(()=>{const frame=requestAnimationFrame(measure);return()=>cancelAnimationFrame(frame);},[visible]);
  useEffect(()=>()=>{latest.current.onDragChange?.(false);latest.current.onInteractionChange?.(false);},[]);
@@ -31,9 +31,10 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
   if(cancelled)return;if(!d.moved){setContext(d.page.id);return;}
   if(d.drop&&latest.current.canParent(d.page.id,d.drop.parentId))void latest.current.onMove(d.page,d.drop.parentId,d.drop);
  }
+ function previewShift(id:string){if(!ghost||!drop||drop.kind==='inside')return 0;const source=visible.findIndex(r=>r.page.id===ghost.page.id),anchor=visible.findIndex(r=>r.page.id===drop.anchorId),row=visible.findIndex(r=>r.page.id===id),target=anchor+(drop.kind==='after'?1:0),height=rects.current.find(r=>r.page.id===ghost.page.id)?.height||46;return source<target&&row>source&&row<target?-height:source>=target&&row>=target&&row<source?height:0;}
  const line=drop?dropLineY(drop,rects.current):null,ghostRect=ghost?rects.current.find(r=>r.page.id===ghost.page.id):null;
  return <View ref={host} collapsable={false} onLayout={measure} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)latest.current.onInteractionChange?.(false);}} onTouchCancel={()=>{end(true);latest.current.onInteractionChange?.(false);}} style={{position:'relative'}}>
-  {visible.map(row=>{const p=row.page,target=drop?.kind==='inside'&&drop.anchorId===p.id,isSource=ghost?.page.id===p.id;return <View key={p.id} style={{marginTop:drop?.kind==='before'&&drop.anchorId===p.id?46:0,marginBottom:drop?.kind==='after'&&drop.anchorId===p.id?46:0}}>
+  {visible.map(row=>{const p=row.page,target=drop?.kind==='inside'&&drop.anchorId===p.id,isSource=ghost?.page.id===p.id;return <View key={p.id} style={{transform:[{translateY:previewShift(p.id)}]}}>
    <View ref={node=>{if(node)nodes.current.set(p.id,node);else nodes.current.delete(p.id);}} collapsable={false} style={{flexDirection:'row',alignItems:'center',paddingLeft:row.depth*PAGE_INDENT,borderRadius:9,backgroundColor:target?c.accentSoft:'transparent',borderWidth:1,borderColor:target?c.accent:'transparent',opacity:isSource?.3:1}}>
     {!compact?<Pressable disabled={!row.hasChildren} accessibilityLabel={(row.open?'Recolher':'Expandir')+' subpáginas de '+p.title} accessibilityState={{expanded:row.open}} onPress={()=>toggle(p.id)} style={{width:28,height:46,alignItems:'center',justifyContent:'center'}}>{row.hasChildren?<View style={{transform:[{rotate:row.open?'90deg':'0deg'}]}}><Icon name="chevron" size={14} color={c.muted}/></View>:null}</Pressable>:null}
     <PageRow page={p} compact={compact} onTouchStart={()=>latest.current.onInteractionChange?.(true)} onOpen={()=>onOpen(p)} onHold={(x,y)=>begin(row,x,y)} onMove={move} onEnd={()=>end()} onCancel={()=>end(true)}/>

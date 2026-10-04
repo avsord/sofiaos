@@ -9,7 +9,7 @@ const profile={name:'Teste Sofia',email:'qa@example.test',role:'owner' as const}
 const expires_at='2050-01-01T00:00:00Z';
 const make=(id:string,title:string,parent=''):Entity=>({id,title,kind:'user_page',content:'',area:'Pessoal',state:'active',privacy:'private',tags:[],revision:1,data:{parent_id:parent,icon:'📄',blocks_json:'[]'}});
 let pages=[make('parent','Teste principal'),make('other','Outra pagina'),make('child','Teste filha','parent'),make('grandchild','Teste neta','child')];
-let moves=0,deletes=0;
+let moves=0,deletes=0,uploads=0;
 const today=new Date();today.setHours(10,0,0,0);const tomorrow=new Date(today);tomorrow.setDate(tomorrow.getDate()+1);
 const events=[{...make('event1','Consulta de hoje'),kind:'commitment',data:{start_at:today.toISOString()}},{...make('event2','Compromisso de amanha'),kind:'commitment',data:{start_at:tomorrow.toISOString()}}];
 let notices=[{id:'notice1',title:'Lembrete da agenda',body:'Seu compromisso está confirmado.',state:'unread',category:'agenda',created_at:new Date().toISOString()},{id:'notice2',title:'Preço acompanhado',body:'O histórico de preço foi atualizado.',state:'unread',category:'price',created_at:new Date(Date.now()-86400000).toISOString()}];
@@ -40,6 +40,7 @@ globalThis.fetch=(async(input:any,init:any={})=>{
   if(method==='POST'){const item={...make('created'+Date.now(),body.title),...body};pages.push(item);return response(item);}
   const kind=u.searchParams.get('kind');return response({items:kind==='user_page'?pages.slice(Number(u.searchParams.get('offset')||0),Number(u.searchParams.get('offset')||0)+100):kind==='monitor'?[{...make('monitorqa','Produto acompanhado'),kind:'monitor',data:{currency:'BRL'}}]:[]});
  }
+ if(p.startsWith('/workspace/entities/')&&p.endsWith('/attachments')&&method==='POST'){if(!body.name||!body.base64)throw Error('Empty attachment');uploads++;return response({id:'attachment-qa-'+uploads});}
  if(p.startsWith('/workspace/entities/')){
   const id=p.split('/')[3],item=pages.find(x=>x.id===id)||events.find(x=>x.id===id);
   if(!item)return response({error:'Missing synthetic entity'},404);
@@ -47,9 +48,10 @@ globalThis.fetch=(async(input:any,init:any={})=>{
   if(method==='PATCH'){if(body.revision!==item.revision)return response({error:'Revision conflict'},409);Object.assign(item,{...body,data:{...item.data,...body.data},revision:item.revision+1});}
   return response(item);
  }
+ if(p==='/messages'&&method==='POST'){messages.push({id:body.client_message_id,role:'user',content:body.message,status:'sent',created_at:new Date().toISOString()});return response({conversation_id:conversation.id,messages,has_more:false,reply:''});}
  if(p.startsWith('/chat-sync'))return response({conversation,messages,has_more:false,deleted_ids:[],current_id:conversation.id,cursor_revision:1});
  if(p==='/conversations')return response({items:[conversation],has_more:false});
  if(p==='/profile')return response({profile:{...profile,...body}});
  return response({error:'Unmapped synthetic route '+p},404);
 }) as typeof fetch;
-export default function App(){const [ready,setReady]=useState(false),[tick,setTick]=useState(0);useEffect(()=>{void saveAuth({token:'q'.repeat(43),token_type:'Bearer',expires_at,profile}).then(()=>setReady(true));const id=setInterval(()=>setTick(x=>x+1),200);return()=>clearInterval(id);},[]);return <View style={{flex:1}}><Text accessibilityLabel={'QA moves '+moves+' deletes '+deletes}>SOFIA_FULL_APP_FIXTURE_ONLY</Text><Pressable accessibilityLabel="QA atualizar remoto" onPress={()=>{pages=pages.map(x=>x.id==='other'?{...x,title:'Nome remoto',revision:x.revision+1}:x);}}><Text>Atualizar remoto</Text></Pressable><View style={{flex:1}}>{ready?<ProductionApp/>:null}</View></View>;}
+export default function App(){const [ready,setReady]=useState(false),[tick,setTick]=useState(0);useEffect(()=>{void saveAuth({token:'q'.repeat(43),token_type:'Bearer',expires_at,profile}).then(()=>setReady(true));const id=setInterval(()=>setTick(x=>x+1),200);return()=>clearInterval(id);},[]);return <View style={{flex:1}}><Text accessibilityLabel={'QA moves '+moves+' deletes '+deletes}>SOFIA_FULL_APP_FIXTURE_ONLY</Text><Pressable accessibilityLabel="QA atualizar remoto" onPress={()=>{pages=pages.map(x=>x.id==='other'?{...x,title:'Nome remoto',revision:x.revision+1}:x);}}><Text accessibilityLabel={'QA uploads '+uploads}>Atualizar remoto</Text></Pressable><View style={{flex:1}}>{ready?<ProductionApp/>:null}</View></View>;}

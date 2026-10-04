@@ -41,7 +41,7 @@ x,y,r,b=box(daynode);adb('shell','input','tap',str((x+r)//2),str((y+b)//2));wait
 bell=box(wait('Notificações: 2 não lidas'));tap('Notificações: 2 não lidas');wait('Hoje');wait('Ontem');popup=box(wait('notification-popover'));assert popup[1]>=bell[3],(bell,popup);snapshot('03-bell-anchor')
 tap('Marcar como lida: Lembrete da agenda');tap('Ver todas as notificações');wait('ATIVIDADES · AVISOS');wait('Agenda · 1');snapshot('04-notification-center');back()
 # Settings split, appearance, real version, and configured state visible.
-tap('Perfil');wait('Perfil do usuário');wait('E-MAIL DE LOGIN');snapshot('05-profile-first');tap('Configurações do aplicativo');wait('Versão instalada 0.3.28');tap('Escuro');snapshot('06-settings-dark');tap('Claro')
+tap('Perfil');wait('Perfil do usuário');wait('E-MAIL DE LOGIN');snapshot('05-profile-first');tap('Configurações do aplicativo');wait('Versão instalada 0.3.29');tap('Escuro');snapshot('06-settings-dark');tap('Claro')
 # Apps goes back exactly to Apps; hardware back does not jump to Home.
 tap('Apps');wait('Seus espaços');tap('Tarefas');wait('Nova tarefa');snapshot('07-tasks');back();wait('Seus espaços');snapshot('08-apps-back')
 # Real tree and parent navigation, opening grandchild directly from root.
@@ -69,13 +69,36 @@ back();tap('Criar página');tap('Criar página em branco');wait('Título da pág
 tap('Título da página');adb('shell','input','text','Minha%spagina');back();time.sleep(1);snapshot('19-autosave-title');tap('Desfazer');time.sleep(.8);tap('Refazer');time.sleep(.8);snapshot('20-undo-redo');back();wait('Abrir página principal Minha pagina');snapshot('21-saved-title-in-tree')
 # Notebook flows use production components and persist through the page autosave API.
 tap('Abrir página principal Minha pagina');tap('Criar página ou usar template');tap('Usar template de conteúdo');tap('Aplicar template Anotações');tap('Novo caderno');tap('Nome do caderno');adb('shell','input','text','Trabalho');back();tap('Criar caderno');wait('Abrir caderno Trabalho');snapshot('21d-notebook-created')
-tap('Abrir caderno Trabalho');tap('Nova folha');tap('Título da folha');adb('shell','input','text','Reuniao');back();tap('Conteúdo da folha');adb('shell','input','text','Conteudo%spreservado');back();time.sleep(1);snapshot('21e-leaf-edited')
-tap('Ações da folha');tap('Duplicar');wait('Título da folha');snapshot('21f-leaf-duplicate');back();wait('Abrir folha Reuniao');back();back();wait('Criar página')
+tap('Nova folha em Trabalho');tap('Título da folha');adb('shell','input','text','Reuniao');back();tap('Conteúdo da folha');adb('shell','input','text','Conteudo%spreservado');back();time.sleep(1);snapshot('21e-leaf-edited');tap('Estilos de texto');wait('Título 1');wait('Lista de tarefas');wait('Citação');snapshot('21h-text-styles');tap('Título 1');wait('Conteúdo da folha')
+tap('Ações da folha');tap('Duplicar');wait('Título da folha');snapshot('21f-leaf-duplicate');tap('Voltar às anotações');wait('Abrir folha Reuniao');root=snapshot('21g-leaf-direct-return');assert find(root,'Título do caderno') is None;back();wait('Criar página')
 # Apps repeated tap returns to root, then editor shows visual dates safely below status bar.
 tap('Apps');tap('Tarefas');wait('Nova tarefa');tap('Apps');wait('Seus espaços');snapshot('21b-apps-reset')
 tap('Agenda');tap('Criar item na data selecionada');wait('Criar · Compromisso');tap('Início');wait('Confirmar data e horário');snapshot('21c-date-picker');back();back()
 # Chat remains a dedicated destination; existing messages and selection work.
 tap('Conversa');wait('Você: Mensagem preservada');hold('Você: Mensagem preservada');snapshot('22-chat-selection');back()
+# Attachment menu and real software keyboard geometry (no simulated keyboard coordinates).
+tap('Anexar arquivo');wait('Imagens');wait('Documentos');wait('Câmera');snapshot('23-attachment-menu');back()
+adb('shell','settings','put','secure','show_ime_with_hard_keyboard','1')
+tap('Mensagem para a Sofia');adb('shell','input','text','Teclado');time.sleep(1)
+root=snapshot('24-chat-keyboard');composer=box(wait('chat-composer'))
+keys=[box(n) for n in root.iter('node') if 'inputmethod' in n.get('package','') and n.get('bounds')!='[0,0][0,0]']
+assert keys,'Software keyboard must be visible for the keyboard regression check'
+keyboard_top=min(b[1] for b in keys if b[3]>b[1]);assert composer[3]<=keyboard_top+3,(composer,keyboard_top)
+back()
+# Pick a real document with Android's system picker, then upload and persist its reference.
+adb('shell','mkdir','-p','/sdcard/Download')
+fixture=out/'Sofia-QA.txt';fixture.write_text('Arquivo sintetico para verificar anexos.')
+adb('push',str(fixture),'/sdcard/Download/Sofia-QA.txt')
+adb('shell','am','broadcast','-a','android.intent.action.MEDIA_SCANNER_SCAN_FILE','-d','file:///sdcard/Download/Sofia-QA.txt')
+tap('Anexar arquivo');tap('Documentos');time.sleep(1)
+root=tree()
+if find(root,'Sofia-QA.txt') is None:
+ tap('Show roots');tap('Downloads')
+tap('Sofia-QA.txt');time.sleep(.5)
+root=tree()
+for confirm in ['OPEN','Open','SELECT','Select']:
+ if find(root,confirm) is not None:tap(confirm);break
+wait('Remover anexo Sofia-QA.txt');snapshot('25-document-preview');tap('Enviar mensagem');wait('QA uploads 1');wait('Abrir anexo Sofia-QA.txt');snapshot('26-document-sent')
 logs=adb('logcat','-d','-s','ReactNativeJS:E','AndroidRuntime:E').decode();(out/'native-errors.txt').write_text(logs)
 assert 'FATAL EXCEPTION' not in logs and 'TypeError' not in logs,logs
 (out/'result.json').write_text(json.dumps({'passed':True,'screens':checks,'synthetic_transport':True,'production_shell':True},indent=2))

@@ -28,7 +28,7 @@ const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'
 export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;active:boolean;storageScope:string;onDepthChange?:(open:boolean)=>void}){
  const c=useTheme(),[pages,setPages]=useState<Entity[]>([]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>()),[pageInteraction,setPageInteraction]=useState(false),[pageDragging,setPageDragging]=useState(false);
  const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null),[createParent,setCreateParent]=useState<Entity|null|undefined>(undefined);
- const refreshFlight=useRef(false),mutationEpoch=useRef(0);
+ const refreshFlight=useRef(false),mutationEpoch=useRef(0),moveBusy=useRef(false),pendingPosition=useRef(new Map<string,Record<string,any>>());
  const history=useRef<string[]>([]),mounted=useRef(true),expandDisk=useRef(Promise.resolve()),inputRefs=useRef(new Map<string,TextInput>());
  const backX=useRef(new Animated.Value(0)).current,selectedRef=useRef<string|null>(null),paneWidth=useRef(0),backAction=useRef<()=>void>(()=>{});
  const pageInteractionRef=useRef(false),refreshGuard=useRef(new PageRefreshGuard());
@@ -59,17 +59,17 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  const key='sofia.native.pages.v1:'+encodeURIComponent(SITE+'|'+storageScope);
  const store=useMemo(()=>new PageEditorStore({save:patch=>api.saveEntity(patch),read:id=>api.entity(id),
   persist:items=>items.length?AsyncStorage.setItem(key+':drafts',JSON.stringify(items)):AsyncStorage.removeItem(key+':drafts'),
-  onSaved:saved=>{mutationEpoch.current++;if(mounted.current)setPages(prev=>prev.map(p=>p.id===saved.id?saved:p));}
+  onSaved:saved=>{mutationEpoch.current++;if(mounted.current)setPages(prev=>prev.map(p=>p.id===saved.id?{...saved,data:{...saved.data,...pendingPosition.current.get(saved.id)}}:p));}
  }),[api,key]);
  useEffect(()=>store.subscribe(()=>setTick(v=>v+1)),[store]);
  async function load(manual=false){
-  if(refreshFlight.current||(!manual&&pageInteractionRef.current))return;
+  if(refreshFlight.current||moveBusy.current||(!manual&&pageInteractionRef.current))return;
   refreshFlight.current=true;const epoch=mutationEpoch.current;
   if(manual)setRefreshing(true);
   try{
    const items:Entity[]=[];
    for(let offset=0;offset<10000;offset+=100){const r=await api.entities('user_page','',offset);items.push(...r.items.filter(x=>x.state!=='archived'));if(r.items.length<100)break;if(offset===9900)throw Error('Há mais páginas do que esta sincronização consegue carregar. Nenhuma página foi removida.');}
-   if(mounted.current&&epoch===mutationEpoch.current){
+   if(mounted.current&&!moveBusy.current&&epoch===mutationEpoch.current){
     items.forEach(page=>store.open(page));
     setPages(prev=>mergeRemotePages(prev,items.map(p=>{const e=store.get(p.id);return e&&e.base.revision>p.revision?e.base:p;}),id=>{const e=store.get(id);return !!e&&e.state!=='saved';}));setError('');
    }
@@ -108,14 +108,15 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  function toggle(id:string){setExpanded(old=>{const next=toggleExpanded(old,id),value=JSON.stringify([...next]);expandDisk.current=expandDisk.current.catch(()=>{}).then(()=>AsyncStorage.setItem(key+':expanded',value)).catch(()=>{if(mounted.current)setError('Não foi possível guardar a abertura das subpáginas neste aparelho.');});return next;});}
  function canParent(pageId:string,parentId:string){return canReparentPage(displayPages,pageId,parentId);}
  async function movePage(page:Entity,parentId:string,drop?:PageDrop){
-  if(movingId||(!drop&&String(page.data?.parent_id||'')===parentId))return;
+  if(moveBusy.current||(!drop&&String(page.data?.parent_id||'')===parentId))return;
   if(!canParent(page.id,parentId)){setError('Essa página não pode ser colocada dentro dela mesma ou de uma subpágina dela.');return;}
   const before=pages;
-  mutationEpoch.current++;setMovingId(page.id);setError('');
+  moveBusy.current=true;mutationEpoch.current++;setMovingId(page.id);setError('');
+  try{
   const plan=drop?legacyMovePlan(displayPages,{id:page.id,revision:page.revision,parentId,kind:drop.kind,anchorId:drop.anchorId}):null;
+  pendingPosition.current=new Map((plan?.siblings||[page]).map((item,i)=>[item.id,{...(item.id===page.id?{parent_id:parentId,node_type:parentId?'page':'space'}:{}),sort_order:(i+1)*1024}]));
   setPages(old=>old.map(item=>{const rank=plan?.siblings.findIndex(p=>p.id===item.id)??-1;const value=item.id===page.id?reparentedPage(item,parentId):item;return rank>=0?{...value,data:{...value.data,sort_order:(rank+1)*1024}}:value;}));
   if(parentId)setExpanded(old=>{const next=new Set(old);next.add(parentId);const value=JSON.stringify([...next]);expandDisk.current=expandDisk.current.catch(()=>{}).then(()=>AsyncStorage.setItem(key+':expanded',value)).catch(()=>{});return next;});
-  try{
    await store.flush(page.id);
    const base=store.get(page.id)?.base||pages.find(item=>item.id===page.id);
    if(!base)throw new Error('Página não encontrada.');
@@ -123,7 +124,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
    mutationEpoch.current++;const savedPages=result.items; savedPages.forEach(saved=>store.open(saved));
    if(mounted.current)setPages(old=>old.map(item=>savedPages.find(p=>p.id===item.id)||item));
   }catch(e){if(mounted.current){setPages(before);setError(errorText(e));}}
-  finally{if(mounted.current)setMovingId(null);}
+  finally{pendingPosition.current.clear();moveBusy.current=false;mutationEpoch.current++;if(mounted.current)setMovingId(null);}
  }
  function open(page:Entity,push=true){if(selectedId){void store.flush(selectedId);if(push&&selectedId!==page.id)history.current.push(selectedId);}store.open(pages.find(p=>p.id===page.id)||page);setSelectedId(page.id);setFocus(null);setAppearance(null);setError('');}
  function back(){if(selectedId)void store.flush(selectedId);setFocus(null);setAppearance(null);const parent=pageBackTarget(byId,selectedId);history.current=[];if(parent&&parent!==selectedId&&byId.has(parent))open(byId.get(parent)!,false);else setSelectedId(null);} backAction.current=back;
