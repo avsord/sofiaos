@@ -72,7 +72,7 @@ x,y,r,b=box(daynode);adb('shell','input','tap',str((x+r)//2),str((y+b)//2));wait
 bell=box(wait('Notificações: 2 não lidas'));tap('Notificações: 2 não lidas');wait('Hoje');wait('Ontem');popup=box(wait('notification-popover'));assert popup[1]>=bell[3],(bell,popup);snapshot('03-bell-anchor')
 tap('Marcar como lida: Lembrete da agenda');tap('Ver todas as notificações');wait('ATIVIDADES · AVISOS');wait('Agenda · 1');snapshot('04-notification-center');back()
 # Settings split, appearance, real version, and configured state visible.
-tap('Perfil');wait('Perfil do usuário');wait('E-MAIL DE LOGIN');snapshot('05-profile-first');tap('Configurações do aplicativo');wait('Versão instalada 0.3.31');tap('Escuro');snapshot('06-settings-dark');tap('Claro')
+tap('Perfil');wait('Perfil do usuário');wait('E-MAIL DE LOGIN');snapshot('05-profile-first');tap('Configurações do aplicativo');wait('Versão instalada 0.3.32');tap('Escuro');snapshot('06-settings-dark');tap('Claro')
 # Apps goes back exactly to Apps; hardware back does not jump to Home.
 tap('Apps');wait('Seus espaços');tap('Tarefas');wait('Nova tarefa');snapshot('07-tasks');back();wait('Seus espaços');snapshot('08-apps-back')
 # Real tree and parent navigation, opening grandchild directly from root.

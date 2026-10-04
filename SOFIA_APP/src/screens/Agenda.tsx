@@ -1,3 +1,4 @@
+import {useAgendaView} from '../lib/agenda-view';
 import React,{useEffect,useState} from 'react';
 import {ScrollView,View,Text,Pressable,RefreshControl} from 'react-native';
 import {SofiaApi} from '../lib/api';
@@ -9,10 +10,11 @@ import {Empty,ErrorBanner,IconButton,ScreenTitle} from '../components/UI';
 import {MonthSwipe} from '../components/MonthSwipe';
 import {EntityEditor,Choice} from './Workspace';
 export function Agenda({api,target,active=true,onGestureLock}:{onGestureLock?:(locked:boolean)=>void;api:SofiaApi;target?:{date:string;id?:string;nonce:number};active?:boolean}){
- const c=useTheme(),[month,setMonth]=useState(new Date(new Date().getFullYear(),new Date().getMonth(),1)),[selected,setSelected]=useState(new Date()),[items,setItems]=useState<AgendaItem[]>([]),[loading,setLoading]=useState(false),[refreshing,setRefreshing]=useState(false),[error,setError]=useState(''),[catalog,setCatalog]=useState<Catalog|null>(null),[editing,setEditing]=useState<Partial<Entity>|null>(null),[kind,setKind]=useState('commitment');
+ const {month,setMonth,selected:selectedKey,setSelected:setSelectedKey,acceptTarget}=useAgendaView(api,'agenda'),selected=new Date(selectedKey+'T12:00:00'),setSelected=(value:Date)=>setSelectedKey(localDateKey(value));
+ const c=useTheme(),[items,setItems]=useState<AgendaItem[]>([]),[loading,setLoading]=useState(false),[refreshing,setRefreshing]=useState(false),[error,setError]=useState(''),[catalog,setCatalog]=useState<Catalog|null>(null),[editing,setEditing]=useState<Partial<Entity>|null>(null),[kind,setKind]=useState('commitment');
  async function load(manual=false){setLoading(true);if(manual)setRefreshing(true);try{const [a,cat]=await Promise.all([api.agenda(),api.catalog()]);setItems(a.items);setCatalog(cat);setError('');}catch(e){setError(errorText(e));}finally{setLoading(false);if(manual)setRefreshing(false);}}
  useEffect(()=>{if(active)void load();},[api,active]);
- useEffect(()=>{if(!target?.date)return;const date=new Date(target.date+'T12:00:00');if(Number.isNaN(date.getTime()))return;setSelected(date);setMonth(new Date(date.getFullYear(),date.getMonth(),1));if(target.id)api.entity(target.id).then(setEditing).catch(e=>setError(errorText(e)));},[target?.nonce,api]);
+ useEffect(()=>{if(!target?.date)return;if(!acceptTarget(target.date,target.nonce))return;if(target.id)api.entity(target.id).then(setEditing).catch(e=>setError(errorText(e)));},[target?.nonce,api]);
  const start=(item:AgendaItem)=>item.data.calendar_all_day?item.data.calendar_date_start||'':item.data.start_at||item.data.remind_at||item.data.due_at||'',activeItems=items.filter(i=>!['cancelled','archived','completed','done'].includes(i.state));
  const chosen=activeItems.filter(i=>start(i)&&localDateKey(start(i))===dayKey(selected)).sort((a,b)=>Date.parse(start(a))-Date.parse(start(b)));
  const cells:(Date|null)[]=Array.from({length:month.getDay()},()=>null);for(let d=1;d<=new Date(month.getFullYear(),month.getMonth()+1,0).getDate();d++)cells.push(new Date(month.getFullYear(),month.getMonth(),d));while(cells.length%7)cells.push(null);

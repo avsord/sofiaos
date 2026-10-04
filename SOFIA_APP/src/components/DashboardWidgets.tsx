@@ -1,3 +1,4 @@
+import {useAgendaView} from '../lib/agenda-view';
 import {MotionModal} from './MotionModal';
 import React,{useMemo,useState} from 'react';
 import {Alert,Modal,Pressable,ScrollView,Text,View} from 'react-native';
@@ -7,8 +8,8 @@ import {localDateKey,monthCells,priceGeometry} from '../lib/dashboard';
 import {useTheme} from '../lib/theme';
 import {Button,IconButton} from './UI';
 import {MonthSwipe} from './MonthSwipe';
-export function MiniAgenda({items,onOpen,onItem,onGestureLock}:{onGestureLock?:(locked:boolean)=>void;items:DayRecord[];onOpen:(day:string)=>void;onItem:(item:DayRecord)=>void}){
- const c=useTheme(),[month,setMonth]=useState(new Date(new Date().getFullYear(),new Date().getMonth(),1)),[selected,setSelected]=useState(localDateKey(new Date()));
+export function MiniAgenda({items,onOpen,onItem,onGestureLock,viewOwner}:{viewOwner:object;onGestureLock?:(locked:boolean)=>void;items:DayRecord[];onOpen:(day:string)=>void;onItem:(item:DayRecord)=>void}){
+ const c=useTheme(),{month,setMonth,selected,setSelected}=useAgendaView(viewOwner,'home');
  const dates=useMemo(()=>new Set(items.map(item=>localDateKey(item.date))),[items]),chosen=items.filter(i=>localDateKey(i.date)===selected);
  const today=()=>{const now=new Date();setMonth(new Date(now.getFullYear(),now.getMonth(),1));setSelected(localDateKey(now));};
  return <View testID="mini-agenda" style={{padding:14,borderRadius:22,borderWidth:1,borderColor:c.line,backgroundColor:c.surface,gap:10}}>
