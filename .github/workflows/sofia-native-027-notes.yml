@@ -1,0 +1,24 @@
+name: Correct 0.3.27 release evidence wording
+on:
+  push:
+    branches: [work/sofia-native-027]
+    paths: [.github/workflows/sofia-native-027-notes.yml]
+permissions:
+  contents: write
+jobs:
+  notes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Align release notes with actual evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('SOFIA_APP/RELEASE_0.3.27.md').read_text()
+          s='\n'.join(line for line in s.splitlines() if 'acessibilidade' not in line)
+          s+='\n\nAceitação completa aprovada: https://github.com/avsord/sofiaos/actions/runs/37171293276 . O primeiro seletor automatizado tocava a camada de fundo; a execução final escolhe os elementos da frente. A ocultação total da camada de fundo na árvore de acessibilidade não foi comprovada. O APK publicado é o mesmo binário validado.\n'
+          Path('/tmp/notes.md').write_text(s)
+          PY
+          gh release edit sofia-android-v0.3.27 --repo avsord/sofiaos --notes-file /tmp/notes.md
