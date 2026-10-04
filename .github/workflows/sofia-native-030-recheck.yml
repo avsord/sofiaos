@@ -40,7 +40,7 @@ jobs:
           test "$(cat dist/SOURCE_COMMIT.txt)" = "$(git rev-parse HEAD)"
           cp /tmp/native-full-smoke.py dist/native-full-smoke.py
           cp /tmp/QA_COMMIT.txt dist/QA_COMMIT.txt
-          cp /tmp/full-app.tsx.fixture dist/QA-fixture.tsx
+          cp /tmp/full-app.tsx.fixture dist/QA-fixture.tsx.fixture
           cp /tmp/publish-checked.cjs dist/publish-checked.cjs
           cp /tmp/RELEASE_0.3.30.md dist/RELEASE_0.3.30.md
       - uses: actions/setup-node@v4
