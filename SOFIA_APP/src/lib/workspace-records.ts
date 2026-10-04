@@ -13,6 +13,7 @@ export class WorkspaceRecords {
   if(!entry){entry={items:[],loaded:!kind,hasMore:false,loading:false,refreshing:false,error:'',request:0};this.entries.set(key,entry);}
   return entry;
  }
+ upsert(kind:string,query:string,record:Entity){const entry=this.view(kind,query);entry.request++;entry.loading=false;entry.refreshing=false;entry.items=entry.items.some(row=>row.id===record.id)?entry.items.map(row=>row.id===record.id?record:row):[record,...entry.items];}
  async load(api:Pick<SofiaApi,'entities'|'library'>,kind:string,query:string,changed:()=>void,more=false,manual=false,complete=false){
   if(!kind)return;const entry=this.view(kind,query),request=++entry.request;
   entry.loading=true;entry.refreshing=manual;changed();
@@ -32,5 +33,5 @@ export function useWorkspaceRecords(api:SofiaApi,kind:string,query:string,comple
  const cache=useMemo(()=>new WorkspaceRecords(),[api]),[,changed]=useReducer(n=>n+1,0);
  const load=(more=false,manual=false)=>cache.load(api,kind,query,changed,more,manual,complete);
  useEffect(()=>{if(!kind)return;const timer=setTimeout(()=>void load(),query?250:0);return()=>clearTimeout(timer);},[api,kind,query,cache,complete]);
- return {...cache.view(kind,query),load};
+ return {...cache.view(kind,query),load,merge:(record:Entity)=>{cache.upsert(kind,query,record);changed();}};
 }

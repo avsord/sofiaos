@@ -51,3 +51,19 @@ test('library ratings and category language adapt to books, music, recipes, sour
  for(const kind of ['reading','music','recipe','video','recipe_session','source','asset','file']){const p=films.libraryPresentation(kind);assert.ok(p.rating&&p.filter&&p.empty);const tags=films.libraryTags(['Pessoal'],4,p.key?'':'Categoria de teste');const record={kind,tags,data:p.key?{[p.key]:kind==='file'?'drive':'Drama'}:{}};assert.equal(films.libraryRating(record),4);assert.equal(films.libraryFacets(record).length,1);assert.equal(films.filterLibrary([record],'4',films.libraryFacets(record)[0]).length,1);assert.deepEqual(Array.from(films.libraryTags(tags,0)),['Pessoal']);}
  assert.equal(films.libraryPresentation('reading').facet,'Gênero literário');assert.equal(films.libraryPresentation('music').facet,'Gênero musical');assert.equal(films.libraryPresentation('recipe').facet,'Tipo de receita');
 });
+
+const areas=load('src/lib/library-areas.ts',{'./library-filters':films});
+test('custom areas suggest editable filters and preserve field identity when renamed',()=>{
+ assert.deepEqual(Array.from(areas.suggestedFields('Artistas de fotografia')),['Estilo','Técnica','País']);assert.deepEqual(Array.from(areas.suggestedFields('Pintores preferidos')),['Estilo','Técnica','País']);
+ const payload=areas.areaPayload('Fotógrafos','Minhas referências',[{id:'style',label:'Estilo'},{id:'country',label:'País'}]);const record={id:'area1',revision:1,...payload};assert.equal(record.kind,'asset');assert.equal(record.privacy,'private');const read=areas.readArea(record);assert.equal(read.fields[0].id,'style');const renamed=areas.areaPayload('Artistas visuais',record.content,[{id:'style',label:'Movimento'}],record);assert.equal(renamed.id,'area1');assert.equal(areas.readArea(renamed).fields[0].id,'style');assert.throws(()=>areas.areaPayload('Area','',[{id:'a',label:'País'},{id:'b',label:'pais'}]));
+});
+test('custom record filters derive from saved values, combine stars and fields and isolate areas',()=>{
+ const area=areas.readArea({id:'area1',revision:1,...areas.areaPayload('Fotografia','',[{id:'style',label:'Estilo'},{id:'country',label:'País'}])});
+ const a={id:'a',revision:1,...areas.customPayload(area,{},'Ana','Referência','https://example.com',5,{style:'Retrato, Documental',country:'Brasil'})};
+ const b={id:'b',revision:1,...areas.customPayload(area,{},'Bia','','',3,{style:'documental',country:'França'})};
+ const other={...a,id:'other',tags:[areas.MEMBER_TAG+'area2','sofia-library-rating-v1:5']};const all=[a,b,other];
+ assert.equal(areas.memberArea(a),'area1');assert.equal(areas.customFacets([a,b],area.fields)[0].options.length,2);assert.equal(areas.customFacets([a,b],area.fields)[1].options.length,2);
+ assert.deepEqual(Array.from(areas.filterCustom(all,'area1','5',{style:'documental',country:'brasil'}),r=>r.id),['a']);assert.equal(areas.filterCustom(all,'area1','3',{country:'brasil'}).length,0);assert.equal(areas.filterCustom(all,'area1','all',{},'franca')[0].id,'b');
+ const saved=areas.customPayload(area,{...a,tags:[...a.tags,'Favoritos']},'Ana nova','Descrição','','4'*1,{...areas.customValues(a),country:'Portugal'});assert.equal(saved.id,'a');assert.ok(saved.tags.includes('Favoritos'));assert.equal(films.libraryRating(saved),4);assert.equal(areas.customValues(saved).style,'Retrato, Documental');assert.throws(()=>areas.customPayload(area,{},'A','','javascript:alert(1)',5,{}));
+});
+test('optimistic record updates cannot be replaced by the pending pre-save snapshot',async()=>{const cache=new WorkspaceRecords();let finish;const pending=cache.load({entities:()=>new Promise(r=>finish=r)},'asset','',()=>{});cache.upsert('asset','',{id:'saved',title:'Preservado'});finish({items:[]});await pending;assert.equal(cache.view('asset','').items[0].id,'saved');assert.equal(cache.view('asset','').loading,false);});

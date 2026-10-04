@@ -111,6 +111,21 @@ for module,label,stem in [('Biblioteca','Livro preservado','library'),('Listas',
    if find(tree(),'Salvar alterações') is not None:break
    swipe(640,1240,640,550,250)
   tap('Salvar alterações');wait('Livro preservado');wait('Avaliação: 3 de 5 estrelas');tap('Filtrar por gênero literário');tap('Romance');wait('Livro preservado');snapshot('08k-book-rating-genre');tap('Livro preservado');wait('3 de 5 estrelas');assert wait('Gênero literário').get('text')=='Romance';snapshot('08l-book-rating-reopened');tap('Fechar editor')
+  # Personal areas: fields suggested by name, real saved data creates filter options.
+  tap('Nova área');tap('Nome da área');adb('shell','input','text','Artistas% sde% sfotografia'.replace('% s','%s'));back();assert wait('Filtro 1').get('text')=='Estilo';assert wait('Filtro 2').get('text')=='Técnica';snapshot('08m-custom-area-fields')
+  for _ in range(5):
+   if find(tree(),'Salvar área') is not None:break
+   swipe(640,1240,640,500,250)
+  tap('Salvar área');wait('Editar área');tap('Criar registro');tap('Nome do registro');adb('shell','input','text','Artista%stest');back();tap('Dar 5 estrelas')
+  for label,value in [('Estilo','Retrato'),('Técnica','Digital'),('País','Brasil')]:
+   for _ in range(4):
+    if find(tree(),label) is not None:break
+    swipe(640,1240,640,650,250)
+   tap(label);adb('shell','input','text',value);back()
+  for _ in range(5):
+   if find(tree(),'Salvar registro') is not None:break
+   swipe(640,1240,640,550,250)
+  tap('Salvar registro');wait('Artista test');wait('Filtrar por Estilo');tap('Filtrar por Estilo');tap('Retrato');tap('Filtrar por estrelas');tap('5 estrelas');wait('Artista test');snapshot('08n-custom-auto-filters');tap('Artista test');wait('5 de 5 estrelas');assert wait('Estilo').get('text')=='Retrato';snapshot('08o-custom-record-reopened');tap('Fechar área da Biblioteca');back();wait('Seus espaços');tap('Biblioteca');wait('Tudo');wait('Artista test');snapshot('08p-custom-in-all')
  back();wait('Seus espaços')
 # Real tree and parent navigation, opening grandchild directly from root.
 tap('Páginas');wait('Abrir página principal Teste principal');tap('Expandir subpáginas de Teste principal');tap('Expandir subpáginas de Teste filha');tap('Abrir subpágina Teste neta');wait('Título da página');snapshot('09-direct-grandchild');back();wait('Abrir subpágina Teste neta');root=snapshot('10-back-to-parent');assert find(root,'Título da página').get('text')=='Teste filha'
