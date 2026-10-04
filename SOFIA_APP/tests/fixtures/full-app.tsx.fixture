@@ -1,0 +1,57 @@
+// SOFIA_FULL_APP_FIXTURE_ONLY: actual production App and screens; synthetic transport only.
+import React,{useEffect,useState} from 'react';
+import {View,Text,Pressable} from 'react-native';
+import ProductionApp from './ProductionApp';
+import {saveAuth} from './src/lib/api';
+import type {Entity} from './src/lib/types';
+import {legacyMovePlan} from './src/lib/legacy-md';
+const profile={name:'Teste Sofia',email:'qa@example.test',role:'owner' as const};
+const expires_at='2050-01-01T00:00:00Z';
+const make=(id:string,title:string,parent=''):Entity=>({id,title,kind:'user_page',content:'',area:'Pessoal',state:'active',privacy:'private',tags:[],revision:1,data:{parent_id:parent,icon:'📄',blocks_json:'[]'}});
+let pages=[make('parent','Teste principal'),make('other','Outra pagina'),make('child','Teste filha','parent'),make('grandchild','Teste neta','child')];
+let moves=0,deletes=0,uploads=0;
+const today=new Date();today.setHours(10,0,0,0);const tomorrow=new Date(today);tomorrow.setDate(tomorrow.getDate()+1);
+const events=[{...make('event1','Consulta de hoje'),kind:'commitment',data:{start_at:today.toISOString()}},{...make('event2','Compromisso de amanha'),kind:'commitment',data:{start_at:tomorrow.toISOString()}}];
+let notices=[{id:'notice1',title:'Lembrete da agenda',body:'Seu compromisso está confirmado.',state:'unread',category:'agenda',created_at:new Date().toISOString()},{id:'notice2',title:'Preço acompanhado',body:'O histórico de preço foi atualizado.',state:'unread',category:'price',created_at:new Date(Date.now()-86400000).toISOString()}];
+const tasks=[{id:'task1',title:'Tarefa de hoje',state:'todo',revision:1,due_at:today.toISOString(),area:'Pessoal'}];
+const conversation={id:'chatqa',title:'Conversa de teste',channel:'mobile',created_at:today.toISOString(),updated_at:today.toISOString()};
+const messages=[{id:'msg1',role:'user',content:'Mensagem preservada',status:'sent',created_at:today.toISOString()},{id:'msg2',role:'assistant',content:'Resposta preservada',status:'sent',created_at:today.toISOString()}];
+const catalog={catalog:{commitment:{label:'Compromisso',group:'flow',states:['planned','confirmed'],fields:[{key:'start_at',label:'Início',type:'datetime'}]},user_page:{label:'Página',group:'knowledge',states:['active'],fields:[]},monitor:{label:'Monitoramento',group:'flow',states:['active'],fields:[]}},areas:['Pessoal']};
+const response=(data:unknown,status=200)=>Promise.resolve(new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}}));
+globalThis.fetch=(async(input:any,init:any={})=>{
+ const u=new URL(String(input)),p=u.pathname.replace('/api/mobile',''),method=init.method||'GET',body=init.body?JSON.parse(init.body):{};
+ if(u.hostname==='api.github.com')return response([],200);
+ if(u.hostname!=='sofiaos.up.railway.app')throw Error('Unexpected network host in isolated fixture');
+ if(p==='/bootstrap')return response({version:'142',profile,expires_at,ai:{ready:true,reason:null},limits:{audio_bytes:1000000,audio_seconds:120,text_chars:12000},capabilities:{text:true,voice_notes:true,notifications_push:false,multi_user:false,e2ee:false,workspace:true}});
+ if(p==='/home')return response({tasks,notifications:notices,today_tasks:tasks,profile});
+ if(p==='/tasks')return response({items:tasks});
+ if(p.startsWith('/tasks/')){Object.assign(tasks[0],body,{revision:tasks[0].revision+1});return response({item:tasks[0]});}
+ if(p==='/agenda')return response({items:events});
+ if(p==='/workspace/catalog')return response(catalog);
+ if(p==='/workspace/integrations')return response({items:[]});
+ if(p==='/md/capabilities')return response({page_order:true});
+ if(p==='/md/calendar/status')return response({configured:false,connected:false});
+ if(p==='/md/notifications'||p==='/notifications')return response({items:notices,next_offset:null,unread:notices.filter(x=>x.state==='unread').length});
+ if(p.startsWith('/notifications/')&&p.endsWith('/read')){notices=notices.map(n=>n.id===p.split('/')[2]?{...n,state:'read'}:n);return response({ok:true});}
+ if(p.startsWith('/md/notifications/')){notices=p.endsWith('/all')?[]:notices.filter(n=>n.id!==p.split('/').at(-1));return response({ok:true});}
+ if(p==='/md/pages/move'){const plan=legacyMovePlan(pages,body);moves++;const changed=plan.siblings.map((x,i)=>({...x,revision:x.revision+1,data:{...x.data,sort_order:(i+1)*1024,...(x.id===body.id?{parent_id:body.parentId}:{})}}));pages=pages.map(x=>changed.find(c=>c.id===x.id)||x);return response({items:changed});}
+ if(p.endsWith('/observations'))return response({items:[{id:'o1',total_cents:19900,observed_at:new Date(Date.now()-86400000).toISOString()},{id:'o2',total_cents:17900,observed_at:new Date().toISOString()}]});
+ if(p==='/workspace/entities'){
+  if(method==='POST'){const item={...make('created'+Date.now(),body.title),...body};pages.push(item);return response(item);}
+  const kind=u.searchParams.get('kind');return response({items:kind==='user_page'?pages.slice(Number(u.searchParams.get('offset')||0),Number(u.searchParams.get('offset')||0)+100):kind==='monitor'?[{...make('monitorqa','Produto acompanhado'),kind:'monitor',data:{currency:'BRL'}}]:[]});
+ }
+ if(p.startsWith('/workspace/entities/')&&p.endsWith('/attachments')&&method==='POST'){if(!body.name||!body.base64)throw Error('Empty attachment');uploads++;return response({id:'attachment-qa-'+uploads});}
+ if(p.startsWith('/workspace/entities/')){
+  const id=p.split('/')[3],item=pages.find(x=>x.id===id)||events.find(x=>x.id===id);
+  if(!item)return response({error:'Missing synthetic entity'},404);
+  if(method==='DELETE'){deletes++;pages=pages.filter(x=>x.id!==id);return response({ok:true});}
+  if(method==='PATCH'){if(body.revision!==item.revision)return response({error:'Revision conflict'},409);Object.assign(item,{...body,data:{...item.data,...body.data},revision:item.revision+1});}
+  return response(item);
+ }
+ if(p==='/messages'&&method==='POST'){messages.push({id:body.client_message_id,role:'user',content:body.message,status:'sent',created_at:new Date().toISOString()});return response({conversation_id:conversation.id,messages,has_more:false,reply:''});}
+ if(p.startsWith('/chat-sync'))return response({conversation,messages,has_more:false,deleted_ids:[],current_id:conversation.id,cursor_revision:1});
+ if(p==='/conversations')return response({items:[conversation],has_more:false});
+ if(p==='/profile')return response({profile:{...profile,...body}});
+ return response({error:'Unmapped synthetic route '+p},404);
+}) as typeof fetch;
+export default function App(){const [ready,setReady]=useState(false),[tick,setTick]=useState(0);useEffect(()=>{void saveAuth({token:'q'.repeat(43),token_type:'Bearer',expires_at,profile}).then(()=>setReady(true));const id=setInterval(()=>setTick(x=>x+1),200);return()=>clearInterval(id);},[]);return <View style={{flex:1}}><Text accessibilityLabel={'QA moves '+moves+' deletes '+deletes}>SOFIA_FULL_APP_FIXTURE_ONLY</Text><Pressable accessibilityLabel="QA atualizar remoto" onPress={()=>{pages=pages.map(x=>x.id==='other'?{...x,title:'Nome remoto',revision:x.revision+1}:x);}}><Text accessibilityLabel={'QA uploads '+uploads}>Atualizar remoto</Text></Pressable><View style={{flex:1}}>{ready?<ProductionApp/>:null}</View></View>;}
