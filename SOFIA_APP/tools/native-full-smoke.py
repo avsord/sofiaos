@@ -100,6 +100,17 @@ for module,label,stem in [('Biblioteca','Livro preservado','library'),('Listas',
  wait(label);(out/(stem+'-reentry-pixels.json')).write_text(json.dumps(metrics))
  if module=='Biblioteca':
   wait('Tudo');wait('Documento preservado');tap('Tipo de registro');tap('Livro');wait('Livro preservado');assert find(tree(),'Documento preservado') is None;snapshot('08d-library-filtered');tap('Tipo de registro');tap('Tudo');wait('Livro preservado');wait('Documento preservado');snapshot('08e-library-all');tap('Criar registro');wait('Novo registro na Biblioteca');wait('Criar Livro');wait('Criar Documento');snapshot('08f-library-create-types');back()
+  tap('Tipo de registro');tap('Filme');wait('Filme de Acao');wait('Filtrar por estrelas');wait('Filtrar por gênero');tap('Filtrar por estrelas');tap('5 estrelas');wait('Filme de Drama');assert find(tree(),'Filme de Acao') is None;snapshot('08g-film-five-stars')
+  tap('Filtrar por gênero');tap('Comédia');wait('Nenhum filme neste filtro');tap('Filtrar por estrelas');tap('Sem avaliação');wait('Filme de Comedia');snapshot('08h-film-genre-unrated');tap('Filtrar por gênero');tap('Todos os gêneros');tap('Filtrar por estrelas');tap('Todas as avaliações');wait('Filme de Acao');tap('Filme de Acao');wait('Dar 4 estrelas');tap('Dar 4 estrelas');snapshot('08i-film-rating-edit')
+  for _ in range(7):
+   if find(tree(),'Salvar alterações') is not None:break
+   swipe(640,1240,640,550,250)
+  tap('Salvar alterações');wait('Filme de Acao');wait('Avaliação: 4 de 5 estrelas');tap('Filme de Acao');wait('4 de 5 estrelas');snapshot('08j-film-rating-reopened');tap('Fechar editor')
+  tap('Tipo de registro');tap('Livro');wait('Livro preservado');wait('Filtrar por gênero literário');tap('Livro preservado');tap('Dar 3 estrelas');tap('Gênero literário');adb('shell','input','text','Romance');back()
+  for _ in range(7):
+   if find(tree(),'Salvar alterações') is not None:break
+   swipe(640,1240,640,550,250)
+  tap('Salvar alterações');wait('Livro preservado');wait('Avaliação: 3 de 5 estrelas');tap('Filtrar por gênero literário');tap('Romance');wait('Livro preservado');snapshot('08k-book-rating-genre');tap('Livro preservado');wait('3 de 5 estrelas');assert wait('Gênero literário').get('text')=='Romance';snapshot('08l-book-rating-reopened');tap('Fechar editor')
  back();wait('Seus espaços')
 # Real tree and parent navigation, opening grandchild directly from root.
 tap('Páginas');wait('Abrir página principal Teste principal');tap('Expandir subpáginas de Teste principal');tap('Expandir subpáginas de Teste filha');tap('Abrir subpágina Teste neta');wait('Título da página');snapshot('09-direct-grandchild');back();wait('Abrir subpágina Teste neta');root=snapshot('10-back-to-parent');assert find(root,'Título da página').get('text')=='Teste filha'

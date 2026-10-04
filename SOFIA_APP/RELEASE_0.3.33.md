@@ -5,6 +5,7 @@
 - Compromissos com repetição semanal, mensal ou anual, edição da série e indicação na agenda.
 - Alertas locais da agenda no Android, com permissão, antecedência e cancelamento após edição/exclusão sincronizada.
 - Conversa acompanha mensagens novas, respostas longas e abertura/fechamento do teclado.
+- Todas as categorias da Biblioteca com 1 a 5 estrelas e filtros adaptados: gênero, tema, tipo, assunto ou origem.
 - Biblioteca abre em Tudo, com registros de todas as categorias, filtro por tipo e criação contextual.
 - Módulos dos Apps preservam registros e estados vazios confirmados ao reabrir; respostas antigas não substituem a categoria atual.
 - Arraste entre menus usa uma única paginação nativa, sem comando extra de reposicionamento ao concluir.
