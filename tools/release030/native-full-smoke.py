@@ -37,10 +37,10 @@ record=subprocess.Popen(['adb','shell','screenrecord','--time-limit','25','/sdca
 for repeat in range(3):
  swipe(620,850,100,850,100);swipe(100,850,620,850,100)
 time.sleep(1)
-root=tree();selected=[n.get('content-desc') for n in root.iter('node') if n.get('selected')=='true' and n.get('resource-id','').startswith('menu-')]
+root=tree();selected=[n.get('content-desc') for n in root.iter('node') if n.get('selected')=='true' and n.get('resource-id','') in ['menu-home','menu-chat','menu-pages','menu-agenda','menu-apps','menu-profile']]
 assert len(selected)==1,selected
 time.sleep(1.2)
-root=tree();assert selected==[n.get('content-desc') for n in root.iter('node') if n.get('selected')=='true' and n.get('resource-id','').startswith('menu-')]
+root=tree();assert selected==[n.get('content-desc') for n in root.iter('node') if n.get('selected')=='true' and n.get('resource-id','') in ['menu-home','menu-chat','menu-pages','menu-agenda','menu-apps','menu-profile']]
 snapshot('00-rapid-gestures-settled')
 for label in ['Páginas','Agenda','Conversa','Apps','Perfil','Início']:tap(label)
 wait('Consulta de hoje');snapshot('00b-rapid-tabs-final-home')

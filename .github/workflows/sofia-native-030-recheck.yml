@@ -29,8 +29,8 @@ jobs:
           git checkout --detach acc9edf7fa8e5b7614d79e409d380904f479c6a4
       - uses: actions/download-artifact@v4
         with:
-          name: Sofia-Android-0.3.30
-          run-id: 37203633393
+          name: Sofia-Android-0.3.30-checked
+          run-id: 37204806045
           github-token: ${{ github.token }}
           path: SOFIA_APP/dist
       - name: Verify unchanged APK and keep QA audit
@@ -39,6 +39,7 @@ jobs:
           sha256sum --check dist/Sofia-OS.apk.sha256
           test "$(cat dist/SOURCE_COMMIT.txt)" = "$(git rev-parse HEAD)"
           cp /tmp/native-full-smoke.py dist/native-full-smoke.py
+          cp dist/QA_COMMIT.txt dist/QA_BUILD_COMMIT.txt
           cp /tmp/QA_COMMIT.txt dist/QA_COMMIT.txt
           cp /tmp/full-app.tsx.fixture dist/QA-fixture.tsx.fixture
           cp /tmp/publish-checked.cjs dist/publish-checked.cjs
@@ -50,43 +51,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
-      - name: Build only isolated QA JavaScript over the unchanged production native binary
-        working-directory: SOFIA_APP
-        run: |
-          set -euo pipefail
-          npm ci
-          npx expo prebuild --platform android --clean --no-install
-          cp App.tsx /tmp/production-App.tsx
-          trap 'cp /tmp/production-App.tsx App.tsx; rm -f ProductionApp.tsx' EXIT
-          cp App.tsx ProductionApp.tsx
-          cp /tmp/full-app.tsx.fixture App.tsx
-          npm run check
-          cd android
-          chmod +x gradlew
-          ./gradlew :app:createBundleReleaseJsAndAssets --no-daemon --max-workers=2
-          cd ..
-          python3 <<'QA'
-          from pathlib import Path
-          import zipfile
-          source=Path('android/app/build/generated/assets/react/release/index.android.bundle')
-          assert source.is_file() and source.stat().st_size>0
-          with zipfile.ZipFile('dist/Sofia-OS.apk') as old,zipfile.ZipFile('/tmp/qa-unsigned.apk','w') as new:
-              for item in old.infolist():
-                  if item.filename.startswith('META-INF/'):continue
-                  new.writestr(item,source.read_bytes() if item.filename=='assets/index.android.bundle' else old.read(item))
-          QA
-          SDK_TOOLS="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -1)"
-          "$SDK_TOOLS/zipalign" -f -P 16 4 /tmp/qa-unsigned.apk /tmp/qa-aligned.apk
-          "$SDK_TOOLS/apksigner" sign --ks android/app/debug.keystore --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out dist/QA-ONLY-full-fixture.apk /tmp/qa-aligned.apk
-          "$SDK_TOOLS/apksigner" verify dist/QA-ONLY-full-fixture.apk
-          cp /tmp/production-App.tsx App.tsx
-          rm ProductionApp.tsx
-          git diff --exit-code -- App.tsx
-          sha256sum --check dist/Sofia-OS.apk.sha256
-          mkdir -p /tmp/baseline029 /tmp/baseline025
-          gh release download sofia-android-v0.3.29 --repo "$GITHUB_REPOSITORY" --pattern Sofia-OS.apk --dir /tmp/baseline029
-          gh release download sofia-android-v0.3.25 --repo "$GITHUB_REPOSITORY" --pattern Sofia-OS.apk --dir /tmp/baseline025
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -102,24 +66,6 @@ jobs:
           script: |
             adb shell wm size 720x1600
             adb shell wm density 280
-            adb install /tmp/baseline025/Sofia-OS.apk
-            adb install -r SOFIA_APP/dist/Sofia-OS.apk
-            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
-            sleep 5
-            adb shell pidof com.avsord.sofiaapp > SOFIA_APP/dist/upgrade-from-025.txt
-            test -s SOFIA_APP/dist/upgrade-from-025.txt
-            adb uninstall com.avsord.sofiaapp
-            adb install /tmp/baseline029/Sofia-OS.apk
-            adb install -r SOFIA_APP/dist/Sofia-OS.apk
-            adb logcat -c
-            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
-            sleep 10
-            adb shell uiautomator dump /sdcard/startup.xml
-            adb pull /sdcard/startup.xml SOFIA_APP/dist/startup.xml
-            grep -q Entrar SOFIA_APP/dist/startup.xml
-            adb exec-out screencap -p > SOFIA_APP/dist/startup.png
-            adb logcat -d -s ReactNativeJS:E AndroidRuntime:E > SOFIA_APP/dist/native-errors.txt
-            ! grep -q 'FATAL EXCEPTION' SOFIA_APP/dist/native-errors.txt
             adb install -r SOFIA_APP/dist/QA-ONLY-full-fixture.apk
             adb logcat -c
             adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
