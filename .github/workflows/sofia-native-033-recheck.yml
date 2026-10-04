@@ -1,0 +1,122 @@
+name: Sofia Android 0.3.33 acceptance recheck
+on:
+  push:
+    branches: [work/sofia-native-030]
+    paths: [.github/workflows/sofia-native-033-recheck.yml, tools/release033/native-033-smoke.py, tools/release033/qa.tsx.fixture]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_PUBLIC_API_URL: https://sofiaos.up.railway.app
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Preserve revised test setup and use exact built source
+        run: |
+          cp tools/release033/native-033-smoke.py /tmp/native-033-smoke.py
+          cp tools/release033/qa.tsx.fixture /tmp/qa.tsx.fixture
+          git rev-parse HEAD > /tmp/QA_COMMIT.txt
+          git checkout --detach 82022350663e6a8e95e347468074a025cb0fb69d
+      - uses: actions/download-artifact@v4
+        with:
+          name: Sofia-Android-0.3.33
+          run-id: 37233513219
+          github-token: ${{ github.token }}
+          path: SOFIA_APP/dist
+      - name: Verify unchanged APK and retain test audit
+        working-directory: SOFIA_APP
+        run: |
+          sha256sum --check dist/Sofia-OS.apk.sha256
+          test "$(cat dist/SOURCE_COMMIT.txt)" = "$(git rev-parse HEAD)"
+          cp /tmp/native-033-smoke.py dist/native-033-smoke.py
+          cp /tmp/QA_COMMIT.txt dist/QA_COMMIT.txt
+          cp /tmp/qa.tsx.fixture dist/QA-fixture.tsx.fixture
+          mv dist/release033-evidence dist/attempt-1-release033-evidence
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build diagnostic QA only, preserving production APK
+        working-directory: SOFIA_APP
+        run: |
+          npm ci
+          npm install --prefix /tmp/sofia-icon-tools --no-save --package-lock=false sharp@0.34.1
+          NODE_PATH=/tmp/sofia-icon-tools/node_modules npm run prepare-assets
+          cp App.tsx ProductionApp.tsx
+          cp /tmp/qa.tsx.fixture App.tsx
+          npm run check
+          npx expo prebuild --platform android --clean --no-install
+          cd android
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon --max-workers=2 -PreactNativeArchitectures=x86_64
+          cd ..
+          cp android/app/build/outputs/apk/release/app-release.apk dist/QA-ONLY-full-fixture.apk
+          cp ProductionApp.tsx App.tsx
+          rm ProductionApp.tsx
+          git restore -- assets
+          sha256sum --check dist/Sofia-OS.apk.sha256
+      - name: Install screenshot comparison tool
+        run: python3 -m pip install Pillow==12.3.0
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Verify native notifications, recurrence, chat scroll and full app
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          target: google_apis
+          disable-animations: false
+          script: |
+            adb shell wm size 720x1600
+            adb shell wm density 280
+            adb install -r SOFIA_APP/dist/QA-ONLY-full-fixture.apk
+            adb shell pm grant com.avsord.sofiaapp android.permission.POST_NOTIFICATIONS
+            adb logcat -c
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            cd SOFIA_APP && python3 /tmp/native-033-smoke.py
+            adb shell am force-stop com.avsord.sofiaapp
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            cd SOFIA_APP && python3 tools/native-full-smoke.py
+      - name: Publish exact checked production APK
+        working-directory: SOFIA_APP
+        run: node tools/publish-release.cjs
+      - name: Verify published APK discovery with both installed and new updater
+        working-directory: SOFIA_APP
+        run: |
+          set -euo pipefail
+          npm ci
+          git show fbec831626845bf18b6b648e3ee257321b16bc7f:SOFIA_APP/src/lib/update.ts > /tmp/sofia-031-updater.ts
+          node <<'NODE' | tee dist/update-discovery.txt
+          const fs=require('fs'),ts=require('typescript'),vm=require('vm');
+          (async()=>{for(const file of ['/tmp/sofia-031-updater.ts','src/lib/update.ts']){
+            const exports={};const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+            vm.runInNewContext(code,{exports,fetch,AbortController,setTimeout,clearTimeout,Date,Error,Promise});
+            const result=await exports.checkForUpdate({currentVersion:'0.3.32'});
+            if(result?.version!=='0.3.33')throw Error('Update not discoverable: '+file);
+            console.log('VERIFIED',file,result.version,result.url);
+          }})().catch(e=>{console.error(e);process.exitCode=1});
+          NODE
+          gh api repos/avsord/sofiaos/releases/tags/sofia-android-v0.3.33 > dist/release.json
+      - name: Upload APK, complete source and verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sofia-Android-0.3.33-checked
+          path: SOFIA_APP/dist/
+          if-no-files-found: warn
+          retention-days: 30
