@@ -1,0 +1,151 @@
+name: Sofia Android 0.3.30 acceptance recheck
+on:
+  push:
+    branches: [work/sofia-native-030]
+    paths: [.github/workflows/sofia-native-030-recheck.yml, tools/release030/native-full-smoke.py, tools/release030/full-app.tsx.fixture]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_PUBLIC_API_URL: https://sofiaos.up.railway.app
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Preserve revised UI selector and use exact built source
+        run: |
+          cp tools/release030/native-full-smoke.py /tmp/native-full-smoke.py
+          cp tools/release030/full-app.tsx.fixture /tmp/full-app.tsx.fixture
+          cp tools/release030/RELEASE_0.3.30.md /tmp/RELEASE_0.3.30.md
+          cp tools/release030/publish-checked.cjs /tmp/publish-checked.cjs
+          git rev-parse HEAD > /tmp/QA_COMMIT.txt
+          git checkout --detach acc9edf7fa8e5b7614d79e409d380904f479c6a4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Sofia-Android-0.3.30
+          run-id: 37203633393
+          github-token: ${{ github.token }}
+          path: SOFIA_APP/dist
+      - name: Verify unchanged APK and keep QA audit
+        working-directory: SOFIA_APP
+        run: |
+          sha256sum --check dist/Sofia-OS.apk.sha256
+          test "$(cat dist/SOURCE_COMMIT.txt)" = "$(git rev-parse HEAD)"
+          cp /tmp/native-full-smoke.py dist/native-full-smoke.py
+          cp /tmp/QA_COMMIT.txt dist/QA_COMMIT.txt
+          cp /tmp/full-app.tsx.fixture dist/QA-fixture.tsx
+          cp /tmp/publish-checked.cjs dist/publish-checked.cjs
+          cp /tmp/RELEASE_0.3.30.md dist/RELEASE_0.3.30.md
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build only isolated QA JavaScript over the unchanged production native binary
+        working-directory: SOFIA_APP
+        run: |
+          set -euo pipefail
+          npm ci
+          npx expo prebuild --platform android --clean --no-install
+          cp App.tsx /tmp/production-App.tsx
+          trap 'cp /tmp/production-App.tsx App.tsx; rm -f ProductionApp.tsx' EXIT
+          cp App.tsx ProductionApp.tsx
+          cp /tmp/full-app.tsx.fixture App.tsx
+          npm run check
+          cd android
+          chmod +x gradlew
+          ./gradlew :app:createBundleReleaseJsAndAssets --no-daemon --max-workers=2
+          cd ..
+          python3 <<'QA'
+          from pathlib import Path
+          import zipfile
+          source=Path('android/app/build/generated/assets/createBundleReleaseJsAndAssets/index.android.bundle')
+          assert source.is_file() and source.stat().st_size>0
+          with zipfile.ZipFile('dist/Sofia-OS.apk') as old,zipfile.ZipFile('/tmp/qa-unsigned.apk','w') as new:
+              for item in old.infolist():
+                  if item.filename.startswith('META-INF/'):continue
+                  new.writestr(item,source.read_bytes() if item.filename=='assets/index.android.bundle' else old.read(item))
+          QA
+          SDK_TOOLS="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -1)"
+          "$SDK_TOOLS/zipalign" -f -P 16 4 /tmp/qa-unsigned.apk /tmp/qa-aligned.apk
+          "$SDK_TOOLS/apksigner" sign --ks android/app/debug.keystore --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out dist/QA-ONLY-full-fixture.apk /tmp/qa-aligned.apk
+          "$SDK_TOOLS/apksigner" verify dist/QA-ONLY-full-fixture.apk
+          cp /tmp/production-App.tsx App.tsx
+          rm ProductionApp.tsx
+          git diff --exit-code -- App.tsx
+          sha256sum --check dist/Sofia-OS.apk.sha256
+          mkdir -p /tmp/baseline029 /tmp/baseline025
+          gh release download sofia-android-v0.3.29 --repo "$GITHUB_REPOSITORY" --pattern Sofia-OS.apk --dir /tmp/baseline029
+          gh release download sofia-android-v0.3.25 --repo "$GITHUB_REPOSITORY" --pattern Sofia-OS.apk --dir /tmp/baseline025
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Verify complete production shell using foreground UI elements
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          target: google_apis
+          disable-animations: false
+          script: |
+            adb shell wm size 720x1600
+            adb shell wm density 280
+            adb install /tmp/baseline025/Sofia-OS.apk
+            adb install -r SOFIA_APP/dist/Sofia-OS.apk
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            sleep 5
+            adb shell pidof com.avsord.sofiaapp > SOFIA_APP/dist/upgrade-from-025.txt
+            test -s SOFIA_APP/dist/upgrade-from-025.txt
+            adb uninstall com.avsord.sofiaapp
+            adb install /tmp/baseline029/Sofia-OS.apk
+            adb install -r SOFIA_APP/dist/Sofia-OS.apk
+            adb logcat -c
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            sleep 10
+            adb shell uiautomator dump /sdcard/startup.xml
+            adb pull /sdcard/startup.xml SOFIA_APP/dist/startup.xml
+            grep -q Entrar SOFIA_APP/dist/startup.xml
+            adb exec-out screencap -p > SOFIA_APP/dist/startup.png
+            adb logcat -d -s ReactNativeJS:E AndroidRuntime:E > SOFIA_APP/dist/native-errors.txt
+            ! grep -q 'FATAL EXCEPTION' SOFIA_APP/dist/native-errors.txt
+            adb install -r SOFIA_APP/dist/QA-ONLY-full-fixture.apk
+            adb logcat -c
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            cd SOFIA_APP && python3 /tmp/native-full-smoke.py
+      - name: Publish exact checked production APK
+        working-directory: SOFIA_APP
+        run: node /tmp/publish-checked.cjs
+      - name: Verify release and updater discovery
+        working-directory: SOFIA_APP
+        run: |
+          npm ci
+          git show 08692f22a0f445b08f2e203eb106ef05723b508f:SOFIA_APP/src/lib/update.ts > /tmp/sofia-029-updater.ts
+          node <<'NODE' | tee dist/update-discovery.txt
+          const fs=require('fs'),ts=require('typescript'),vm=require('vm');
+          (async()=>{for(const file of ['/tmp/sofia-029-updater.ts','src/lib/update.ts']){
+            const exports={};const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+            vm.runInNewContext(code,{exports,fetch,AbortController,setTimeout,clearTimeout,Date,Error,Promise});
+            const result=await exports.checkForUpdate({currentVersion:'0.3.29'});
+            if(result?.version!=='0.3.30')throw Error('Update not discoverable: '+file);
+            console.log('VERIFIED',file,result.version,result.url);
+          }})().catch(e=>{console.error(e);process.exitCode=1});
+          NODE
+          gh api repos/avsord/sofiaos/releases/tags/sofia-android-v0.3.30 > dist/release.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sofia-Android-0.3.30-checked
+          path: SOFIA_APP/dist
+          retention-days: 30
