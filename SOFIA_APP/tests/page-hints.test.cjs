@@ -53,7 +53,7 @@ test('page canvas stays compact and subpages render as inline page rows',()=>{
 test('writing hint disappears after the page has a real title and blank body stops reserving vertical space',()=>{
  const source=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
  assert.ok(source.includes("const showBodyGuide=emptyBody&&!hasSubpageContent;"));
- assert.ok(source.includes("height:(!b.text&&!b.html&&!pageBlockHint(b,i,showBodyGuide,focus===b.id)&&focus!==b.id)?0:undefined"));
+ assert.ok(source.includes("height:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:undefined"));
  assert.ok(source.includes("marginTop:2"));
  assert.ok(!source.includes('accessibilityLabel="Recolher subpáginas"'));
  assert.ok(!source.includes('accessibilityLabel="Mostrar subpáginas"'));

@@ -37,10 +37,10 @@ record=subprocess.Popen(['adb','shell','screenrecord','--time-limit','25','/sdca
 for repeat in range(3):
  swipe(620,850,100,850,100);swipe(100,850,620,850,100)
 time.sleep(1)
-root=tree();selected=[n.get('content-desc') for n in root.iter('node') if n.get('selected')=='true' and n.get('resource-id','').startswith('menu-')]
-assert len(selected)==1,selected
+root=snapshot('00-rapid-gestures-diagnostic');selected=[n.get('content-desc') for n in root.iter('node') if n.get('selected')=='true' and n.get('resource-id','') in ['menu-home','menu-chat','menu-pages','menu-agenda','menu-apps','menu-profile']]
+assert len(selected)==1,[dict(n.attrib) for n in root.iter('node') if n.get('resource-id','').startswith('menu-')]
 time.sleep(1.2)
-root=tree();assert selected==[n.get('content-desc') for n in root.iter('node') if n.get('selected')=='true' and n.get('resource-id','').startswith('menu-')]
+root=tree();assert selected==[n.get('content-desc') for n in root.iter('node') if n.get('selected')=='true' and n.get('resource-id','') in ['menu-home','menu-chat','menu-pages','menu-agenda','menu-apps','menu-profile']]
 snapshot('00-rapid-gestures-settled')
 for label in ['Páginas','Agenda','Conversa','Apps','Perfil','Início']:tap(label)
 wait('Consulta de hoje');snapshot('00b-rapid-tabs-final-home')
@@ -72,7 +72,7 @@ x,y,r,b=box(daynode);adb('shell','input','tap',str((x+r)//2),str((y+b)//2));wait
 bell=box(wait('Notificações: 2 não lidas'));tap('Notificações: 2 não lidas');wait('Hoje');wait('Ontem');popup=box(wait('notification-popover'));assert popup[1]>=bell[3],(bell,popup);snapshot('03-bell-anchor')
 tap('Marcar como lida: Lembrete da agenda');tap('Ver todas as notificações');wait('ATIVIDADES · AVISOS');wait('Agenda · 1');snapshot('04-notification-center');back()
 # Settings split, appearance, real version, and configured state visible.
-tap('Perfil');wait('Perfil do usuário');wait('E-MAIL DE LOGIN');snapshot('05-profile-first');tap('Configurações do aplicativo');wait('Versão instalada 0.3.30');tap('Escuro');snapshot('06-settings-dark');tap('Claro')
+tap('Perfil');wait('Perfil do usuário');wait('E-MAIL DE LOGIN');snapshot('05-profile-first');tap('Configurações do aplicativo');wait('Versão instalada 0.3.31');tap('Escuro');snapshot('06-settings-dark');tap('Claro')
 # Apps goes back exactly to Apps; hardware back does not jump to Home.
 tap('Apps');wait('Seus espaços');tap('Tarefas');wait('Nova tarefa');snapshot('07-tasks');back();wait('Seus espaços');snapshot('08-apps-back')
 # Real tree and parent navigation, opening grandchild directly from root.

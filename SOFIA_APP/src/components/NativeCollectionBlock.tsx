@@ -36,6 +36,9 @@ export function NativeCollectionBlock({block,onChange,onDelete}:{onDelete?:()=>v
  const nameProp=d.properties.find(p=>p.key==='name')||d.properties[0];
  const addRow=(seed:Record<string,any>={})=>{const next=clone(d),values:Record<string,any>={};for(const p of next.properties)values[p.key]=p.type==='checkbox'?false:'';Object.assign(values,seed);next.rows.push({id:makeId(),values,page_content:''});commit(next);};
  const updateRow=(id:string,key:string,value:any)=>{const next=clone(d),row=next.rows.find(r=>r.id===id);if(!row)return;row.values[key]=value;commit(next,'collection-row:'+id+':'+key);};
+ // Existing page_content is the description; no migration or property deletion is needed.
+ const updateDescription=(id:string,value:string)=>{const next=clone(d),row=next.rows.find(r=>r.id===id);if(!row)return;const prop=next.properties.find(p=>p.key==='description');if(prop)row.values[prop.key]=value;else row.page_content=value;commit(next,'collection-row:'+id+':description');};
+ const descriptionInput=(row:Row)=><View style={{gap:4,marginTop:8}}><Text style={{color:c.muted,fontSize:11}}>Descrição</Text><TextInput accessibilityLabel={'Descrição de '+String(row.values[nameProp.key]||'nova tarefa')} multiline value={String(d.properties.some(p=>p.key==='description')?row.values.description||'':row.page_content||'')} onChangeText={v=>updateDescription(row.id,v)} placeholder="Adicionar descrição…" placeholderTextColor={c.muted} style={{minHeight:42,padding:0,color:c.text,fontSize:13,lineHeight:19,textAlignVertical:'top'}}/></View>;
  const removeRow=(id:string)=>Alert.alert('Excluir item?','Somente este item será removido desta coleção.',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{const next=clone(d);next.rows=next.rows.filter(r=>r.id!==id);commit(next);}}]);
  const editStatus=(prop:Prop,value:string|null)=>setStatusEdit({propKey:prop.key,value,title:value||'',color:value?(prop.option_colors?.[value]||'gray'):'gray'});
  const saveStatus=()=>{if(!statusEdit)return;const next=clone(d),prop=next.properties.find(p=>p.key===statusEdit.propKey);if(!prop)return;prop.options=prop.options||[];prop.option_colors=prop.option_colors||{};
@@ -58,10 +61,11 @@ export function NativeCollectionBlock({block,onChange,onDelete}:{onDelete?:()=>v
       <View style={{width:9,height:9,borderRadius:9,backgroundColor:hex}}/><Text numberOfLines={1} style={{flex:1,color:c.text,fontSize:12,fontWeight:'700'}}>{option}</Text><Text style={{color:c.muted,fontSize:11}}>{rows.length}</Text><Text style={{color:c.muted}}>•••</Text>
      </Pressable>
      {rows.map(row=><View key={row.id} style={{marginBottom:6,padding:9,borderRadius:9,backgroundColor:c.surface,borderWidth:1,borderColor:c.line}}>
-      <TextInput value={String(row.values[nameProp.key]||'')} onChangeText={v=>updateRow(row.id,nameProp.key,v)} placeholder="Nova página" placeholderTextColor={c.muted} style={{color:c.text,fontSize:13,padding:0,minHeight:28}}/>
+      <TextInput accessibilityLabel="Título do item" value={String(row.values[nameProp.key]||'')} onChangeText={v=>updateRow(row.id,nameProp.key,v)} placeholder="Nova tarefa" placeholderTextColor={c.muted} style={{color:c.text,fontSize:13,padding:0,minHeight:28}}/>
+      {descriptionInput(row)}
       <Pressable onPress={()=>removeRow(row.id)} accessibilityLabel="Excluir item" style={{alignSelf:'flex-end',paddingTop:4}}><Text style={{fontSize:10,color:c.muted}}>Excluir</Text></Pressable>
      </View>)}
-     <Pressable onPress={()=>addRow({[group.key]:option})} style={{padding:8}}><Text style={{color:c.muted,fontSize:12}}>＋ Nova página</Text></Pressable>
+     <Pressable accessibilityLabel={"Nova tarefa em "+option} onPress={()=>addRow({[group.key]:option})} style={{padding:8}}><Text style={{color:c.muted,fontSize:12}}>＋ Nova tarefa</Text></Pressable>
     </View>;
    })}
    <Pressable accessibilityRole="button" accessibilityLabel="Adicionar coluna" onPress={()=>editStatus(group,null)} style={{width:120,minHeight:70,borderRadius:12,borderWidth:1,borderStyle:'dashed',borderColor:c.line,alignItems:'center',justifyContent:'center'}}>

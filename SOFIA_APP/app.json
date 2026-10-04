@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sofia OS",
     "slug": "sofia-app",
-    "version": "0.3.30",
+    "version": "0.3.31",
     "scheme": "sofiaapp",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.avsord.sofiaapp",
-      "versionCode": 35,
+      "versionCode": 36,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.RECORD_AUDIO",
@@ -46,7 +46,8 @@
           "cameraPermission": "A Sofia usa a câmera somente quando você escolhe tirar uma foto."
         }
       ],
-      "./plugins/with-sofia-logo.cjs"
+      "./plugins/with-sofia-logo.cjs",
+      "./plugins/with-calendar-gesture.cjs"
     ]
   }
 }

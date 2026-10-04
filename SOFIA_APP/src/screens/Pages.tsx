@@ -30,7 +30,7 @@ const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'
 
 export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;active:boolean;storageScope:string;onDepthChange?:(open:boolean)=>void}){
  const keyboardVisible=useKeyboardVisible(),reduced=useReducedMotion(),reducedRef=useRef(reduced);reducedRef.current=reduced;
- const backCommitted=useRef(false);
+ const backCommitted=useRef(false),scrollPositions=useRef(new Map<string,number>());
  const c=useTheme(),[pages,setPages]=useState<Entity[]>([]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>()),[pageInteraction,setPageInteraction]=useState(false),[pageDragging,setPageDragging]=useState(false);
  const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null),[createParent,setCreateParent]=useState<Entity|null|undefined>(undefined);
  const refreshFlight=useRef(false),mutationEpoch=useRef(0),moveBusy=useRef(false),pendingPosition=useRef(new Map<string,Record<string,any>>());
@@ -158,19 +158,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   if(mounted.current){history.current=history.current.filter(key=>!ids.has(key));setPages(old=>old.filter(p=>!ids.has(p.id)));if(ids.has(selectedId||''))setSelectedId(null);setFocus(null);}
  })().catch(e=>setError(errorText(e)));}}]);}
  function removePage(){if(entry)confirmDeletePage(entry.base);}
- function staticBlockView(b:PageBlock,i:number){
-  if(b.type==='divider')return <View key={b.id} style={{paddingVertical:14}}><View style={{height:1,backgroundColor:c.line}}/></View>;
-  if(b.type==='image'&&b.data?.attachment_id)return <View key={b.id} style={{marginVertical:8}}><Image source={api.attachmentSource(String(b.data.attachment_id))} style={{width:'100%',height:210,borderRadius:8}} resizeMode="contain"/></View>;
-  if(b.type==='collection')return <NativeCollectionBlock key={b.id} block={b} onChange={()=>{}}/>;
-  if(['image','file','table','bookmark'].includes(b.type))return <View key={b.id} style={{padding:12,borderRadius:8,backgroundColor:c.input,marginVertical:5}}><Text style={{color:c.text,fontSize:13}}>{b.text||({table:'Tabela',image:'Imagem',file:'Arquivo',bookmark:'Link'} as Record<string,string>)[b.type]}</Text></View>;
-  const heading=b.type==='heading1'?30:b.type==='heading2'?24:b.type==='heading3'?20:16;
-  const prefix=b.type==='bullet'?'• ':b.type==='number'?String(i+1)+'. ':b.type==='quote'?'│ ':b.type==='callout'?'💡 ':'';
-  return <View key={b.id} style={{flexDirection:'row',alignItems:'flex-start',gap:b.type==='todo'?7:0,minHeight:34}}>
-   {b.type==='todo'?<Text style={{fontSize:18,color:c.muted,paddingTop:2}}>{b.checked?'☑':'☐'}</Text>:prefix?<Text style={{fontSize:heading,lineHeight:heading+9,color:c.muted,paddingTop:4}}>{prefix}</Text>:null}
-   <Text style={{flex:1,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:4,fontFamily:b.type==='code'?'monospace':undefined}}>{b.text||''}</Text>
-  </View>;
- }
- function blockView(b:PageBlock,i:number){
+ function blockView(b:PageBlock,i:number,preview=false,bodyGuide=showBodyGuide,blockFocus=focus){
   if(b.type==='divider')return <Pressable key={b.id} accessibilityLabel="Divisor" onLongPress={()=>confirmRemoveBlock(b)} style={{paddingVertical:14}}><View style={{height:1,backgroundColor:c.line}}/></Pressable>;
   if(b.type==='image'&&b.data?.attachment_id)return <Pressable key={b.id} accessible={false} onLongPress={()=>confirmRemoveBlock(b)} style={{marginVertical:8}}><Image source={api.attachmentSource(String(b.data.attachment_id))} style={{width:'100%',height:210,borderRadius:8}} resizeMode="contain"/>{b.data.caption?<Text style={{color:c.muted,fontSize:12}}>{String(b.data.caption)}</Text>:null}</Pressable>;
   if(b.type==='collection')return <NativeCollectionBlock key={b.id} block={b} onChange={(data,group)=>updateBlock(b,{data},group)} onDelete={()=>confirmRemoveBlock(b)}/>;
@@ -179,10 +167,29 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   const prefix=b.type==='bullet'?'• ':b.type==='number'?String(i+1)+'. ':b.type==='quote'?'│ ':b.type==='callout'?'💡 ':'';
   return <Pressable key={b.id} accessible={false} onLongPress={()=>confirmRemoveBlock(b)} style={{flexDirection:'row',alignItems:'flex-start',gap:b.type==='todo'?7:0}}>
    {b.type==='todo'?<Switch accessibilityLabel="Concluir tarefa" value={!!b.checked} onValueChange={checked=>updateBlock(b,{checked})}/>:prefix?<Text style={{fontSize:heading,lineHeight:heading+9,color:c.muted,paddingTop:4}}>{prefix}</Text>:null}
-   <TextInput ref={node=>{if(node)inputRefs.current.set(b.id,node);else inputRefs.current.delete(b.id);}} accessibilityLabel={'Conteúdo do bloco '+(i+1)} value={b.text||''} onChangeText={text=>updateBlock(b,{text,html:''},'text:'+b.id)}
-    onFocus={()=>setFocus(b.id)} onBlur={()=>{if(selectedId)void store.flush(selectedId);}} multiline placeholder={pageBlockHint(b,i,showBodyGuide,focus===b.id)} placeholderTextColor={placeholderColor}
-    style={{flex:1,minHeight:(!b.text&&!b.html&&!pageBlockHint(b,i,showBodyGuide,focus===b.id)&&focus!==b.id)?0:42,height:(!b.text&&!b.html&&!pageBlockHint(b,i,showBodyGuide,focus===b.id)&&focus!==b.id)?0:undefined,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:(!b.text&&!b.html&&!pageBlockHint(b,i,showBodyGuide,focus===b.id)&&focus!==b.id)?0:4,fontFamily:b.type==='code'?'monospace':undefined,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:8,paddingHorizontal:b.type==='code'?10:0}}/>
+   <TextInput editable={!preview} ref={node=>{if(preview)return;if(node)inputRefs.current.set(b.id,node);else inputRefs.current.delete(b.id);}} accessibilityLabel={'Conteúdo do bloco '+(i+1)} value={b.text||''} onChangeText={text=>updateBlock(b,{text,html:''},'text:'+b.id)}
+    onFocus={()=>setFocus(b.id)} onBlur={()=>{if(!preview&&selectedId)void store.flush(selectedId);}} multiline placeholder={pageBlockHint(b,i,bodyGuide,blockFocus===b.id)} placeholderTextColor={placeholderColor}
+    style={{flex:1,minHeight:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:42,height:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:undefined,color:c.text,fontSize:heading,lineHeight:heading+9,fontWeight:b.type.startsWith('heading')?'700':'400',paddingVertical:(!b.text&&!b.html&&!pageBlockHint(b,i,bodyGuide,blockFocus===b.id)&&blockFocus!==b.id)?0:4,fontFamily:b.type==='code'?'monospace':undefined,backgroundColor:b.type==='code'?c.input:'transparent',borderRadius:8,paddingHorizontal:b.type==='code'?10:0}}/>
   </Pressable>;
+ }
+ function documentContent(selected:Entity,draft:PageDraft,preview=false){
+  const hasCover=!!draft.appearance.cover_type,subpages=children.get(selected.id)||[];
+  const emptyBody=pageBodyIsEmpty(draft.blocks),hasSubpageContent=!!subpages.length;
+  return <PageDocumentScroll key={selected.id} pageId={selected.id} preview={preview} enabled={!pageDragging} initialY={scrollPositions.current.get(selected.id)||0} onScrollY={y=>scrollPositions.current.set(selected.id,y)}>
+   <Pressable accessibilityRole="button" accessibilityLabel={hasCover?'Alterar capa':'Adicionar capa'} onPress={()=>setAppearance('cover')} style={{height:hasCover?190:28,overflow:'hidden',backgroundColor:hasCover?c.accentSoft:'transparent'}}>
+    {hasCover?<PageCover data={draft.appearance} api={api}/>:<View style={{alignSelf:'flex-end',padding:12,opacity:.55}}><Icon name="image" size={20} color={c.muted}/></View>}
+   </Pressable>
+   <View style={{paddingHorizontal:30,marginTop:hasCover?-44:0}}>
+    <Pressable accessibilityRole="button" accessibilityLabel="Alterar ícone da página" onPress={()=>setAppearance('icon')} style={{width:78,height:78,alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:58,color:c.text}}>{String(draft.appearance.icon||'📄')}</Text></Pressable>
+    <TextInput editable={!preview} accessibilityLabel="Título da página" value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>{if(!preview)void store.flush(selected.id);}} multiline placeholder={pageTitleHint(emptyBody,hasSubpageContent,!preview&&focus==='title')} placeholderTextColor={placeholderColor} style={{minHeight:60,fontSize:38,lineHeight:44,fontWeight:'800',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}/>
+    {String(selected.data.purpose||'').trim()?<Text style={{fontSize:13,lineHeight:20,color:c.muted,marginBottom:12}}>{String(selected.data.purpose)}</Text>:null}
+    <View style={{gap:2}}>{draft.blocks.map((block,index)=>blockView(block,index,preview,emptyBody&&!hasSubpageContent,preview?null:focus))}</View>
+    <Pressable accessibilityLabel="Continuar escrevendo" onPress={()=>{const last=draft.blocks.at(-1);if(last&&['text','heading1','heading2','heading3','bullet','todo','number','quote','code','callout'].includes(last.type)){setFocus(last.id);inputRefs.current.get(last.id)?.focus();}else addBlock();}} style={{minHeight:18}}/>
+    {subpages.length?<View style={{marginTop:2}}>
+      <PageTreeList roots={subpages} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={preview?undefined:changePageInteraction} onDragChange={preview?undefined:setPageDragging} compact/>
+    </View>:null}
+   </View>
+  </PageDocumentScroll>;
  }
  const listView=<ScrollView scrollEnabled={!pageDragging} style={{flex:1,backgroundColor:c.bg}} contentContainerStyle={{paddingBottom:34}} refreshControl={<RefreshControl enabled={!pageInteraction&&!selectedId} refreshing={refreshing} onRefresh={refreshPages} tintColor={c.accent}/>}>
   <ScreenTitle title="Páginas" eyebrow="IDEIAS · NOTAS · SEUS ESPAÇOS" right={<IconButton name="plus" label="Criar página" filled disabled={!ready} onPress={()=>setCreateParent(null)}/>}/>
@@ -202,22 +209,13 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  const status=entry.state==='saving'?'Salvando…':entry.state==='pending'?'Sincronizando…':entry.state==='error'?'Não salvo':entry.state==='conflict'?'Conflito':selected.privacy==='private'?'Particular':selected.area;
  const hasCover=!!draft.appearance.cover_type;
  const previousBackdrop=previousEntry&&previousPage?(()=>{
-  const pd=previousEntry.draft,pp={...previousPage,data:{...previousPage.data,...pd.appearance}},pc=!!pd.appearance.cover_type,psubs=children.get(pp.id)||[];
+  const pd=previousEntry.draft,pp={...previousPage,data:{...previousPage.data,...pd.appearance}};
   return <View pointerEvents="none" style={{flex:1,backgroundColor:c.bg}}>
    <View style={{zIndex:20,elevation:5,minHeight:54,flexDirection:'row',alignItems:'center',paddingHorizontal:4,borderBottomWidth:1,borderColor:c.line,backgroundColor:c.surface}}>
     <IconButton name="back" label="Voltar" size={34} disabled onPress={()=>{}}/>
     <View style={{flex:1,minWidth:0,paddingHorizontal:5}}><Text numberOfLines={1} style={{color:c.text,fontSize:15,fontWeight:'700'}}>{pp.title}</Text><Text style={{color:c.muted,fontSize:9,marginTop:3}}>{pp.privacy==='private'?'Particular':pp.area}</Text></View>
    </View>
-   <ScrollView scrollEnabled={false} contentContainerStyle={{paddingBottom:60}}>
-    <View style={{height:pc?190:28,overflow:'hidden',backgroundColor:pc?c.accentSoft:'transparent'}}>{pc?<PageCover data={pd.appearance} api={api}/>:null}</View>
-    <View style={{paddingHorizontal:30,marginTop:pc?-44:0}}>
-     <View style={{width:78,height:78,alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:58,color:c.text}}>{String(pd.appearance.icon||'📄')}</Text></View>
-     <Text style={{minHeight:60,fontSize:38,lineHeight:44,fontWeight:'800',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}>{pd.title==='Sem título'?'':pd.title}</Text>
-     {String(pp.data.purpose||'').trim()?<Text style={{fontSize:13,lineHeight:20,color:c.muted,marginBottom:12}}>{String(pp.data.purpose)}</Text>:null}
-     <View style={{gap:2}}>{pd.blocks.map(staticBlockView)}</View>
-     {psubs.length?<View style={{marginTop:2}}><PageTreeList roots={psubs} children={children} expanded={expanded} toggle={()=>{}} onOpen={()=>{}} onMove={()=>{}} canParent={()=>false} compact/></View>:null}
-    </View>
-   </ScrollView>
+   {documentContent(pp,pd,true)}
   </View>;
  })():listView;
  const editor=<View style={{flex:1,backgroundColor:c.bg,overflow:'hidden'}}>
@@ -232,21 +230,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
    </View>
   </View>
   {error?<ErrorBanner text={error}/>:null}{entry.error?<ErrorBanner text={entry.error} onRetry={entry.state==='conflict'?resolveConflict:()=>void store.flush(selected.id)}/>:null}
-  <ScrollView scrollEnabled={!pageDragging} keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingBottom:60}}>
-   <Pressable accessibilityRole="button" accessibilityLabel={hasCover?'Alterar capa':'Adicionar capa'} onPress={()=>setAppearance('cover')} style={{height:hasCover?190:28,overflow:'hidden',backgroundColor:hasCover?c.accentSoft:'transparent'}}>
-    {hasCover?<PageCover data={draft.appearance} api={api}/>:<View style={{alignSelf:'flex-end',padding:12,opacity:.55}}><Icon name="image" size={20} color={c.muted}/></View>}
-   </Pressable>
-   <View style={{paddingHorizontal:30,marginTop:hasCover?-44:0}}>
-    <Pressable accessibilityRole="button" accessibilityLabel="Alterar ícone da página" onPress={()=>setAppearance('icon')} style={{width:78,height:78,alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:58,color:c.text}}>{String(draft.appearance.icon||'📄')}</Text></Pressable>
-    <TextInput accessibilityLabel="Título da página" value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>void store.flush(selected.id)} multiline placeholder={pageTitleHint(emptyBody,hasSubpageContent,focus==='title')} placeholderTextColor={placeholderColor} style={{minHeight:60,fontSize:38,lineHeight:44,fontWeight:'800',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}/>
-    {String(selected.data.purpose||'').trim()?<Text style={{fontSize:13,lineHeight:20,color:c.muted,marginBottom:12}}>{String(selected.data.purpose)}</Text>:null}
-    <View style={{gap:2}}>{draft.blocks.map(blockView)}</View>
-    <Pressable accessibilityLabel="Continuar escrevendo" onPress={()=>{const last=draft.blocks.at(-1);if(last&&['text','heading1','heading2','heading3','bullet','todo','number','quote','code','callout'].includes(last.type)){setFocus(last.id);inputRefs.current.get(last.id)?.focus();}else addBlock();}} style={{minHeight:18}}/>
-    {subpages.length?<View style={{marginTop:2}}>
-      <PageTreeList roots={subpages} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={changePageInteraction} onDragChange={setPageDragging} compact/>
-    </View>:null}
-   </View>
-  </ScrollView>
+  {documentContent(selected,draft)}
   <KeyboardToolbar visible={keyboardVisible&&!!focus&&focus!=='title'} testID="page-format-toolbar"><View style={{backgroundColor:c.surface,borderTopWidth:1,borderColor:c.line}}><ScrollView horizontal keyboardShouldPersistTaps="always" showsHorizontalScrollIndicator={false}>    <View style={{flexDirection:'row',alignItems:'center',flexWrap:'nowrap',gap:4,paddingVertical:8}}>
      <IconButton name="plus" label="Adicionar bloco" size={34} onPress={addBlock}/>
      {([['text','Texto'],['heading2','Título'],['bullet','Lista'],['todo','Tarefa'],['divider','Divisor']] as const).map(([type,label])=><Pressable key={type} accessibilityRole="button" onPress={()=>formatBlock(type)} style={{paddingHorizontal:9,paddingVertical:9,borderRadius:8,backgroundColor:c.input}}><Text style={{fontSize:11,color:c.muted}}>{label}</Text></Pressable>)}
@@ -262,4 +246,10 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   </Animated.View>
   {createPicker}
  </View>;
+}
+
+/** Preserve each page's viewport, and keep preview/editor native text metrics identical. */
+function PageDocumentScroll({pageId,preview,enabled,initialY,onScrollY,children}:{pageId:string;preview:boolean;enabled:boolean;initialY:number;onScrollY:(y:number)=>void;children:React.ReactNode}){
+ const initialOffset=useRef({x:0,y:initialY}).current;
+ return <ScrollView testID={(preview?'page-preview-':'page-document-')+pageId} scrollEnabled={!preview&&enabled} contentOffset={initialOffset} onScroll={preview?undefined:e=>onScrollY(e.nativeEvent.contentOffset.y)} scrollEventThrottle={16} keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingBottom:60}}>{children}</ScrollView>;
 }
