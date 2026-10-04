@@ -29,7 +29,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: Sofia-Android-0.3.33-checked
-          run-id: 37239951741
+          run-id: 37241130210
           github-token: ${{ github.token }}
           path: SOFIA_APP/dist
       - name: Verify unchanged APK and retain test audit
@@ -46,7 +46,7 @@ jobs:
           assert json.load(open('dist/release033-evidence/result.json'))['passed']
           assert json.load(open('dist/release033-evidence/chat-scroll-geometry.json'))['passed']
           PYVERIFY
-          if [ -d dist/full-app-evidence ]; then mv dist/full-app-evidence dist/attempt-7-full-app-evidence; fi
+          if [ -d dist/full-app-evidence ]; then cp -a dist/full-app-evidence dist/attempt-8-full-app-evidence; fi
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
