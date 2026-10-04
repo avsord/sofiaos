@@ -30,6 +30,7 @@ def swipe(x,y,tx,ty,duration=450):adb('shell','input','swipe',str(x),str(y),str(
 def hold(label,icon=False):
  x,y,r,b=box(wait(label));x=x+18 if icon else (x+r)//2;swipe(x,(y+b)//2,x,(y+b)//2,800)
 def back():adb('shell','input','keyevent','4');time.sleep(.3)
+adb('shell','settings','put','secure','show_ime_with_hard_keyboard','1')
 wait('Início');pid=adb('shell','pidof',pkg).strip();assert pid
 # Fast interrupted gestures and taps; the last settled menu must not roll back.
 record=subprocess.Popen(['adb','shell','screenrecord','--time-limit','25','/sdcard/menu-motion.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
