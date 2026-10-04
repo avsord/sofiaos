@@ -23,8 +23,8 @@ jobs:
           git checkout --detach 08692f22a0f445b08f2e203eb106ef05723b508f
       - uses: actions/download-artifact@v4
         with:
-          name: Sofia-Android-0.3.29
-          run-id: 37177332456
+          name: Sofia-Android-0.3.29-checked
+          run-id: 37178341486
           github-token: ${{ github.token }}
           path: SOFIA_APP/dist
       - name: Verify unchanged APK and keep QA audit
@@ -32,9 +32,10 @@ jobs:
         run: |
           sha256sum --check dist/Sofia-OS.apk.sha256
           test "$(cat dist/SOURCE_COMMIT.txt)" = "$(git rev-parse HEAD)"
+          cp dist/native-full-smoke.py dist/preceding-full-smoke.py
           cp /tmp/native-full-smoke.py dist/native-full-smoke.py
           cp /tmp/QA_COMMIT.txt dist/QA_COMMIT.txt
-          rm -rf dist/full-app-evidence
+          cp dist/native-full-smoke.py dist/final-chat-smoke.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
