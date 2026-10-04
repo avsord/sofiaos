@@ -91,10 +91,18 @@ snapshot('tasks-priority-symbols')
 record=subprocess.Popen(['adb','shell','screenrecord','--time-limit','180','/sdcard/tasks032.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 row=box(wait('task-row-filter0'));reference=Image.open(io.BytesIO(adb('exec-out','screencap','-p'))).convert('RGB');metrics=[]
 for attempt in range(3):
- tap('Voltar aos apps');button=box(wait('Tarefas'));adb('shell','input','tap',str((button[0]+button[2])//2),str((button[1]+button[3])//2))
+ tap('Voltar aos apps');button=box(wait('Tarefas'));apps_frame=Image.open(io.BytesIO(adb('exec-out','screencap','-p'))).convert('RGB');adb('shell','input','tap',str((button[0]+button[2])//2),str((button[1]+button[3])//2))
+ # ADB input can return before React processes the touch. Ignore only unchanged Apps frames.
+ for pending in range(15):
+  raw=adb('exec-out','screencap','-p');frame=Image.open(io.BytesIO(raw)).convert('RGB')
+  title_diff=ImageChops.difference(apps_frame.crop((35,100,500,210)),frame.crop((35,100,500,210)))
+  if sum(max(p)>12 for p in title_diff.getdata())/(465*110)>.02:break
+  time.sleep(.05)
+ else:raise AssertionError('Task navigation did not start')
  # No UI dump/wait before this first frame: test the cached list immediately after navigation.
  for sample in range(3):
-  raw=adb('exec-out','screencap','-p');(out/f'task-return-{attempt}-{sample}.png').write_bytes(raw);frame=Image.open(io.BytesIO(raw)).convert('RGB')
+  if sample:raw=adb('exec-out','screencap','-p');frame=Image.open(io.BytesIO(raw)).convert('RGB')
+  (out/f'task-return-{attempt}-{sample}.png').write_bytes(raw)
   diff=ImageChops.difference(reference.crop(tuple(row)),frame.crop(tuple(row)));fraction=sum(max(p)>12 for p in diff.getdata())/((row[2]-row[0])*(row[3]-row[1]));metrics.append(fraction)
   assert fraction<.015,('task row flicker',attempt,sample,fraction)
   time.sleep(.8)
