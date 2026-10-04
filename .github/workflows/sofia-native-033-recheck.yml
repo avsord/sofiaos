@@ -2,7 +2,7 @@ name: Sofia Android 0.3.33 acceptance recheck
 on:
   push:
     branches: [work/sofia-native-030]
-    paths: [.github/workflows/sofia-native-033-recheck.yml, tools/release033/native-033-smoke.py, tools/release033/qa.tsx.fixture]
+    paths: [.github/workflows/sofia-native-033-recheck.yml, tools/release033/native-033-smoke.py, tools/release033/qa.tsx.fixture, tools/release033/native-full-smoke.py]
 permissions:
   contents: write
   actions: read
@@ -22,13 +22,14 @@ jobs:
       - name: Preserve revised test setup and use exact built source
         run: |
           cp tools/release033/native-033-smoke.py /tmp/native-033-smoke.py
+          cp tools/release033/native-full-smoke.py /tmp/native-full-smoke.py
           cp tools/release033/qa.tsx.fixture /tmp/qa.tsx.fixture
           git rev-parse HEAD > /tmp/ACCEPTANCE_COMMIT.txt
-          git checkout --detach 82022350663e6a8e95e347468074a025cb0fb69d
+          git checkout --detach f880c09bda7a6eef05be1cb226b51781ebd24ef9
       - uses: actions/download-artifact@v4
         with:
-          name: Sofia-Android-0.3.33-checked
-          run-id: 37234396243
+          name: Sofia-Android-0.3.33
+          run-id: 37239151622
           github-token: ${{ github.token }}
           path: SOFIA_APP/dist
       - name: Verify unchanged APK and retain test audit
@@ -37,12 +38,38 @@ jobs:
           sha256sum --check dist/Sofia-OS.apk.sha256
           test "$(cat dist/SOURCE_COMMIT.txt)" = "$(git rev-parse HEAD)"
           cp /tmp/native-033-smoke.py dist/native-033-smoke.py
+          cp /tmp/native-full-smoke.py dist/native-full-smoke.py
           cp /tmp/ACCEPTANCE_COMMIT.txt dist/ACCEPTANCE_COMMIT.txt
           cp /tmp/qa.tsx.fixture dist/QA-fixture.tsx.fixture
-          mv dist/release033-evidence dist/attempt-2-release033-evidence
+          if [ -d dist/release033-evidence ]; then mv dist/release033-evidence dist/attempt-6-release033-evidence; fi
+          if [ -d dist/full-app-evidence ]; then mv dist/full-app-evidence dist/attempt-6-full-app-evidence; fi
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build diagnostic QA only with a cold-start-safe alarm deadline
+        working-directory: SOFIA_APP
+        run: |
+          npm ci
+          npm install --prefix /tmp/sofia-icon-tools --no-save --package-lock=false sharp@0.34.1
+          NODE_PATH=/tmp/sofia-icon-tools/node_modules npm run prepare-assets
+          cp App.tsx ProductionApp.tsx
+          cp /tmp/qa.tsx.fixture App.tsx
+          npm run check
+          npx expo prebuild --platform android --clean --no-install
+          cd android
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon --max-workers=2 -PreactNativeArchitectures=x86_64
+          cd ..
+          cp android/app/build/outputs/apk/release/app-release.apk dist/QA-ONLY-full-fixture.apk
+          cp ProductionApp.tsx App.tsx
+          rm ProductionApp.tsx
+          git restore -- assets
+          sha256sum --check dist/Sofia-OS.apk.sha256
       - name: Install screenshot comparison tool
         run: python3 -m pip install Pillow==12.3.0
       - name: Enable KVM
@@ -67,7 +94,7 @@ jobs:
             cd SOFIA_APP && python3 /tmp/native-033-smoke.py
             adb shell am force-stop com.avsord.sofiaapp
             adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
-            cd SOFIA_APP && python3 tools/native-full-smoke.py
+            cd SOFIA_APP && python3 /tmp/native-full-smoke.py
       - name: Publish exact checked production APK
         working-directory: SOFIA_APP
         run: node tools/publish-release.cjs

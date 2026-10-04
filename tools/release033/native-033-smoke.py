@@ -95,6 +95,33 @@ for _ in range(50):
  if find(tree(),'Notificacao nativa Sofia') is not None:break
  time.sleep(.7)
 wait('Notificacao nativa Sofia');snapshot('notification-while-backgrounded');tap('Notificacao nativa Sofia');wait('Fechar editor');snapshot('notification-opened-agenda');tap('Fechar editor');tap('Início')
+# Sending disables the input briefly, which can hide the IME. Verify growth first, then explicitly reopen the keyboard.
+tap('Conversa');tap('Mensagem para a Sofia');adb('shell','input','text','Teste%srolagem');tap('Enviar mensagem');wait('Sofia: FIM DA RESPOSTA QA');time.sleep(5)
+tail=box(wait('Sofia: FIM DA RESPOSTA QA'));composer=box(wait('chat-composer'));assert tail[3]<=composer[1]+3 and tail[3]>tail[1],(tail,composer);snapshot('chat-follows-growing-reply')
+# Confirm the real Android IME is visible before testing keyboard geometry and dismissal.
+tap('Mensagem para a Sofia');time.sleep(1)
+ime=adb('shell','dumpsys','input_method').decode();windows=adb('shell','dumpsys','window').decode()
+(out/'chat-keyboard-input-method.txt').write_text(ime);(out/'chat-keyboard-window.txt').write_text(windows)
+assert re.search(r'mInputShown=true|mIsInputViewShown=true',ime),'IME must report its input shown'
+frames=[]
+for line in windows.splitlines():
+ if ('ITYPE_IME' in line or 'type=ime' in line) and 'visible=true' in line:
+  match=re.search(r'frame=\[(\d+),(\d+)\]\[(\d+),(\d+)\]',line)
+  if match:
+   bounds=list(map(int,match.groups()))
+   if bounds[3]>bounds[1] and bounds[1]>0:frames.append(bounds)
+assert frames,'Visible IME frame must be present'
+keyboard_top=min(b[1] for b in frames)
+tail=box(wait('Sofia: FIM DA RESPOSTA QA'));composer=box(wait('chat-composer'))
+assert tail[3]<=composer[1]+3 and tail[3]>tail[1] and composer[3]<=keyboard_top+3,(tail,composer,keyboard_top)
+keyboard_geometry={'tail':tail,'composer':composer,'ime_frames':frames}
+snapshot('chat-follows-growing-reply-keyboard')
+back();time.sleep(.4);tail=box(wait('Sofia: FIM DA RESPOSTA QA'));composer=box(wait('chat-composer'));assert tail[3]<=composer[1]+3;snapshot('chat-follows-keyboard-close')
+# Read older messages deliberately, then sending must resume following.
+for _ in range(3):swipe(340,430,340,1100,250)
+tap('Mensagem para a Sofia');adb('shell','input','text','Voltar%sao%sfim');tap('Enviar mensagem');wait('Você: Voltar ao fim');snapshot('chat-send-resumes-following')
+(out/'chat-scroll-geometry.json').write_text(json.dumps({'tail':tail,'composer':composer,'keyboard':keyboard_geometry,'passed':True}))
+tap('Início')
 # New requirement: selecting another month/day resets on leaving either calendar.
 home_today=days(tree());tap('Próximo mês');assert days(tree())!=home_today
 for label in ['Conversa','Páginas','Apps','Início']:tap(label)
@@ -130,32 +157,6 @@ tap('Teste principal');snapshot('page-open');tap('Voltar');wait('Teste principal
 # Full-page editor has an opaque, immediate surface; task editing remains usable.
 tap('Apps');tap('Tarefas');wait('Editar tarefa Projeto urgente');tap('Editar tarefa Projeto urgente');wait('Título');snapshot('task-editor-opaque');back()
 tap('Perfil');tap('Configurações do aplicativo');scroll_to('Notificações da agenda');snapshot('notification-settings')
-# Sending disables the input briefly, which can hide the IME. Verify growth first, then explicitly reopen the keyboard.
-tap('Conversa');tap('Mensagem para a Sofia');adb('shell','input','text','Teste%srolagem');tap('Enviar mensagem');wait('Sofia: FIM DA RESPOSTA QA');time.sleep(5)
-tail=box(wait('Sofia: FIM DA RESPOSTA QA'));composer=box(wait('chat-composer'));assert tail[3]<=composer[1]+3 and tail[3]>tail[1],(tail,composer);snapshot('chat-follows-growing-reply')
-# Confirm the real Android IME is visible before testing keyboard geometry and dismissal.
-tap('Mensagem para a Sofia');time.sleep(1)
-ime=adb('shell','dumpsys','input_method').decode();windows=adb('shell','dumpsys','window').decode()
-(out/'chat-keyboard-input-method.txt').write_text(ime);(out/'chat-keyboard-window.txt').write_text(windows)
-assert re.search(r'mInputShown=true|mIsInputViewShown=true',ime),'IME must report its input shown'
-frames=[]
-for line in windows.splitlines():
- if ('ITYPE_IME' in line or 'type=ime' in line) and 'visible=true' in line:
-  match=re.search(r'frame=\[(\d+),(\d+)\]\[(\d+),(\d+)\]',line)
-  if match:
-   bounds=list(map(int,match.groups()))
-   if bounds[3]>bounds[1] and bounds[1]>0:frames.append(bounds)
-assert frames,'Visible IME frame must be present'
-keyboard_top=min(b[1] for b in frames)
-tail=box(wait('Sofia: FIM DA RESPOSTA QA'));composer=box(wait('chat-composer'))
-assert tail[3]<=composer[1]+3 and tail[3]>tail[1] and composer[3]<=keyboard_top+3,(tail,composer,keyboard_top)
-keyboard_geometry={'tail':tail,'composer':composer,'ime_frames':frames}
-snapshot('chat-follows-growing-reply-keyboard')
-back();time.sleep(.4);tail=box(wait('Sofia: FIM DA RESPOSTA QA'));composer=box(wait('chat-composer'));assert tail[3]<=composer[1]+3;snapshot('chat-follows-keyboard-close')
-# Read older messages deliberately, then sending must resume following.
-for _ in range(3):swipe(340,430,340,1100,250)
-tap('Mensagem para a Sofia');adb('shell','input','text','Voltar%sao%sfim');tap('Enviar mensagem');wait('Você: Voltar ao fim');snapshot('chat-send-resumes-following')
-(out/'chat-scroll-geometry.json').write_text(json.dumps({'tail':tail,'composer':composer,'keyboard':keyboard_geometry,'passed':True}))
 logs=adb('logcat','-d','-s','ReactNativeJS:E','AndroidRuntime:E').decode();(out/'native-errors.txt').write_text(logs);assert 'FATAL EXCEPTION' not in logs and 'TypeError' not in logs,logs
 (out/'result.json').write_text(json.dumps({'passed':True,'scenarios':checks,'synthetic_transport':True,'native_notification_delivered_in_background':True,'page_pixel_comparison':True},indent=2))
 print('PASS 033: current calendar on reentry, home priority filter, recurring events, native notifications and page transitions')
