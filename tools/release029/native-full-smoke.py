@@ -9,7 +9,11 @@ def tree():
  adb('shell','uiautomator','dump','/sdcard/full.xml')
  return ET.fromstring(adb('shell','cat','/sdcard/full.xml'))
 def find(root,label):
- return next((n for n in reversed(list(root.iter('node'))) if (n.get('content-desc')==label or n.get('text')==label or n.get('resource-id','').endswith(label)) and n.get('bounds')!='[0,0][0,0]'),None)
+ nodes=[n for n in reversed(list(root.iter('node'))) if n.get('bounds')!='[0,0][0,0]']
+ for attr in ['content-desc','resource-id','text']:
+  for n in nodes:
+   if n.get(attr)==label or (attr=='resource-id' and n.get(attr,'').endswith(label)):return n
+ return None
 def wait(label):
  for _ in range(12):
   root=tree();n=find(root,label)
@@ -53,7 +57,7 @@ adb('shell','mkdir','-p','/sdcard/Download')
 fixture=out/'Sofia-QA.txt';fixture.write_text('Arquivo sintetico para verificar anexos.')
 adb('push',str(fixture),'/sdcard/Download/Sofia-QA.txt')
 adb('shell','am','broadcast','-a','android.intent.action.MEDIA_SCANNER_SCAN_FILE','-d','file:///sdcard/Download/Sofia-QA.txt')
-tap('Anexar arquivo');tap('Documentos');time.sleep(1)
+tap('Anexar arquivo');tap('Documentos');time.sleep(1);snapshot('24b-document-picker')
 root=tree()
 if find(root,'Sofia-QA.txt') is None:
  tap('Show roots');tap('Downloads')
