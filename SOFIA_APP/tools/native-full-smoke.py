@@ -97,7 +97,10 @@ for module,label,stem in [('Biblioteca','Livro preservado','library'),('Listas',
  metrics=[]
  for frame_id in range(3):
   pixels=adb('exec-out','screencap','-p');(out/f'08c-{stem}-return-{frame_id}.png').write_bytes(pixels);frame=Image.open(io.BytesIO(pixels)).convert('RGB');crop=(0,280,720,1300);diff=ImageChops.difference(reference.crop(crop),frame.crop(crop));fraction=sum(max(p)>12 for p in diff.getdata())/(720*1020);metrics.append(fraction);assert fraction<.015,(module,'content flashed',fraction)
- wait(label);(out/(stem+'-reentry-pixels.json')).write_text(json.dumps(metrics));back();wait('Seus espaços')
+ wait(label);(out/(stem+'-reentry-pixels.json')).write_text(json.dumps(metrics))
+ if module=='Biblioteca':
+  wait('Tudo');wait('Documento preservado');tap('Tipo de registro');tap('Livro');wait('Livro preservado');assert find(tree(),'Documento preservado') is None;snapshot('08d-library-filtered');tap('Tipo de registro');tap('Tudo');wait('Livro preservado');wait('Documento preservado');snapshot('08e-library-all');tap('Criar registro');wait('Novo registro na Biblioteca');wait('Criar Livro');wait('Criar Documento');snapshot('08f-library-create-types');back()
+ back();wait('Seus espaços')
 # Real tree and parent navigation, opening grandchild directly from root.
 tap('Páginas');wait('Abrir página principal Teste principal');tap('Expandir subpáginas de Teste principal');tap('Expandir subpáginas de Teste filha');tap('Abrir subpágina Teste neta');wait('Título da página');snapshot('09-direct-grandchild');back();wait('Abrir subpágina Teste neta');root=snapshot('10-back-to-parent');assert find(root,'Título da página').get('text')=='Teste filha'
 back();wait('Abrir subpágina Teste filha');root=snapshot('11-back-to-grandparent');assert find(root,'Título da página').get('text')=='Teste principal';back();wait('Criar página')

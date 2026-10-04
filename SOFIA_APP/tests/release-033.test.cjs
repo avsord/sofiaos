@@ -35,3 +35,9 @@ test('late module responses cannot replace another category or a newer request',
  const cache=new WorkspaceRecords(),pending=[],api={entities:kind=>new Promise(resolve=>pending.push({kind,resolve}))};const old=cache.load(api,'book','',()=>{}),other=cache.load(api,'course','',()=>{}),fresh=cache.load(api,'book','',()=>{});
  pending[2].resolve({items:[{id:'new'}]});await fresh;pending[1].resolve({items:[{id:'course1'}]});await other;pending[0].resolve({items:[{id:'stale'}]});await old;assert.equal(cache.view('book','').items[0].id,'new');assert.equal(cache.view('course','').items[0].id,'course1');assert.equal(cache.view('book','query').loaded,false);
 });
+
+test('Library Tudo requests the complete library group, with search and pagination, independently of type filters',async()=>{
+ const cache=new WorkspaceRecords(),calls=[],api={library:async(q,offset)=>{calls.push(['library',q,offset]);return {items:offset?[{id:'last',kind:'recipe'}]:Array.from({length:100},(_,i)=>({id:'item'+i,kind:i%2?'music':'reading'}))};},entities:async(kind,q,offset)=>{calls.push([kind,q,offset]);return {items:[{id:'only',kind}]};}};
+ await cache.load(api,'@library','',()=>{});assert.equal(cache.view('@library','').items.length,100);await cache.load(api,'@library','',()=>{},true);assert.equal(cache.view('@library','').items.length,101);assert.equal(calls[1][2],100);
+ await cache.load(api,'reading','',()=>{});assert.equal(cache.view('reading','').items.length,1);assert.equal(cache.view('@library','').items.length,101);await cache.load(api,'@library','ref',()=>{});assert.deepEqual(calls.at(-1),['library','ref',0]);
+});
