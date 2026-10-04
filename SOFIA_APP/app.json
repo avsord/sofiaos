@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sofia OS",
     "slug": "sofia-app",
-    "version": "0.3.26",
+    "version": "0.3.27",
     "scheme": "sofiaapp",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.avsord.sofiaapp",
-      "versionCode": 31,
+      "versionCode": 32,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.RECORD_AUDIO"
@@ -44,7 +44,8 @@
           "photosPermission": "Escolha uma imagem para a capa da página.",
           "cameraPermission": false
         }
-      ]
+      ],
+      "./plugins/with-sofia-logo.cjs"
     ]
   }
 }

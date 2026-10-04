@@ -82,7 +82,7 @@ function Shell(){
   while(tabHistory.current.length){const previous=tabHistory.current.pop()!;if(previous!==current.tab){switchTab(previous);return true;}}
   if(current.tab!=='home'&&auth){switchTab('home');return true;}return false;
  },[auth,switchTab]);
- useEffect(()=>{const s=BackHandler.addEventListener('hardwareBackPress',()=>tab==='apps'&&workspaceDepth?false:goBack());return()=>s.remove();},[tab,workspaceDepth,goBack]);
+ useEffect(()=>{const s=BackHandler.addEventListener('hardwareBackPress',()=>(tab==='apps'&&workspaceDepth)||(tab==='pages'&&pagesDepth)?false:goBack());return()=>s.remove();},[tab,workspaceDepth,pagesDepth,goBack]);
  const login=useCallback(async(a:Auth)=>{await saveAuth(a);tabHistory.current=[];setAuth(a);switchTab('home');setError('');},[switchTab]);
  const changePrefs=useCallback(async(p:Prefs)=>{await savePrefs(p);setPrefs(p);},[]);
  const logout=useCallback(async()=>{void silenceVoices();let revokeFailed=false;try{await api.logout();}catch{revokeFailed=true;}try{await forgetAuth();}catch{Alert.alert('Armazenamento','Não foi possível apagar a cópia local da sessão. Limpe os dados do aplicativo antes de compartilhar o aparelho.');}tabHistory.current=[];setAuth(null);setBootstrap(null);setLocked(false);if(revokeFailed)Alert.alert('Você saiu deste aparelho','Não foi possível confirmar a revogação no servidor. Use “Encerrar todas as sessões” no site para invalidá-la antes da expiração.');},[api]);

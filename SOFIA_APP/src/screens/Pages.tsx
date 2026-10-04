@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
-import {View,Text,ScrollView,TextInput,Pressable,Switch,Alert,RefreshControl,BackHandler,AppState,Keyboard,Image,Animated,PanResponder} from 'react-native';
+import {View,Text,ScrollView,TextInput,Pressable,Switch,Alert,RefreshControl,BackHandler,AppState,Keyboard,Image,Animated,PanResponder,Dimensions} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {SofiaApi,SITE} from '../lib/api';
 import type {Entity} from '../lib/types';
@@ -11,6 +11,7 @@ import {pageBodyIsEmpty,pageBlockHint,pageTitleHint} from '../lib/page-hints';
 import {Empty,ErrorBanner,IconButton,ScreenTitle} from '../components/UI';
 import {PageRefreshGuard} from '../lib/page-gesture';
 import {mergeRemotePages} from '../lib/page-sync';
+import {pageBackTarget,shouldBeginPageBack} from '../lib/page-navigation';
 import {Icon} from '../components/Icon';
 import {PageCover,PageAppearance,PAGE_COVERS} from '../components/PageAppearance';
 import {PageTreeList} from '../components/PageTreeList';
@@ -39,9 +40,10 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  function endPageTouch(){if(!pageInteractionRef.current)return;changePageInteraction(false);setPageDragging(false);}
  function refreshPages(){if(refreshGuard.current.canRefresh()&&!selectedRef.current)void load(true);}
  selectedRef.current=selectedId;
+ const editingRef=useRef(false);editingRef.current=!!focus;
  const pageBackResponder=useMemo(()=>PanResponder.create({
-  onMoveShouldSetPanResponder:(_e,g)=>!pageInteractionRef.current&&!!selectedRef.current&&g.dx>8&&Math.abs(g.dx)>Math.abs(g.dy)*1.15,
-  onMoveShouldSetPanResponderCapture:(_e,g)=>!pageInteractionRef.current&&!!selectedRef.current&&g.dx>8&&Math.abs(g.dx)>Math.abs(g.dy)*1.15,
+  onMoveShouldSetPanResponder:(_e,g)=>!!selectedRef.current&&shouldBeginPageBack(g,paneWidth.current||Dimensions.get('window').width,Dimensions.get('window').width,editingRef.current,pageInteractionRef.current),
+  onMoveShouldSetPanResponderCapture:(_e,g)=>!!selectedRef.current&&shouldBeginPageBack(g,paneWidth.current||Dimensions.get('window').width,Dimensions.get('window').width,editingRef.current,pageInteractionRef.current),
   onPanResponderGrant:()=>backX.stopAnimation(),
   onPanResponderMove:(_e,g)=>backX.setValue(Math.max(0,Math.min(paneWidth.current||420,g.dx))),
   onPanResponderRelease:(_e,g)=>{
@@ -122,8 +124,8 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   finally{if(mounted.current)setMovingId(null);}
  }
  function open(page:Entity,push=true){if(selectedId){void store.flush(selectedId);if(push&&selectedId!==page.id)history.current.push(selectedId);}store.open(pages.find(p=>p.id===page.id)||page);setSelectedId(page.id);setFocus(null);setAppearance(null);setError('');}
- function back(){if(selectedId)void store.flush(selectedId);setFocus(null);setAppearance(null);let id=history.current.pop();while(id&&!byId.has(id))id=history.current.pop();if(id)open(byId.get(id)!,false);else setSelectedId(null);} backAction.current=back;
- useEffect(()=>{if(!active)return;const sub=BackHandler.addEventListener('hardwareBackPress',()=>{if(!selectedId)return false;back();return true;});return()=>sub.remove();},[active,selectedId,byId,store]);
+ function back(){if(selectedId)void store.flush(selectedId);setFocus(null);setAppearance(null);const parent=pageBackTarget(byId,selectedId);history.current=[];if(parent&&parent!==selectedId&&byId.has(parent))open(byId.get(parent)!,false);else setSelectedId(null);} backAction.current=back;
+ useEffect(()=>{if(!active)return;const sub=BackHandler.addEventListener('hardwareBackPress',()=>{if(pageInteractionRef.current)return true;if(!selectedId)return false;back();return true;});return()=>sub.remove();},[active,selectedId,byId,store]);
  function edit(change:(draft:PageDraft)=>PageDraft,group=''){if(selectedId)store.edit(selectedId,change,group);}
  async function create(parent?:Entity,template?:PageTemplate){mutationEpoch.current++;try{
   const preset=template?freshTemplate(template):null;
@@ -183,7 +185,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   onBlank={()=>void create(createParent||undefined)} onTemplate={template=>selectedId?applyTemplate(template):void create(undefined,template)}/>;
  if(!entry)return <View style={{flex:1}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{listView}{createPicker}</View>;
  const draft=entry.draft,selected={...entry.base,data:{...entry.base.data,...draft.appearance}},subpages=children.get(selected.id)||[];
- const previousId=[...history.current].reverse().find(id=>byId.has(id))||null;
+ const previousId=pageBackTarget(byId,selected.id);
  const previousEntry=previousId?store.get(previousId):undefined;
  const previousPage=previousId?byId.get(previousId):undefined;
  const path:Entity[]=[];let cur:Entity|undefined=selected;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&path.length<40){seen.add(cur.id);path.unshift(cur);cur=byId.get(String(cur.data?.parent_id||''));}
@@ -243,7 +245,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   {appearance?<PageAppearance key={selected.id+appearance} api={api} pageId={selected.id} kind={appearance} onClose={()=>setAppearance(null)} onApply={patch=>{store.edit(selected.id,d=>({...d,appearance:{...d.appearance,...patch}}));void store.flush(selected.id);}}/>:null}
  </View>;
  return <View style={{flex:1,backgroundColor:c.bg}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>
-  {previousBackdrop}
+  <View style={{flex:1}} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">{previousBackdrop}</View>
   <Animated.View {...pageBackResponder.panHandlers} style={{position:'absolute',left:0,right:0,top:0,bottom:0,backgroundColor:c.bg,transform:[{translateX:backX}]}}>
    {editor}
   </Animated.View>
