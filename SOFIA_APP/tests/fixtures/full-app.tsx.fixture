@@ -49,7 +49,11 @@ globalThis.fetch=(async(input:any,init:any={})=>{
   if(method==='PATCH'){if(body.revision!==item.revision)return response({error:'Revision conflict'},409);Object.assign(item,{...body,data:{...item.data,...body.data},revision:item.revision+1});}
   return response(item);
  }
- if(p==='/messages'&&method==='POST'){messages.push({id:body.client_message_id,client_id:body.client_message_id,role:'user',content:body.message,status:'sent',created_at:new Date().toISOString()});return response({conversation_id:conversation.id,messages,has_more:false,reply:''});}
+ if(p==='/messages'&&method==='POST'){messages.push({id:body.client_message_id,client_id:body.client_message_id,role:'user',content:body.message,status:'sent',created_at:new Date().toISOString()});if(body.message==='Teste rolagem'){
+ for(let i=0;i<30;i++)messages.push({id:'scroll-'+i,role:'assistant',content:'Trecho '+i+' da resposta longa. A conversa deve acompanhar o crescimento.',status:'sent',created_at:new Date().toISOString()});
+ messages.push({id:'scroll-tail',role:'assistant',content:'FIM DA RESPOSTA QA',status:'sent',created_at:new Date().toISOString()});
+ setTimeout(()=>{const preceding=messages.find(m=>m.id==='scroll-29');if(preceding)preceding.content+='\n'+Array.from({length:24},(_,i)=>'Continuacao '+i+' recebida da Sofia.').join('\n');},1800);
+ }return response({conversation_id:conversation.id,messages,has_more:false,reply:''});}
  if(p.startsWith('/chat-sync'))return response({conversation,messages,has_more:false,deleted_ids:[],current_id:conversation.id,cursor_revision:1});
  if(p==='/conversations')return response({items:[conversation],has_more:false});
  if(p==='/profile')return response({profile:{...profile,...body}});

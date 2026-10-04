@@ -115,6 +115,14 @@ tap('Teste principal');snapshot('page-open');tap('Voltar');wait('Teste principal
 # Full-page editor has an opaque, immediate surface; task editing remains usable.
 tap('Apps');tap('Tarefas');wait('Editar tarefa Projeto urgente');tap('Editar tarefa Projeto urgente');wait('Título');snapshot('task-editor-opaque');back()
 tap('Perfil');tap('Configurações do aplicativo');scroll_to('Notificações da agenda');snapshot('notification-settings')
+# Long replies and later reply growth stay visible above the real keyboard.
+tap('Conversa');tap('Mensagem para a Sofia');adb('shell','input','text','Teste%srolagem');tap('Enviar mensagem');wait('Sofia: FIM DA RESPOSTA QA');time.sleep(5)
+tail=box(wait('Sofia: FIM DA RESPOSTA QA'));composer=box(wait('chat-composer'));assert tail[3]<=composer[1]+3 and tail[3]>tail[1],(tail,composer);snapshot('chat-follows-growing-reply-keyboard')
+back();time.sleep(.4);tail=box(wait('Sofia: FIM DA RESPOSTA QA'));composer=box(wait('chat-composer'));assert tail[3]<=composer[1]+3;snapshot('chat-follows-keyboard-close')
+# Read older messages deliberately, then sending must resume following.
+for _ in range(3):swipe(340,430,340,1100,250)
+tap('Mensagem para a Sofia');adb('shell','input','text','Voltar%sao%sfim');tap('Enviar mensagem');wait('Você: Voltar ao fim');snapshot('chat-send-resumes-following');back()
+(out/'chat-scroll-geometry.json').write_text(json.dumps({'tail':tail,'composer':composer,'passed':True}))
 logs=adb('logcat','-d','-s','ReactNativeJS:E','AndroidRuntime:E').decode();(out/'native-errors.txt').write_text(logs);assert 'FATAL EXCEPTION' not in logs and 'TypeError' not in logs,logs
 (out/'result.json').write_text(json.dumps({'passed':True,'scenarios':checks,'synthetic_transport':True,'native_notification_delivered_in_background':True,'page_pixel_comparison':True},indent=2))
 print('PASS 033: current calendar on reentry, home priority filter, recurring events, native notifications and page transitions')
