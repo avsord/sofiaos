@@ -1,0 +1,19 @@
+'use strict';
+const {withDangerousMod}=require('expo/config-plugins');
+const fs=require('fs'),path=require('path');
+module.exports=config=>withDangerousMod(config,['android',async c=>{
+ const res=path.join(c.modRequest.platformProjectRoot,'app/src/main/res');
+ const svg=fs.readFileSync(path.join(c.modRequest.projectRoot,'assets/adaptive-foreground.svg'),'utf8');
+ const d=svg.match(/<path d="([^"]+)"/)[1];
+ const vector=background=>`<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="96" android:viewportHeight="96">${background?'<path android:fillColor="#7258E8" android:pathData="M0,0h96v96h-96z"/>':''}<path android:fillColor="#00000000" android:strokeColor="#24FFFFFF" android:strokeWidth="0.65" android:pathData="M48,6.5 A41.5,41.5 0,1 1,47.99,6.5 Z"/><group android:scaleX="0.0256689159" android:scaleY="-0.0256757730" android:translateX="29.02543638" android:translateY="64.14633546"><path android:fillColor="#FFFFFF" android:pathData="${d}"/></group></vector>`;
+ const write=(rel,data)=>{const p=path.join(res,rel);fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileSync(p,data);};
+ write('drawable/sofia_logo.xml',vector(true));write('drawable/sofia_logo_foreground.xml',vector(false));
+ for(const folder of fs.readdirSync(res).filter(x=>x.startsWith('drawable-'))){const p=path.join(res,folder,'splashscreen_logo.png');if(fs.existsSync(p))fs.unlinkSync(p);}
+ write('drawable/splashscreen_logo.xml','<layer-list xmlns:android="http://schemas.android.com/apk/res/android"><item android:drawable="@color/activityBackground"/><item android:width="192dp" android:height="192dp" android:gravity="center" android:drawable="@drawable/sofia_logo"/></layer-list>');
+ // The launch icon is a vector at every scale; the OS keeps its standard animation.
+ write('values-v31/sofia-splash.xml','<resources><style name="Theme.App.SplashScreen" parent="AppTheme"><item name="android:windowBackground">@drawable/splashscreen_logo</item><item name="android:windowSplashScreenBackground">@color/activityBackground</item><item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_logo</item></style></resources>');
+ for(const name of ['ic_launcher.xml','ic_launcher_round.xml']){const p=path.join(res,'mipmap-anydpi-v26',name);if(fs.existsSync(p))fs.writeFileSync(p,fs.readFileSync(p,'utf8').replace('@mipmap/ic_launcher_foreground','@drawable/sofia_logo_foreground'));}
+ // The generated legacy background must not treat the vector/layer-list as a bitmap.
+ write('drawable/ic_launcher_background.xml','<layer-list xmlns:android="http://schemas.android.com/apk/res/android"><item android:drawable="@color/iconBackground"/></layer-list>');
+ return c;
+}]);
