@@ -35,7 +35,15 @@ a=box(wait('agenda-calendar-half'));b=box(wait('agenda-items-half'));assert b[0]
 x,y,r,b=box(wait('agenda-calendar-half'))
 month_before=ET.tostring(tree(),encoding='unicode')
 before_days={n.get('content-desc') for n in tree().iter('node') if n.get('resource-id','').startswith('agenda-day-')}
-swipe(x+40,y+100,r-40,y+100,900);time.sleep(1)
+for attempt in range(3):
+ sx=x+40;ex=r-40;sy=y+110
+ adb('shell','input','motionevent','DOWN',str(sx),str(sy));time.sleep(.1)
+ for step in range(1,13):
+  adb('shell','input','motionevent','MOVE',str(round(sx+(ex-sx)*step/12)),str(sy));time.sleep(.04)
+ adb('shell','input','motionevent','UP',str(ex),str(sy));time.sleep(.8)
+ current_days={n.get('content-desc') for n in tree().iter('node') if n.get('resource-id','').startswith('agenda-day-')}
+ if current_days!=before_days:break
+snapshot('01b-month-gesture-result')
 after_days={n.get('content-desc') for n in tree().iter('node') if n.get('resource-id','').startswith('agenda-day-')}
 assert before_days and after_days and before_days!=after_days,'Calendar swipe must change month'
 wait('Início');snapshot('01b-month-swipe');tap('Voltar ao dia de hoje');wait('Consulta de hoje')
