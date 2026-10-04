@@ -10,7 +10,7 @@ permissions:
   contents: write
 concurrency:
   group: sofia-android-release
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   release:
     runs-on: ubuntu-latest
