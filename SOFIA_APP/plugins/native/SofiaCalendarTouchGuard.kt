@@ -23,7 +23,7 @@ internal class SofiaCalendarTouchGuard {
       while (ancestor != null) {
         if (ancestor is ReactHorizontalScrollView) {
           pager = ancestor
-          wasEnabled = ancestor.getScrollEnabled()
+          wasEnabled = ancestor.scrollEnabled
           break
         }
         ancestor = ancestor.parent
