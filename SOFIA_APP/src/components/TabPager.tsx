@@ -90,7 +90,7 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
       onContentSizeChange={contentLayout} style={[styles.fill,{opacity:readyWidth===width?1:0}]}
       contentContainerStyle={[styles.row,{width:width*TAB_ORDER.length}]}>
       {React.Children.map(children,(child,index) => <View key={TAB_ORDER[index]} collapsable={false}
-        style={[styles.page,{width}]} accessibilityElementsHidden={activeTab !== TAB_ORDER[index]}
+        style={[styles.page,{width}]} pointerEvents={activeTab===TAB_ORDER[index]?'auto':'none'} accessibilityElementsHidden={activeTab !== TAB_ORDER[index]}
         importantForAccessibility={activeTab === TAB_ORDER[index] ? 'auto' : 'no-hide-descendants'}>{child}</View>)}
     </Animated.ScrollView>:null}
   </View>;

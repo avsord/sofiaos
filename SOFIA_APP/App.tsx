@@ -1,3 +1,4 @@
+import {useAgendaNotifications} from './src/lib/agenda-notifications';
 import React,{Component,ErrorInfo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {View,Text,StatusBar,ActivityIndicator,AccessibilityInfo,useColorScheme,AppState,Alert,Keyboard,BackHandler,Linking,StyleSheet} from 'react-native';
 import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
@@ -77,6 +78,7 @@ function Shell(){
   tabHistory.current=[...tabHistory.current,current.tab].slice(-30);switchTab(next);
  },[switchTab]);
  const openAgenda=useCallback((date:string,id?:string)=>{setAgendaTarget({date,id,nonce:Date.now()});navigate('agenda');},[navigate]);
+ useAgendaNotifications(api,auth?.profile.email||'',ready?!!auth:null,openAgenda);
  const goBack=useCallback(()=>{
   const current=navigation.current;
   if(current.locked){Alert.alert('Sua conversa','Pare a gravação ou aguarde a resposta.');return true;}

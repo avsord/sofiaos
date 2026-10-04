@@ -1,3 +1,4 @@
+import {expandAgenda,eventStart,readRepeat} from '../lib/agenda-recurrence';
 import {useAgendaView} from '../lib/agenda-view';
 import {MotionModal} from './MotionModal';
 import React,{useMemo,useState} from 'react';
@@ -8,8 +9,9 @@ import {localDateKey,monthCells,priceGeometry} from '../lib/dashboard';
 import {useTheme} from '../lib/theme';
 import {Button,IconButton} from './UI';
 import {MonthSwipe} from './MonthSwipe';
-export function MiniAgenda({items,onOpen,onItem,onGestureLock,viewOwner}:{viewOwner:object;onGestureLock?:(locked:boolean)=>void;items:DayRecord[];onOpen:(day:string)=>void;onItem:(item:DayRecord)=>void}){
- const c=useTheme(),{month,setMonth,selected,setSelected}=useAgendaView(viewOwner,'home');
+export function MiniAgenda({items,onOpen,onItem,onGestureLock,viewOwner,active=true}:{active?:boolean;viewOwner:object;onGestureLock?:(locked:boolean)=>void;items:DayRecord[];onOpen:(day:string)=>void;onItem:(item:DayRecord)=>void}){
+ const c=useTheme(),{month,setMonth,selected,setSelected}=useAgendaView(viewOwner,'home',active);
+ items=items.flatMap(record=>record.isTask||!record.original||readRepeat(record.original as import('../lib/types').AgendaItem).frequency==='none'?[record]:expandAgenda([record.original as import('../lib/types').AgendaItem],month).map(event=>({...record,id:record.id+eventStart(event),date:eventStart(event),original:event})));
  const dates=useMemo(()=>new Set(items.map(item=>localDateKey(item.date))),[items]),chosen=items.filter(i=>localDateKey(i.date)===selected);
  const today=()=>{const now=new Date();setMonth(new Date(now.getFullYear(),now.getMonth(),1));setSelected(localDateKey(now));};
  return <View testID="mini-agenda" style={{padding:14,borderRadius:22,borderWidth:1,borderColor:c.line,backgroundColor:c.surface,gap:10}}>

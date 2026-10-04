@@ -10,11 +10,11 @@ const expires_at='2050-01-01T00:00:00Z';
 const make=(id:string,title:string,parent=''):Entity=>({id,title,kind:'user_page',content:'',area:'Pessoal',state:'active',privacy:'private',tags:[],revision:1,data:{parent_id:parent,icon:'📄',blocks_json:'[]'}});
 let pages=[make('parent','Teste principal'),make('other','Outra pagina'),make('child','Teste filha','parent'),make('grandchild','Teste neta','child')];
 const longParent=make('long-parent','Pagina longa');longParent.data={...longParent.data,cover_type:'color',cover_value:'#DAD2FF',blocks_json:JSON.stringify([{id:'long-body',type:'text',text:Array.from({length:28},(_,i)=>'Linha '+(i+1)+' da pagina longa.').join('\n')}])};pages.push(longParent,make('long-child','Filha da pagina longa','long-parent'));
-let moves=0,deletes=0,uploads=0,taskDelay=0;
+let moves=0,deletes=0,uploads=0,taskDelay=1600;
 const today=new Date();today.setHours(10,0,0,0);const tomorrow=new Date(today);tomorrow.setDate(tomorrow.getDate()+1);
-const events:Entity[]=[{...make('event1','Consulta de hoje'),kind:'commitment',data:{start_at:today.toISOString()}},{...make('event2','Compromisso de amanha'),kind:'commitment',data:{start_at:tomorrow.toISOString()}}];
+const events:Entity[]=[{...make('native-notice','Notificacao nativa Sofia'),kind:'commitment',state:'planned',data:{start_at:new Date(Date.now()+20000).toISOString()}},{...make('event1','Consulta de hoje'),kind:'commitment',data:{start_at:today.toISOString()}},{...make('event2','Compromisso de amanha'),kind:'commitment',data:{start_at:tomorrow.toISOString()}}];
 let notices=[{id:'notice1',title:'Lembrete da agenda',body:'Seu compromisso está confirmado.',state:'unread',category:'agenda',created_at:new Date().toISOString()},{id:'notice2',title:'Preço acompanhado',body:'O histórico de preço foi atualizado.',state:'unread',category:'price',created_at:new Date(Date.now()-86400000).toISOString()}];
-const tasks:import('./src/lib/types').Task[]=[{id:'task1',title:'Tarefa de hoje',state:'todo',revision:1,due_at:today.toISOString(),area:'Pessoal'}];
+const tasks:import('./src/lib/types').Task[]=['important','medium','light','none'].map((priority_level,i)=>({id:'filter'+i,title:['Projeto urgente','Estudar curso','Organizar casa','Ler livro'][i],area:i<2?'Trabalho':'Pessoal',priority_level,state:'todo',revision:1}));
 const conversation={id:'chatqa',title:'Conversa de teste',channel:'mobile',created_at:today.toISOString(),updated_at:today.toISOString()};
 const messages:import('./src/lib/types').Message[]=[{id:'msg1',role:'user',content:'Mensagem preservada',status:'sent',created_at:today.toISOString()},{id:'msg2',role:'assistant',content:'Resposta preservada',status:'sent',created_at:today.toISOString()}];
 const catalog={catalog:{commitment:{label:'Compromisso',group:'flow',states:['planned','confirmed'],fields:[{key:'start_at',label:'Início',type:'datetime'}]},user_page:{label:'Página',group:'knowledge',states:['active'],fields:[]},monitor:{label:'Monitoramento',group:'flow',states:['active'],fields:[]}},areas:['Pessoal']};
@@ -45,7 +45,7 @@ globalThis.fetch=(async(input:any,init:any={})=>{
  if(p.startsWith('/workspace/entities/')){
   const id=p.split('/')[3],item=pages.find(x=>x.id===id)||events.find(x=>x.id===id);
   if(!item)return response({error:'Missing synthetic entity'},404);
-  if(method==='DELETE'){deletes++;pages=pages.filter(x=>x.id!==id);return response({ok:true});}
+  if(method==='DELETE'){deletes++;pages=pages.filter(x=>x.id!==id);const eventIndex=events.findIndex(x=>x.id===id);if(eventIndex>=0)events.splice(eventIndex,1);return response({ok:true});}
   if(method==='PATCH'){if(body.revision!==item.revision)return response({error:'Revision conflict'},409);Object.assign(item,{...body,data:{...item.data,...body.data},revision:item.revision+1});}
   return response(item);
  }
@@ -55,4 +55,4 @@ globalThis.fetch=(async(input:any,init:any={})=>{
  if(p==='/profile')return response({profile:{...profile,...body}});
  return response({error:'Unmapped synthetic route '+p},404);
 }) as typeof fetch;
-export default function App(){const [ready,setReady]=useState(false),[tick,setTick]=useState(0);useEffect(()=>{void saveAuth({token:'q'.repeat(43),token_type:'Bearer',expires_at,profile}).then(()=>setReady(true));const id=setInterval(()=>setTick(x=>x+1),200);return()=>clearInterval(id);},[]);return <View style={{flex:1}}><Text accessibilityLabel={'QA moves '+moves+' deletes '+deletes}>SOFIA_FULL_APP_FIXTURE_ONLY</Text><Pressable accessibilityLabel="QA atualizar remoto" onPress={()=>{pages=pages.map(x=>x.id==='other'?{...x,title:'Nome remoto',revision:x.revision+1}:x);}}><Text accessibilityLabel={'QA uploads '+uploads}>Atualizar remoto</Text></Pressable><Pressable style={{position:'absolute',right:0,top:0,zIndex:99}} accessibilityLabel="QA preparar tarefas" onPress={()=>{taskDelay=1600;tasks.splice(0,tasks.length,...['important','medium','light','none'].map((priority_level,i)=>({id:'filter'+i,title:['Projeto urgente','Estudar curso','Organizar casa','Ler livro'][i],area:i<2?'Trabalho':'Pessoal',priority_level,state:'todo',revision:1})));}}><Text>Preparar tarefas</Text></Pressable><View style={{flex:1}}>{ready?<ProductionApp/>:null}</View></View>;}
+export default function App(){const [ready,setReady]=useState(false),[tick,setTick]=useState(0);useEffect(()=>{void saveAuth({token:'q'.repeat(43),token_type:'Bearer',expires_at,profile}).then(()=>setReady(true));const id=setInterval(()=>setTick(x=>x+1),200);return()=>clearInterval(id);},[]);return <View style={{flex:1}}><Text accessibilityLabel={'QA moves '+moves+' deletes '+deletes}>SOFIA_FULL_APP_FIXTURE_ONLY</Text><Pressable accessibilityLabel="QA atualizar remoto" onPress={()=>{pages=pages.map(x=>x.id==='other'?{...x,title:'Nome remoto',revision:x.revision+1}:x);}}><Text accessibilityLabel={'QA uploads '+uploads}>Atualizar remoto</Text></Pressable><View style={{flex:1}}>{ready?<ProductionApp/>:null}</View></View>;}

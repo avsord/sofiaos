@@ -1,4 +1,5 @@
 export type CalendarState={configured:boolean;connected:boolean;syncing?:boolean;last_sync?:string;error?:string;calendar_name?:string;calendar_id?:string;warnings?:string[];conflicts?:{id:string;reason:string}[];calendars?:{id:string;summary:string;accessRole:string}[]};
+import {agendaChanged} from './agenda-events';
 import {LegacyMdAdapter} from './legacy-md';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -87,8 +88,8 @@ export class SofiaApi {
   catalog() { return this.request<Catalog>('/workspace/catalog'); }
   async entities(kind: string, q = '', offset = 0) { const result=await this.request<{items:Entity[]}>('/workspace/entities?limit=100&kind='+encodeURIComponent(kind)+'&q='+encodeURIComponent(q)+'&offset='+offset);return kind==='user_page'?{...result,items:await this.md.decorate(result.items)}:result; }
   async entity(id: string) { const item=await this.request<Entity>('/workspace/entities/'+encodeURIComponent(id));return item.kind==='user_page'?(await this.md.decorate([item]))[0]:item; }
-  async saveEntity(input: Partial<Entity>) { const body=input.data?await this.md.clean(input):input;const saved=await this.request<Entity>('/workspace/entities'+(input.id?'/'+encodeURIComponent(input.id):''),body,input.id?'PATCH':'POST');return saved.kind==='user_page'?(await this.md.decorate([saved]))[0]:saved; }
-  deleteEntity(id: string) { return this.request<{ok: boolean}>('/workspace/entities/' + encodeURIComponent(id), undefined, 'DELETE'); }
+  async saveEntity(input: Partial<Entity>) { const body=input.data?await this.md.clean(input):input;const saved=await this.request<Entity>('/workspace/entities'+(input.id?'/'+encodeURIComponent(input.id):''),body,input.id?'PATCH':'POST');if(['commitment','reminder'].includes(saved.kind))agendaChanged(this);return saved.kind==='user_page'?(await this.md.decorate([saved]))[0]:saved; }
+  async deleteEntity(id: string) { const result=await this.request<{ok: boolean}>('/workspace/entities/' + encodeURIComponent(id), undefined, 'DELETE');agendaChanged(this);return result; }
   uploadAttachment(id:string,input:{name:string;mime:string;base64:string}) { return this.request<{id:string}>('/workspace/entities/'+encodeURIComponent(id)+'/attachments',input,'POST',60000); }
   attachmentSource(id:string) { if(!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('Imagem inválida.');return {uri:SITE+'/api/mobile/workspace/attachments/'+encodeURIComponent(id)+'?inline=1',headers:{Authorization:'Bearer '+this.token}}; }
   entityAction(id: string, input: object) { return this.request<any>('/workspace/entities/' + encodeURIComponent(id) + '/action', input); }

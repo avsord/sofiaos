@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sofia OS",
     "slug": "sofia-app",
-    "version": "0.3.32",
+    "version": "0.3.33",
     "scheme": "sofiaapp",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.avsord.sofiaapp",
-      "versionCode": 37,
+      "versionCode": 38,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.RECORD_AUDIO",
@@ -47,7 +47,14 @@
         }
       ],
       "./plugins/with-sofia-logo.cjs",
-      "./plugins/with-calendar-gesture.cjs"
+      "./plugins/with-calendar-gesture.cjs",
+      [
+        "expo-notifications",
+        {
+          "color": "#7258E8",
+          "defaultChannel": "sofia-agenda"
+        }
+      ]
     ]
   }
 }
