@@ -1,4 +1,5 @@
 name: Sofia Android 0.3.36 update
+# Preserve legacy note editing until the separately approved server deployment is live.
 on:
   workflow_dispatch:
   push:
