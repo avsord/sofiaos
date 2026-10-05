@@ -13,15 +13,19 @@ export function useKeyboardVisible(){
  return visible;
 }
 /** Retain the exiting surface. Interruptions continue from its current position. */
-export function useMotionPresence(visible:boolean){
+export function useMotionPresence(visible:boolean,{enterReady=true,enterDuration=280,exitDuration=220}:{enterReady?:boolean;enterDuration?:number;exitDuration?:number}={}){
  const reduced=useReducedMotion(),progress=useRef(new Animated.Value(0)).current,epoch=useRef(0);
  const [mounted,setMounted]=useState(visible);
  useEffect(()=>{
   const token=++epoch.current;progress.stopAnimation();
   if(visible)setMounted(true);
-  const animation=Animated.timing(progress,{toValue:visible?1:0,duration:reduced?0:visible?280:220,easing:MOTION_EASE,useNativeDriver:true,isInteraction:false});
+  // A native Modal may attach after React's visibility effect. Keep it at the
+  // entrance position until onShow/layout, rather than spending the animation
+  // while its window is still invisible.
+  if(visible&&!enterReady){progress.setValue(0);return;}
+  const animation=Animated.timing(progress,{toValue:visible?1:0,duration:reduced?0:visible?enterDuration:exitDuration,easing:MOTION_EASE,useNativeDriver:true,isInteraction:false});
   animation.start(({finished})=>{if(finished&&!visible&&token===epoch.current)setMounted(false);});
   return()=>{++epoch.current;animation.stop();};
- },[visible,reduced,progress]);
+ },[visible,reduced,progress,enterReady,enterDuration,exitDuration]);
  return {mounted,progress,reduced};
 }

@@ -30,8 +30,9 @@ for i in range(6):
 tap('Voltar ao dia de hoje')
 adb('shell','input','swipe','500','160','430','160','450');time.sleep(1)
 wait('Sofia');screenshot('short-menu-swipe');tap('Início');wait('Olá, Teste.')
-# Home row opens details; only the separate checkbox concludes.
 adb('shell','input','swipe','360','1200','360','450','400');time.sleep(.4)
+tap('Filtrar níveis das tarefas do Início');wait('Nível das tarefas');screenshot('home-task-filter');tap('Todas');time.sleep(.3)
+# Home row opens details; only the separate checkbox concludes.
 tap('Abrir tarefa Projeto urgente');wait('Detalhes da tarefa');wait('Descricao da tarefa QA');screenshot('home-task-details')
 tap('Editar tarefa');wait('Descrição');screenshot('home-task-edit');tap('Cancelar edição');tap('Fechar detalhes da tarefa');time.sleep(.4)
 wait('Concluir Projeto urgente');tap('Concluir Projeto urgente');time.sleep(.6);assert find(tree(),'Abrir tarefa Projeto urgente') is None,'Row tap must not complete; checkbox must complete'
