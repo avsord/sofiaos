@@ -6,9 +6,10 @@ import type {Message} from './types';
 export function hasChatArrival(previous:readonly Message[],next:readonly Message[]){
  const last=next.at(-1);if(!last)return false;
  if(!previous.length)return true;
- const index=next.findIndex(m=>m.id===previous.at(-1)?.id);
- if(index>=0&&index<next.length-1)return true;
  const old=new Map(previous.map(m=>[m.id,m]));
+ // The server can replace an optimistic user ID when it acknowledges a send.
+ // A new tail still is an arrival, even if the old tail ID no longer exists.
+ if(!old.has(last.id))return true;
  return next.some(m=>old.has(m.id)&&old.get(m.id)!.content!==m.content);
 }
 

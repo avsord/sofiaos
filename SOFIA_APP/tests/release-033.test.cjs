@@ -76,4 +76,5 @@ test('chat follows arrivals and growth of any reply but not unchanged polls, old
  assert.equal(hasChatArrival(before,before.map(m=>({...m}))),false);
  assert.equal(hasChatArrival(before,[{id:'a',content:'A growing'},before[1]]),true);
  assert.equal(hasChatArrival(before,[before[0]]),false);
+ assert.equal(hasChatArrival([{id:'optimistic',content:'Hello'}],[{id:'server-user',content:'Hello'},{id:'reply',content:'Response'}]),true);
 });
