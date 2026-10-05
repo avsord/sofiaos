@@ -9,6 +9,8 @@ const COOKIE='sofia_google_calendar_state';
 const hash=x=>crypto.createHash('sha256').update(String(x)).digest('hex');
 const stamp=()=>new Date().toISOString();
 const clone=x=>JSON.parse(JSON.stringify(x));
+// Let HTTP requests run between background records; never hold a transaction across this yield.
+const yieldRequests=()=>new Promise(resolve=>setImmediate(resolve));
 function encrypt(value,key){const iv=crypto.randomBytes(12),c=crypto.createCipheriv('aes-256-gcm',key,iv),data=Buffer.concat([c.update(JSON.stringify(value),'utf8'),c.final()]);return Buffer.concat([iv,c.getAuthTag(),data]).toString('base64');}
 function decrypt(value,key){const raw=Buffer.from(value,'base64');if(raw.length<29)throw Error('Invalid encrypted token');const c=crypto.createDecipheriv('aes-256-gcm',key,raw.subarray(0,12));c.setAuthTag(raw.subarray(12,28));return JSON.parse(Buffer.concat([c.update(raw.subarray(28)),c.final()]).toString('utf8'));}
 function cookie(req,name){const pair=String(req.headers.cookie||'').split(';').find(x=>x.trim().startsWith(name+'='));return pair?pair.trim().slice(name.length+1):'';}
@@ -102,12 +104,12 @@ class GoogleCalendarSync{
   const conflicts=[],warnings=[...(a.meta.sync_token?(a.meta.warnings||[]):[])],remote=[];let syncToken=a.meta.sync_token||'',nextToken='',retried=false;
   for(;;){try{let pageToken='';remote.length=0;do{const params=new URLSearchParams({maxResults:'2500',showDeleted:'true',singleEvents:'false'});if(syncToken)params.set('syncToken',syncToken);if(pageToken)params.set('pageToken',pageToken);const result=await this.request(base+'?'+params);still();remote.push(...result.items||[]);pageToken=result.nextPageToken||'';nextToken=result.nextSyncToken||nextToken;}while(pageToken);break;}catch(e){if(e.googleStatus===410&&!retried){syncToken='';warnings.length=0;retried=true;continue;}throw e;}}
   const mappings=this.links(a),byGoogle=new Map(mappings.map(link=>[link.google_id,link])),conflictIds=new Set();let recurring=0,unsupported=0;
-  for(const event of remote){still();const link=byGoogle.get(event.id),local=link?this.safeGet(link.local_id):null;
+  for(const event of remote){await yieldRequests();still();const link=byGoogle.get(event.id),local=link?this.safeGet(link.local_id):null;
    if(event.recurrence?.length||event.recurringEventId){recurring++;if(local)conflictIds.add(local.id);continue;}
    if(event.status==='cancelled'){
     if(!link||link.deleted)continue;
     if(local&&!deleted(local)&&fingerprint(toGoogle(local))!==link.local_hash){conflicts.push({id:local.id,reason:'Exclusão no Google e edição na Sofia'});conflictIds.add(local.id);continue;}
-    if(local){this.applying=true;try{const cancelled=this.w.save({revision:local.revision,state:'cancelled',data:{...local.data,sync_state:'synced'}},local.id);this.saveLink(a,cancelled,event,{isDeleted:true});}finally{this.applying=false;}}
+    if(local){this.applying=true;try{this.runtime.store.tx(()=>{const cancelled=this.w.save({revision:local.revision,state:'cancelled',data:{...local.data,sync_state:'synced'}},local.id);this.saveLink(a,cancelled,event,{isDeleted:true});});}finally{this.applying=false;}}
     else this.db.prepare('UPDATE md_google_links SET deleted=1 WHERE owner=? AND account_key=? AND calendar_id=? AND local_id=?').run(OWNER,a.account_key,a.meta.calendar_id,link.local_id);
     continue;
    }
@@ -115,18 +117,18 @@ class GoogleCalendarSync{
    if(link?.deleted)continue; // Never resurrect an intentionally deleted local event.
    if(local?.privacy==='local'){conflictIds.add(local.id);continue;}
    const remoteChanged=!link||fingerprint(event)!==link.remote_hash,localChanged=!!link&&(!local||deleted(local)||fingerprint(toGoogle(local))!==link.local_hash);
-   if(link&&local&&!deleted(local)&&fingerprint(event)===fingerprint(toGoogle(local))){this.saveLink(a,local,event);continue;}
+   if(link&&local&&!deleted(local)&&fingerprint(event)===fingerprint(toGoogle(local))){if(link.local_hash!==fingerprint(toGoogle(local))||link.remote_hash!==fingerprint(event)||link.etag!==(event.etag||''))this.saveLink(a,local,event);continue;}
    if(link&&remoteChanged&&localChanged){conflicts.push({id:link.local_id,reason:'Mudanças simultâneas nos dois calendários'});conflictIds.add(link.local_id);continue;}
    if(link&&!remoteChanged){if(event.etag!==link.etag)this.db.prepare('UPDATE md_google_links SET etag=? WHERE owner=? AND account_key=? AND calendar_id=? AND local_id=?').run(event.etag,OWNER,a.account_key,a.meta.calendar_id,link.local_id);continue;}
    if(link&&!local)continue;
-   this.applying=true;try{const saved=this.w.save(fromGoogle(event,local,a.meta.calendar_id),local?.id);this.saveLink(a,saved,event);}finally{this.applying=false;}
+   this.applying=true;try{this.runtime.store.tx(()=>{const saved=this.w.save(fromGoogle(event,local,a.meta.calendar_id),local?.id);this.saveLink(a,saved,event);});}finally{this.applying=false;}
   }
   // Fresh mappings and records after import prevent a stale revision from overwriting an edit.
   const currentLinks=this.links(a),byLocal=new Map(currentLinks.map(link=>[link.local_id,link]));
   const ids=this.db.prepare("SELECT id FROM entities WHERE owner=? AND kind IN ('commitment','reminder')").all(OWNER);
-  const entities=ids.map(row=>this.w.get(row.id)),toPush=new Map(entities.map(e=>[e.id,e]));
+  const toPush=new Map();for(const row of ids){await yieldRequests();still();const e=this.w.get(row.id);toPush.set(e.id,e);}
   for(const link of currentLinks)if(!toPush.has(link.local_id))toPush.set(link.local_id,null);
-  for(const [id,entity] of toPush){still();const link=byLocal.get(id);if(conflictIds.has(id)||link?.deleted||entity?.privacy==='local')continue;
+  for(const [id,entity] of toPush){await yieldRequests();still();const link=byLocal.get(id);if(conflictIds.has(id)||link?.deleted||entity?.privacy==='local')continue;
    if(entity?.data.external_event_id&&!link)continue; // Imported from another account/calendar: never copy it silently.
    if(deleted(entity)){
     if(!link)continue;try{await this.request(base+'/'+encodeURIComponent(link.google_id),{method:'DELETE',headers:{'If-Match':link.etag}});}catch(e){if(e.googleStatus===412){conflicts.push({id,reason:'Evento alterado no Google durante a exclusão'});continue;}if(![404,410].includes(e.googleStatus))throw e;}still();this.db.prepare('UPDATE md_google_links SET deleted=1 WHERE owner=? AND account_key=? AND calendar_id=? AND local_id=?').run(OWNER,a.account_key,a.meta.calendar_id,id);continue;
@@ -145,7 +147,7 @@ class GoogleCalendarSync{
     // deletes this exact remote record instead of importing a duplicate.
     this.saveLink(a,entity,saved);this.schedule();continue;
    }
-   this.applying=true;try{const marked=this.w.save({revision:fresh.revision,data:{...fresh.data,calendar_provider:'google',calendar_id:a.meta.calendar_id,external_event_id:saved.id,sync_state:'synced'}},id);this.saveLink(a,marked,saved);}finally{this.applying=false;}
+   this.applying=true;try{this.runtime.store.tx(()=>{const marked=this.w.save({revision:fresh.revision,data:{...fresh.data,calendar_provider:'google',calendar_id:a.meta.calendar_id,external_event_id:saved.id,sync_state:'synced'}},id);this.saveLink(a,marked,saved);});}finally{this.applying=false;}
   }
   still();const fresh=this.account();if(!fresh)return;
   if(recurring)warnings.push('Eventos recorrentes permanecem sob edição no Google; a série não é expandida nesta versão.');

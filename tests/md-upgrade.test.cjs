@@ -116,3 +116,16 @@ test('MD4: expired Google authorization never impersonates an expired Sofia sess
 test('MD4: callback base accepts HTTPS or local HTTP, never other protocols',t=>{
  const runtime=setup(t);runtime.config.publicBaseUrl='ftp://localhost';const sync=new GoogleCalendarSync(runtime,{env:ENV});t.after(()=>sync.close());assert.equal(sync.configured(),false);
 });
+
+// Large initial imports must keep foreground requests responsive.
+test('Google import yields to foreground work while preserving every event',async t=>{
+ const r=syncFixture(t);for(let i=0;i<160;i++)r.google.events.set('remote'+i,{id:'remote'+i,etag:'"1"',summary:'Event '+i,start:{dateTime:'2026-10-06T12:00:00Z'},end:{dateTime:'2026-10-06T13:00:00Z'}});
+ let imported=0,foregroundDuringImport=false;const original=r.workspace.save.bind(r.workspace);r.workspace.save=(...args)=>{const result=original(...args);imported++;if(imported===1)setImmediate(()=>{foregroundDuringImport=imported<160;});return result;};
+ await r.sync.sync();assert.equal(imported,160);assert.equal(foregroundDuringImport,true);assert.equal(r.workspace.list({kind:'commitment',limit:500}).length,160);
+ let linksWritten=0;const saveLink=r.sync.saveLink.bind(r.sync);r.sync.saveLink=(...args)=>{linksWritten++;return saveLink(...args);};await r.sync.sync();assert.equal(imported,160);assert.equal(linksWritten,0);
+});
+test('Calendar disconnect during a yielded import stops remaining writes',async t=>{
+ const r=syncFixture(t);for(let i=0;i<30;i++)r.google.events.set('remote'+i,{id:'remote'+i,etag:'"1"',summary:'Event '+i,start:{dateTime:'2026-10-06T12:00:00Z'},end:{dateTime:'2026-10-06T13:00:00Z'}});
+ let imported=0;const original=r.workspace.save.bind(r.workspace);r.workspace.save=(...args)=>{const result=original(...args);if(++imported===1)setImmediate(()=>void r.sync.disconnect());return result;};
+ await r.sync.sync();assert.equal(imported,1);assert.equal(r.sync.status().connected,false);
+});
