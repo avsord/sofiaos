@@ -15,7 +15,7 @@ export function MiniAgenda({items,onOpen,onItem,onGestureLock,viewOwner,active=t
  const expanded=useMemo(()=>items.flatMap(record=>record.isTask||!record.original||readRepeat(record.original as import('../lib/types').AgendaItem).frequency==='none'?[record]:expandAgenda([record.original as import('../lib/types').AgendaItem],month).map(event=>({...record,id:record.id+eventStart(event),date:eventStart(event),original:event}))),[items,month.getTime()]);
  const dates=useMemo(()=>new Set(expanded.map(item=>localDateKey(item.date))),[expanded]),chosen=expanded.filter(i=>localDateKey(i.date)===selected);
  const today=()=>{const now=new Date();setMonth(new Date(now.getFullYear(),now.getMonth(),1));setSelected(localDateKey(now));};
- return <View testID="mini-agenda" style={{padding:14,borderRadius:22,borderWidth:1,borderColor:c.line,backgroundColor:c.surface,gap:10}}>
+ return <MonthSwipe onLock={onGestureLock} onMonth={delta=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()+delta,1))}><View testID="mini-agenda" style={{padding:14,borderRadius:22,borderWidth:1,borderColor:c.line,backgroundColor:c.surface,gap:10}}>
   <View style={{flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,color:c.text,fontWeight:'700',fontSize:19}}>Agenda</Text><Pressable accessibilityRole="button" accessibilityLabel="Abrir agenda completa" onPress={()=>onOpen(selected)} style={{padding:8}}><Text style={{fontSize:12,color:c.accent}}>Abrir agenda</Text></Pressable></View>
   <View testID="agenda-split-row" style={{flexDirection:'row',alignItems:'stretch'}}>
    <View testID="agenda-items-half" style={{width:'50%',minWidth:0,paddingRight:10}}>
@@ -25,7 +25,6 @@ export function MiniAgenda({items,onOpen,onItem,onGestureLock,viewOwner,active=t
     </ScrollView>
    </View>
    <View testID="agenda-calendar-half" style={{width:'50%',minWidth:0,paddingLeft:8,borderLeftWidth:1,borderColor:c.line}}>
-    <MonthSwipe onLock={onGestureLock} onMonth={delta=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()+delta,1))}>
     <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',minHeight:34}}>
      <Pressable accessibilityRole="button" accessibilityLabel="Mês anterior" onPress={()=>setMonth(new Date(month.getFullYear(),month.getMonth()-1,1))} style={{width:24,height:34,alignItems:'center',justifyContent:'center'}}><Text style={{color:c.accent,fontSize:22}}>‹</Text></Pressable>
      <Pressable accessibilityRole="button" accessibilityLabel="Voltar ao dia de hoje" onPress={today} style={{flex:1,minWidth:0}}><Text numberOfLines={2} maxFontSizeMultiplier={1.3} style={{color:c.text,fontSize:11,fontWeight:'600',textAlign:'center',textTransform:'capitalize'}}>{month.toLocaleDateString('pt-BR',{month:'short',year:'numeric'})}</Text></Pressable>
@@ -33,10 +32,9 @@ export function MiniAgenda({items,onOpen,onItem,onGestureLock,viewOwner,active=t
     </View>
     <View style={{flexDirection:'row',paddingVertical:4}}>{['D','S','T','Q','Q','S','S'].map((v,i)=><Text key={i} maxFontSizeMultiplier={1.2} style={{width:'14.2857%',fontSize:9,color:c.muted,textAlign:'center'}}>{v}</Text>)}</View>
     <View style={{flexDirection:'row',flexWrap:'wrap',height:180}}>{monthCells(month).map((day,i)=>{const key=day?localDateKey(day):'',active=key===selected;return <View key={i} style={{width:'14.2857%',paddingVertical:1}}>{day?<Pressable testID={'agenda-day-'+key} accessibilityRole="button" accessibilityLabel={day.toLocaleDateString('pt-BR')+(dates.has(key)?', com compromissos':'')} accessibilityState={{selected:active}} onPress={()=>setSelected(key)} style={{height:28,borderRadius:7,alignItems:'center',justifyContent:'center',backgroundColor:active?c.accent:'transparent',gap:2}}><Text maxFontSizeMultiplier={1.25} style={{fontSize:11,color:active?'#fff':c.text}}>{day.getDate()}</Text><View style={{width:3,height:3,borderRadius:2,backgroundColor:dates.has(key)?(active?'#fff':c.accent):'transparent'}}/></Pressable>:null}</View>;})}</View>
-    </MonthSwipe>
    </View>
   </View>
- </View>;
+ </View></MonthSwipe>;
 }
 function PricePlot({series,height=132,range}:{series:PriceSeries[];height?:number;range?:{min:number;max:number}}){const c=useTheme(),g=priceGeometry(series,320,height,range);if(!g)return <Text style={{color:c.muted,fontSize:12,paddingVertical:16}}>Ainda sem histórico de preços.</Text>;const currency=series[0]?.currency||'BRL',money=(v:number)=>v.toLocaleString('pt-BR',{style:'currency',currency});return <View><View style={{flexDirection:'row',justifyContent:'space-between'}}><Text style={{color:c.muted,fontSize:10}}>{money(g.ymax)}</Text><Text style={{color:c.muted,fontSize:10}}>Preço × tempo</Text></View><Svg width="100%" height={height} viewBox={`0 0 320 ${height}`}><Line x1={12} y1={height-8} x2={308} y2={height-8} stroke={c.line}/>{g.lines.map(line=><React.Fragment key={line.id}><Polyline points={line.points.map(p=>p.join(',')).join(' ')} fill="none" stroke={line.color} strokeWidth={2.5}/>{line.points.length===1?<Circle cx={line.points[0][0]} cy={line.points[0][1]} r={3} fill={line.color}/>:null}</React.Fragment>)}</Svg><View style={{flexDirection:'row',justifyContent:'space-between'}}><Text style={{fontSize:10,color:c.muted}}>{new Date(g.xmin).toLocaleDateString('pt-BR')}</Text><Text style={{fontSize:10,color:c.muted}}>{money(g.ymin)}</Text><Text style={{fontSize:10,color:c.muted}}>{new Date(g.xmax).toLocaleDateString('pt-BR')}</Text></View></View>;}
 function sourceLabel(url:string){try{return new URL(url).hostname;}catch{return url;}}

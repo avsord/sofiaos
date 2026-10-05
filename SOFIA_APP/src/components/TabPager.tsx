@@ -86,15 +86,17 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
     const delta=x-dragStart.current;
     // Let native velocity settle a fling. Starting another animation here
     // competes with Android momentum and produces the visible hesitation.
-    if(w>0 && Math.abs(velocity||0)<.1 && Math.abs(delta)>=Math.min(28,w*.07) && Math.abs(delta)<w*.45 && Math.abs(x-Math.round(x/w)*w)>1){
+    if(w>0 && Math.abs(velocity||0)<.1 && Math.abs(delta)>=Math.min(20,w*.05) && Math.abs(delta)<w*.45 && Math.abs(x-Math.round(x/w)*w)>1){
       const origin=Math.round(dragStart.current/w),index=Math.max(0,Math.min(TAB_ORDER.length-1,origin+(delta>0?1:-1)));
       scroll.current?.scrollTo({x:index*w,y:0,animated:true});return;
     }
     if (w > 0 && velocity !== undefined && Math.abs(velocity) < 0.01 && Math.abs(x - Math.round(x/w)*w) < 0.5) finish(event);
   },[finish]);
 
+  // Explicit intervals select the adjacent page from fling direction on Android.
+  // Plain pagingEnabled predicts travel and otherwise falls back to half a screen.
   return <View style={styles.fill} onLayout={layout}>
-    {width>0?<Animated.ScrollView ref={scroll} horizontal pagingEnabled
+    {width>0?<Animated.ScrollView ref={scroll} horizontal pagingEnabled snapToInterval={width}
       contentOffset={initialOffset} onLayout={nativeLayout} scrollsChildToFocus={false}
       decelerationRate="fast" disableIntervalMomentum directionalLockEnabled nestedScrollEnabled
       scrollEnabled={enabled && readyWidth===width} showsHorizontalScrollIndicator={false}

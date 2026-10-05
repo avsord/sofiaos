@@ -6,7 +6,7 @@ def tree():
  adb('shell','uiautomator','dump','/sdcard/performance.xml');return ET.fromstring(adb('shell','cat','/sdcard/performance.xml'))
 def find(root,label):
  for n in reversed(list(root.iter('node'))):
-  if n.get('bounds')!='[0,0][0,0]' and (n.get('text')==label or n.get('content-desc')==label):return n
+  if n.get('bounds')!='[0,0][0,0]' and (n.get('text')==label or n.get('content-desc')==label or n.get('resource-id','').endswith(label)):return n
  return None
 def wait(label):
  for _ in range(15):
@@ -28,7 +28,24 @@ baseline=calendar_bounds(r)
 for i in range(6):
  tap('Próximo mês');time.sleep(.3);assert calendar_bounds(tree())==baseline,'Home calendar changed height'
 tap('Voltar ao dia de hoje')
-adb('shell','input','swipe','500','160','430','160','450');time.sleep(1)
+# Short fast and short slow releases must pick exactly the adjacent menu.
+for duration in (80,450):
+ adb('shell','input','swipe','500','160','440','160',str(duration));time.sleep(.7)
+ wait('Sofia');assert wait('menu-chat').get('selected')=='true','Short swipe failed to select Chat'
+ adb('shell','input','swipe','400','160','460','160',str(duration));time.sleep(.7)
+ wait('Olá, Teste.');assert wait('menu-home').get('selected')=='true','Short reverse swipe failed'
+screenshot('short-fast-and-slow-menus')
+def calendar_swipes(menu):
+ n=wait('calendar-month-swipe');x,y,r,b=map(int,re.findall(r'\d+',n.get('bounds')))
+ # Reserve both calendar halves, the header, and diagonal/fast drags.
+ for fraction,duration,dy in ((.3,70,0),(.75,90,8),(.7,400,0)):
+  sx=int(x+(r-x)*fraction);sy=y+min(125,(b-y)//2);ex=max(x+10,sx-100)
+  adb('shell','input','swipe',str(sx),str(sy),str(ex),str(sy+dy),str(duration));time.sleep(.4)
+  assert wait('menu-'+menu).get('selected')=='true','Calendar swipe changed menu'
+ screenshot(menu+'-calendar-reserved')
+calendar_swipes('home');tap('Voltar ao dia de hoje')
+tap('Agenda');wait('Sua agenda');calendar_swipes('agenda');tap('Voltar para hoje');tap('Início');wait('Olá, Teste.')
+adb('shell','input','swipe','500','160','440','160','450');time.sleep(1)
 wait('Sofia');screenshot('short-menu-swipe');tap('Início');wait('Olá, Teste.')
 adb('shell','input','swipe','360','1200','360','450','400');time.sleep(.4)
 tap('Filtrar níveis das tarefas do Início');wait('Nível das tarefas');screenshot('home-task-filter');tap('Todas');time.sleep(.3)

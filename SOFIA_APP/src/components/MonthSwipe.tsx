@@ -1,15 +1,20 @@
-import React,{useMemo,useRef} from 'react';
-import {PanResponder,Platform,View} from 'react-native';
+import React,{useEffect,useMemo,useRef} from 'react';
+import {PanResponder,View} from 'react-native';
 export function MonthSwipe({children,onMonth,onLock}:{children:React.ReactNode;onMonth:(delta:number)=>void;onLock?:(locked:boolean)=>void}){
  const latest=useRef({onMonth,onLock});latest.current={onMonth,onLock};
- // Android reserves the outer native pager at ACTION_DOWN, before JS can race it.
- // Other platforms retain the responder lock. Day taps and vertical scrolling stay native.
- const lock=(value:boolean)=>{if(Platform.OS!=='android')latest.current.onLock?.(value);};
+ const locked=useRef(false),claimed=useRef(false);
+ // Keep the React prop locked for the whole gesture, on Android as well.
+ // The native ACTION_DOWN guard prevents the first fast MOVE from racing JS;
+ // this lock also survives renders while dates/appointments are refreshed.
+ const lock=(value:boolean)=>{if(locked.current!==value){locked.current=value;latest.current.onLock?.(value);}};
+ useEffect(()=>()=>lock(false),[]);
  const pan=useMemo(()=>PanResponder.create({
+  onStartShouldSetPanResponderCapture:()=>{lock(true);return false;},
   onMoveShouldSetPanResponder:(_,g)=>Math.abs(g.dx)>12&&Math.abs(g.dx)>Math.abs(g.dy)*1.4,
   onMoveShouldSetPanResponderCapture:(_,g)=>Math.abs(g.dx)>12&&Math.abs(g.dx)>Math.abs(g.dy)*1.4,
-  onPanResponderRelease:(_,g)=>{if(Math.abs(g.dx)>35)latest.current.onMonth(g.dx<0?1:-1);lock(false);},
-  onPanResponderTerminate:()=>lock(false),onPanResponderTerminationRequest:()=>false
+  onPanResponderGrant:()=>{claimed.current=true;lock(true);},
+  onPanResponderRelease:(_,g)=>{if(Math.abs(g.dx)>35)latest.current.onMonth(g.dx<0?1:-1);claimed.current=false;lock(false);},
+  onPanResponderTerminate:()=>{claimed.current=false;lock(false);},onPanResponderTerminationRequest:()=>false
  }),[]);
- return <View testID="calendar-month-swipe" nativeID="sofia-calendar-gesture" collapsable={false} {...pan.panHandlers} onTouchStart={()=>lock(true)} onTouchEnd={()=>lock(false)} onTouchCancel={()=>lock(false)}>{children}</View>;
+ return <View testID="calendar-month-swipe" nativeID="sofia-calendar-gesture" collapsable={false} {...pan.panHandlers} onTouchStart={()=>lock(true)} onTouchEnd={event=>{if(!event.nativeEvent.touches.length&&!claimed.current)lock(false);}} onTouchCancel={()=>{if(!claimed.current)lock(false);}}>{children}</View>;
 }

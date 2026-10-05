@@ -132,8 +132,8 @@ test('resizing waits for matching geometry and preserves the selected page',()=>
 test('late stale content callbacks cannot break subsequent direct menu taps',()=>{
  const p=pager();p.scroll.onContentSizeChange(0,0);p.scroll.onLayout({nativeEvent:{layout:{width:0}}});p.ref.current.goTo('apps');assert.equal(p.commands.at(-1).x,1600);
 });
-test('native full-page snapping is the only snap policy, and taps remain immediate',()=>{
- const p=pager();assert.equal(p.scroll.decelerationRate,'fast');assert.equal(p.scroll.pagingEnabled,true);assert.equal(p.scroll.snapToInterval,undefined);assert.equal(p.scroll.disableIntervalMomentum,true);
+test('native interval snapping selects the neighboring menu even with a short fling',()=>{
+ const p=pager();assert.equal(p.scroll.decelerationRate,'fast');assert.equal(p.scroll.pagingEnabled,true);assert.equal(p.scroll.snapToInterval,400);assert.equal(p.scroll.disableIntervalMomentum,true);
  p.ref.current.goTo('home');assert.equal(p.commands.at(-1).animated,false);
 });
 
@@ -144,3 +144,7 @@ test('settling a native swipe and subsequent layout callbacks do not issue a sec
 test('short slow horizontal drags settle one neighbor with native animation, in both directions',()=>{const p=pager();p.scroll.onScrollBeginDrag(end(400));p.scroll.onScrollEndDrag(end(470,.05));assert.deepEqual(p.commands,[{x:800,y:0,animated:true}]);p.scroll.onMomentumScrollEnd(end(800));assert.deepEqual(p.selected,['pages']);const q=pager();q.scroll.onScrollBeginDrag(end(400));q.scroll.onScrollEndDrag(end(330,-.05));assert.deepEqual(q.commands,[{x:0,y:0,animated:true}]);q.scroll.onMomentumScrollEnd(end(0));assert.deepEqual(q.selected,['home']);});
 
 test('a 30dp slow drag changes menu but a fling never starts competing JS momentum',()=>{const p=pager();p.scroll.onScrollBeginDrag(end(400));p.scroll.onScrollEndDrag(end(430,.03));assert.deepEqual(p.commands,[{x:800,y:0,animated:true}]);const q=pager();q.scroll.onScrollBeginDrag(end(400));q.scroll.onScrollEndDrag(end(430,.8));assert.equal(q.commands.length,0);q.scroll.onMomentumScrollEnd(end(800));assert.deepEqual(q.selected,['pages']);});
+
+
+test('20dp slow drag is enough in both directions, while tiny drift does not switch menu',()=>{for(const d of [-20,20]){const p=pager();p.scroll.onScrollBeginDrag(end(400));p.scroll.onScrollEndDrag(end(400+d,0));assert.deepEqual(p.commands,[{x:d>0?800:0,y:0,animated:true}]);}for(const d of [-8,8]){const p=pager();p.scroll.onScrollBeginDrag(end(400));p.scroll.onScrollEndDrag(end(400+d,0));assert.equal(p.commands.length,0);}});
+test('snap interval follows viewport resize rather than retaining a stale pixel distance',()=>{const p=pager();p.measure(600);assert.equal(p.scroll.snapToInterval,600);});
