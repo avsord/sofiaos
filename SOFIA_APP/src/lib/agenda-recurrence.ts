@@ -3,7 +3,18 @@ export const REPEATS=[{value:'none',label:'Não repetir'},{value:'weekly',label:
 export type Repeat=typeof REPEATS[number]['value'];
 const prefix='sofia-repeat-v1:';
 export const isAgendaMeta=(tag:string)=>tag.startsWith(prefix)||tag==='sofia-notify-v1:off';
-export function readRepeat(item:{tags?:string[]}){const tag=item.tags?.find(t=>t.startsWith(prefix)),[frequency,zone]=(tag?.slice(prefix.length)||'').split(':');let timeZone=zone||Intl.DateTimeFormat().resolvedOptions().timeZone;try{new Intl.DateTimeFormat('en',{timeZone});}catch{timeZone='UTC';}return {frequency:(REPEATS.some(p=>p.value===frequency)?frequency:'none') as Repeat,timeZone};}
+// A Google import can contain hundreds of ordinary events. Resolve the device
+// zone once and validate each distinct recurrence tag once, rather than create
+// two Intl formatters per event on every render and notification refresh.
+const deviceTimeZone=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
+const repeatRules=new Map<string,{frequency:Repeat;timeZone:string}>();
+export function readRepeat(item:{tags?:string[]}){
+ const tag=item.tags?.find(t=>t.startsWith(prefix))||'',cached=repeatRules.get(tag);if(cached)return cached;
+ const [frequency,zone]=tag.slice(prefix.length).split(':');let timeZone=zone||deviceTimeZone;
+ if(zone)try{new Intl.DateTimeFormat('en',{timeZone});}catch{timeZone='UTC';}
+ const rule={frequency:(REPEATS.some(p=>p.value===frequency)?frequency:'none') as Repeat,timeZone};
+ if(repeatRules.size>=64)repeatRules.delete(repeatRules.keys().next().value!);repeatRules.set(tag,rule);return rule;
+}
 export function agendaTags(tags:string[],frequency:Repeat,timeZone=Intl.DateTimeFormat().resolvedOptions().timeZone,notify=true){return [...tags.filter(t=>!isAgendaMeta(t)),...(frequency==='none'?[]:[prefix+frequency+':'+timeZone]),...(notify?[]:['sofia-notify-v1:off'])];}
 export function eventStart(item:AgendaItem){return item.data.calendar_all_day?item.data.calendar_date_start||'':item.data.start_at||item.data.remind_at||item.data.due_at||'';}
 const formatters=new Map<string,Intl.DateTimeFormat>();
