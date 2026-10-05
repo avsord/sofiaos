@@ -62,7 +62,10 @@ jobs:
           const filename=path.resolve('tools/publish-release.cjs'),original=fs.readFileSync(filename,'utf8');
           const needle='const notes=path.join(app,`RELEASE_${version}.md`);';
           if(!original.includes(needle))throw Error('Release publisher changed');
-          const script=original.replace(needle,"const notes='/tmp/sofia-release035.md';");
+          const snapshotLine="const snapshot=git('commit-tree',tree,'-p',main,'-m',`release: validated Android ${version}; source ${source}`);";
+          const pushLine="git('push','origin',snapshot+':refs/heads/release/'+tag);";
+          if(!original.includes(snapshotLine)||!original.includes(pushLine))throw Error('Snapshot publication changed');
+          const script=original.replace(needle,"const notes='/tmp/sofia-release035.md';").replace(snapshotLine,"const snapshot='ddc880fcb191f25b608543eecf33e43cd23c5781';").replace(pushLine,"if(api('repos/'+repo+'/git/ref/heads/release/'+tag).object.sha!==snapshot)throw Error('Existing snapshot changed');");
           const mod=new Module(filename,module);mod.filename=filename;mod.paths=Module._nodeModulePaths(path.dirname(filename));mod._compile(script,filename);
           JS
       - name: Check released APK and updater discovery
