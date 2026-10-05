@@ -43,7 +43,7 @@ test('024 rendered mini agenda: equal halves, same row, selecting day updates ev
  const halves=nodes.filter(n=>['agenda-calendar-half','agenda-items-half'].includes(n.props?.testID));assert.equal(halves.length,2);assert.equal(halves[0].props.testID,'agenda-items-half');assert.equal(halves[1].props.testID,'agenda-calendar-half');halves.forEach(n=>assert.equal(n.props.style.width,'50%'));
  assert.ok(nodes.some(n=>n.props?.accessibilityLabel==='Hoje teste'));assert.ok(!nodes.some(n=>n.props?.accessibilityLabel==='Outra data teste'));
  nodes.find(n=>n.props?.testID==='agenda-day-'+other).props.onPress();nodes=descendants(render());assert.ok(nodes.some(n=>n.props?.accessibilityLabel==='Outra data teste'));assert.ok(!nodes.some(n=>n.props?.accessibilityLabel==='Hoje teste'));assert.deepEqual(opened,[]);
- const list=nodes.find(n=>n.props?.testID==='agenda-day-items');assert.equal(list.props.nestedScrollEnabled,true);assert.equal(list.props.style.height,190);
+ const list=nodes.find(n=>n.props?.testID==='agenda-day-items');assert.equal(list.props.nestedScrollEnabled,false);assert.equal(list.props.showsVerticalScrollIndicator,false);assert.equal(list.props.bounces,false);assert.equal(list.props.style.height,190);
 });
 test('024 popover: top follows actual bell across mobile/tablet widths, never screen centre',()=>{
  for(const width of [320,360,400,768,1200]){const anchor={x:width-80,y:48,width:44,height:44};const r=layout.notificationPopoverLayout(anchor,{width,height:900},{top:24,bottom:24});assert.equal(r.top,100);assert.ok(r.left>=16);assert.ok(r.left+r.width<=width-16);assert.ok(r.top+r.height<=876);assert.equal(r.width,width-32);assert.equal(r.left,16);}
@@ -57,5 +57,5 @@ test('024 wiring: native refresh disabled independently of scroll; pending/held 
 });
 test('024 identity: native manifest, npm and updater agree; package, scheme and release prefix retained',()=>{
  const config=JSON.parse(fs.readFileSync(path.join(root,'app.json'),'utf8')).expo,pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8')),lock=JSON.parse(fs.readFileSync(path.join(root,'package-lock.json'),'utf8'));
- const updater=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');assert.equal(config.version,'0.3.38');assert.equal(pkg.version,config.version);assert.equal(lock.version,config.version);assert.equal(lock.packages[''].version,config.version);assert.equal(config.android.versionCode,43);assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.scheme,'sofiaapp');assert.ok(updater.includes("APP_VERSION = '0.3.38'"));assert.ok(updater.includes("RELEASE_PREFIX = 'sofia-android-v'"));
+ const updater=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');assert.equal(config.version,'0.3.39');assert.equal(pkg.version,config.version);assert.equal(lock.version,config.version);assert.equal(lock.packages[''].version,config.version);assert.equal(config.android.versionCode,44);assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.scheme,'sofiaapp');assert.ok(updater.includes("APP_VERSION = '0.3.39'"));assert.ok(updater.includes("RELEASE_PREFIX = 'sofia-android-v'"));
 });

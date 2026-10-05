@@ -25,6 +25,24 @@ def calendar_bounds(root):
  assert rows,'Calendar geometry absent'
  return rows[0]
 baseline=calendar_bounds(r)
+def refresh_count():return adb('logcat','-d','-s','ReactNativeJS:I').decode(errors='replace').count('SOFIA_HOME_PULL_REFRESH')
+# Consume vertical drags only in the appointment list, even at both edges.
+list_node=wait('agenda-day-items');lx,ly,lr,lb=map(int,re.findall(r'\d+',list_node.get('bounds')))
+sx=(lx+lr)//2;sy=lb-20;ey=ly+20;before_refresh=refresh_count()
+for direction in ('bottom','top'):
+ for duration in (80,350,80,350):
+  a,b=(sy,ey) if direction=='bottom' else (ey,sy)
+  adb('shell','input','swipe',str(sx),str(a),str(sx),str(b),str(duration));time.sleep(.25)
+  assert calendar_bounds(tree())==baseline,'Appointment list moved Home at '+direction
+  assert refresh_count()==before_refresh,'Appointment scroll triggered Home refresh'
+screenshot('appointment-edges-isolated');print('PASS appointment list edges stay inside calendar',flush=True)
+# A moderate pull used to exceed Android's default. It must no longer refresh.
+before_refresh=refresh_count();adb('shell','input','swipe','705','300','705','550','450');time.sleep(.8)
+assert refresh_count()==before_refresh,'Moderate Home pull refreshed accidentally'
+# A deliberate long pull still refreshes; regular outside scrolling remains usable.
+adb('shell','input','swipe','705','300','705','850','650');time.sleep(1)
+assert refresh_count()>before_refresh,'Deliberate Home pull failed to refresh'
+wait('Olá, Teste.');screenshot('deliberate-home-refresh');print('PASS moderate pull ignored and deliberate pull refreshes',flush=True)
 for i in range(6):
  tap('Próximo mês');time.sleep(.3);assert calendar_bounds(tree())==baseline,'Home calendar changed height'
 tap('Voltar ao dia de hoje');tap('Próximo mês');wait('Compromisso proximo mes QA');screenshot('month-selection-updates-items');tap('Voltar ao dia de hoje')
@@ -34,7 +52,17 @@ for duration in (80,450):
  wait('Sofia');assert wait('menu-chat').get('selected')=='true','Short swipe failed to select Chat'
  adb('shell','input','swipe','400','160','460','160',str(duration));time.sleep(.7)
  wait('Olá, Teste.');assert wait('menu-home').get('selected')=='true','Short reverse swipe failed'
-screenshot('short-fast-and-slow-menus')
+screenshot('short-fast-and-slow-menus');print('PASS short fast and slow menu swipes',flush=True)
+# System back and edge gestures are inert at all six menu roots.
+for label,menu in (('Conversa','chat'),('Páginas','pages'),('Agenda','agenda'),('Apps','apps'),('Perfil','profile'),('Início','home')):
+ tap(label);time.sleep(.25)
+ for start,end in ((3,180),(717,540)):
+  adb('shell','input','swipe',str(start),'900',str(end),'900','250');time.sleep(.2)
+ adb('shell','input','keyevent','BACK');time.sleep(.3)
+ assert wait('menu-'+menu).get('selected')=='true','System back changed menu '+menu
+ assert adb('shell','pidof','com.avsord.sofiaapp').strip()==pid,'System back exited app'
+screenshot('menu-system-back-disabled');print('PASS system back and edge gestures are inert in six menus',flush=True)
+
 def calendar_swipes(menu):
  n=wait('calendar-month-swipe');x,y,r,b=map(int,re.findall(r'\d+',n.get('bounds')))
  # Reserve both calendar halves, the header, and diagonal/fast drags.
@@ -73,5 +101,5 @@ tap('Filtros da Biblioteca');tap('Filtrar por estrelas');tap('★★★★★');
 tap('Voltar aos apps');tap('Notas');tap('Criar registro');tap('Título da nota');adb('shell','input','text','NotaQA036')
 tap('Conteúdo da nota');adb('shell','input','text','TextoQA036');tap('Negrito');adb('shell','input','text','Bold');tap('Fechar teclado');tap('Salvar');wait('NotaQA036');tap('NotaQA036');wait('Título da nota');wait('Conteúdo da nota');screenshot('rich-note-reopened');tap('Voltar das notas');tap('Início')
 logs=adb('logcat','-d').decode(errors='replace');(out/'native-log.txt').write_text(logs);assert 'FATAL EXCEPTION' not in logs;assert 'CALENDAR_PERF' in logs
-(out/'result.json').write_text(json.dumps({'passed':True,'events':500,'passes':10,'native_hermes_budget_ms':1000,'menu_roundtrips':3}))
+(out/'result.json').write_text(json.dumps({'passed':True,'events':500,'passes':10,'native_hermes_budget_ms':1000,'menu_roundtrips':3,'appointment_edges_isolated':True,'moderate_pull_ignored':True,'deliberate_pull_refreshes':True,'root_system_back_inert':True}))
 print('PASS native calendar performance, 500 events, existing update signature and navigation')
