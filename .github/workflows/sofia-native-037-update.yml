@@ -6,7 +6,9 @@ on:
     branches: [work/sofia-refinements-037]
     paths:
       - .github/workflows/sofia-native-037-update.yml
-      - SOFIA_APP/**
+      - SOFIA_APP/src/**
+      - SOFIA_APP/tests/**
+      - SOFIA_APP/tools/native-performance-smoke.py
 permissions:
   contents: write
 concurrency:
