@@ -38,14 +38,16 @@ function fromGoogle(event,old,calendarId){
  const projection=googleProjection(event),allDay=!!projection.start?.date;if(!projection.start||!projection.end)throw Error('Evento sem início ou fim');
  const dateStart=allDay?projection.start.date:'',dateEnd=allDay?projection.end.date:'';
  const start=allDay?dateStart+'T12:00:00.000Z':projection.start.dateTime,end=allDay?dateEnd+'T12:00:00.000Z':projection.end.dateTime;
- const kind=old?.kind||'commitment',data={...(old?.data||{}),[kind==='reminder'?'remind_at':'start_at']:start,calendar_provider:'google',calendar_id:calendarId,external_event_id:event.id,sync_state:'synced',calendar_all_day:allDay,calendar_date_start:dateStart,calendar_date_end:dateEnd};
+ const kind=old?.kind||'commitment',data={...(old?.data||{}),[kind==='reminder'?'remind_at':'start_at']:start,calendar_provider:'google',calendar_id:calendarId,external_event_id:event.id,calendar_recurring_id:event.recurringEventId||'',calendar_original_start:JSON.stringify(event.originalStartTime||{}),calendar_time_zone:event.start?.timeZone||'',sync_state:'synced',calendar_all_day:allDay,calendar_date_start:dateStart,calendar_date_end:dateEnd};
  if(kind==='commitment'){data.end_at=end;data.location=projection.location;}
  return {kind,title:projection.summary.slice(0,240),content:projection.description.slice(0,16000),state:old?.state||'confirmed',area:old?.area||'Pessoal',privacy:old?.privacy||'private',tags:old?.tags||[],revision:old?.revision,data};
 }
 class GoogleCalendarSync{
  constructor(runtime,{fetchImpl=globalThis.fetch,env=process.env}={}){
   this.runtime=runtime;this.db=runtime.store.db;this.w=runtime.workspace;this.fetch=fetchImpl;this.env=env;this.pending=new Map();this.tickets=new Map();this.busy=null;this.epoch=0;this.applying=false;this.controller=null;
-  this.db.exec(`CREATE TABLE IF NOT EXISTS md_google_account(owner TEXT PRIMARY KEY,secret TEXT NOT NULL,meta TEXT NOT NULL);
+  this.windows=new Map();this.seriesRefresh=0;
+  this.db.exec(`CREATE TABLE IF NOT EXISTS md_google_series(owner TEXT NOT NULL,account_key TEXT NOT NULL,calendar_id TEXT NOT NULL,google_id TEXT NOT NULL,event TEXT NOT NULL,PRIMARY KEY(owner,account_key,calendar_id,google_id));
+   CREATE TABLE IF NOT EXISTS md_google_account(owner TEXT PRIMARY KEY,secret TEXT NOT NULL,meta TEXT NOT NULL);
    CREATE TABLE IF NOT EXISTS md_google_links(owner TEXT NOT NULL,account_key TEXT NOT NULL,calendar_id TEXT NOT NULL,local_id TEXT NOT NULL,google_id TEXT NOT NULL,local_hash TEXT NOT NULL,etag TEXT NOT NULL,remote_hash TEXT NOT NULL,deleted INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(owner,account_key,calendar_id,local_id),UNIQUE(owner,account_key,calendar_id,google_id));`);
  }
  key(){const k=Buffer.from(this.env.SOFIA_CALENDAR_TOKEN_KEY||'','base64');return k.length===32?k:null;}
@@ -92,20 +94,68 @@ class GoogleCalendarSync{
  async access(){const a=this.account();if(!a)throw new AppError('GOOGLE_NOT_CONNECTED','Google Agenda não conectado.',409);if(a.expires_at>Date.now()+60000)return a.access_token;const epoch=this.epoch;const token=await this.token({grant_type:'refresh_token',refresh_token:a.refresh_token});if(epoch!==this.epoch)throw new AppError('CANCELLED','Sincronização cancelada.',409);this.write({...a,...token,refresh_token:token.refresh_token||a.refresh_token,expires_at:Date.now()+Number(token.expires_in||3600)*1000});return token.access_token;}
  async request(path,options={}){const access=await this.access(),{response,body}=await this.raw(API+path,{...options,headers:{Authorization:'Bearer '+access,'Content-Type':'application/json',...(options.headers||{})}});if(!response.ok){const error=new AppError('GOOGLE_REQUEST','Não foi possível sincronizar com o Google Agenda. Tente novamente.',[401,403].includes(response.status)?409:response.status);error.googleStatus=response.status;throw error;}return body;}
  async calendarList(access){const result=[];let pageToken='';do{const params=new URLSearchParams({maxResults:'250'});if(pageToken)params.set('pageToken',pageToken);const {response,body}=await this.raw(API+'/users/me/calendarList?'+params,{headers:{Authorization:'Bearer '+access}});if(!response.ok)throw new AppError('GOOGLE_CALENDARS','Não foi possível listar os calendários autorizados.',502);for(const c of body.items||[])result.push({id:c.id,summary:c.summary||c.id,accessRole:c.accessRole,primary:!!c.primary});pageToken=body.nextPageToken||'';}while(pageToken);return result;}
- async disconnect(){const a=this.configured()?this.account():null;this.epoch++;this.controller?.abort();this.pending.clear();this.tickets.clear();this.db.prepare('DELETE FROM md_google_account WHERE owner=?').run(OWNER);if(a?.refresh_token){try{await this.fetch('https://oauth2.googleapis.com/revoke',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({token:a.refresh_token}),signal:AbortSignal.timeout(8000),redirect:'error'});}catch{/* Local access is removed even while offline. */}}}
- async select(id){const startEpoch=this.epoch,a=this.account();if(!a)throw new AppError('GOOGLE_NOT_CONNECTED','Conecte o Google Agenda.');if(typeof id!=='string'||id.length>1024)throw new AppError('BAD_CALENDAR','Calendário inválido.');const calendars=await this.calendarList(await this.access()),selected=calendars.find(c=>c.id===id&&['owner','writer'].includes(c.accessRole));if(!selected)throw new AppError('GOOGLE_READ_ONLY','O calendário não permite edição.',403);if(startEpoch!==this.epoch)throw new AppError('CANCELLED','A conexão mudou durante a seleção.',409);this.epoch++;this.controller?.abort();const fresh=this.account();if(!fresh)throw new AppError('GOOGLE_NOT_CONNECTED','Conecte o Google Agenda.');fresh.meta={...fresh.meta,calendar_id:id,calendar_name:selected.summary,calendars,sync_token:'',last_sync:null,conflicts:[],error:''};this.write(fresh);this.schedule();}
+ async disconnect(){this.windows.clear();const a=this.configured()?this.account():null;this.epoch++;this.controller?.abort();this.pending.clear();this.tickets.clear();this.db.prepare('DELETE FROM md_google_account WHERE owner=?').run(OWNER);if(a?.refresh_token){try{await this.fetch('https://oauth2.googleapis.com/revoke',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({token:a.refresh_token}),signal:AbortSignal.timeout(8000),redirect:'error'});}catch{/* Local access is removed even while offline. */}}}
+ async select(id){this.windows.clear();const startEpoch=this.epoch,a=this.account();if(!a)throw new AppError('GOOGLE_NOT_CONNECTED','Conecte o Google Agenda.');if(typeof id!=='string'||id.length>1024)throw new AppError('BAD_CALENDAR','Calendário inválido.');const calendars=await this.calendarList(await this.access()),selected=calendars.find(c=>c.id===id&&['owner','writer'].includes(c.accessRole));if(!selected)throw new AppError('GOOGLE_READ_ONLY','O calendário não permite edição.',403);if(startEpoch!==this.epoch)throw new AppError('CANCELLED','A conexão mudou durante a seleção.',409);this.epoch++;this.controller?.abort();const fresh=this.account();if(!fresh)throw new AppError('GOOGLE_NOT_CONNECTED','Conecte o Google Agenda.');fresh.meta={...fresh.meta,calendar_id:id,calendar_name:selected.summary,calendars,sync_token:'',last_sync:null,conflicts:[],error:''};this.write(fresh);this.schedule();}
  links(a){return this.db.prepare('SELECT * FROM md_google_links WHERE owner=? AND account_key=? AND calendar_id=?').all(OWNER,a.account_key,a.meta.calendar_id);}
  saveLink(a,entity,event,{isDeleted=false}={}){const localHash=entity?fingerprint(toGoogle(entity)):'';this.db.prepare('INSERT INTO md_google_links VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(owner,account_key,calendar_id,local_id) DO UPDATE SET google_id=excluded.google_id,local_hash=excluded.local_hash,etag=excluded.etag,remote_hash=excluded.remote_hash,deleted=excluded.deleted').run(OWNER,a.account_key,a.meta.calendar_id,entity.id,event.id,localHash,event.etag||'',event.status==='cancelled'?'':fingerprint(event),isDeleted?1:0);}
  safeGet(id){try{return this.w.get(id);}catch(e){if(e.status===404||e.code==='NOT_FOUND')return null;throw e;}}
  async sync(){if(!this.configured()||!this.account())return;if(this.busy)return this.busy;const epoch=this.epoch;this.controller=new AbortController();this.busy=this.perform(epoch).catch(error=>{if(epoch!==this.epoch)return;const a=this.account();if(a){a.meta.error=error.code==='GOOGLE_AUTH'?'A autorização Google expirou. Reconecte a conta.':'A sincronização não terminou. Seus registros foram preservados; tente novamente.';this.write(a);}throw error;}).finally(()=>{this.busy=null;this.controller=null;});return this.busy;}
+ cancelOccurrence(a,link,local,conflicts){
+  if(link.deleted||deleted(local))return;
+  if(fingerprint(toGoogle(local))!==link.local_hash){conflicts.push({id:local.id,reason:'Ocorrência removida no Google e editada na Sofia'});return;}
+  this.applying=true;try{this.runtime.store.tx(()=>{const saved=this.w.save({revision:local.revision,state:'cancelled',data:{...local.data,sync_state:'synced'}},local.id);this.saveLink(a,saved,{id:link.google_id,status:'cancelled'},{isDeleted:true});});}finally{this.applying=false;}
+ }
+ async ensureMonth(month){
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month||''))throw new AppError('BAD_DATE','Mês inválido.');
+  if(!this.configured()||!this.account())return;
+  const first=Date.parse(month+'-01T00:00:00Z'),end=new Date(first);end.setUTCMonth(end.getUTCMonth()+1);
+  // Expand an overlap for device timezones and multi-day events.
+  const range={min:new Date(first-2*86400000).toISOString(),max:new Date(end.getTime()+2*86400000).toISOString()};
+  const existing=this.windows.get(month);if(existing&&Date.now()-existing.loaded<30000)return;
+  this.windows.set(month,{...range,loaded:0});
+  if(this.busy)await this.busy;
+  await this.sync();
+ }
+ async expandSeries(a,epoch,conflicts){
+  const still=()=>{if(epoch!==this.epoch)throw new AppError('CANCELLED','Conexão alterada.',409);};
+  const now=new Date(),year=now.getUTCFullYear();
+  const ranges=[{min:new Date(Date.UTC(year-1,0,1)).toISOString(),max:new Date(Date.UTC(year+3,0,1)).toISOString()},...this.windows.values()];
+  const series=this.db.prepare('SELECT event FROM md_google_series WHERE owner=? AND account_key=? AND calendar_id=?').all(OWNER,a.account_key,a.meta.calendar_id);
+  for(const row of series){const master=JSON.parse(row.event);for(const range of ranges){
+   const events=[];let pageToken='';do{const params=new URLSearchParams({maxResults:'2500',showDeleted:'true',timeMin:range.min,timeMax:range.max});if(pageToken)params.set('pageToken',pageToken);
+    const result=await this.request('/calendars/'+encodeURIComponent(a.meta.calendar_id)+'/events/'+encodeURIComponent(master.id)+'/instances?'+params);still();events.push(...result.items||[]);pageToken=result.nextPageToken||'';
+   }while(pageToken);
+   const links=this.links(a),byGoogle=new Map(links.map(link=>[link.google_id,link])),seen=new Set();
+   for(const event of events){await yieldRequests();still();seen.add(event.id);const link=byGoogle.get(event.id),local=link?this.safeGet(link.local_id):null;
+    if(event.status==='cancelled'){if(link&&local)this.cancelOccurrence(a,link,local,conflicts);continue;}
+    if(link?.deleted||local?.privacy==='local')continue;
+    if(!googleProjection(event).start||!googleProjection(event).end)continue;
+    const remoteHash=fingerprint(event),localHash=local?fingerprint(toGoogle(local)):'';
+    if(link&&remoteHash===link.remote_hash){if(link.etag!==event.etag)this.db.prepare('UPDATE md_google_links SET etag=? WHERE owner=? AND account_key=? AND calendar_id=? AND local_id=?').run(event.etag||'',OWNER,a.account_key,a.meta.calendar_id,link.local_id);continue;}
+    if(link&&(!local||deleted(local)||localHash!==link.local_hash)&&localHash!==remoteHash){conflicts.push({id:link.local_id,reason:'Mudanças simultâneas nesta ocorrência'});continue;}
+    this.applying=true;try{this.runtime.store.tx(()=>{const saved=this.w.save(fromGoogle(event,local,a.meta.calendar_id),local?.id);this.saveLink(a,saved,event);});}finally{this.applying=false;}
+   }
+   // Reconcile removed occurrences after a COUNT/UNTIL/rule change, only in the fully fetched window.
+   for(const link of links){await yieldRequests();still();const local=this.safeGet(link.local_id);if(!local||local.data.calendar_recurring_id!==master.id||seen.has(link.google_id))continue;
+    const start=local.data.calendar_all_day?local.data.calendar_date_start+'T12:00:00Z':local.data.start_at||local.data.remind_at,end=local.data.end_at||start;
+    if(Date.parse(start)>=Date.parse(range.min)&&Date.parse(start)<Date.parse(range.max)&&Date.parse(end)>Date.parse(range.min))this.cancelOccurrence(a,link,local,conflicts);
+   }
+  }}
+  for(const range of this.windows.values())range.loaded=Date.now();
+ }
  async perform(epoch){
   const a=this.account();if(!a)return;const cal=encodeURIComponent(a.meta.calendar_id),base='/calendars/'+cal+'/events';const still=()=>{if(this.epoch!==epoch)throw new AppError('CANCELLED','Conexão alterada durante a sincronização.',409);};
   // Conflict snapshots contain IDs only; no body or credentials in public status.
-  const conflicts=[],warnings=[...(a.meta.sync_token?(a.meta.warnings||[]):[])],remote=[];let syncToken=a.meta.sync_token||'',nextToken='',retried=false;
+  const conflicts=[],warnings=[],remote=[];let syncToken=a.meta.sync_token||'',nextToken='',retried=false;
   for(;;){try{let pageToken='';remote.length=0;do{const params=new URLSearchParams({maxResults:'2500',showDeleted:'true',singleEvents:'false'});if(syncToken)params.set('syncToken',syncToken);if(pageToken)params.set('pageToken',pageToken);const result=await this.request(base+'?'+params);still();remote.push(...result.items||[]);pageToken=result.nextPageToken||'';nextToken=result.nextSyncToken||nextToken;}while(pageToken);break;}catch(e){if(e.googleStatus===410&&!retried){syncToken='';warnings.length=0;retried=true;continue;}throw e;}}
-  const mappings=this.links(a),byGoogle=new Map(mappings.map(link=>[link.google_id,link])),conflictIds=new Set();let recurring=0,unsupported=0;
+  const mappings=this.links(a),byGoogle=new Map(mappings.map(link=>[link.google_id,link])),conflictIds=new Set();let recurring=0,unsupported=0;let seriesChanged=false;
   for(const event of remote){await yieldRequests();still();const link=byGoogle.get(event.id),local=link?this.safeGet(link.local_id):null;
-   if(event.recurrence?.length||event.recurringEventId){recurring++;if(local)conflictIds.add(local.id);continue;}
+   if(event.recurrence?.length){const previous=this.db.prepare('SELECT event FROM md_google_series WHERE owner=? AND account_key=? AND calendar_id=? AND google_id=?').get(OWNER,a.account_key,a.meta.calendar_id,event.id);if(!previous||JSON.parse(previous.event).etag!==event.etag)seriesChanged=true;this.db.prepare('INSERT INTO md_google_series VALUES(?,?,?,?,?) ON CONFLICT(owner,account_key,calendar_id,google_id) DO UPDATE SET event=excluded.event').run(OWNER,a.account_key,a.meta.calendar_id,event.id,JSON.stringify(event));recurring++;continue;}
+   if(event.recurringEventId){seriesChanged=true;continue;} // Instances (including exceptions) come from Google's bounded expansion.
+   if(event.status==='cancelled'&&this.db.prepare('SELECT google_id FROM md_google_series WHERE owner=? AND account_key=? AND calendar_id=? AND google_id=?').get(OWNER,a.account_key,a.meta.calendar_id,event.id)){
+    seriesChanged=true;this.db.prepare('DELETE FROM md_google_series WHERE owner=? AND account_key=? AND calendar_id=? AND google_id=?').run(OWNER,a.account_key,a.meta.calendar_id,event.id);
+    for(const mapping of this.links(a)){await yieldRequests();still();const occurrence=this.safeGet(mapping.local_id);if(occurrence?.data.calendar_recurring_id===event.id)this.cancelOccurrence(a,mapping,occurrence,conflicts);}continue;
+   }
    if(event.status==='cancelled'){
     if(!link||link.deleted)continue;
     if(local&&!deleted(local)&&fingerprint(toGoogle(local))!==link.local_hash){conflicts.push({id:local.id,reason:'Exclusão no Google e edição na Sofia'});conflictIds.add(local.id);continue;}
@@ -113,7 +163,7 @@ class GoogleCalendarSync{
     else this.db.prepare('UPDATE md_google_links SET deleted=1 WHERE owner=? AND account_key=? AND calendar_id=? AND local_id=?').run(OWNER,a.account_key,a.meta.calendar_id,link.local_id);
     continue;
    }
-   const projected=googleProjection(event);if(!projected.start||!projected.end||['focusTime','outOfOffice','workingLocation','birthday'].includes(event.eventType)){unsupported++;continue;}
+   const projected=googleProjection(event);if(!projected.start||!projected.end){unsupported++;continue;}
    if(link?.deleted)continue; // Never resurrect an intentionally deleted local event.
    if(local?.privacy==='local'){conflictIds.add(local.id);continue;}
    const remoteChanged=!link||fingerprint(event)!==link.remote_hash,localChanged=!!link&&(!local||deleted(local)||fingerprint(toGoogle(local))!==link.local_hash);
@@ -123,6 +173,8 @@ class GoogleCalendarSync{
    if(link&&!local)continue;
    this.applying=true;try{this.runtime.store.tx(()=>{const saved=this.w.save(fromGoogle(event,local,a.meta.calendar_id),local?.id);this.saveLink(a,saved,event);});}finally{this.applying=false;}
   }
+  if(seriesChanged||Date.now()-this.seriesRefresh>86400000||[...this.windows.values()].some(range=>!range.loaded)){await this.expandSeries(a,epoch,conflicts);this.seriesRefresh=Date.now();}
+  for(const conflict of conflicts)conflictIds.add(conflict.id);
   // Fresh mappings and records after import prevent a stale revision from overwriting an edit.
   const currentLinks=this.links(a),byLocal=new Map(currentLinks.map(link=>[link.local_id,link]));
   const ids=this.db.prepare("SELECT id FROM entities WHERE owner=? AND kind IN ('commitment','reminder')").all(OWNER);
@@ -131,6 +183,7 @@ class GoogleCalendarSync{
   for(const [id,entity] of toPush){await yieldRequests();still();const link=byLocal.get(id);if(conflictIds.has(id)||link?.deleted||entity?.privacy==='local')continue;
    if(entity?.data.external_event_id&&!link)continue; // Imported from another account/calendar: never copy it silently.
    if(deleted(entity)){
+    if(entity?.data.calendar_recurring_id)this.seriesRefresh=0;
     if(!link)continue;try{await this.request(base+'/'+encodeURIComponent(link.google_id),{method:'DELETE',headers:{'If-Match':link.etag}});}catch(e){if(e.googleStatus===412){conflicts.push({id,reason:'Evento alterado no Google durante a exclusão'});continue;}if(![404,410].includes(e.googleStatus))throw e;}still();this.db.prepare('UPDATE md_google_links SET deleted=1 WHERE owner=? AND account_key=? AND calendar_id=? AND local_id=?').run(OWNER,a.account_key,a.meta.calendar_id,id);continue;
    }
    const payload=toGoogle(entity);if(!payload)continue;const localHash=fingerprint(payload);if(link&&link.local_hash===localHash)continue;
@@ -141,7 +194,7 @@ class GoogleCalendarSync{
     if(e.googleStatus===409&&!link){saved=await this.request(base+'/'+googleId);if(fingerprint(saved)!==localHash){conflicts.push({id,reason:'Revisar tentativa anterior de envio'});continue;}}
     else if(e.googleStatus===404&&link){conflicts.push({id,reason:'Evento removido no Google durante a edição'});continue;}else throw e;
    }
-   still();const fresh=this.safeGet(id);if(!fresh||fresh.revision!==entity.revision){
+   still();if(entity?.data.calendar_recurring_id)this.seriesRefresh=0;const fresh=this.safeGet(id);if(!fresh||fresh.revision!==entity.revision){
     // Keep the identity of the exported snapshot even if the user edited/deleted
     // the local record while Google was responding. The next pass patches or
     // deletes this exact remote record instead of importing a duplicate.
@@ -150,7 +203,7 @@ class GoogleCalendarSync{
    this.applying=true;try{this.runtime.store.tx(()=>{const marked=this.w.save({revision:fresh.revision,data:{...fresh.data,calendar_provider:'google',calendar_id:a.meta.calendar_id,external_event_id:saved.id,sync_state:'synced'}},id);this.saveLink(a,marked,saved);});}finally{this.applying=false;}
   }
   still();const fresh=this.account();if(!fresh)return;
-  if(recurring)warnings.push('Eventos recorrentes permanecem sob edição no Google; a série não é expandida nesta versão.');
+  
   if(unsupported)warnings.push('Há tipos especiais de evento que permanecem no Google.');
   // Keep the previous token while conflicts exist, so a retry cannot forget remote changes.
   fresh.meta={...fresh.meta,last_sync:stamp(),error:'',conflicts,warnings:[...new Set(warnings)],sync_token:conflicts.length?syncToken:nextToken||syncToken};this.write(fresh);

@@ -1,7 +1,7 @@
 import {expandAgenda,eventStart,readRepeat,REPEATS} from '../lib/agenda-recurrence';
 import {subscribeAgenda} from '../lib/agenda-events';
 import {useAgendaView} from '../lib/agenda-view';
-import React,{useEffect,useMemo,useState} from 'react';
+import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {ScrollView,View,Text,Pressable,RefreshControl} from 'react-native';
 import {SofiaApi} from '../lib/api';
 import {useTheme} from '../lib/theme';
@@ -14,9 +14,10 @@ import {EntityEditor,Choice} from './Workspace';
 export function Agenda({api,target,active=true,onGestureLock}:{onGestureLock?:(locked:boolean)=>void;api:SofiaApi;target?:{date:string;id?:string;nonce:number};active?:boolean}){
  const {month,setMonth,selected:selectedKey,setSelected:setSelectedKey,acceptTarget}=useAgendaView(api,'agenda',active),selected=new Date(selectedKey+'T12:00:00'),setSelected=(value:Date)=>setSelectedKey(localDateKey(value));
  const c=useTheme(),[items,setItems]=useState<AgendaItem[]>([]),[loading,setLoading]=useState(false),[refreshing,setRefreshing]=useState(false),[error,setError]=useState(''),[catalog,setCatalog]=useState<Catalog|null>(null),[editing,setEditing]=useState<Partial<Entity>|null>(null),[kind,setKind]=useState('commitment');
- async function load(manual=false){setLoading(true);if(manual)setRefreshing(true);try{const [a,cat]=await Promise.all([api.agenda(),api.catalog()]);setItems(a.items);setCatalog(cat);setError('');}catch(e){setError(errorText(e));}finally{setLoading(false);if(manual)setRefreshing(false);}}
- useEffect(()=>{if(active)void load();},[api,active]);
- useEffect(()=>subscribeAgenda(owner=>{if(owner===api)void load();}),[api]);
+ const request=useRef(0);
+ async function load(manual=false){const id=++request.current;setLoading(true);if(manual)setRefreshing(true);try{const [a,cat]=await Promise.all([api.agenda(`${month.getFullYear()}-${String(month.getMonth()+1).padStart(2,'0')}`),api.catalog()]);if(id!==request.current)return;setItems(a.items);setCatalog(cat);setError('');}catch(e){if(id===request.current)setError(errorText(e));}finally{if(id===request.current){setLoading(false);if(manual)setRefreshing(false);}}}
+ useEffect(()=>{if(active)void load();},[api,active,month.getTime()]);
+ useEffect(()=>subscribeAgenda(owner=>{if(owner===api)void load();}),[api,month.getTime()]);
  useEffect(()=>{if(!target?.date)return;if(!acceptTarget(target.date,target.nonce))return;if(target.id)api.entity(target.id).then(setEditing).catch(e=>setError(errorText(e)));},[target?.nonce,api]);
  const start=(item:AgendaItem)=>item.data.calendar_all_day?item.data.calendar_date_start||'':item.data.start_at||item.data.remind_at||item.data.due_at||'',activeItems=useMemo(()=>expandAgenda(items,month),[items,month.getTime()]);
  const eventDays=useMemo(()=>new Set(activeItems.map(i=>localDateKey(eventStart(i)))),[activeItems]);

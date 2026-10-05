@@ -35,6 +35,17 @@ tap('Notificações: 2 não lidas');time.sleep(.35);screenshot('bell-origin');ta
 for i in range(3):
  tap('Agenda');wait('Sua agenda');tap('Próximo mês');tap('Mês anterior');screenshot('agenda-'+str(i));tap('Início');wait('Olá, Teste.')
  assert adb('shell','pidof','com.avsord.sofiaapp').strip()==pid,'App restarted'
+# Actual production screens with synthetic transport: new layout/filter/note flows.
+tap('Perfil');tap('Configurações do aplicativo');tap('Horário');wait('Claro a partir de');wait('Escuro a partir de');screenshot('schedule-settings')
+tap('Início');tap('Apps');tap('Biblioteca');tap('Criar registro')
+r=tree();new=find(r,'Nova área da Biblioteca');assert new is not None
+# New area is last, after existing built-in types.
+last_y=int(re.findall(r'\d+',new.get('bounds'))[1]);assert last_y>int(re.findall(r'\d+',find(r,'Criar Filme').get('bounds'))[1])
+screenshot('library-plus');tap('Fechar tipos da Biblioteca');tap('Tipo de registro');tap('Filme');time.sleep(2)
+tap('Filtros da Biblioteca');tap('Filtrar por estrelas');tap('★★★★★');tap('Ver registros');wait('Filme de Drama');r=screenshot('film-five-stars');assert find(r,'Filme de Acao') is None
+# Persist a rich note and reopen the same entity through Apps/Notas.
+tap('Voltar aos apps');tap('Notas');tap('Criar registro');tap('Título da nota');adb('shell','input','text','NotaQA036')
+tap('Conteúdo da nota');adb('shell','input','text','TextoQA036');tap('Negrito');adb('shell','input','text','Bold');tap('Fechar teclado');tap('Salvar');wait('NotaQA036');tap('NotaQA036');wait('Título da nota');wait('Conteúdo da nota');screenshot('rich-note-reopened');tap('Voltar das notas');tap('Início')
 logs=adb('logcat','-d').decode(errors='replace');(out/'native-log.txt').write_text(logs);assert 'FATAL EXCEPTION' not in logs;assert 'CALENDAR_PERF' in logs
 (out/'result.json').write_text(json.dumps({'passed':True,'events':500,'passes':10,'native_hermes_budget_ms':1000,'menu_roundtrips':3}))
 print('PASS native calendar performance, 500 events, existing update signature and navigation')

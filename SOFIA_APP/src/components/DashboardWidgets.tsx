@@ -1,7 +1,7 @@
 import {expandAgenda,eventStart,readRepeat} from '../lib/agenda-recurrence';
 import {useAgendaView} from '../lib/agenda-view';
 import {MotionModal} from './MotionModal';
-import React,{useMemo,useState} from 'react';
+import React,{useEffect,useMemo,useState} from 'react';
 import {Alert,Linking,Modal,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
 import Svg,{Circle,Line,Polyline} from 'react-native-svg';
 import type {DayRecord,PriceSeries} from '../lib/dashboard';
@@ -9,8 +9,9 @@ import {observationPoints,stableProductColor,localDateKey,monthCells,priceGeomet
 import {useTheme} from '../lib/theme';
 import {Button,IconButton} from './UI';
 import {MonthSwipe} from './MonthSwipe';
-export function MiniAgenda({items,onOpen,onItem,onGestureLock,viewOwner,active=true}:{active?:boolean;viewOwner:object;onGestureLock?:(locked:boolean)=>void;items:DayRecord[];onOpen:(day:string)=>void;onItem:(item:DayRecord)=>void}){
+export function MiniAgenda({items,onOpen,onItem,onGestureLock,viewOwner,active=true,onMonthChange}:{onMonthChange?:(month:Date)=>void;active?:boolean;viewOwner:object;onGestureLock?:(locked:boolean)=>void;items:DayRecord[];onOpen:(day:string)=>void;onItem:(item:DayRecord)=>void}){
  const c=useTheme(),{month,setMonth,selected,setSelected}=useAgendaView(viewOwner,'home',active);
+ useEffect(()=>{if(active)onMonthChange?.(month);},[active,month.getTime(),onMonthChange]);
  const expanded=useMemo(()=>items.flatMap(record=>record.isTask||!record.original||readRepeat(record.original as import('../lib/types').AgendaItem).frequency==='none'?[record]:expandAgenda([record.original as import('../lib/types').AgendaItem],month).map(event=>({...record,id:record.id+eventStart(event),date:eventStart(event),original:event}))),[items,month.getTime()]);
  const dates=useMemo(()=>new Set(expanded.map(item=>localDateKey(item.date))),[expanded]),chosen=expanded.filter(i=>localDateKey(i.date)===selected);
  const today=()=>{const now=new Date();setMonth(new Date(now.getFullYear(),now.getMonth(),1));setSelected(localDateKey(now));};

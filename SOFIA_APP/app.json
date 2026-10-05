@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sofia OS",
     "slug": "sofia-app",
-    "version": "0.3.35",
+    "version": "0.3.36",
     "scheme": "sofiaapp",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.avsord.sofiaapp",
-      "versionCode": 40,
+      "versionCode": 41,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.RECORD_AUDIO",
@@ -34,7 +34,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "A Sofia usa o microfone somente quando você escolhe gravar uma mensagem de voz.",
+          "microphonePermission": "A Sofia usa o microfone somente quando voc\u00ea escolhe gravar uma mensagem de voz.",
           "enableBackgroundRecording": false,
           "enableBackgroundPlayback": false
         }
@@ -42,8 +42,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Escolha imagens para enviar na conversa ou usar nas suas páginas.",
-          "cameraPermission": "A Sofia usa a câmera somente quando você escolhe tirar uma foto."
+          "photosPermission": "Escolha imagens para enviar na conversa ou usar nas suas p\u00e1ginas.",
+          "cameraPermission": "A Sofia usa a c\u00e2mera somente quando voc\u00ea escolhe tirar uma foto."
         }
       ],
       "./plugins/with-sofia-logo.cjs",

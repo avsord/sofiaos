@@ -20,7 +20,7 @@ export class WorkspaceRecords {
   try{const offset=more?entry.items.length:0;let result=await (kind===LIBRARY_ALL?api.library(query,offset):api.entities(kind,query,offset));if(request!==entry.request)return;
    // Library filters must cover the whole category, including later API pages.
    if((complete||kind==='film')&&!more){const all=new Map(result.items.map(row=>[row.id,row]));let page=result.items,nextOffset=page.length;
-    while(page.length===100){const next=await api.entities(kind,query,nextOffset);if(request!==entry.request)return;page=next.items;nextOffset+=page.length;const before=all.size;page.forEach(row=>all.set(row.id,row));if(page.length&&all.size===before)throw Error('Não foi possível completar a lista desta categoria. Tente novamente.');}
+    while(page.length===100){const next=await (kind===LIBRARY_ALL?api.library(query,nextOffset):api.entities(kind,query,nextOffset));if(request!==entry.request)return;page=next.items;nextOffset+=page.length;const before=all.size;page.forEach(row=>all.set(row.id,row));if(page.length&&all.size===before)throw Error('Não foi possível completar a lista desta categoria. Tente novamente.');}
     result={items:[...all.values()]};
    }
    entry.items=more?[...new Map([...entry.items,...result.items].map(row=>[row.id,row])).values()]:result.items;

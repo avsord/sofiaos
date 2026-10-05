@@ -94,9 +94,7 @@ test('MD4: editing while first export is in flight retains mapping and never imp
 test('MD4: deleting while first export is in flight removes the exact remote record on retry',async t=>{
  const r=syncFixture(t),e=event(r.workspace);r.google.onPost(()=>r.workspace.deleteEntity(e.id));await r.sync.sync();await r.sync.sync();assert.equal([...r.google.events.values()][0].status,'cancelled');assert.equal(r.workspace.list({kind:'commitment'}).length,0);
 });
-test('MD4: unsupported recurring events produce a warning, never fabricated flattened copies',async t=>{
- const r=syncFixture(t);r.google.events.set('recurring',{id:'recurring',summary:'Série',recurrence:['RRULE:FREQ=WEEKLY'],start:{dateTime:'2026-10-03T12:00:00Z'},end:{dateTime:'2026-10-03T13:00:00Z'},etag:'"1"'});await r.sync.sync();assert.equal(r.workspace.list({kind:'commitment'}).length,0);assert.ok(r.sync.status().warnings.length);
-});
+
 test('MD4: disconnect removes authorization but preserves synced entities',async t=>{
  const r=syncFixture(t),e=event(r.workspace);await r.sync.sync();await r.sync.disconnect();assert.equal(r.sync.status().connected,false);assert.equal(r.workspace.get(e.id).title,e.title);assert.equal(r.google.calls.at(-1).url,'https://oauth2.googleapis.com/revoke');
 });

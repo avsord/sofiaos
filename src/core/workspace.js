@@ -41,6 +41,13 @@ class Workspace {
      else {v=cleanText(v,f.label,f.type==='textarea'?(f.max||16000):(f.max||1000),true);rejectSecrets(v);}
      data[f.key]=v;
    }
+   if(def.group==='knowledge'&&data.leaf_document){
+     let document;try{document=JSON.parse(data.leaf_document);}catch{throw new AppError('BAD_NOTE_DOCUMENT','Documento da nota inválido.');}
+     if(document.version!==1||!Array.isArray(document.blocks)||document.blocks.length>500||!Array.isArray(document.properties)||document.properties.length>100)throw new AppError('BAD_NOTE_DOCUMENT','Documento da nota inválido.');
+     const blockTypes=new Set(['text','heading1','heading2','heading3','bullet','number','todo','quote','code','divider']);
+     for(const b of document.blocks)if(!b||typeof b.id!=='string'||typeof b.text!=='string'||!blockTypes.has(b.type)||!Array.isArray(b.marks)||b.marks.some(m=>!Number.isInteger(m.start)||!Number.isInteger(m.end)||m.start<0||m.end> b.text.length||m.end<=m.start))throw new AppError('BAD_NOTE_DOCUMENT','Bloco da nota inválido.');
+     for(const p of document.properties)if(!p||typeof p.id!=='string'||typeof p.name!=='string'||typeof p.value!=='string')throw new AppError('BAD_NOTE_DOCUMENT','Propriedade da nota inválida.');
+   }
    if(kind==='user_page'){
      const allowedBlocks=new Set(['text','heading1','heading2','heading3','heading4','bullet','number','todo','toggle','code','quote','callout','equation','divider','page_link','image','file','table','date','task_link','commitment_link','bookmark','sofia','collection']);
      if(data.blocks_json){

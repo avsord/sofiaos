@@ -41,10 +41,8 @@ export function createMenuMotion(initial:Tab='chat') {
     if(tracking)taps.forEach((tap,i)=>tap.setValue(menuWeight(lastOffset/width,i)));
     live.setValue(0);tracking=false;dragging=false;selected=next;
     const index=tabIndex(next);
-    if(reduced){taps.forEach((tap,i)=>tap.setValue(i===index?1:0));return;}
-    // Animate only the old/new weights, never sweep through intermediate menus.
-    springs=taps.map((tap,i)=>Animated.spring(tap,{...MENU_SPRING,toValue:i===index?1:0}));
-    springs.forEach(s=>s.start()); // No completion callback gates page navigation.
+    taps.forEach((tap,i)=>tap.setValue(i===index?1:0)); // Tap selection is visible on the first native frame.
+
   }
   return {
     scrollX,onScroll,weights,motionAmount,select,

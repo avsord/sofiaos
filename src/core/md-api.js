@@ -9,6 +9,9 @@ function installFields(){
  const append=(kind,field)=>{if(!CATALOG[kind].fields.some(x=>x.key===field.key))CATALOG[kind].fields.push(field);};
  append('user_page',{key:'sort_order',label:'Ordem da página',type:'number',developerOnly:true});
  for(const kind of ['commitment','reminder']){
+  append(kind,{key:'calendar_recurring_id',label:'Série Google',type:'text',max:1024,developerOnly:true});
+  append(kind,{key:'calendar_original_start',label:'Início original Google',type:'text',developerOnly:true});
+  append(kind,{key:'calendar_time_zone',label:'Fuso Google',type:'text',developerOnly:true});
   append(kind,{key:'calendar_all_day',label:'Dia inteiro',type:'checkbox',developerOnly:true});
   append(kind,{key:'calendar_date_start',label:'Data inicial',type:'date',developerOnly:true});
   append(kind,{key:'calendar_date_end',label:'Data final exclusiva',type:'date',developerOnly:true});

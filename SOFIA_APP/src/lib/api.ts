@@ -1,4 +1,5 @@
 export type CalendarState={configured:boolean;connected:boolean;syncing?:boolean;last_sync?:string;error?:string;calendar_name?:string;calendar_id?:string;warnings?:string[];conflicts?:{id:string;reason:string}[];calendars?:{id:string;summary:string;accessRole:string}[]};
+import {themeTimes} from './theme-schedule';
 import {agendaChanged} from './agenda-events';
 import {LegacyMdAdapter} from './legacy-md';
 import * as SecureStore from 'expo-secure-store';
@@ -19,8 +20,8 @@ export async function readAuth(): Promise<Auth | null> {
 export function saveAuth(auth: Auth) { return SecureStore.setItemAsync(AUTH_KEY, JSON.stringify(auth), secureOptions); }
 export function forgetAuth() { return SecureStore.deleteItemAsync(AUTH_KEY); }
 export async function readPrefs(): Promise<Prefs> {
-  try { const p = JSON.parse(await AsyncStorage.getItem(PREFS_KEY) || '{}'); return { appearance: ['system','light','dark'].includes(p.appearance) ? p.appearance : 'system', enterToSend: p.enterToSend === true, autoSendVoice: p.autoSendVoice !== false }; }
-  catch { return { appearance: 'system', enterToSend: false, autoSendVoice: true }; }
+  try { const p = JSON.parse(await AsyncStorage.getItem(PREFS_KEY) || '{}'); return { appearance: ['system','light','dark','schedule'].includes(p.appearance) ? p.appearance : 'schedule', enterToSend: p.enterToSend === true, autoSendVoice: p.autoSendVoice !== false, ...themeTimes(p) }; }
+  catch { return { appearance: 'schedule', enterToSend: false, autoSendVoice: true, lightAt:'05:00', darkAt:'19:00' }; }
 }
 export function savePrefs(p: Prefs) { return AsyncStorage.setItem(PREFS_KEY, JSON.stringify(p)); }
 export class ApiError extends Error {
@@ -80,7 +81,7 @@ export class SofiaApi {
   taskState(task: Task, state: 'done' | 'todo') { return this.request<{item: Task}>('/tasks/' + encodeURIComponent(task.id), { state, revision: task.revision }, 'PATCH'); }
   saveTask(task: Partial<Task>) { return this.request<{item: Task}>('/tasks' + (task.id ? '/' + encodeURIComponent(task.id) : ''), task, task.id ? 'PATCH' : 'POST'); }
   deleteTask(id: string) { return this.request<{ok: boolean}>('/tasks/' + encodeURIComponent(id), undefined, 'DELETE'); }
-  agenda() { return this.request<{items: AgendaItem[]}>('/agenda'); }
+  agenda(month?:string) { return this.request<{items: AgendaItem[]}>('/agenda'+(month?'?month='+encodeURIComponent(month):'')); }
   createEvent(title: string, start_at: string) { return this.request<{item: AgendaItem}>('/agenda', { title, start_at }); }
   notifications() { return this.request<{items: Notice[]; push_enabled: boolean}>('/notifications'); }
   markRead(id: string) { return this.request<{ok: boolean}>('/notifications/' + encodeURIComponent(id) + '/read', {}); }
