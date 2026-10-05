@@ -57,3 +57,10 @@ test('native conversation: same owner web conversation is visible and continues 
  assert.equal(r.body.conversation_id,c.id);assert.equal(f.store.messages(c.id).length,2);
  const list=await f.request('/conversations',undefined,'GET',token);assert.ok(list.body.items.some(i=>i.id===c.id));
 });
+
+test('native agenda returns saved events without awaiting a slow Google synchronization',async t=>{
+ const f=await setup(t),token=await f.login(),calendar=require('../src/core/md-api').getMdRuntime(f.runtime||f).calendar;
+ const e=f.workspace.save({kind:'commitment',title:'Evento preservado',state:'confirmed',area:'Pessoal',privacy:'private',data:{start_at:'2026-10-05T12:00:00Z'}});
+ let queued='';calendar.requestMonth=month=>{queued=month;return true;};calendar.ensureMonth=()=>{throw Error('GET must not await synchronization');};
+ const r=await f.request('/agenda?month=2026-10',undefined,'GET',token);assert.equal(r.status,200);assert.equal(queued,'2026-10');assert.equal(r.body.refresh_pending,true);assert.ok(r.body.items.some(x=>x.id===e.id));
+});

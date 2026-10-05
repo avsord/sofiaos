@@ -205,10 +205,10 @@ function makeMobileApi(runtime, deps) {
     }
     if (match && m === 'DELETE') { rate(session, 'write', 40); return send(store.deleteTask(validId(match[1]))); }
     if (p === '/api/mobile/agenda' && m === 'GET') {
-      const month=url.searchParams.get('month');if(month)await require('../core/md-api').getMdRuntime(runtime).calendar.ensureMonth(month);
+      const month=url.searchParams.get('month');const refreshPending=month?require('../core/md-api').getMdRuntime(runtime).calendar.requestMonth(month):false;
       const now=new Date(),min=month?Date.parse(month+'-01T00:00:00Z')-2*86400000:Date.now()-40*86400000,end=month?new Date(month+'-01T00:00:00Z'):now;if(month)end.setUTCMonth(end.getUTCMonth()+1);const max=month?end.getTime()+2*86400000:Date.now()+400*86400000;
       const items=[];for(const kind of ['commitment','reminder'])for(let offset=0;;offset+=500){const rows=workspace.list({kind,limit:500,offset});items.push(...rows.filter(e=>!e.data.calendar_recurring_id||(Date.parse(e.data.start_at||e.data.remind_at)<max&&Date.parse(e.data.end_at||e.data.start_at||e.data.remind_at)>min)));if(rows.length<500)break;await new Promise(resolve=>setImmediate(resolve));}
-      return send({items,provider:'sofia'});
+      return send({items,provider:'sofia',refresh_pending:refreshPending});
     }
     if (p === '/api/mobile/agenda' && m === 'POST') {
       rate(session, 'write', 40); const b = await bodyJson(req, 8192);

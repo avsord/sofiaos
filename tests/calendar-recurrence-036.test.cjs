@@ -17,3 +17,21 @@ test('rich knowledge document saves formatting alongside plain text and keeps or
 test('upgrade resets the old unexpanded feed token once, importing unchanged series without duplicating existing instances',async t=>{const f=fixture(t),a=f.sync.account();a.meta.sync_token='legacy-token';f.sync.write(a);f.state.instances=[occurrence('a','2026-10-03T12:00:00Z')];await f.sync.sync();assert.equal(f.state.calls[0].u.searchParams.has('syncToken'),false);assert.equal(f.sync.account().meta.recurrence_version,1);const id=f.workspace.list({kind:'commitment'})[0].id;await f.sync.sync();assert.ok(f.state.calls.some(c=>c.u.searchParams.get('syncToken')==='token'));assert.equal(f.workspace.list({kind:'commitment'}).length,1);assert.equal(f.workspace.list({kind:'commitment'})[0].id,id);});
 
 test('site/plain-text edits refresh the rich body while retaining properties, record identity and prior version',t=>{const f=fixture(t);const document=JSON.stringify({version:1,created_at:'2026-10-05T12:00:00Z',blocks:[{id:'body',type:'text',text:'Antes',marks:[{start:0,end:5,bold:true}]}],properties:[{id:'author',name:'Autor',value:'Eu'}]});const e=f.workspace.save({kind:'annotation',title:'Nota',content:'Antes',data:{leaf_document:document}});const next=f.workspace.save({revision:e.revision,content:'Mudou no site'},e.id),rich=JSON.parse(next.data.leaf_document);assert.equal(next.id,e.id);assert.equal(rich.blocks[0].text,next.content);assert.equal(rich.properties[0].value,'Eu');assert.equal(rich.created_at,'2026-10-05T12:00:00Z');assert.ok(f.store.db.prepare('SELECT COUNT(*) AS n FROM entity_versions WHERE entity_id=?').get(e.id).n>=2);});
+
+test('agenda read queues one background load while Google is slow, preserving saved occurrences',async t=>{
+ const f=fixture(t);f.state.instances=[occurrence('a','2026-10-05T12:00:00Z')];await f.sync.sync();
+ let release,calls=0;f.sync.ensureMonth=async month=>{calls++;await new Promise(r=>release=r);f.sync.windows.set(month,{loaded:Date.now()});};
+ assert.equal(f.sync.requestMonth('2035-06'),true);assert.equal(f.sync.requestMonth('2035-06'),true);assert.equal(calls,1);
+ assert.equal(f.workspace.list({kind:'commitment'})[0].data.external_event_id,'a');release();await f.sync.monthLoads.get('2035-06');
+ assert.equal(f.sync.requestMonth('2035-06'),false);assert.equal(calls,1);
+});
+test('opening a month already inside the expanded range does not trigger Google calls again',async t=>{
+ const f=fixture(t);await f.sync.sync();const before=f.state.calls.length;const month=new Date().toISOString().slice(0,7);
+ await f.sync.ensureMonth(month);assert.equal(f.state.calls.length,before);f.sync.windows.get(month).loaded-=60000;
+ await f.sync.ensureMonth(month);assert.equal(f.state.calls.length,before);assert.equal(f.sync.requestMonth(month),false);
+});
+test('failed background month read keeps local data and backs off before retrying',async t=>{
+ const f=fixture(t);f.state.instances=[occurrence('a','2026-10-05T12:00:00Z')];await f.sync.sync();f.state.fail=true;
+ assert.equal(f.sync.requestMonth('2035-06'),true);await f.sync.monthLoads.get('2035-06');const count=f.state.calls.length;
+ assert.equal(f.sync.requestMonth('2035-06'),false);assert.equal(f.state.calls.length,count);assert.equal(f.workspace.list({kind:'commitment'})[0].state,'confirmed');
+});
