@@ -174,7 +174,7 @@ class Workspace {
      const reasons=[];if(mon.data.target_price!==''&&total<=Math.round(mon.data.target_price*100))reasons.push('atingiu o preço-alvo');
      if(latest&&mon.data.drop_percent!==''&&total<latest.total_cents&&(latest.total_cents-total)/latest.total_cents*100>=mon.data.drop_percent)reasons.push('atingiu a queda percentual');
      if(mon.data.new_low&&min!==null&&total<min)reasons.push('menor total desde o início das suas observações');
-     if(reasons.length&&(!previous.length||when>=previous.at(-1).observed_at)&&(!latest||latest.total_cents!==total))this.notify('price',mon.title+' — oportunidade',reasons.join('; ')+'. Total inclui o frete informado. Fonte: '+source,key,'opportunity',key+':'+total+':'+when.slice(0,10));
+     if(reasons.length&&(!previous.length||when>=previous.at(-1).observed_at)&&(!latest||latest.total_cents!==total))this.notify('price',mon.title+' — oportunidade',reasons.join('; ')+(mon.data.method==='product'?'. Preço do produto; frete a confirmar na loja. Fonte: ':'. Total inclui o frete informado. Fonte: ')+source,key,'opportunity',key+':'+total+':'+when.slice(0,10));
      this.event('entity',key,'observation',mon.area,'Observação de preço registrada');return this.db.prepare('SELECT * FROM observations WHERE id=?').get(oid);
    });
  }
