@@ -1,11 +1,13 @@
 name: Sofia Android 0.3.38 update
-# Server recurrence fix is already deployed; this release changes client gestures only.
+# Server recurrence fix is already deployed; this release updates client gestures and monthly agenda loading.
 on:
   workflow_dispatch:
   push:
     branches: [work/sofia-refinements-038]
     paths:
       - .github/workflows/sofia-native-038-update.yml
+      - SOFIA_APP/plugins/**
+      - SOFIA_APP/package*.json
       - SOFIA_APP/src/**
       - SOFIA_APP/tests/**
       - SOFIA_APP/tools/native-performance-smoke.py

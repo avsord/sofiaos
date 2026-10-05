@@ -1,5 +1,5 @@
 import React,{forwardRef,useCallback,useImperativeHandle,useLayoutEffect,useMemo,useRef,useState} from 'react';
-import {Animated,ScrollView,View,StyleSheet} from 'react-native';
+import {Animated,ScrollView,View,StyleSheet,Platform} from 'react-native';
 import type {LayoutChangeEvent,NativeScrollEvent,NativeSyntheticEvent} from 'react-native';
 import type {Tab} from '../lib/types';
 import type {MenuMotion} from '../lib/menu-motion';
@@ -86,7 +86,7 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
     const delta=x-dragStart.current;
     // Let native velocity settle a fling. Starting another animation here
     // competes with Android momentum and produces the visible hesitation.
-    if(w>0 && Math.abs(velocity||0)<.1 && Math.abs(delta)>=Math.min(20,w*.05) && Math.abs(delta)<w*.45 && Math.abs(x-Math.round(x/w)*w)>1){
+    if(Platform.OS!=='android' && w>0 && Math.abs(velocity||0)<.1 && Math.abs(delta)>=Math.min(20,w*.05) && Math.abs(delta)<w*.45 && Math.abs(x-Math.round(x/w)*w)>1){
       const origin=Math.round(dragStart.current/w),index=Math.max(0,Math.min(TAB_ORDER.length-1,origin+(delta>0?1:-1)));
       scroll.current?.scrollTo({x:index*w,y:0,animated:true});return;
     }
@@ -96,7 +96,7 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
   // Explicit intervals select the adjacent page from fling direction on Android.
   // Plain pagingEnabled predicts travel and otherwise falls back to half a screen.
   return <View style={styles.fill} onLayout={layout}>
-    {width>0?<Animated.ScrollView ref={scroll} horizontal pagingEnabled snapToInterval={width}
+    {width>0?<Animated.ScrollView nativeID="sofia-tab-pager" ref={scroll} horizontal pagingEnabled snapToInterval={width}
       contentOffset={initialOffset} onLayout={nativeLayout} scrollsChildToFocus={false}
       decelerationRate="fast" disableIntervalMomentum directionalLockEnabled nestedScrollEnabled
       scrollEnabled={enabled && readyWidth===width} showsHorizontalScrollIndicator={false}

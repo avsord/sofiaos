@@ -8,7 +8,7 @@ function viewFor(owner:object,key:string){let scoped=views.get(owner);if(!scoped
 export function useAgendaView(owner:object,key:string,active=true){
  const view=viewFor(owner,key),[,render]=useReducer(n=>n+1,0);
  useLayoutEffect(()=>{if(!active){const now=new Date();view.month=new Date(now.getFullYear(),now.getMonth(),1);view.selected=localDateKey(now);render();}},[active,owner,key]);
- const setMonth=(next:SetStateAction<Date>)=>{view.month=typeof next==='function'?next(view.month):next;render();};
+ const setMonth=(next:SetStateAction<Date>)=>{const value=typeof next==='function'?next(view.month):next;const day=Math.min(Number(view.selected.slice(8)),new Date(value.getFullYear(),value.getMonth()+1,0).getDate());view.month=new Date(value.getFullYear(),value.getMonth(),1);view.selected=localDateKey(new Date(value.getFullYear(),value.getMonth(),day));render();};
  const setSelected=(next:string)=>{view.selected=next;render();};
  const acceptTarget=(date:string,nonce:number)=>{if(view.targetNonce===nonce)return false;const value=new Date(date+'T12:00:00');if(!Number.isFinite(value.getTime()))return false;view.targetNonce=nonce;view.selected=date;view.month=new Date(value.getFullYear(),value.getMonth(),1);render();return true;};
  return {month:view.month,selected:view.selected,setMonth,setSelected,acceptTarget};

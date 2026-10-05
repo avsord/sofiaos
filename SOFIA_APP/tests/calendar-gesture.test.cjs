@@ -5,7 +5,7 @@ function calendar(){
  const React={useRef:x=>({current:x}),useMemo:fn=>fn(),useEffect:fn=>cleanup.push(fn())};React.default=React;
  const {MonthSwipe}=load('src/components/MonthSwipe.tsx',{
   react:React,'react/jsx-runtime':{jsx:(type,props)=>({type,props})},
-  'react-native':{View:'View',PanResponder:{create:handlers=>{gestures=handlers;return{panHandlers:handlers};}}}
+  'react-native':{Platform:{OS:'ios'},View:'View',PanResponder:{create:handlers=>{gestures=handlers;return{panHandlers:handlers};}}}
  });
  const view=MonthSwipe({children:'calendar',onMonth:x=>months.push(x),onLock:x=>locks.push(x)}).props;
  return{view,gestures,locks,months,unmount:()=>cleanup.forEach(fn=>fn?.())};

@@ -26,7 +26,7 @@ function button(onSelect){
 function pager(options={}){
  const h=hooks(),commands=[],selected=[],ref={current:null};
  const native={scrollTo:command=>commands.push({...command})};
- const {TabPager}=load('src/components/TabPager.tsx',{'react':h.React,'react/jsx-runtime':jsx,'react-native':{Animated:animated.Animated,ScrollView:'ScrollView',View:'View',StyleSheet:{create:s=>s}},'../lib/tab-navigation':model});
+ const {TabPager}=load('src/components/TabPager.tsx',{'react':h.React,'react/jsx-runtime':jsx,'react-native':{Platform:{OS:'ios'},Animated:animated.Animated,ScrollView:'ScrollView',View:'View',StyleSheet:{create:s=>s}},'../lib/tab-navigation':model});
  let props={motion:options.motion||createMenuMotion(),activeTab:options.initial||'chat',enabled:true,onSelect:tab=>{selected.push(tab);ref.current.goTo(tab);},children:Array.from(model.TAB_ORDER,x=>({type:'Screen',props:{id:x}}))};
  let rendered;
  function render(patch={}){props={...props,...patch};const outer=h.render(()=>TabPager(props,ref));const scroll=outer.props.children;if(scroll)scroll.props.ref.current=native;h.flush();rendered={outer:outer.props,scroll:scroll?.props};return rendered;}

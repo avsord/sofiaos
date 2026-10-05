@@ -7,7 +7,7 @@
     "start": "expo start",
     "android": "expo run:android",
     "check": "tsc --noEmit",
-    "test": "node tools/test.cjs && node --test tests/navigation.test.cjs tests/navigation-interaction.test.cjs tests/calendar-gesture.test.cjs tests/menu-motion.test.cjs tests/editor.test.cjs tests/chat-sync.test.cjs tests/update.test.cjs tests/page-hints.test.cjs tests/page-hierarchy.test.cjs tests/page-templates.test.cjs tests/md-interactions.test.cjs tests/legacy-md.test.cjs tests/release-024.test.cjs tests/page-touch-crash.test.cjs tests/release-026.test.cjs tests/release-027.test.cjs tests/release-029.test.cjs tests/release-030.test.cjs tests/release-032.test.cjs tests/release-033.test.cjs tests/release-036.test.cjs && node --test tests/calendar-performance.test.cjs",
+    "test": "node tools/test.cjs && node --test tests/navigation.test.cjs tests/navigation-interaction.test.cjs tests/calendar-gesture.test.cjs tests/agenda-cache.test.cjs tests/menu-motion.test.cjs tests/editor.test.cjs tests/chat-sync.test.cjs tests/update.test.cjs tests/page-hints.test.cjs tests/page-hierarchy.test.cjs tests/page-templates.test.cjs tests/md-interactions.test.cjs tests/legacy-md.test.cjs tests/release-024.test.cjs tests/page-touch-crash.test.cjs tests/release-026.test.cjs tests/release-027.test.cjs tests/release-029.test.cjs tests/release-030.test.cjs tests/release-032.test.cjs tests/release-033.test.cjs tests/release-036.test.cjs && node --test tests/calendar-performance.test.cjs",
     "prepare-assets": "node tools/assets.cjs"
   },
   "dependencies": {

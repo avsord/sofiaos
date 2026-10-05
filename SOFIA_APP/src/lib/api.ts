@@ -81,7 +81,7 @@ export class SofiaApi {
   taskState(task: Task, state: 'done' | 'todo') { return this.request<{item: Task}>('/tasks/' + encodeURIComponent(task.id), { state, revision: task.revision }, 'PATCH'); }
   saveTask(task: Partial<Task>) { return this.request<{item: Task}>('/tasks' + (task.id ? '/' + encodeURIComponent(task.id) : ''), task, task.id ? 'PATCH' : 'POST'); }
   deleteTask(id: string) { return this.request<{ok: boolean}>('/tasks/' + encodeURIComponent(id), undefined, 'DELETE'); }
-  agenda(month?:string) { return this.request<{items: AgendaItem[]}>('/agenda'+(month?'?month='+encodeURIComponent(month):'')); }
+  agenda(month?:string) { return this.request<{items: AgendaItem[];refresh_pending?:boolean}>('/agenda'+(month?'?month='+encodeURIComponent(month):'')); }
   createEvent(title: string, start_at: string) { return this.request<{item: AgendaItem}>('/agenda', { title, start_at }); }
   notifications() { return this.request<{items: Notice[]; push_enabled: boolean}>('/notifications'); }
   markRead(id: string) { return this.request<{ok: boolean}>('/notifications/' + encodeURIComponent(id) + '/read', {}); }

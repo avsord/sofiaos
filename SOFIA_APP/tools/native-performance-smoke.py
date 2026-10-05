@@ -27,7 +27,7 @@ def calendar_bounds(root):
 baseline=calendar_bounds(r)
 for i in range(6):
  tap('Próximo mês');time.sleep(.3);assert calendar_bounds(tree())==baseline,'Home calendar changed height'
-tap('Voltar ao dia de hoje')
+tap('Voltar ao dia de hoje');tap('Próximo mês');wait('Compromisso proximo mes QA');screenshot('month-selection-updates-items');tap('Voltar ao dia de hoje')
 # Short fast and short slow releases must pick exactly the adjacent menu.
 for duration in (80,450):
  adb('shell','input','swipe','500','160','440','160',str(duration));time.sleep(.7)
