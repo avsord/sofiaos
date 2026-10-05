@@ -37,10 +37,10 @@ jobs:
           }
           JS
           gh run download "$ORIGINAL_RUN" --repo "$GITHUB_REPOSITORY" --name Sofia-Android-0.3.35 --dir SOFIA_APP/dist
-          cd SOFIA_APP/dist
-          sha256sum -c Sofia-OS.apk.sha256
-          node -e "if(!require('./performance-evidence/result.json').passed)throw Error('Native checks did not pass')"
-          test "$(cat SOURCE_COMMIT.txt)" = "$(git rev-parse HEAD)"
+          cd SOFIA_APP
+          sha256sum -c dist/Sofia-OS.apk.sha256
+          node -e "if(!require('./dist/performance-evidence/result.json').passed)throw Error('Native checks did not pass')"
+          test "$(cat dist/SOURCE_COMMIT.txt)" = "$(git rev-parse HEAD)"
       - name: Publish exact tested source and binary with reviewed release text
         working-directory: SOFIA_APP
         run: |
