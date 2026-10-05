@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "Sofia OS",
+    "slug": "sofia-app",
+    "version": "0.3.39",
+    "scheme": "sofiaapp",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#F7F6FA",
+    "icon": "./assets/icon.png",
+    "ios": {
+      "bundleIdentifier": "com.avsord.sofiaapp",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.avsord.sofiaapp",
+      "versionCode": 44,
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_CONTACTS",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-foreground.png",
+        "backgroundColor": "#7258E8"
+      }
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "A Sofia usa o microfone somente quando voc\u00ea escolhe gravar uma mensagem de voz.",
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Escolha imagens para enviar na conversa ou usar nas suas p\u00e1ginas.",
+          "cameraPermission": "A Sofia usa a c\u00e2mera somente quando voc\u00ea escolhe tirar uma foto."
+        }
+      ],
+      "./plugins/with-sofia-logo.cjs",
+      "./plugins/with-calendar-gesture.cjs",
+      [
+        "expo-notifications",
+        {
+          "color": "#7258E8",
+          "defaultChannel": "sofia-agenda"
+        }
+      ]
+    ]
+  }
+}
