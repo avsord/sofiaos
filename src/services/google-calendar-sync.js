@@ -146,7 +146,7 @@ class GoogleCalendarSync{
  async perform(epoch){
   const a=this.account();if(!a)return;const cal=encodeURIComponent(a.meta.calendar_id),base='/calendars/'+cal+'/events';const still=()=>{if(this.epoch!==epoch)throw new AppError('CANCELLED','Conexão alterada durante a sincronização.',409);};
   // Conflict snapshots contain IDs only; no body or credentials in public status.
-  const conflicts=[],warnings=[],remote=[];let syncToken=a.meta.sync_token||'',nextToken='',retried=false;
+  const conflicts=[],warnings=[],remote=[];let syncToken=a.meta.recurrence_version===1?(a.meta.sync_token||''):'',nextToken='',retried=false;
   for(;;){try{let pageToken='';remote.length=0;do{const params=new URLSearchParams({maxResults:'2500',showDeleted:'true',singleEvents:'false'});if(syncToken)params.set('syncToken',syncToken);if(pageToken)params.set('pageToken',pageToken);const result=await this.request(base+'?'+params);still();remote.push(...result.items||[]);pageToken=result.nextPageToken||'';nextToken=result.nextSyncToken||nextToken;}while(pageToken);break;}catch(e){if(e.googleStatus===410&&!retried){syncToken='';warnings.length=0;retried=true;continue;}throw e;}}
   const mappings=this.links(a),byGoogle=new Map(mappings.map(link=>[link.google_id,link])),conflictIds=new Set();let recurring=0,unsupported=0;let seriesChanged=false;
   for(const event of remote){await yieldRequests();still();const link=byGoogle.get(event.id),local=link?this.safeGet(link.local_id):null;
@@ -206,7 +206,7 @@ class GoogleCalendarSync{
   
   if(unsupported)warnings.push('Há tipos especiais de evento que permanecem no Google.');
   // Keep the previous token while conflicts exist, so a retry cannot forget remote changes.
-  fresh.meta={...fresh.meta,last_sync:stamp(),error:'',conflicts,warnings:[...new Set(warnings)],sync_token:conflicts.length?syncToken:nextToken||syncToken};this.write(fresh);
+  fresh.meta={...fresh.meta,last_sync:stamp(),error:'',conflicts,warnings:[...new Set(warnings)],sync_token:conflicts.length?syncToken:nextToken||syncToken,recurrence_version:1};this.write(fresh);
  }
 }
 module.exports={GoogleCalendarSync,encrypt,decrypt,toGoogle,fromGoogle,googleProjection,fingerprint};
