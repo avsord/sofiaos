@@ -1,0 +1,6 @@
+import type {AttachmentDraft} from './types';
+const MIME:Record<string,string>={pdf:'application/pdf',txt:'text/plain',md:'text/markdown',csv:'text/csv',json:'application/json',zip:'application/zip',jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',gif:'image/gif'};
+export const attachmentTypes=Object.values(MIME);
+export function attachmentMime(name:string,mime?:string){const value=MIME[name.split('.').pop()?.toLowerCase()||'']||mime||'';if(!attachmentTypes.includes(value))throw Error('Selecione uma imagem, PDF, TXT, Markdown, CSV, JSON ou ZIP.');return value;}
+export function attachmentText(files:AttachmentDraft[],site:string){return files.map(f=>(f.mime.startsWith('image/')?'!':'')+'['+f.name.replace(/[\[\]\\\r\n]/g,' ')+']('+site+'/api/attachments/'+f.attachmentId+'?inline=1)').join('\n');}
+export function parseAttachments(content:string,site:string){const attachments:{id:string;name:string;image:boolean}[]=[];const text=content.replace(/(!?)\[([^\]\n]+)\]\((https:\/\/[^\s)]+)\)/g,(all,bang,name,url)=>{try{const u=new URL(url);if(u.origin!==site)return all;const match=u.pathname.match(/^\/api\/attachments\/([A-Za-z0-9_-]+)$/);if(!match)return all;attachments.push({id:match[1],name,image:bang==='!'});return '';}catch{return all;}}).trim();return {text,attachments};}
