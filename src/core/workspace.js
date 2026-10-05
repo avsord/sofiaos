@@ -43,9 +43,15 @@ class Workspace {
    }
    if(def.group==='knowledge'&&data.leaf_document){
      let document;try{document=JSON.parse(data.leaf_document);}catch{throw new AppError('BAD_NOTE_DOCUMENT','Documento da nota inválido.');}
+     // A plain-text edit from the site/Sofia must not leave an older rich body visible.
+     // Keep properties/date; the previous rich representation remains in entity versions.
+     if(old&&content!==old.content&&data.leaf_document===old.data?.leaf_document){document.blocks=[{id:old.id+'-body',type:'text',text:content,marks:[]}];data.leaf_document=JSON.stringify(document);}
+     if(Array.isArray(document.blocks)&&!document.blocks.length&&content){document.blocks=[{id:(old?.id||'note')+'-body',type:'text',text:content,marks:[]}];data.leaf_document=JSON.stringify(document);}
+     if(data.leaf_document.length>64000)throw new AppError('BAD_NOTE_DOCUMENT','Documento da nota excede o limite.');
      if(document.version!==1||!Array.isArray(document.blocks)||document.blocks.length>500||!Array.isArray(document.properties)||document.properties.length>100)throw new AppError('BAD_NOTE_DOCUMENT','Documento da nota inválido.');
      const blockTypes=new Set(['text','heading1','heading2','heading3','bullet','number','todo','quote','code','divider']);
      for(const b of document.blocks)if(!b||typeof b.id!=='string'||typeof b.text!=='string'||!blockTypes.has(b.type)||!Array.isArray(b.marks)||b.marks.some(m=>!Number.isInteger(m.start)||!Number.isInteger(m.end)||m.start<0||m.end> b.text.length||m.end<=m.start))throw new AppError('BAD_NOTE_DOCUMENT','Bloco da nota inválido.');
+     if(cleanText(document.blocks.map(b=>b.text).join('\n\n'),'Texto da nota',16000,true)!==content)throw new AppError('BAD_NOTE_DOCUMENT','O texto e os blocos da nota não correspondem.');
      for(const p of document.properties)if(!p||typeof p.id!=='string'||typeof p.name!=='string'||typeof p.value!=='string')throw new AppError('BAD_NOTE_DOCUMENT','Propriedade da nota inválida.');
    }
    if(kind==='user_page'){
