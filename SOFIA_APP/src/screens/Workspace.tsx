@@ -1,3 +1,5 @@
+import {Choice} from '../components/Choice';
+export {Choice} from '../components/Choice';
 import {propertyOf,propertyTags,isProperty,organizationOptions} from '../lib/library-organization';
 import {LibraryAreaEditor,LibraryRecordEditor} from '../components/LibraryAreaEditor';
 import {AREA_PREFIX,isAreaRecord,memberArea,readArea,customFacets,filterCustom} from '../lib/library-areas';
@@ -38,10 +40,6 @@ const modules:{id:string;title:string;caption:string;icon:IconName;kinds?:string
  {id:'knowledge',title:'Notas',caption:'Conhecimento da sua Sofia',icon:'edit',group:'knowledge'},
  {id:'all',title:'Todos os registros',caption:'Estudos, projetos, rotina e biblioteca',icon:'grid'}
 ];
-export function Choice({value,options,onChange,label,creatable=false}:{creatable?:boolean;value:string;options:{value:string;label:string}[];onChange:(v:string)=>void;label:string}){
- const c=useTheme(),[open,setOpen]=useState(false),[query,setQuery]=useState('');
- return <><Pressable onPress={()=>{setQuery('');setOpen(true);}} accessibilityRole="button" accessibilityLabel={label} style={[forms.input,{borderColor:c.line,backgroundColor:c.input,flexDirection:'row',alignItems:'center',gap:12}]}><Text numberOfLines={2} style={{flex:1,color:c.text,fontSize:14}}>{options.find(x=>x.value===value)?.label||value||'Selecionar'}</Text><Icon name="chevron" color={c.muted} size={18}/></Pressable><Sheet visible={open} onClose={()=>setOpen(false)} label="Fechar seleção"><View style={{gap:12}}><View style={{flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,fontSize:20,fontWeight:'600',color:c.text}}>{label}</Text><IconButton name="close" label="Fechar seleção" onPress={()=>setOpen(false)}/></View>{options.length>8||creatable?<TextInput value={query} onChangeText={setQuery} placeholder="Buscar" placeholderTextColor={c.muted} style={[forms.input,{borderColor:c.line,color:c.text}]}/>:null}<ScrollView keyboardShouldPersistTaps="handled">{options.filter(o=>o.label.toLocaleLowerCase().includes(query.toLocaleLowerCase())).map(o=><Pressable key={o.value} onPress={()=>{onChange(o.value);setOpen(false);}} style={{minHeight:48,padding:12,borderBottomWidth:1,borderColor:c.line,flexDirection:'row',gap:10,alignItems:'center'}}><Text style={{flex:1,color:c.text,fontSize:15}}>{o.label}</Text>{value===o.value?<Icon name="check" color={c.accent}/>:null}</Pressable>)}{creatable&&query.trim()&&!options.some(o=>o.value.toLowerCase()===query.trim().toLowerCase())?<Button title={'Criar “'+query.trim()+'”'} onPress={()=>{onChange(query.trim());setOpen(false);}}/>:null}</ScrollView></View></Sheet></>;
-}
 export function Input({label,value,onChange,multiline=false,placeholder='',keyboardType='default',maxLength}:{label:string;value:string;onChange:(v:string)=>void;multiline?:boolean;placeholder?:string;keyboardType?:'default'|'numeric'|'email-address'|'url';maxLength?:number}){
  const c=useTheme();return <View><Text style={[forms.label,{color:c.muted}]}>{label}</Text><TextInput accessibilityLabel={label} value={value} maxLength={maxLength} onChangeText={onChange} multiline={multiline} keyboardType={keyboardType} placeholder={placeholder} placeholderTextColor={c.muted} style={[forms.input,{color:c.text,borderColor:c.line,backgroundColor:c.input,minHeight:multiline?100:52,paddingVertical:12,textAlignVertical:multiline?'top':'center'}]}/></View>;
 }

@@ -40,7 +40,7 @@ jobs:
           npm ci
           npm install --prefix /tmp/sofia-icon-tools --no-save --package-lock=false sharp@0.34.1
           NODE_PATH=/tmp/sofia-icon-tools/node_modules npm run prepare-assets
-      - name: Typecheck and complete app regressions
+      - name: Typecheck task layout, library organization and complete app regressions
         working-directory: SOFIA_APP
         run: |
           set -euo pipefail
