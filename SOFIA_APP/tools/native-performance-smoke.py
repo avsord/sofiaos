@@ -34,7 +34,8 @@ adb('shell','input','swipe','360','1200','360','450','400');time.sleep(.4)
 tap('Filtrar níveis das tarefas do Início');wait('Nível das tarefas');screenshot('home-task-filter');tap('Todas');time.sleep(.3)
 # Home row opens details; only the separate checkbox concludes.
 tap('Abrir tarefa Projeto urgente');wait('Detalhes da tarefa');wait('Descricao da tarefa QA');screenshot('home-task-details')
-tap('Editar tarefa');wait('Descrição');screenshot('home-task-edit');tap('Cancelar edição');tap('Fechar detalhes da tarefa');time.sleep(.4)
+tap('Editar tarefa');wait('Descrição');screenshot('home-task-edit');tap('Descrição');adb('shell','input','keyevent','123');adb('shell','input','text','%satualizada');adb('shell','input','keyevent','BACK');time.sleep(.3)
+adb('shell','input','swipe','360','1200','360','550','400');time.sleep(.3);tap('Salvar tarefa');wait('Detalhes da tarefa');wait('Descricao da tarefa QA atualizada');screenshot('home-task-saved');tap('Fechar detalhes da tarefa');time.sleep(.4)
 wait('Concluir Projeto urgente');tap('Concluir Projeto urgente');time.sleep(.6);assert find(tree(),'Abrir tarefa Projeto urgente') is None,'Row tap must not complete; checkbox must complete'
 adb('shell','input','swipe','360','400','360','1200','400');time.sleep(.4)
 tap('Conversa');tap('Mensagem para a Sofia');adb('shell','input','text','Teste%srolagem');tap('Enviar mensagem');time.sleep(1.5);wait('FIM DA RESPOSTA QA');time.sleep(3);wait('FIM DA RESPOSTA QA');screenshot('chat-growing-reply');adb('shell','input','keyevent','BACK');tap('Início');wait('Olá, Teste.')

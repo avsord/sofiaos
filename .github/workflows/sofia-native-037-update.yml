@@ -6,7 +6,7 @@ on:
     branches: [work/sofia-refinements-037]
     paths:
       - .github/workflows/sofia-native-037-update.yml
-      - SOFIA_APP/src/lib/agenda-recurrence.ts
+      - SOFIA_APP/**
 permissions:
   contents: write
 concurrency:
@@ -183,5 +183,3 @@ jobs:
           path: SOFIA_APP/dist/
           if-no-files-found: warn
           retention-days: 30
-
-# Use the supported Ubuntu 22.04 pool during the hosted runner incident; keep every Android acceptance check.
