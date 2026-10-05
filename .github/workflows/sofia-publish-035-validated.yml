@@ -1,0 +1,89 @@
+name: Publish validated Sofia 0.3.35 APK
+on:
+  push:
+    branches: [work/sofia-refinements-035]
+    paths: [.github/workflows/sofia-publish-035-validated.yml]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: sofia-android-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ORIGINAL_RUN: '37256696877'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: f4b6a408079dcd2b8e05b5e836fdf7ad5db723ec
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: SOFIA_APP/package-lock.json
+      - name: Require completed native validation before reusing unchanged APK
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_RUN/jobs" > /tmp/prior-jobs.json
+          node - <<'JS'
+          const jobs=require('/tmp/prior-jobs.json').jobs,job=jobs.find(j=>j.name==='release');
+          if(!job||job.status!=='completed')throw Error('Original validation is not complete');
+          for(const prefix of ['Typecheck task layout','Verify existing task description','Verify identity','Verify upgrade, sensitive']){
+            const step=job.steps.find(s=>s.name.startsWith(prefix));if(step?.conclusion!=='success')throw Error('Unverified prerequisite '+prefix);
+          }
+          JS
+          gh run download "$ORIGINAL_RUN" --repo "$GITHUB_REPOSITORY" --name Sofia-Android-0.3.35 --dir SOFIA_APP/dist
+          cd SOFIA_APP/dist
+          sha256sum -c Sofia-OS.apk.sha256
+          node -e "if(!require('./performance-evidence/result.json').passed)throw Error('Native checks did not pass')"
+          test "$(cat SOURCE_COMMIT.txt)" = "$(git rev-parse HEAD)"
+      - name: Publish exact tested source and binary with reviewed release text
+        working-directory: SOFIA_APP
+        run: |
+          cat > /tmp/sofia-release035.md <<'MD'
+          Sofia OS 0.3.35
+          
+          O Início agora mostra Tarefas com espaço entre título, filtro e lista. O calendário mantém a altura ao mudar de mês. Arrastos curtos trocam os menus com mais facilidade. O sino abre a partir da sua posição e os fundos escuros aparecem e desaparecem com fade.
+          
+          A prioridade pedida à Sofia é preservada ao criar e editar tarefas. Na Biblioteca, Área representa o tema e Propriedade identifica a marca, projeto ou pessoa; ambas têm opções reutilizáveis e filtros.
+          
+          Monitoramentos consultam o link principal do produto, buscam outras lojas e registram preços públicos verificáveis da mesma variante. O Início mostra a linha da fonte principal, com cor escolhida; o detalhe separa o histórico por loja e permite ajustar a faixa de preços. Frete é confirmado na loja. Fontes bloqueadas ou sem preço verificável são informadas sem inventar valores.
+          
+          Atualização por cima da versão instalada, com a mesma assinatura. Mensagens, registros e conexão Google preservados e conferidos no servidor.
+          MD
+          node - <<'JS'
+          // Only the release-text location is supplied externally. The source tree,
+          // tested APK, checksum, signature evidence and publication checks are unchanged.
+          const fs=require('fs'),path=require('path'),Module=require('module');
+          const filename=path.resolve('tools/publish-release.cjs'),original=fs.readFileSync(filename,'utf8');
+          const needle='const notes=path.join(app,`RELEASE_${version}.md`);';
+          if(!original.includes(needle))throw Error('Release publisher changed');
+          const script=original.replace(needle,"const notes='/tmp/sofia-release035.md';");
+          const mod=new Module(filename,module);mod.filename=filename;mod.paths=Module._nodeModulePaths(path.dirname(filename));mod._compile(script,filename);
+          JS
+      - name: Check released APK and updater discovery
+        working-directory: SOFIA_APP
+        run: |
+          npm ci
+          node - <<'JS'
+          const fs=require('fs'),cp=require('child_process'),vm=require('vm'),ts=require('typescript');
+          (async()=>{
+            const original=cp.execFileSync('git',['show','sofia-android-v0.3.34:SOFIA_APP/src/lib/update.ts'],{encoding:'utf8'});
+            for(const source of [original,fs.readFileSync('src/lib/update.ts','utf8')]){
+              const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,exports={};
+              vm.runInNewContext(code,{exports,fetch,AbortController,setTimeout,clearTimeout,Date,Error,Promise});
+              const result=await exports.checkForUpdate({currentVersion:'0.3.34'});if(result?.version!=='0.3.35')throw Error('Update not discoverable');
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          JS
+          gh api repos/avsord/sofiaos/releases/tags/sofia-android-v0.3.35 > dist/release.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sofia-Android-0.3.35-published
+          path: SOFIA_APP/dist/
+          retention-days: 30
