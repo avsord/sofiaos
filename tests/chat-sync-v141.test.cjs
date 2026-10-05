@@ -68,3 +68,13 @@ test('sync: a recoverable deletion failure is explicit rather than reported succ
  const f=await setup(t),c=f.store.createConversation('A','web'),a=f.add(c.id),sync=createChatSync(f.store),original=f.store.deleteMessage.bind(f.store);
  f.store.deleteMessage=id=>{if(id===a[1].id)throw Error('fixture failure');return original(id);};const r=sync.remove(c.id,a.map(m=>m.id));assert.equal(r.ok,false);assert.deepEqual(r.deleted_ids,[a[0].id]);assert.equal(r.failed[0].id,a[1].id);assert.ok(f.store.message(a[1].id));
 });
+
+test('sync: restart preserves personal history and repairs legacy shutdown pauses only',async t=>{
+ const f=await setup(t),c=f.store.createConversation('Personal','mobile');f.add(c.id);f.store.checkpoint(c.id,{reason:'shutdown'});
+ assert.equal(f.store.conversation(c.id).state,'active');
+ f.store.db.prepare("UPDATE conversations SET state='paused' WHERE id=?").run(c.id);
+ const manual=f.store.createConversation('Manual','web');f.add(manual.id);f.store.checkpoint(manual.id,{reason:'manual'});
+ const removed=f.store.createConversation('Deleted','mobile');f.add(removed.id);f.store.checkpoint(removed.id,{reason:'shutdown'});f.store.clearChatHistory([removed.id]);
+ const sync=createChatSync(f.store);assert.equal(sync.select(c.id).state,'active');assert.equal(sync.snapshot().messages.length,2);
+ assert.equal(f.store.conversation(manual.id).state,'paused');assert.equal(f.store.db.prepare('SELECT state FROM conversations WHERE id=?').get(removed.id).state,'deleted');
+});
