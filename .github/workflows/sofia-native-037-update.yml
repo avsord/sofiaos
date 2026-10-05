@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 65
     env:
       CI: '1'
@@ -184,4 +184,4 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-# Menu scroll frames run entirely on the native UI thread.
+# Use the supported Ubuntu 22.04 pool during the hosted runner incident; keep every Android acceptance check.
