@@ -1,11 +1,11 @@
-import {useChatAutoscroll} from '../lib/chat-scroll';
+import {hasChatArrival,useChatAutoscroll} from '../lib/chat-scroll';
 import {attachmentText,parseAttachments} from '../lib/chat-attachments';
 import * as Sharing from 'expo-sharing';
 import {Paths} from 'expo-file-system';
 import type {AttachmentDraft} from '../lib/types';
 import {KeyboardViewport} from '../components/KeyboardViewport';
 import {Sheet} from '../components/Sheet';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { View, Text, Image, FlatList, Modal, ScrollView, Pressable, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, AppState, BackHandler } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import * as Clipboard from 'expo-clipboard';
@@ -41,6 +41,13 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
  const c=useTheme(),list=useRef<FlatList<Message>>(null);
  const {follow:followChat,pause:pauseChat,...chatScroll}=useChatAutoscroll(list,active);
  const [conversation,setConversation]=useState<Conversation|null>(null),[messages,setMessages]=useState<Message[]>([]),[hasMore,setHasMore]=useState(false);
+ const previousMessages=useRef<Message[]>([]);
+ useLayoutEffect(()=>{
+  // History prepends and unchanged polling must not move the viewport. New
+  // messages and a growing answer resume following even after reading above.
+  if(hasChatArrival(previousMessages.current,messages))followChat();
+  previousMessages.current=messages;
+ },[messages]);
  const [loading,setLoading]=useState(true),[sending,setSending]=useState(false),[refreshing,setRefreshing]=useState(false),[dirty,setDirty]=useState(false),[recordingLock,setRecordingLock]=useState(false),[error,setError]=useState('');
  const [history,setHistory]=useState(false),[items,setItems]=useState<Conversation[]>([]),[historyMore,setHistoryMore]=useState(false),[query,setQuery]=useState('');
  const [selectedConversations,setSelectedConversations]=useState(new Set<string>());

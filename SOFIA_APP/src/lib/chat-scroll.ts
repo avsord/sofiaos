@@ -1,6 +1,16 @@
 import {useEffect, useLayoutEffect, useRef, type RefObject} from 'react';
 import {Keyboard} from 'react-native';
 import type {FlatList, LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent} from 'react-native';
+import type {Message} from './types';
+
+export function hasChatArrival(previous:readonly Message[],next:readonly Message[]){
+ const last=next.at(-1);if(!last)return false;
+ if(!previous.length)return true;
+ const index=next.findIndex(m=>m.id===previous.at(-1)?.id);
+ if(index>=0&&index<next.length-1)return true;
+ const old=new Map(previous.map(m=>[m.id,m]));
+ return next.some(m=>old.has(m.id)&&old.get(m.id)!.content!==m.content);
+}
 
 // Content growth and keyboard resize also produce native scroll events. Only
 // a deliberate drag/momentum may opt out of following the conversation.
@@ -25,9 +35,13 @@ export function useChatAutoscroll(list:RefObject<FlatList<any>|null>,active:bool
  const intent=useRef(new ChatScrollIntent()).current,frame=useRef<number|null>(null),enabled=useRef(active);
  enabled.current=active;
  function cancel(){if(frame.current!==null){cancelAnimationFrame(frame.current);frame.current=null;}}
+ const target=useRef(-1);
  function jump(){
-  if(intent.contentHeight>0&&intent.viewportHeight>0)list.current?.scrollToOffset({offset:intent.endOffset,animated:false});
-  else list.current?.scrollToEnd({animated:false});
+  if(intent.contentHeight>0&&intent.viewportHeight>0){
+   const offset=intent.endOffset;
+   if(Math.abs(target.current-offset)<1)return;
+   target.current=offset;list.current?.scrollToOffset({offset,animated:true});
+  } else list.current?.scrollToEnd({animated:true});
  }
  function settle(){
   cancel();
@@ -43,17 +57,17 @@ export function useChatAutoscroll(list:RefObject<FlatList<any>|null>,active:bool
  function position(e:NativeSyntheticEvent<NativeScrollEvent>){const n=e.nativeEvent;intent.position(n.contentOffset.y,n.contentSize.height,n.layoutMeasurement.height);
   // Android may restore the old scroll offset after its keyboard/focus resize.
   // Reconcile that native geometry only while following, never during a user drag.
-  if(intent.following&&!intent.interacting&&intent.endOffset-n.contentOffset.y>2)settle();
+  if(intent.following&&!intent.interacting&&intent.endOffset-n.contentOffset.y>2&&Math.abs(target.current-intent.endOffset)>1)settle();
  }
  useLayoutEffect(()=>{settle();return cancel;},[active]);
  useEffect(()=>{const show=Keyboard.addListener('keyboardDidShow',settle),hide=Keyboard.addListener('keyboardDidHide',settle);return()=>{show.remove();hide.remove();};},[]);
  return {
-  follow:()=>{lastDrag.current=0;intent.follow();settle();},
+  follow:()=>{lastDrag.current=0;target.current=-1;intent.follow();settle();},
   pause:()=>{lastDrag.current=0;cancel();intent.pause();},
   onContentSizeChange:(_width:number,height:number)=>{intent.contentHeight=height;settle();},
-  onLayout:(e:LayoutChangeEvent)=>{intent.viewportHeight=e.nativeEvent.layout.height;settle();},
+  onLayout:(e:LayoutChangeEvent)=>{target.current=-1;intent.viewportHeight=e.nativeEvent.layout.height;settle();},
   onScroll:position,
-  onScrollBeginDrag:()=>{lastDrag.current=Date.now();cancel();intent.begin();},
+  onScrollBeginDrag:()=>{lastDrag.current=Date.now();target.current=-1;cancel();intent.begin();},
   onScrollEndDrag:(e:NativeSyntheticEvent<NativeScrollEvent>)=>{lastDrag.current=Date.now();position(e);intent.end();settle();},
   onMomentumScrollBegin:()=>{if(lastDrag.current&&Date.now()-lastDrag.current<500){cancel();intent.begin();}},
   onMomentumScrollEnd:(e:NativeSyntheticEvent<NativeScrollEvent>)=>{position(e);lastDrag.current=0;intent.end();settle();},

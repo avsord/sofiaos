@@ -67,3 +67,13 @@ test('custom record filters derive from saved values, combine stars and fields a
  const saved=areas.customPayload(area,{...a,tags:[...a.tags,'Favoritos']},'Ana nova','Descrição','','4'*1,{...areas.customValues(a),country:'Portugal'});assert.equal(saved.id,'a');assert.ok(saved.tags.includes('Favoritos'));assert.equal(films.libraryRating(saved),4);assert.equal(areas.customValues(saved).style,'Retrato, Documental');assert.throws(()=>areas.customPayload(area,{},'A','','javascript:alert(1)',5,{}));
 });
 test('optimistic record updates cannot be replaced by the pending pre-save snapshot',async()=>{const cache=new WorkspaceRecords();let finish;const pending=cache.load({entities:()=>new Promise(r=>finish=r)},'asset','',()=>{});cache.upsert('asset','',{id:'saved',title:'Preservado'});finish({items:[]});await pending;assert.equal(cache.view('asset','').items[0].id,'saved');assert.equal(cache.view('asset','').loading,false);});
+
+const {hasChatArrival}=load('src/lib/chat-scroll.ts',{'react':{},'react-native':{}});
+test('chat follows arrivals and growth of any reply but not unchanged polls, older history or deletions',()=>{
+ const before=[{id:'a',content:'A'},{id:'b',content:'B'}];
+ assert.equal(hasChatArrival(before,[...before,{id:'c',content:'C'}]),true);
+ assert.equal(hasChatArrival(before,[{id:'older',content:'History'},...before]),false);
+ assert.equal(hasChatArrival(before,before.map(m=>({...m}))),false);
+ assert.equal(hasChatArrival(before,[{id:'a',content:'A growing'},before[1]]),true);
+ assert.equal(hasChatArrival(before,[before[0]]),false);
+});

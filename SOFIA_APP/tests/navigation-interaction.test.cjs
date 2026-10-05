@@ -133,7 +133,7 @@ test('late stale content callbacks cannot break subsequent direct menu taps',()=
  const p=pager();p.scroll.onContentSizeChange(0,0);p.scroll.onLayout({nativeEvent:{layout:{width:0}}});p.ref.current.goTo('apps');assert.equal(p.commands.at(-1).x,1600);
 });
 test('native full-page snapping is the only snap policy, and taps remain immediate',()=>{
- const p=pager();assert.equal(p.scroll.decelerationRate,'fast');assert.equal(p.scroll.pagingEnabled,true);assert.equal(p.scroll.snapToInterval,undefined);assert.equal(p.scroll.disableIntervalMomentum,undefined);
+ const p=pager();assert.equal(p.scroll.decelerationRate,'fast');assert.equal(p.scroll.pagingEnabled,true);assert.equal(p.scroll.snapToInterval,undefined);assert.equal(p.scroll.disableIntervalMomentum,true);
  p.ref.current.goTo('home');assert.equal(p.commands.at(-1).animated,false);
 });
 
@@ -142,3 +142,5 @@ test('old momentum cannot end a new touch or pull it back',()=>{const p=pager();
 test('settling a native swipe and subsequent layout callbacks do not issue a second scroll command',()=>{const p=pager();p.scroll.onScrollBeginDrag(end(400));p.scroll.onScrollEndDrag(end(680,.5));p.scroll.onMomentumScrollEnd(end(800));assert.deepEqual(p.selected,['pages']);assert.equal(p.commands.length,0);p.render({activeTab:'pages'});p.scroll.onContentSizeChange(2400,700);p.scroll.onLayout({nativeEvent:{layout:{width:400}}});assert.equal(p.commands.length,0);p.ref.current.goTo('profile');assert.deepEqual(p.commands,[{x:2000,y:0,animated:false}]);});
 
 test('short slow horizontal drags settle one neighbor with native animation, in both directions',()=>{const p=pager();p.scroll.onScrollBeginDrag(end(400));p.scroll.onScrollEndDrag(end(470,.05));assert.deepEqual(p.commands,[{x:800,y:0,animated:true}]);p.scroll.onMomentumScrollEnd(end(800));assert.deepEqual(p.selected,['pages']);const q=pager();q.scroll.onScrollBeginDrag(end(400));q.scroll.onScrollEndDrag(end(330,-.05));assert.deepEqual(q.commands,[{x:0,y:0,animated:true}]);q.scroll.onMomentumScrollEnd(end(0));assert.deepEqual(q.selected,['home']);});
+
+test('a 30dp slow drag changes menu but a fling never starts competing JS momentum',()=>{const p=pager();p.scroll.onScrollBeginDrag(end(400));p.scroll.onScrollEndDrag(end(430,.03));assert.deepEqual(p.commands,[{x:800,y:0,animated:true}]);const q=pager();q.scroll.onScrollBeginDrag(end(400));q.scroll.onScrollEndDrag(end(430,.8));assert.equal(q.commands.length,0);q.scroll.onMomentumScrollEnd(end(800));assert.deepEqual(q.selected,['pages']);});

@@ -84,7 +84,9 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
     const x = event.nativeEvent.contentOffset.x, w = size.current;
     const velocity = event.nativeEvent.velocity?.x;
     const delta=x-dragStart.current;
-    if(w>0 && Math.abs(delta)>=Math.min(64,w*.16) && Math.abs(delta)<w*.45 && Math.abs(x-Math.round(x/w)*w)>1){
+    // Let native velocity settle a fling. Starting another animation here
+    // competes with Android momentum and produces the visible hesitation.
+    if(w>0 && Math.abs(velocity||0)<.1 && Math.abs(delta)>=Math.min(28,w*.07) && Math.abs(delta)<w*.45 && Math.abs(x-Math.round(x/w)*w)>1){
       const origin=Math.round(dragStart.current/w),index=Math.max(0,Math.min(TAB_ORDER.length-1,origin+(delta>0?1:-1)));
       scroll.current?.scrollTo({x:index*w,y:0,animated:true});return;
     }
@@ -94,7 +96,7 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
   return <View style={styles.fill} onLayout={layout}>
     {width>0?<Animated.ScrollView ref={scroll} horizontal pagingEnabled
       contentOffset={initialOffset} onLayout={nativeLayout} scrollsChildToFocus={false}
-      decelerationRate="fast" directionalLockEnabled nestedScrollEnabled
+      decelerationRate="fast" disableIntervalMomentum directionalLockEnabled nestedScrollEnabled
       scrollEnabled={enabled && readyWidth===width} showsHorizontalScrollIndicator={false}
       bounces={false} overScrollMode="never" removeClippedSubviews={false}
       keyboardShouldPersistTaps="handled" keyboardDismissMode="none"

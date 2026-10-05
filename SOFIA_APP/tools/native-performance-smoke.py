@@ -28,8 +28,15 @@ baseline=calendar_bounds(r)
 for i in range(6):
  tap('Próximo mês');time.sleep(.3);assert calendar_bounds(tree())==baseline,'Home calendar changed height'
 tap('Voltar ao dia de hoje')
-adb('shell','input','swipe','500','160','350','160','450');time.sleep(1)
+adb('shell','input','swipe','500','160','430','160','450');time.sleep(1)
 wait('Sofia');screenshot('short-menu-swipe');tap('Início');wait('Olá, Teste.')
+# Home row opens details; only the separate checkbox concludes.
+adb('shell','input','swipe','360','1200','360','450','400');time.sleep(.4)
+tap('Abrir tarefa Projeto urgente');wait('Detalhes da tarefa');wait('Descricao da tarefa QA');screenshot('home-task-details')
+tap('Editar tarefa');wait('Descrição');screenshot('home-task-edit');tap('Cancelar edição');tap('Fechar detalhes da tarefa');time.sleep(.4)
+wait('Concluir Projeto urgente');tap('Concluir Projeto urgente');time.sleep(.6);assert find(tree(),'Abrir tarefa Projeto urgente') is None,'Row tap must not complete; checkbox must complete'
+adb('shell','input','swipe','360','400','360','1200','400');time.sleep(.4)
+tap('Conversa');tap('Mensagem para a Sofia');adb('shell','input','text','Teste%srolagem');tap('Enviar mensagem');time.sleep(1.5);wait('FIM DA RESPOSTA QA');time.sleep(3);wait('FIM DA RESPOSTA QA');screenshot('chat-growing-reply');adb('shell','input','keyevent','BACK');tap('Início');wait('Olá, Teste.')
 tap('Notificações: 2 não lidas');time.sleep(.35);screenshot('bell-origin');tap('Fechar notificações')
 
 for i in range(3):
