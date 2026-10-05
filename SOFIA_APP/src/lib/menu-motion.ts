@@ -1,5 +1,4 @@
 import {Animated} from 'react-native';
-import type {NativeScrollEvent,NativeSyntheticEvent} from 'react-native';
 import type {Tab} from './types';
 import {TAB_ORDER,tabIndex} from './tab-navigation';
 
@@ -31,14 +30,13 @@ export function createMenuMotion(initial:Tab='chat') {
   let springs:Animated.CompositeAnimation[]=[];
   const stop=()=>{springs.forEach(s=>s.stop());springs=[];};
   const onScroll=Animated.event([{nativeEvent:{contentOffset:{x:scrollX}}}],{
-    useNativeDriver:true,
-    // Only an interruption snapshot. Visual frames never depend on this listener.
-    listener:(event:NativeSyntheticEvent<NativeScrollEvent>)=>{lastOffset=event.nativeEvent.contentOffset.x;}
+    // The graph follows the finger entirely on the UI thread. There is no
+    // per-frame JS listener competing with screen refreshes or chat updates.
+    useNativeDriver:true
   });
   function select(next:Tab) {
     if(next===selected&&!dragging)return; // A React commit must not restart the motion.
     stop();
-    if(tracking)taps.forEach((tap,i)=>tap.setValue(menuWeight(lastOffset/width,i)));
     live.setValue(0);tracking=false;dragging=false;selected=next;
     const index=tabIndex(next);
     taps.forEach((tap,i)=>tap.setValue(i===index?1:0)); // Tap selection is visible on the first native frame.
