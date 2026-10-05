@@ -34,8 +34,8 @@ export function NotificationBell({onViewAll}:{onViewAll:()=>void}){
  const layout=notificationPopoverLayout(anchor,screen,insets);
  function reveal(){closing.current=false;motion.stopAnimation();motion.setValue(0);setOpen(true);void n.refresh();}
  function show(){if(opening.current)return;opening.current=true;if(bell.current)bell.current.measureInWindow((x,y,width,height)=>{setAnchor({x,y,width,height});reveal();});else reveal();}
- function close(after?:()=>void){if(closing.current)return;closing.current=true;motion.stopAnimation();Animated.timing(motion,{toValue:0,duration:reduced?0:180,easing:MOTION_EASE,useNativeDriver:true}).start(({finished})=>{if(finished){setOpen(false);closing.current=false;opening.current=false;after?.();}});}
- function animateShown(){if(closing.current)return;Animated.timing(motion,{toValue:1,duration:reduced?0:220,easing:MOTION_EASE,useNativeDriver:true}).start();}
+ function close(after?:()=>void){if(closing.current)return;closing.current=true;motion.stopAnimation();Animated.timing(motion,{toValue:0,duration:reduced?0:220,easing:MOTION_EASE,useNativeDriver:true}).start(({finished})=>{if(finished){setOpen(false);closing.current=false;opening.current=false;after?.();}});}
+ function animateShown(){if(closing.current)return;Animated.timing(motion,{toValue:1,duration:reduced?0:280,easing:MOTION_EASE,useNativeDriver:true}).start();}
  useEffect(()=>()=>motion.stopAnimation(),[motion]);
  useEffect(()=>{if(open)bell.current?.measureInWindow((x,y,width,height)=>setAnchor({x,y,width,height}));},[screen.width,screen.height,open]);
  return <><View ref={bell} collapsable={false}>
@@ -43,8 +43,8 @@ export function NotificationBell({onViewAll}:{onViewAll:()=>void}){
  </View><Modal visible={open} transparent hardwareAccelerated statusBarTranslucent navigationBarTranslucent animationType="none" onShow={animateShown} onRequestClose={()=>close()}>
   <View style={{flex:1}}>
    {/* Keep one stable dim layer for the whole native window lifetime. Only the card animates. */}
-   <View testID="notification-backdrop" style={{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:'#00000044'}}><Pressable accessibilityLabel="Fechar notificações" onPress={()=>close()} style={{flex:1}}/></View>
-   <Animated.View testID="notification-popover" accessibilityViewIsModal style={{position:'absolute',...layout,backgroundColor:c.bg,borderWidth:1,borderColor:c.line,borderRadius:20,padding:14,gap:10,elevation:14,shadowColor:'#000',shadowOffset:{width:0,height:5},shadowOpacity:.18,shadowRadius:16,opacity:motion,transform:[{translateY:motion.interpolate({inputRange:[0,1],outputRange:[-18,0]})}]}}>
+   <Animated.View testID="notification-backdrop" style={{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:'#00000044',opacity:motion}}><Pressable accessibilityLabel="Fechar notificações" onPress={()=>close()} style={{flex:1}}/></Animated.View>
+   <Animated.View testID="notification-popover" accessibilityViewIsModal style={{position:'absolute',...layout,backgroundColor:c.bg,borderWidth:1,borderColor:c.line,borderRadius:20,padding:14,gap:10,elevation:14,shadowColor:'#000',shadowOffset:{width:0,height:5},shadowOpacity:.18,shadowRadius:16,opacity:motion,transform:[{translateX:motion.interpolate({inputRange:[0,1],outputRange:[(anchor.x+anchor.width/2-(layout.left+layout.width/2))*.14,0]})},{translateY:motion.interpolate({inputRange:[0,1],outputRange:[-(layout.height/2)*.14,0]})},{scale:motion.interpolate({inputRange:[0,1],outputRange:[.86,1]})}]}}>
     <View style={{flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,fontSize:20,fontWeight:'700',color:c.text}}>Notificações</Text><IconButton name="close" label="Fechar notificações" onPress={()=>close()}/></View>
     <ScrollView nestedScrollEnabled style={{flex:1}} contentContainerStyle={{paddingBottom:10}}><NotificationList/></ScrollView>
     {n.items.length?<Pressable onPress={()=>Alert.alert('Limpar notificações?','Somente os avisos serão removidos. Seus eventos e registros permanecem.',[{text:'Cancelar',style:'cancel'},{text:'Limpar',onPress:()=>void n.clearAll()}])}><Text style={{color:c.muted,fontSize:12,padding:6}}>Limpar todas</Text></Pressable>:null}

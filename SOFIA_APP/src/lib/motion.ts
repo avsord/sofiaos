@@ -19,7 +19,7 @@ export function useMotionPresence(visible:boolean){
  useEffect(()=>{
   const token=++epoch.current;progress.stopAnimation();
   if(visible)setMounted(true);
-  const animation=Animated.timing(progress,{toValue:visible?1:0,duration:reduced?0:visible?240:180,easing:MOTION_EASE,useNativeDriver:true,isInteraction:false});
+  const animation=Animated.timing(progress,{toValue:visible?1:0,duration:reduced?0:visible?280:220,easing:MOTION_EASE,useNativeDriver:true,isInteraction:false});
   animation.start(({finished})=>{if(finished&&!visible&&token===epoch.current)setMounted(false);});
   return()=>{++epoch.current;animation.stop();};
  },[visible,reduced,progress]);

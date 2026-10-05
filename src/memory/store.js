@@ -300,7 +300,7 @@ class Store {
       const d=this.makeDigest(conversationId), last=this.messages(conversationId,1)[0], checkpointId=id();
       this.db.prepare('INSERT INTO checkpoints VALUES (?,?,?,?,?,?,?,?,?)').run(checkpointId,conversationId,OWNER,reason,topic,next_step,d.id,last?.id || null,now());
       if(this.messages(conversationId,200).some(m=>this.isLocal('message',m.id)))this.markLocal('checkpoint',checkpointId);
-      this.db.prepare("UPDATE conversations SET state='paused',updated_at=? WHERE id=?").run(now(),conversationId);this.audit('checkpoint.created',checkpointId);
+      if(reason!=='shutdown'||!['web','mobile'].includes(c.channel))this.db.prepare("UPDATE conversations SET state='paused',updated_at=? WHERE id=?").run(now(),conversationId);this.audit('checkpoint.created',checkpointId);
       return this.db.prepare('SELECT * FROM checkpoints WHERE id=?').get(checkpointId);
     });
   }

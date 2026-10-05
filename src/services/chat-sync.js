@@ -5,6 +5,9 @@ const {AppError,validId}=require('../core/util');
 const OWNER='owner-local';
 function createChatSync(store){
  store.db.exec(`CREATE TABLE IF NOT EXISTS owner_chat_cursor(owner TEXT PRIMARY KEY,conversation_id TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 1) STRICT;`);
+ // Repair only personal threads hidden by a shutdown checkpoint; never restore deleted history.
+ store.db.prepare(`UPDATE conversations SET state='active' WHERE owner=? AND state='paused'
+ AND channel IN ('web','mobile') AND (SELECT reason FROM checkpoints WHERE conversation_id=conversations.id ORDER BY rowid DESC LIMIT 1)='shutdown'`).run(OWNER);
  function eligible(id){const c=store.conversation(validId(id));if(c.owner!==OWNER||c.state!=='active'||!['web','mobile'].includes(c.channel))throw new AppError('NOT_FOUND','Conversa pessoal não encontrada.',404);return c;}
  function cursor(){return store.db.prepare('SELECT * FROM owner_chat_cursor WHERE owner=?').get(OWNER);}
  function select(id){const c=eligible(id),old=cursor();if(old?.conversation_id!==c.id)store.db.prepare('INSERT INTO owner_chat_cursor(owner,conversation_id,revision) VALUES(?,?,1) ON CONFLICT(owner) DO UPDATE SET conversation_id=excluded.conversation_id,revision=owner_chat_cursor.revision+1').run(OWNER,c.id);return c;}

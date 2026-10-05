@@ -5,7 +5,7 @@ function publicIP(ip){
  const kind=net.isIP(ip);if(kind===4){const [a,b]=ip.split('.').map(Number);return !(a===0||a===10||a===127||a>=224||(a===169&&b===254)||(a===172&&b>=16&&b<=31)||(a===192&&(b===168||b===0||b===88))||(a===100&&b>=64&&b<=127)||a===198||a===203);}
  if(kind===6){const n=ip.toLowerCase();return /^[23][0-9a-f]{3}:/.test(n)&&!n.startsWith('2001:db8:')&&!n.startsWith('2001:0:')&&!n.startsWith('2002:');}return false;
 }
-async function readFeed(address,{signal,resolve=dns.lookup}={}){
+async function readFeed(address,{signal,resolve=dns.lookup,format='json',redirects=0}={}){
  let u;try{u=new URL(address);}catch{throw new AppError('FEED_URL','Endereço de feed inválido.');}
  if(u.protocol!=='https:'||u.username||u.password||(u.port&&u.port!=='443')||net.isIP(u.hostname)||u.hostname==='localhost'||/\.(?:localhost|local|internal|test)$/i.test(u.hostname))throw new AppError('FEED_URL','Feed exige domínio público HTTPS sem credenciais.');
  let addresses;try{addresses=await resolve(u.hostname,{all:true,verbatim:true});}catch{throw new AppError('FEED_DNS','Não foi possível resolver o domínio do feed.');}
@@ -13,10 +13,11 @@ async function readFeed(address,{signal,resolve=dns.lookup}={}){
  const chosen=addresses[0];
  return new Promise((resolve,reject)=>{
    let total=0,done=false;const chunks=[];const finish=(e,data)=>{if(done)return;done=true;e?reject(e):resolve(data);};
-   const req=https.get(u,{signal,timeout:10000,headers:{Accept:'application/json','User-Agent':'SofiaOS-AuthorizedFeed/45'},lookup:(host,opts,cb)=>opts?.all?cb(null,[chosen]):cb(null,chosen.address,chosen.family)},res=>{
+   const req=https.get(u,{signal,timeout:10000,headers:{Accept:format==='html'?'text/html,application/xhtml+xml':'application/json','User-Agent':'SofiaOS-AuthorizedFeed/45'},lookup:(host,opts,cb)=>opts?.all?cb(null,[chosen]):cb(null,chosen.address,chosen.family)},res=>{
+     if(format==='html'&&[301,302,303,307,308].includes(res.statusCode)&&res.headers.location&&redirects<3){res.resume();readFeed(new URL(res.headers.location,u).href,{signal,resolve,format,redirects:redirects+1}).then(data=>finish(null,data),finish);return;}
      if(res.statusCode!==200){res.resume();return finish(new AppError('FEED_HTTP','Feed respondeu HTTP '+res.statusCode+'. Redirecionamentos não são seguidos.'));}
-     if(!/^(application\/json|application\/[^;]+\+json)/i.test(res.headers['content-type']||'')){res.resume();return finish(new AppError('FEED_TYPE','A fonte não retornou JSON. HTML de loja não é feed compatível.'));}
-     res.on('data',b=>{total+=b.length;if(total>512*1024){req.destroy();return finish(new AppError('FEED_SIZE','Feed ultrapassou 512 KB.'));}chunks.push(b);});res.on('end',()=>{try{finish(null,JSON.parse(Buffer.concat(chunks).toString('utf8')));}catch{finish(new AppError('FEED_JSON','Feed contém JSON inválido.'));}});res.on('error',()=>finish(new AppError('FEED_CONNECTION','Leitura do feed interrompida.')));
+     if(format!=='html'&&!/^(application\/json|application\/[^;]+\+json)/i.test(res.headers['content-type']||'')){res.resume();return finish(new AppError('FEED_TYPE','A fonte não retornou JSON. HTML de loja não é feed compatível.'));}
+     res.on('data',b=>{total+=b.length;if(total>(format==='html'?2*1024*1024:512*1024)){req.destroy();return finish(new AppError('FEED_SIZE','Feed ultrapassou 512 KB.'));}chunks.push(b);});res.on('end',()=>{try{const text=Buffer.concat(chunks).toString('utf8');finish(null,format==='html'?text:JSON.parse(text));}catch{finish(new AppError('FEED_JSON','Feed contém JSON inválido.'));}});res.on('error',()=>finish(new AppError('FEED_CONNECTION','Leitura do feed interrompida.')));
    });
    req.on('timeout',()=>req.destroy(new Error('timeout')));req.on('error',()=>finish(new AppError('FEED_CONNECTION','Não foi possível consultar o feed. Nenhum preço foi inventado.')));
  });

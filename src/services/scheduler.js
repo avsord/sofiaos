@@ -14,7 +14,7 @@ function nextRoutine(e,after=new Date()){
  }return null;
 }
 class Scheduler{
- constructor(workspace,{fetcher=readFeed,clock=()=>new Date()}={}){this.w=workspace;this.fetcher=fetcher;this.clock=clock;this.busy=false;this.controller=null;this.stopped=false;}
+ constructor(workspace,{fetcher=readFeed,clock=()=>new Date(),config={}}={}){this.config=config;this.w=workspace;this.fetcher=fetcher;this.clock=clock;this.busy=false;this.controller=null;this.stopped=false;}
  async tick(){if(this.busy||this.stopped)return;this.busy=true;this.controller=new AbortController();try{
   const stamp=this.clock().toISOString();const due=this.w.db.prepare("SELECT * FROM jobs WHERE state='active' AND next_at<=? ORDER BY next_at LIMIT 10").all(stamp);
   for(const j of due){if(this.stopped)break;const e=this.w.get(j.entity_id);if(e.state!=='active')continue;try{
@@ -27,7 +27,7 @@ class Scheduler{
     this.w.changeState(e.id,'done',e.revision);
   }
  }finally{this.busy=false;this.controller=null;}}
- async monitor(e,j,stamp){const d=e.data;if(d.method!=='json'||!d.consent)return;const json=await this.fetcher(d.feed_url,{signal:this.controller?.signal});this.w.observe(e.id,{price:field(json,d.price_path),shipping:d.shipping_path?field(json,d.shipping_path):0,variant:field(json,d.variant_path),currency:field(json,d.currency_path),source:d.feed_url,source_key:j.id+':'+stamp,observed_at:stamp});this.w.db.prepare('UPDATE jobs SET last_at=?,last_error=NULL,next_at=?,run_count=run_count+1 WHERE id=?').run(stamp,new Date(Date.parse(stamp)+j.interval_minutes*60000).toISOString(),j.id);}
+ async monitor(e,j,stamp){const d=e.data;if(d.method==='product'){await require('./product-monitor').collect(this.w,e,{stamp,signal:this.controller?.signal,config:this.config});this.w.db.prepare('UPDATE jobs SET last_at=?,last_error=NULL,next_at=?,run_count=run_count+1 WHERE id=?').run(stamp,new Date(Date.parse(stamp)+j.interval_minutes*60000).toISOString(),j.id);return;}if(d.method!=='json'||!d.consent)return;const json=await this.fetcher(d.feed_url,{signal:this.controller?.signal});this.w.observe(e.id,{price:field(json,d.price_path),shipping:d.shipping_path?field(json,d.shipping_path):0,variant:field(json,d.variant_path),currency:field(json,d.currency_path),source:d.feed_url,source_key:j.id+':'+stamp,observed_at:stamp});this.w.db.prepare('UPDATE jobs SET last_at=?,last_error=NULL,next_at=?,run_count=run_count+1 WHERE id=?').run(stamp,new Date(Date.parse(stamp)+j.interval_minutes*60000).toISOString(),j.id);}
  routine(e,j,stamp){
   const next=nextRoutine(e,new Date(Date.parse(stamp)-60000));
   // First run schedules ahead, never floods missed historical occurrences.

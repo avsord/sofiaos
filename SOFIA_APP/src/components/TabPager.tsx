@@ -12,6 +12,7 @@ type Props = {motion: MenuMotion; activeTab: Tab; enabled: boolean; onSelect: (t
 export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({activeTab,enabled,onSelect,children,motion},ref) {
   const scroll = useRef<ScrollView>(null);
   const aligned = useRef<{width:number;x:number}|null>(null);
+  const dragStart=useRef(0);
   const size = useRef(0),measured = useRef({viewport:0,content:0});
   const [width,setWidth] = useState(0),[readyWidth,setReadyWidth] = useState(0);
   const selection = useRef(createPagerSelection(activeTab));
@@ -66,7 +67,7 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
   // Recomputed only for a new viewport (first mount / resize).
   const initialOffset=useMemo(()=>({x:Math.max(0,tabIndex(selection.current.current()))*width,y:0}),[width]);
   const begin = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (latest.current.enabled) {aligned.current=null;selection.current.beginDrag();motion.beginDrag(event.nativeEvent.contentOffset.x);}
+    if (latest.current.enabled) {dragStart.current=event.nativeEvent.contentOffset.x;aligned.current=null;selection.current.beginDrag();motion.beginDrag(event.nativeEvent.contentOffset.x);}
   },[motion]);
   const finish = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (!latest.current.enabled) {goTo(latest.current.activeTab);return;}
@@ -82,6 +83,11 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
     selection.current.release(event.timeStamp);
     const x = event.nativeEvent.contentOffset.x, w = size.current;
     const velocity = event.nativeEvent.velocity?.x;
+    const delta=x-dragStart.current;
+    if(w>0 && Math.abs(velocity||0)<.15 && Math.abs(delta)>=Math.min(64,w*.16) && Math.abs(delta)<w*.45 && Math.abs(x-Math.round(x/w)*w)>1){
+      const origin=Math.round(dragStart.current/w),index=Math.max(0,Math.min(TAB_ORDER.length-1,origin+(delta>0?1:-1)));
+      scroll.current?.scrollTo({x:index*w,y:0,animated:true});return;
+    }
     if (w > 0 && velocity !== undefined && Math.abs(velocity) < 0.01 && Math.abs(x - Math.round(x/w)*w) < 0.5) finish(event);
   },[finish]);
 

@@ -76,11 +76,12 @@ class Workspace {
    if(kind==='commitment'&&data.end_at&&data.start_at&&data.end_at<=data.start_at)throw new AppError('BAD_DATE','O fim precisa ser posterior ao início.');
    if(kind==='course'&&data.progress!==''&&data.progress>100)throw new AppError('BAD_PROGRESS','Progresso deve ficar entre 0 e 100.');
    if(kind==='monitor'){
-     if(!data.target_id||!['purchase','course'].includes(this.get(data.target_id).kind))throw new AppError('TARGET_REQUIRED','O monitor deve referenciar um item de Comprar ou um curso existente.');
+     if((!data.target_id&&data.method!=='product')||(data.target_id&&!['purchase','course'].includes(this.get(data.target_id).kind)))throw new AppError('TARGET_REQUIRED','O monitor deve referenciar um item de Comprar ou um curso existente.');
      if(!data.variant)throw new AppError('VARIANT_REQUIRED','Defina a variante exata para não comparar produtos diferentes.');
      data.currency=data.currency||'BRL';data.method=data.method||'manual';data.interval_minutes=data.interval_minutes||360;
      if(!Number.isInteger(data.interval_minutes)||data.interval_minutes<15||data.interval_minutes>43200)throw new AppError('BAD_INTERVAL','Intervalo entre 15 e 43200 minutos.');
      if(data.drop_percent!==''&&data.drop_percent>100)throw new AppError('BAD_PERCENT','Queda deve ficar entre 0 e 100%.');
+     if(data.method==='product'){if(!data.preferred_url||!data.preferred_url.startsWith('https://'))throw new AppError('PRODUCT_LINK','Informe o link HTTPS principal do produto.');if(data.line_color&&!/^#[0-9a-f]{6}$/i.test(data.line_color))throw new AppError('BAD_COLOR','Selecione uma cor válida.');data.interval_minutes=Math.max(60,data.interval_minutes);}
      if(data.method==='json'&&(!data.feed_url||!data.price_path||!data.variant_path||!data.currency_path||!data.consent))throw new AppError('FEED_REQUIRED','Informe feed HTTPS autorizado, campos de preço/variante/moeda e consentimento.');
      if(data.feed_url&&[...new URL(data.feed_url).searchParams.keys()].some(k=>/token|api.?key|auth|secret|signature/i.test(k)))throw new AppError('SECRET_FEED','Use um feed público sem tokens, assinaturas ou credenciais na URL.');
      if(data.feed_url&&!data.feed_url.startsWith('https://'))throw new AppError('BAD_FEED','O feed precisa usar HTTPS.');
@@ -159,7 +160,7 @@ class Workspace {
  notify(category,title,body,entityId,importance='info',dedup=null){this.db.prepare('INSERT OR IGNORE INTO notifications VALUES(?,?,?,?,?,?,?, ?,?)').run(id(),category,title,body,entityId||null,importance,'unread',dedup,now());}
  notifications(){return this.db.prepare("SELECT n.*,COALESCE(e.area,'Geral') AS area FROM notifications n LEFT JOIN entities e ON e.id=n.entity_id ORDER BY n.created_at DESC,n.rowid DESC LIMIT 300").all();}
  markRead(key){this.db.prepare("UPDATE notifications SET state='read' WHERE id=?").run(key);return {ok:true};}
- syncJob(e){const active=e.state==='active'&&(e.kind==='routine'||e.data.method==='json');this.db.prepare('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,0) ON CONFLICT(entity_id,kind) DO UPDATE SET state=excluded.state,next_at=CASE WHEN jobs.state<>excluded.state THEN excluded.next_at ELSE jobs.next_at END,interval_minutes=excluded.interval_minutes').run(id(),e.id,e.kind,active?'active':'paused',active?now():null,null,null,e.kind==='monitor'?e.data.interval_minutes:1);}
+ syncJob(e){const active=e.state==='active'&&(e.kind==='routine'||['json','product'].includes(e.data.method));this.db.prepare('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,0) ON CONFLICT(entity_id,kind) DO UPDATE SET state=excluded.state,next_at=CASE WHEN jobs.state<>excluded.state THEN excluded.next_at ELSE jobs.next_at END,interval_minutes=excluded.interval_minutes').run(id(),e.id,e.kind,active?'active':'paused',active?now():null,null,null,e.kind==='monitor'?e.data.interval_minutes:1);}
  observations(key){if(this.get(key).kind!=='monitor')throw new AppError('BAD_KIND','Não é um monitor.');return this.db.prepare('SELECT * FROM observations WHERE monitor_id=? ORDER BY observed_at ASC,rowid ASC').all(key);}
  observe(key,b){const mon=this.get(key);if(mon.kind!=='monitor')throw new AppError('BAD_KIND','Não é um monitor.');
    const price=Number(b.price),shipping=Number(b.shipping??0);if(!Number.isFinite(price)||price<=0||price>1e8||!Number.isFinite(shipping)||shipping<0||shipping>1e8)throw new AppError('BAD_PRICE','Informe preço positivo e frete não negativo.');
@@ -169,7 +170,7 @@ class Workspace {
    const previous=this.observations(key),cents=Math.round(price*100),freight=Math.round(shipping*100),total=cents+freight,sourceKey=b.source_key?cleanText(b.source_key,'ID da observação',160):null;
    const duplicate=sourceKey&&this.db.prepare('SELECT * FROM observations WHERE monitor_id=? AND source_key=?').get(key,sourceKey);if(duplicate)return {...duplicate,replayed:true};
    return this.s.tx(()=>{const oid=id();this.db.prepare('INSERT INTO observations VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(oid,key,cents,freight,total,b.currency,b.variant,source,when,now(),sourceKey);
-     const history=previous.filter(p=>p.observed_at<=when),latest=history.at(-1),min=history.length?Math.min(...history.map(x=>x.total_cents)):null;
+     const history=previous.filter(p=>p.observed_at<=when&&p.source===source),latest=history.at(-1),min=history.length?Math.min(...history.map(x=>x.total_cents)):null;
      const reasons=[];if(mon.data.target_price!==''&&total<=Math.round(mon.data.target_price*100))reasons.push('atingiu o preço-alvo');
      if(latest&&mon.data.drop_percent!==''&&total<latest.total_cents&&(latest.total_cents-total)/latest.total_cents*100>=mon.data.drop_percent)reasons.push('atingiu a queda percentual');
      if(mon.data.new_low&&min!==null&&total<min)reasons.push('menor total desde o início das suas observações');

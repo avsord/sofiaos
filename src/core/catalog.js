@@ -1417,4 +1417,6 @@ const CATALOG={
     "description": "Aprendizado revisável: um caso não vira regra universal."
   }
 };
+CATALOG.monitor.fields.find(f=>f.key==='method').options.push('product');
+CATALOG.monitor.fields.push({key:'preferred_url',label:'Link principal do produto',type:'url'},{key:'comparison_urls',label:'Outras lojas (um link por linha, opcional)',type:'textarea'},{key:'line_color',label:'Cor da linha',type:'text'},{key:'discover',label:'Buscar o mesmo produto em outras lojas',type:'checkbox'});
 module.exports={CATALOG};

@@ -27,7 +27,7 @@ function makeApi45(runtime,{bodyJson,json}){const {store,workspace:w,routing,vau
  match=p.match(/^\/api\/entities\/([\w-]+)$/);if(match){const key=validId(match[1]);if(m==='GET')return send(w.get(key));if(m==='PATCH')return send(w.save(await body(),key));if(m==='DELETE')return send(w.deleteEntity(key));}
  match=p.match(/^\/api\/entities\/([\w-]+)\/(versions|observations|attachments|calendar|action)$/);if(match){const key=validId(match[1]),action=match[2];
   if(m==='GET'&&action==='versions')return send({items:w.versions(key)});
-  if(m==='GET'&&action==='observations')return send({items:w.observations(key)});
+  if(m==='GET'&&action==='observations')return send({items:w.observations(key),status:store.db.prepare('SELECT last_at,last_error,next_at FROM jobs WHERE entity_id=?').get(key)||null});
   if(m==='POST'&&action==='observations')return send(w.observe(key,await body()),201);
   if(m==='GET'&&action==='attachments')return send({items:w.attachmentList(key)});
   if(m==='POST'&&action==='attachments')return send(w.attach(key,await bodyJson(req,15*1024*1024)),201);

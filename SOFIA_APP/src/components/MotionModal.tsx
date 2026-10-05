@@ -10,5 +10,5 @@ export function MotionModal({visible=true,children,transparent=false,...props}:M
 function AnimatedTransparentModal({visible=true,children,animationType:_animationType,...props}:ModalProps){
  const c=useTheme(),{mounted,progress,reduced}=useMotionPresence(!!visible),last=useRef(children);
  if(visible)last.current=children;
- return <Modal {...props} visible={mounted} transparent animationType="none"><Animated.View pointerEvents={visible?'auto':'none'} style={{flex:1,backgroundColor:'transparent',opacity:progress,transform:[{translateY:progress.interpolate({inputRange:[0,1],outputRange:[reduced?0:20,0]})}]}}>{visible?children:last.current}</Animated.View></Modal>;
+ return <Modal {...props} visible={mounted} transparent animationType="none"><Animated.View pointerEvents={visible?'auto':'none'} style={{flex:1,backgroundColor:'transparent',opacity:progress}}>{visible?children:last.current}</Animated.View></Modal>;
 }
