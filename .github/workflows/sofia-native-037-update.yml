@@ -183,3 +183,5 @@ jobs:
           path: SOFIA_APP/dist/
           if-no-files-found: warn
           retention-days: 30
+
+# Native acceptance includes short gestures, growing replies and task detail actions.
