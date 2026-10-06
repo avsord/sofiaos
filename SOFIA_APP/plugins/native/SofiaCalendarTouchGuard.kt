@@ -76,6 +76,18 @@ internal class SofiaCalendarTouchGuard {
         ancestor = ancestor.parent
       }
     }
+    if (event.actionMasked == MotionEvent.ACTION_MOVE) {
+      val view = menu
+      val dx = abs(event.rawX - downX); val dy = abs(event.rawY - downY)
+      if (view != null && view.scrollEnabled &&
+          dx >= 12f * view.resources.displayMetrics.density && dx > dy * 1.5f) {
+        // A vertical child may reserve the pointer before the horizontal pager
+        // reaches its touch slop. Release that reservation only after direction
+        // is clear; normal native interception emits the complete drag lifecycle.
+        // Calendar, appointment-list and system-edge streams have no menu owner.
+        view.requestDisallowInterceptTouchEvent(false)
+      }
+    }
     pager?.setScrollEnabled(false)
     if (appointmentList != null) {
       // Do not donate unconsumed scroll/fling to Home at either list edge.

@@ -161,6 +161,7 @@ jobs:
             adb logcat -d -s ReactNativeJS:E AndroidRuntime:E > SOFIA_APP/dist/native-errors.txt
             ! grep -q 'FATAL EXCEPTION' SOFIA_APP/dist/native-errors.txt
             adb install -r /tmp/sofia-full-fixture.apk
+            adb shell pm grant com.avsord.sofiaapp android.permission.POST_NOTIFICATIONS
             adb logcat -c
             adb shell am force-stop com.avsord.sofiaapp
             adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
