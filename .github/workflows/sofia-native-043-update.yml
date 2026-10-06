@@ -75,7 +75,7 @@ jobs:
       - name: Verify existing server without restarting or changing its data
         run: |
           curl -fsS --max-time 30 https://sofiaos.up.railway.app/health > SOFIA_APP/dist/server-health.json
-          node -e "const h=require('./SOFIA_APP/dist/server-health.json');if(!h.ok||Number(h.version.split('.')[0])<142||!h.task_description_format||!h.selected_task_context||!h.agenda_priority)throw Error('Incompatible server');console.log('Existing server preserved:',h.version)"
+          node -e "const h=require('./SOFIA_APP/dist/server-health.json');if(!h.ok||Number(h.version.split('.')[0])<142)throw Error('Incompatible server');console.log('Existing server preserved:',h.version)"
       - uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: false
@@ -182,6 +182,10 @@ jobs:
             adb shell am force-stop com.avsord.sofiaapp
             adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
             cd SOFIA_APP && python3 /tmp/sofia-run-acceptance.py
+      - name: Require live server support before publishing the APK
+        run: |
+          curl -fsS --max-time 30 https://sofiaos.up.railway.app/health > SOFIA_APP/dist/server-release-gate.json
+          node -e "const h=require('./SOFIA_APP/dist/server-release-gate.json');if(!h.ok||!h.task_description_format||!h.selected_task_context||!h.agenda_priority)throw Error('Server publication is required before the APK release; all existing records remain preserved')"
       - name: Publish exact checked APK on existing update channel
         working-directory: SOFIA_APP
         run: node tools/publish-release.cjs
