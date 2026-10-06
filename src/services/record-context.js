@@ -1,7 +1,7 @@
 'use strict';
 const {normalize}=require('../core/util');
 const allowed=(privacy,route)=>route==='shared'?privacy==='shared':privacy!=='local';
-function taskRecord(store,task){return {id:task.id,kind:'task',title:task.title,state:task.state,area:task.area,priority_level:task.priority_level,description:task.description,due_at:task.due_at,revision:task.revision,source_id:task.source_id,privacy:store.privacyOf('task',task.id)||'private'};}
+function taskRecord(store,task){return {id:task.id,kind:'task',title:task.title,state:task.state,area:task.area,priority_level:task.priority_level,description:task.description,description_document:task.description_document,due_at:task.due_at,revision:task.revision,source_id:task.source_id,privacy:store.privacyOf('task',task.id)||'private'};}
 function searchTasks(store,query,route='private',limit=6){
  const terms=normalize(query).split(/\W+/).filter(x=>x.length>2);
  return store.tasks().map(t=>taskRecord(store,t)).filter(t=>allowed(t.privacy,route))

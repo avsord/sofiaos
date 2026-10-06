@@ -53,6 +53,7 @@ function makeMobileApi(runtime, deps) {
   function payload(b, text) {
     const c = conversation(b.conversation_id); validId(b.client_message_id);
     return { conversation_id: c.id, client_message_id: b.client_message_id, message: text, route: 'private', retry: b.retry === true,
+      ...(b.selected_task_id?{selected_task_id:validId(b.selected_task_id)}:{}),
       ...(b.clarification_id ? { clarification_id: validId(b.clarification_id) } : {}),
       ...(b.clarification_option ? { clarification_option: String(b.clarification_option).slice(0,80) } : {}) };
   }

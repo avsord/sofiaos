@@ -1422,4 +1422,5 @@ const CATALOG={
 CATALOG.monitor.fields.find(f=>f.key==='method').options.push('product');
 CATALOG.monitor.fields.push({key:'preferred_url',label:'Link principal do produto',type:'url'},{key:'comparison_urls',label:'Outras lojas (um link por linha, opcional)',type:'textarea'},{key:'line_color',label:'Cor da linha',type:'text'},{key:'discover',label:'Buscar o mesmo produto em outras lojas',type:'checkbox'});
 for(const definition of Object.values(CATALOG))if(definition.group==='knowledge')definition.fields.push({key:'leaf_document',label:'Documento da nota',type:'textarea',max:64000,developerOnly:true});
+for(const kind of ['commitment','reminder'])CATALOG[kind].fields.push({key:'priority_level',label:'Prioridade',type:'select',options:['none','light','medium','important']});
 module.exports={CATALOG};

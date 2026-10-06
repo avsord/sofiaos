@@ -1,4 +1,4 @@
-import {useEffect, useLayoutEffect, useRef, type RefObject} from 'react';
+import {useEffect, useLayoutEffect, useRef, useState, type RefObject} from 'react';
 import {Keyboard} from 'react-native';
 import type {FlatList, LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent} from 'react-native';
 import type {Message} from './types';
@@ -20,11 +20,13 @@ export class ChatScrollIntent {
  interacting=false;
  contentHeight=0;
  viewportHeight=0;
+ offset=0;
+ get distanceFromEnd(){return Math.max(0,this.endOffset-this.offset);}
  get endOffset(){return Math.max(0,this.contentHeight-this.viewportHeight);}
  follow(){this.following=true;this.interacting=false;}
  begin(){this.interacting=true;}
  position(offset:number,content:number,viewport:number){
-  this.contentHeight=content;this.viewportHeight=viewport;
+  this.offset=offset;this.contentHeight=content;this.viewportHeight=viewport;
   if(this.interacting)this.following=content-offset-viewport<100;
  }
  end(){this.interacting=false;}
@@ -32,7 +34,7 @@ export class ChatScrollIntent {
 }
 
 export function useChatAutoscroll(list:RefObject<FlatList<any>|null>,active:boolean){
- const lastDrag=useRef(0);
+ const lastDrag=useRef(0),pendingFollow=useRef(false),[showJump,setShowJump]=useState(false);
  const intent=useRef(new ChatScrollIntent()).current,frame=useRef<number|null>(null),enabled=useRef(active);
  enabled.current=active;
  function cancel(){if(frame.current!==null){cancelAnimationFrame(frame.current);frame.current=null;}}
@@ -55,21 +57,23 @@ export function useChatAutoscroll(list:RefObject<FlatList<any>|null>,active:bool
    frame.current=requestAnimationFrame(()=>{frame.current=null;if(enabled.current&&intent.following&&!intent.interacting)jump();});
   });
  }
- function position(e:NativeSyntheticEvent<NativeScrollEvent>){const n=e.nativeEvent;
+ function position(e:NativeSyntheticEvent<NativeScrollEvent>){const n=e.nativeEvent;if(!enabled.current)return;
   // A scroll callback queued before the latest layout must not shrink the
   // measured reply or pull an in-flight animation back to its previous end.
   intent.position(n.contentOffset.y,intent.contentHeight||n.contentSize.height,intent.viewportHeight||n.layoutMeasurement.height);
+  setShowJump(intent.distanceFromEnd>100);
   // Android may restore the old scroll offset after its keyboard/focus resize.
   // Reconcile that native geometry only while following, never during a user drag.
   if(intent.following&&!intent.interacting&&intent.endOffset-n.contentOffset.y>2&&Math.abs(target.current-intent.endOffset)>1)settle();
  }
- useLayoutEffect(()=>{settle();return cancel;},[active]);
+ useLayoutEffect(()=>{if(active&&pendingFollow.current){pendingFollow.current=false;settle();}return cancel;},[active]);
  useEffect(()=>{const show=Keyboard.addListener('keyboardDidShow',settle),hide=Keyboard.addListener('keyboardDidHide',settle);return()=>{show.remove();hide.remove();};},[]);
  return {
-  follow:()=>{lastDrag.current=0;target.current=-1;intent.follow();settle();},
+  showJump,
+  follow:()=>{pendingFollow.current=!enabled.current;setShowJump(false);lastDrag.current=0;target.current=-1;intent.follow();settle();},
   pause:()=>{lastDrag.current=0;cancel();intent.pause();},
-  onContentSizeChange:(_width:number,height:number)=>{intent.contentHeight=height;settle();},
-  onLayout:(e:LayoutChangeEvent)=>{target.current=-1;intent.viewportHeight=e.nativeEvent.layout.height;settle();},
+  onContentSizeChange:(_width:number,height:number)=>{if(height<=0)return;const changed=Math.abs(height-intent.contentHeight)>1;intent.contentHeight=height;if(changed){target.current=-1;settle();}},
+  onLayout:(e:LayoutChangeEvent)=>{const height=e.nativeEvent.layout.height;if(!enabled.current||height<=0||Math.abs(height-intent.viewportHeight)<1)return;target.current=-1;intent.viewportHeight=height;settle();},
   onScroll:position,
   onScrollBeginDrag:()=>{lastDrag.current=Date.now();target.current=-1;cancel();intent.begin();},
   onScrollEndDrag:(e:NativeSyntheticEvent<NativeScrollEvent>)=>{lastDrag.current=Date.now();position(e);intent.end();settle();},

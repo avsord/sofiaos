@@ -15,7 +15,7 @@ import {pageBodyIsEmpty,pageBlockHint,pageTitleHint} from '../lib/page-hints';
 import {Empty,ErrorBanner,IconButton,ScreenTitle} from '../components/UI';
 import {PageRefreshGuard} from '../lib/page-gesture';
 import {mergeRemotePages} from '../lib/page-sync';
-import {pageBackTarget,shouldBeginPageBack} from '../lib/page-navigation';
+import {entryBackTarget,shouldBeginPageBack} from '../lib/page-navigation';
 import {Icon} from '../components/Icon';
 import {PageCover,PageAppearance,PAGE_COVERS} from '../components/PageAppearance';
 import {PageTreeList} from '../components/PageTreeList';
@@ -133,7 +133,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   finally{pendingPosition.current.clear();moveBusy.current=false;mutationEpoch.current++;if(mounted.current)setMovingId(null);}
  }
  function open(page:Entity,push=true){if(selectedId){void store.flush(selectedId);if(push&&selectedId!==page.id)history.current.push(selectedId);}store.open(pages.find(p=>p.id===page.id)||page);setSelectedId(page.id);setFocus(null);setAppearance(null);setError('');}
- function back(){if(selectedId)void store.flush(selectedId);setFocus(null);setAppearance(null);const parent=pageBackTarget(byId,selectedId);history.current=[];if(parent&&parent!==selectedId&&byId.has(parent))open(byId.get(parent)!,false);else setSelectedId(null);} backAction.current=back;
+ function back(){if(selectedId)void store.flush(selectedId);setFocus(null);setAppearance(null);const parent=entryBackTarget(byId,selectedId,history.current);if(parent)history.current.splice(history.current.lastIndexOf(parent));else history.current=[];if(parent&&parent!==selectedId&&byId.has(parent))open(byId.get(parent)!,false);else setSelectedId(null);} backAction.current=back;
  useEffect(()=>{if(!active)return;const sub=BackHandler.addEventListener('hardwareBackPress',()=>{if(pageInteractionRef.current)return true;if(!selectedId)return false;back();return true;});return()=>sub.remove();},[active,selectedId,byId,store]);
  function edit(change:(draft:PageDraft)=>PageDraft,group=''){if(selectedId)store.edit(selectedId,change,group);}
  async function create(parent?:Entity,template?:PageTemplate){mutationEpoch.current++;try{
@@ -202,7 +202,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   onBlank={()=>void create(createParent||undefined)} onTemplate={template=>selectedId?applyTemplate(template):void create(undefined,template)}/>;
  if(!entry)return <View style={{flex:1}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{listView}{createPicker}</View>;
  const draft=entry.draft,selected={...entry.base,data:{...entry.base.data,...draft.appearance}},subpages=children.get(selected.id)||[];
- const previousId=pageBackTarget(byId,selected.id);
+ const previousId=entryBackTarget(byId,selected.id,history.current);
  const previousEntry=previousId?store.get(previousId):undefined;
  const previousPage=previousId?byId.get(previousId):undefined;
  const path:Entity[]=[];let cur:Entity|undefined=selected;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&path.length<40){seen.add(cur.id);path.unshift(cur);cur=byId.get(String(cur.data?.parent_id||''));}

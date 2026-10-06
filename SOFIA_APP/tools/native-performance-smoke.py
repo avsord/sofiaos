@@ -79,11 +79,13 @@ adb('shell','input','swipe','360','1200','360','450','400');time.sleep(.4)
 tap('Filtrar níveis das tarefas do Início');wait('Nível das tarefas');screenshot('home-task-filter');tap('Todas');time.sleep(.3)
 # Home row opens details; only the separate checkbox concludes.
 tap('Abrir tarefa Projeto urgente');wait('Detalhes da tarefa');wait('Descricao da tarefa QA');screenshot('home-task-details')
-tap('Editar tarefa');wait('Descrição');screenshot('home-task-edit');tap('Descrição');adb('shell','input','keyevent','123');adb('shell','input','text','%satualizada');adb('shell','input','keyevent','BACK');time.sleep(.3)
-adb('shell','input','swipe','360','1200','360','550','400');time.sleep(.3);tap('Salvar tarefa');wait('Detalhes da tarefa');wait('Descricao da tarefa QA atualizada');screenshot('home-task-saved');tap('Fechar detalhes da tarefa');time.sleep(.4)
+tap('Editar tarefa');wait('Descrição');screenshot('home-task-edit');tap('Descrição');adb('shell','input','keyevent','123');tap('Negrito na descrição');adb('shell','input','text','%satualizada');adb('shell','input','keyevent','BACK');time.sleep(.3)
+adb('shell','input','swipe','360','1200','360','550','400');time.sleep(.3);tap('Salvar tarefa');wait('Detalhes da tarefa');wait('Descricao da tarefa QA atualizada');screenshot('home-task-saved');qa_task=json.loads(next(n.get('content-desc')[9:] for n in tree().iter('node') if n.get('content-desc','').startswith('QA tasks ')));assert any(m.get('bold') for t in qa_task if t['id']=='filter0' for m in t['document']['marks']),'Bold description was not persisted';tap('Levar para conversa');wait('Tarefa em contexto');wait('Projeto urgente');tap('Mensagem para a Sofia');adb('shell','input','text','ContextoQA');tap('Enviar mensagem');time.sleep(1);wait('QA task context filter0');tap('Remover tarefa da conversa');adb('shell','input','keyevent','BACK');tap('Início');wait('Olá, Teste.');time.sleep(.4)
 wait('Concluir Projeto urgente');tap('Concluir Projeto urgente');time.sleep(.6);assert find(tree(),'Abrir tarefa Projeto urgente') is None,'Row tap must not complete; checkbox must complete'
 adb('shell','input','swipe','360','400','360','1200','400');time.sleep(.4)
-tap('Conversa');tap('Mensagem para a Sofia');adb('shell','input','text','Teste%srolagem');tap('Enviar mensagem');time.sleep(1.5);wait('FIM DA RESPOSTA QA');time.sleep(3);wait('FIM DA RESPOSTA QA');screenshot('chat-growing-reply');adb('shell','input','keyevent','BACK');tap('Início');wait('Olá, Teste.')
+tap('Conversa');tap('Mensagem para a Sofia');adb('shell','input','text','Teste%srolagem');tap('Enviar mensagem');time.sleep(1.5);wait('FIM DA RESPOSTA QA');time.sleep(3);wait('FIM DA RESPOSTA QA');screenshot('chat-growing-reply');adb('shell','input','keyevent','BACK');time.sleep(.4)
+for _ in range(4):adb('shell','input','swipe','360','430','360','1120','300');time.sleep(.2)
+wait('Descer para a última mensagem');screenshot('chat-jump-button');tap('Descer para a última mensagem');time.sleep(1);wait('FIM DA RESPOSTA QA');screenshot('chat-jump-bottom');tap('Início');wait('Olá, Teste.')
 tap('Notificações: 2 não lidas');time.sleep(.35);screenshot('bell-origin');tap('Fechar notificações')
 
 for i in range(3):
@@ -133,6 +135,15 @@ wait('Editar cápsula NovaCapsulaQA');wait('1 · 10:01');wait('Todo mês no dia 
 print('PASS capsule daily dose, preserved history, two-reminder editor and new routine',flush=True)
 tap('Apps');tap('Listas');wait('Compra preservada');wait('Descrição de compra preservada');tap('Filtros das listas');wait('Filtrar área das listas');wait('Filtrar estado das listas');screenshot('shopping-library-style-filters');tap('Ver registros');tap('Criar registro');wait('Novo registro nas listas');wait('Criar Item de compra');screenshot('shopping-library-style-create');adb('shell','input','keyevent','BACK');tap('Voltar aos apps');tap('Início')
 print('PASS shopping shared Library layout, Everything, filters and plus menu',flush=True)
+# Direct entry from Pages tree returns to Pages menu; nested entry returns to the parent.
+tap('Páginas');wait('Abrir página principal Teste principal');tap('Expandir subpáginas de Teste principal');tap('Expandir subpáginas de Teste filha');tap('Abrir subpágina Teste neta');wait('Título da página');adb('shell','input','keyevent','BACK');wait('Abrir página principal Teste principal');assert find(tree(),'Título da página') is None,'Direct subpage entry returned to a parent editor'
+tap('Abrir página principal Teste principal');tap('Abrir subpágina Teste filha');wait('Título da página');adb('shell','input','keyevent','BACK');assert wait('Título da página').get('text')=='Teste principal','Nested entry did not return to its actual parent';adb('shell','input','keyevent','BACK');tap('Início');wait('Olá, Teste.')
+# Long press today's date on the Home calendar creates an appointment on that date.
+for _ in range(3):
+ if find(tree(),'agenda-split-row') is not None:break
+ adb('shell','input','swipe','360','400','360','1200','250');time.sleep(.4)
+day=adb('shell','date','+%Y-%m-%d').decode().strip();node=wait('agenda-day-'+day);x,y,z,w=map(int,re.findall(r'\d+',node.get('bounds')));adb('shell','input','swipe',str((x+z)//2),str((y+w)//2),str((x+z)//2),str((y+w)//2),'800');wait('Criar · Compromisso');wait('Prioridade');screenshot('home-date-hold-create');tap('Prioridade');tap('Importante');screenshot('agenda-priority-editor');tap('Fechar editor');tap('Início')
+print('PASS task rich description and selected context, chat jump, entry-path page back, Home date hold and Agenda priority',flush=True)
 logs=adb('logcat','-d').decode(errors='replace');(out/'native-log.txt').write_text(logs);assert 'FATAL EXCEPTION' not in logs;assert 'CALENDAR_PERF' in logs
 (out/'result.json').write_text(json.dumps({'passed':True,'events':500,'passes':10,'native_hermes_budget_ms':1000,'menu_roundtrips':3,'appointment_edges_isolated':True,'moderate_pull_ignored':True,'deliberate_pull_refreshes':True,'root_system_back_inert':True,'capsules_daily_widget_and_history':True}))
 print('PASS native calendar performance, 500 events, existing update signature and navigation')

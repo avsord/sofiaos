@@ -127,9 +127,10 @@ for module,label,stem in [('Biblioteca','Livro preservado','library'),('Listas',
    swipe(640,1240,640,550,250)
   tap('Salvar registro');wait('Artista test');wait('Filtrar por Estilo');tap('Filtrar por Estilo');tap('Retrato');tap('Filtrar por estrelas');tap('5 estrelas');wait('Artista test');snapshot('08n-custom-auto-filters');tap('Artista test');wait('5 de 5 estrelas');assert wait('Estilo').get('text')=='Retrato';snapshot('08o-custom-record-reopened');tap('Fechar área da Biblioteca');back();wait('Seus espaços');tap('Biblioteca');wait('Tudo');wait('Artista test');snapshot('08p-custom-in-all')
  back();wait('Seus espaços')
-# Real tree and parent navigation, opening grandchild directly from root.
-tap('Páginas');wait('Abrir página principal Teste principal');tap('Expandir subpáginas de Teste principal');tap('Expandir subpáginas de Teste filha');tap('Abrir subpágina Teste neta');wait('Título da página');snapshot('09-direct-grandchild');back();wait('Abrir subpágina Teste neta');root=snapshot('10-back-to-parent');assert find(root,'Título da página').get('text')=='Teste filha'
-back();wait('Abrir subpágina Teste filha');root=snapshot('11-back-to-grandparent');assert find(root,'Título da página').get('text')=='Teste principal';back();wait('Criar página')
+# Entry-path navigation: direct tree entry returns to menu, nested entry returns to parent.
+tap('Páginas');wait('Abrir página principal Teste principal');tap('Expandir subpáginas de Teste principal');tap('Expandir subpáginas de Teste filha');tap('Abrir subpágina Teste neta');wait('Título da página');snapshot('09-direct-grandchild');back();wait('Abrir página principal Teste principal');assert find(tree(),'Título da página') is None
+
+tap('Abrir página principal Teste principal');tap('Abrir subpágina Teste filha');tap('Abrir subpágina Teste neta');back();assert wait('Título da página').get('text')=='Teste filha';snapshot('10-back-to-parent');back();assert wait('Título da página').get('text')=='Teste principal';snapshot('11-back-to-grandparent');back();wait('Criar página')
 # Actual icon/text holds and cancellation stay alive with no writes/deletes.
 for i in range(2):
  hold('Abrir página principal Teste principal',True);wait('Excluir página Teste principal');snapshot('12-root-hold-'+str(i));tap('Fechar ações da página')

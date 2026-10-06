@@ -8,3 +8,5 @@ export function shouldBeginPageBack(g:{x0:number;dx:number;dy:number},paneWidth:
  const left=Math.max(0,(screenWidth-paneWidth)/2);
  return !editing&&!interacting&&g.x0>=left&&g.x0<=left+28&&g.dx>8&&Math.abs(g.dx)>Math.abs(g.dy)*1.15;
 }
+
+export function entryBackTarget(pages:ReadonlyMap<string,Entity>,current:string|null,history:readonly string[]):string|null{return [...history].reverse().find(id=>id!==current&&pages.has(id))||null;}
