@@ -69,7 +69,14 @@ jobs:
             adb logcat -c
             adb shell am force-stop com.avsord.sofiaapp
             adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
-            cd SOFIA_APP && python3 tools/native-performance-smoke.py
+            cd SOFIA_APP
+            if ! python3 tools/native-performance-smoke.py; then
+              adb shell uiautomator dump /sdcard/failure.xml
+              adb pull /sdcard/failure.xml dist/performance-evidence/failure.xml
+              adb exec-out screencap -p > dist/performance-evidence/failure.png
+              adb logcat -d > dist/performance-evidence/failure-log.txt
+              exit 1
+            fi
       - name: Publish only after full native validation succeeds
         run: cd SOFIA_APP && node tools/publish-release.cjs
       - name: Verify release and update discovery
