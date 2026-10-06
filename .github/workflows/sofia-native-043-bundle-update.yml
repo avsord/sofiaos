@@ -1,0 +1,128 @@
+name: Sofia Android 0.3.43 validated native shell update
+on:
+  push:
+    branches: [work/sofia-refinements-043]
+    paths: [.github/workflows/sofia-native-043-bundle-update.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EXPO_NO_TELEMETRY: '1'
+      CI: '1'
+      EXPO_PUBLIC_API_URL: https://sofiaos.up.railway.app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Load corrected acceptance driver without changing built app source
+        run: git show origin/work/sofia-refinements-043:tools/native-043-revalidate.py > /tmp/native-043-revalidate.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Download verified native shell and acceptance shell
+        run: |
+          gh run download 37519932797 --repo avsord/sofiaos --name Sofia-Android-0.3.43 --dir SOFIA_APP/dist
+          test "$(cat SOFIA_APP/dist/SOURCE_COMMIT.txt)" = "32815e5fad1648a792d8c66d38ff9812ef95027f"
+          cd SOFIA_APP && sha256sum -c dist/Sofia-OS.apk.sha256
+      - name: Upload first-run diagnostic evidence separately
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sofia-043-shell-before-update-evidence
+          path: |
+            SOFIA_APP/dist/performance-evidence/
+            SOFIA_APP/dist/startup.xml
+            SOFIA_APP/dist/startup.png
+            SOFIA_APP/dist/native-errors.txt
+      - name: Check original source again
+        run: |
+          cd SOFIA_APP && npm ci && npm run check && npm test
+      - name: Compile only changed application code and verify reused native bytes
+        run: |
+          cd SOFIA_APP && npx expo prebuild --platform android --clean --no-install
+          cd ..
+          python3 tools/rebundle-native-shell-043.py
+      - name: Install Python image comparison and enable KVM
+        run: |
+          python3 -m venv /tmp/sofia-python
+          /tmp/sofia-python/bin/pip install Pillow==12.3.0
+          echo "/tmp/sofia-python/bin" >> "$GITHUB_PATH"
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          cat > /tmp/sofia-run-acceptance.py <<'PYCODE'
+          import subprocess,sys,pathlib
+          result=subprocess.run([sys.executable,'/tmp/native-043-revalidate.py'])
+          if result.returncode:
+            subprocess.run(['adb','shell','uiautomator','dump','/sdcard/failure.xml'])
+            subprocess.run(['adb','pull','/sdcard/failure.xml','dist/performance-evidence/failure.xml'])
+            for args,name in [(['exec-out','screencap','-p'],'failure.png'),(['logcat','-d'],'failure-log.txt')]:
+              pathlib.Path('dist/performance-evidence/'+name).write_bytes(subprocess.check_output(['adb',*args]))
+          sys.exit(result.returncode)
+          PYCODE
+          mkdir /tmp/sofia-baseline
+          gh release download sofia-android-v0.3.36 --repo avsord/sofiaos --pattern Sofia-OS.apk --dir /tmp/sofia-baseline
+      - name: Validate full Android flows on updated Hermes and verified native shell
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          target: google_apis
+          disable-animations: false
+          script: |
+            adb shell wm size 720x1600
+            adb shell wm density 280
+            adb install /tmp/sofia-baseline/Sofia-OS.apk
+            adb install -r SOFIA_APP/dist/Sofia-OS.apk
+            adb shell pm grant com.avsord.sofiaapp android.permission.POST_NOTIFICATIONS
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            for attempt in $(seq 1 12); do sleep 3; adb shell uiautomator dump /sdcard/startup.xml; adb pull /sdcard/startup.xml SOFIA_APP/dist/revalidate-startup.xml; grep -q Entrar SOFIA_APP/dist/revalidate-startup.xml && break; done
+            grep -q Entrar SOFIA_APP/dist/revalidate-startup.xml
+            adb install -r SOFIA_APP/dist/QA-ONLY-full-fixture.apk
+            adb shell pm grant com.avsord.sofiaapp android.permission.POST_NOTIFICATIONS
+            adb logcat -c
+            adb shell am force-stop com.avsord.sofiaapp
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            cd SOFIA_APP && python3 /tmp/sofia-run-acceptance.py
+      - name: Require compatible server before publishing the APK
+        run: |
+          curl -fsS --max-time 30 https://sofiaos.up.railway.app/health > SOFIA_APP/dist/server-release-gate.json
+          node -e "const h=require('./SOFIA_APP/dist/server-release-gate.json');if(!h.ok||!h.task_description_format||!h.selected_task_context||!h.agenda_priority)throw Error('Server publication is required before the APK release')"
+      - name: Publish only after full native validation succeeds
+        run: cd SOFIA_APP && node tools/publish-release.cjs
+      - name: Verify release and update discovery
+        run: |
+          cd SOFIA_APP
+          gh api repos/avsord/sofiaos/releases/tags/sofia-android-v0.3.43 > dist/release.json
+          node <<'NODE'
+          const fs=require('fs'),vm=require('vm'),ts=require('typescript'),r=JSON.parse(fs.readFileSync('dist/release.json'));
+          if(r.draft||r.prerelease||!r.published_at||!r.assets.some(a=>a.name==='Sofia-OS.apk'&&a.state==='uploaded'&&a.size>0))throw Error('Not published');
+          const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/lib/update.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports,fetch,AbortController,setTimeout,clearTimeout,Date,Error,Promise});
+          exports.checkForUpdate({currentVersion:'0.3.42'}).then(r=>{if(r?.version!=='0.3.43')throw Error('Not discoverable');console.log('VERIFIED',r.version,r.url)}).catch(e=>{console.error(e);process.exitCode=1});
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sofia-Android-0.3.43-native-shell-validated
+          path: |
+            SOFIA_APP/dist/performance-evidence/
+            SOFIA_APP/dist/revalidate-startup.xml
+            SOFIA_APP/dist/release.json
+            SOFIA_APP/dist/native-reuse.json
+            SOFIA_APP/dist/Sofia-OS.apk
+            SOFIA_APP/dist/Sofia-OS.apk.sha256
+            SOFIA_APP/dist/SOURCE_COMMIT.txt
+            SOFIA_APP/dist/Sofia-OS-source.zip
+
+# Read fixture state after closing the native task modal.
+
+# Preserve Home scroll position after selected task context.
