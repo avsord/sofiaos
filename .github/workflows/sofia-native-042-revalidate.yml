@@ -1,0 +1,92 @@
+name: Sofia Android 0.3.42 exact APK revalidation
+on:
+  push:
+    branches: [work/sofia-refinements-042]
+    paths: [.github/workflows/sofia-native-042-revalidate.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 99d33c5b76e792c228116f3e8c7ddf4aafd63b5c
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Download exact production APK and native acceptance APK
+        run: |
+          gh run download 37407419102 --repo avsord/sofiaos --name Sofia-Android-0.3.42 --dir SOFIA_APP/dist
+          test "$(cat SOFIA_APP/dist/SOURCE_COMMIT.txt)" = "$(git rev-parse HEAD)"
+          cd SOFIA_APP && sha256sum -c dist/Sofia-OS.apk.sha256
+      - name: Upload first-run diagnostic evidence separately
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sofia-042-first-failure-evidence
+          path: |
+            SOFIA_APP/dist/performance-evidence/
+            SOFIA_APP/dist/startup.xml
+            SOFIA_APP/dist/startup.png
+            SOFIA_APP/dist/native-errors.txt
+      - name: Check original source again
+        run: |
+          cd SOFIA_APP && npm ci && npm run check && npm test
+      - name: Install Python image comparison and enable KVM
+        run: |
+          python3 -m venv /tmp/sofia-python
+          /tmp/sofia-python/bin/pip install Pillow==12.3.0
+          echo "/tmp/sofia-python/bin" >> "$GITHUB_PATH"
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          mkdir /tmp/sofia-baseline
+          gh release download sofia-android-v0.3.36 --repo avsord/sofiaos --pattern Sofia-OS.apk --dir /tmp/sofia-baseline
+      - name: Revalidate full Android flows on unchanged binary
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          target: google_apis
+          disable-animations: false
+          script: |
+            adb shell wm size 720x1600
+            adb shell wm density 280
+            adb install /tmp/sofia-baseline/Sofia-OS.apk
+            adb install -r SOFIA_APP/dist/Sofia-OS.apk
+            adb shell pm grant com.avsord.sofiaapp android.permission.POST_NOTIFICATIONS
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            for attempt in $(seq 1 12); do sleep 3; adb shell uiautomator dump /sdcard/startup.xml; adb pull /sdcard/startup.xml SOFIA_APP/dist/revalidate-startup.xml; grep -q Entrar SOFIA_APP/dist/revalidate-startup.xml && break; done
+            grep -q Entrar SOFIA_APP/dist/revalidate-startup.xml
+            adb install -r SOFIA_APP/dist/QA-ONLY-full-fixture.apk
+            adb shell pm grant com.avsord.sofiaapp android.permission.POST_NOTIFICATIONS
+            adb logcat -c
+            adb shell am force-stop com.avsord.sofiaapp
+            adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+            cd SOFIA_APP && python3 tools/native-performance-smoke.py
+      - name: Publish only after full native validation succeeds
+        run: cd SOFIA_APP && node tools/publish-release.cjs
+      - name: Verify release and update discovery
+        run: |
+          cd SOFIA_APP
+          gh api repos/avsord/sofiaos/releases/tags/sofia-android-v0.3.42 > dist/release.json
+          node <<'NODE'
+          const fs=require('fs'),vm=require('vm'),ts=require('typescript'),r=JSON.parse(fs.readFileSync('dist/release.json'));
+          if(r.draft||r.prerelease||!r.published_at||!r.assets.some(a=>a.name==='Sofia-OS.apk'&&a.state==='uploaded'&&a.size>0))throw Error('Not published');
+          const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/lib/update.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports,fetch,AbortController,setTimeout,clearTimeout,Date,Error,Promise});
+          exports.checkForUpdate({currentVersion:'0.3.41'}).then(r=>{if(r?.version!=='0.3.42')throw Error('Not discoverable');console.log('VERIFIED',r.version,r.url)}).catch(e=>{console.error(e);process.exitCode=1});
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sofia-042-revalidation-evidence
+          path: |
+            SOFIA_APP/dist/performance-evidence/
+            SOFIA_APP/dist/revalidate-startup.xml
+            SOFIA_APP/dist/release.json
