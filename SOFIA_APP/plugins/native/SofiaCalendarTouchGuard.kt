@@ -23,6 +23,7 @@ internal class SofiaCalendarTouchGuard {
   private var originX = 0
   private val bounds = Rect()
   private var appointmentList: ReactScrollView? = null
+  private var homeRefresh: ReactSwipeRefreshLayout? = null
   private val verticalParents = mutableListOf<Pair<ReactScrollView, Boolean>>()
   private val refreshParents = mutableListOf<Pair<ReactSwipeRefreshLayout, Boolean>>()
 
@@ -30,16 +31,17 @@ internal class SofiaCalendarTouchGuard {
     if (event.actionMasked == MotionEvent.ACTION_DOWN) {
       release()
       downX = event.rawX; downY = event.rawY
-      val home = taggedAt(root, event.rawX.toInt(), event.rawY.toInt(), "sofia-home-scroll")
-      var refreshAncestor = home?.parent
+      // Native wrappers can change after a keyboard/modal transition. Match the
+      // visible Home independently of the pointer's edge and include the tagged
+      // view itself when looking for its refresh control.
+      val home = visibleHome(root)
+      var refreshAncestor: View? = home
       while (refreshAncestor != null) {
         if (refreshAncestor is ReactSwipeRefreshLayout) {
-          // Native default is 64 dp. A deliberate longer pull avoids refresh
-          // when the user merely scrolls back to the top of Home.
-          refreshAncestor.setDistanceToTriggerSync((112f * root.resources.displayMetrics.density).roundToInt())
+          homeRefresh = refreshAncestor
           break
         }
-        refreshAncestor = refreshAncestor.parent
+        refreshAncestor = refreshAncestor.parent as? View
       }
       appointmentList = taggedAt(root, event.rawX.toInt(), event.rawY.toInt(), "sofia-agenda-items") as? ReactScrollView
       var listAncestor = appointmentList?.parent
@@ -88,6 +90,11 @@ internal class SofiaCalendarTouchGuard {
         view.requestDisallowInterceptTouchEvent(false)
       }
     }
+    // RN can lay out its refresh wrapper during the stream. Reapply the
+    // deliberate-pull distance before MOVE and UP as well as DOWN.
+    homeRefresh?.let { view ->
+      view.setDistanceToTriggerSync((112f * view.resources.displayMetrics.density).roundToInt())
+    }
     pager?.setScrollEnabled(false)
     if (appointmentList != null) {
       // Do not donate unconsumed scroll/fling to Home at either list edge.
@@ -125,8 +132,20 @@ internal class SofiaCalendarTouchGuard {
     refreshParents.forEach { (view, enabled) -> view.isEnabled = enabled }
     appointmentList?.parent?.requestDisallowInterceptTouchEvent(false)
     appointmentList = null
+    homeRefresh = null
     verticalParents.clear()
     refreshParents.clear()
+  }
+
+  private fun visibleHome(view: View): View? {
+    if (view.visibility != View.VISIBLE || view.alpha <= 0f || !view.getGlobalVisibleRect(bounds)) return null
+    if (view.getTag(com.facebook.react.R.id.view_tag_native_id) == "sofia-home-scroll" ||
+        view.getTag(com.facebook.react.R.id.react_test_id) == "home-scroll") return view
+    if (view is ViewGroup) for (index in view.childCount-1 downTo 0) {
+      val found = visibleHome(view.getChildAt(index))
+      if (found != null) return found
+    }
+    return null
   }
 
   private fun pagerAt(view: View, x: Int, y: Int): ReactHorizontalScrollView? {
