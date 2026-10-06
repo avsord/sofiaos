@@ -4,9 +4,19 @@ Estado em 06/10/2026. Repositório: avsord/sofiaos. Branch de trabalho: work/sof
 
 ## Situação de entrega
 
-A última release estável publicada continua sendo 0.3.42, código Android 47. **0.3.43, código 48, ainda não foi publicada.** O código foi implementado e os testes locais passaram. O APK foi compilado na execução 37479988326. A aceitação falhou em uma ação automática de teclado; a revalidação 37496001135 salvou a descrição com sucesso mas tentou ler a instrumentação atrás do modal nativo. A execução 37514479960 confirmou que o texto foi salvo mas o negrito não foi aplicado. Foram corrigidas as áreas de rolagem ancestrais, passando keyboardShouldPersistTaps=always no Início e nos editores, e acrescentada indicação acessível/visual do estilo ativo. A execução 37516141511 compila essa correção e executa o teste de formatação primeiro, seguido dos demais testes nativos. A validação completa ainda precisa passar. Não entregar 0.3.42 como se fosse 0.3.43.
+**0.3.43, código Android 48, JÁ FOI PUBLICADA como release estável em 06/10/2026 às 17:17:08 de São Paulo (2026-10-06T20:17:08Z).** TypeScript, 229 testes do aplicativo e 212 testes do servidor passaram. O servidor 0.3.43 já foi publicado e os novos recursos foram confirmados em /health.
 
-Fonte atual em compilação e validação: 48d7a8fc0870fbe2df72cca009abaf784beca49b. O artefato antigo 517d58acb4d41b47349a7f29602684597b79e3e7 não deve ser publicado após a falha de negrito. Identidade Android: com.avsord.sofiaapp. Atualização pelo mesmo canal GitHub, tag esperada sofia-android-v0.3.43 e asset Sofia-OS.apk. Manter a assinatura existente; o workflow compara os certificados antes de permitir publicação.
+Fonte do APK atual: 69518a52ab3c5c311180edc1d3bf87068972c337. Execução: 37523400802, job 112474211843, workflow Sofia Android 0.3.43 validated native shell update. A execução terminou SUCCESS, incluindo a aceitação Android completa, publicação e descoberta em Verificar atualizações. A compilação JavaScript/Hermes e a verificação da assinatura passaram. O shell Android previamente compilado em 32815e5fad1648a792d8c66d38ff9812ef95027f foi reutilizado: todos os arquivos nativos, recursos e bibliotecas foram comparados byte a byte. Apenas Home.tsx mudou no aplicativo, desativando nestedScrollEnabled no ScrollView do Início. O pacote continua com com.avsord.sofiaapp, versão 0.3.43/código 48 e o mesmo certificado.
+
+Correções encontradas na aceitação: keyboardShouldPersistTaps=always nos ancestrais do editor para o negrito receber o toque; teste de teclado condicionado à presença real do IME; leitura da instrumentação após fechar o modal nativo; retorno ao Início considerando a posição preservada de rolagem. A atualização acidental após uma puxada moderada foi identificada no caminho de nested scrolling: SwipeRefreshLayout acumula distância integral nesse caminho, diferente do fator 0,5 do toque direto. A rolagem aninhada foi desativada apenas no Início; a aceitação continua exigindo que a puxada moderada não atualize e que a longa atualize. Nenhuma verificação Android foi removida.
+
+Canal GitHub: tag sofia-android-v0.3.43, asset Sofia-OS.apk uploaded, 52.126.011 bytes. Release não draft nem prerelease. SHA-256: b570c15ef776d96bc1c8a32760a52d4beffb62c355f810e7a2cb0dad0875836c.
+
+APK: https://github.com/avsord/sofiaos/releases/download/sofia-android-v0.3.43/Sofia-OS.apk
+
+Execução aprovada: https://github.com/avsord/sofiaos/actions/runs/37523400802
+
+Atualização descoberta pelo cliente 0.3.42 em Ajustes > Verificar atualizações. Não entregar 0.3.42 nem o APK QA-ONLY-full-fixture.apk como atualização.
 
 ## Pedidos implementados nesta rodada
 
@@ -24,7 +34,7 @@ Fonte atual em compilação e validação: 48d7a8fc0870fbe2df72cca009abaf784beca
 
 ## Servidor publicado nesta rodada
 
-O usuário autorizou explicitamente a publicação novamente em 06/10/2026. accept_deploy foi aceito. Deployment 2daa256b-793c-4beb-bb01-a4712969436c terminou SUCCESS às 18:51 UTC (15:51 São Paulo). Fonte efetivamente implantada: 0e746b06c313072baf7eed58af9828d8b01b9620, branch work/sofia-refinements-043. Volume existente foi montado e o restore gate confirmou início normal com chave preservada. A checagem HTTP dos novos recursos será feita antes da publicação do APK. Não continuar dizendo que a autorização está pendente.
+O usuário autorizou explicitamente a publicação novamente em 06/10/2026. accept_deploy foi aceito. Deployment 2daa256b-793c-4beb-bb01-a4712969436c terminou SUCCESS às 18:51 UTC (15:51 São Paulo). Fonte efetivamente implantada: 0e746b06c313072baf7eed58af9828d8b01b9620, branch work/sofia-refinements-043. Volume existente foi montado e o restore gate confirmou início normal com chave preservada. A checagem HTTP confirmou md_upgrade=0.3.43 e task_description_format, selected_task_context e agenda_priority ativos. Não continuar dizendo que a autorização está pendente.
 
 Configuração preservada:
 
@@ -47,15 +57,11 @@ Após deploy, /health deve indicar md_upgrade=0.3.43, task_description_format=tr
 - TypeScript completo aprovado.
 - Aplicativo: 229 testes aprovados, incluindo retorno por caminho, múltiplas cores no dia, preservação de estilos e ausência de rolagem na reativação do chat.
 - Servidor: 212 testes aprovados. Inclui persistência/reabertura/exportação, formatação pela Sofia, entrada inválida recusada sem alteração, ordem após edição, contexto real da tarefa, prioridades de compromissos e transporte mobile de texto e áudio.
-- Aceitação Android ampliada: instalação sobre APK anterior, assinatura, 500 eventos, gestos e limites de rolagem, notificações, Cápsulas, Listas, salvar descrição em negrito, levar tarefa ao chat, botão de descer, retorno das páginas e segurar data para criar compromisso. O resultado nativo ainda deve ser confirmado na execução mais recente.
+- Aceitação Android ampliada: instalação sobre APK anterior, assinatura, 500 eventos, gestos e limites de rolagem, notificações, Cápsulas, Listas, salvar descrição em negrito, levar tarefa ao chat, botão de descer, retorno das páginas e segurar data para criar compromisso. Resultado confirmado SUCCESS na execução 37523400802. A puxada moderada foi ignorada, a longa atualizou, gestos curtos rápidos e lentos passaram, 500 eventos renderizaram sem exceção fatal e a assinatura anterior foi preservada.
 
 ## Próximo passo
 
-1. Concluir a validação Android e inspecionar qualquer falha real antes de liberar.
-2. Deployment já SUCCESS; confirmar /health com os três novos recursos.
-3. Publicar o APK exatamente validado. Para reutilizar um artefato, verificar SOURCE_COMMIT, hash, assinatura e versão/código; nunca publicar o APK QA-ONLY-full-fixture.apk.
-4. Confirmar release estável, published_at, asset uploaded com tamanho positivo, atualização descoberta pelo cliente antigo e novo, e validação Android success.
-5. Atualizar este master com os IDs finais, hash, tamanho, publicação e link direto. Só então dizer que 0.3.43 JÁ FOI PUBLICADA.
+Entrega concluída. Ao continuar em outro chat, partir desta release e conferir a versão instalada antes de investigar qualquer novo relato. Preservar mensagens e todos os dados nas próximas atualizações. Não republicar o binário desta tag com outra fonte: alterações futuras precisam de nova versão/código Android e nova aceitação. O servidor e o APK possuem commits diferentes, registrados acima, e ambos foram publicados com sucesso.
 
 ## Continuidade anterior
 
