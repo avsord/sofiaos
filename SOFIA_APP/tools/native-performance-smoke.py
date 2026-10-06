@@ -101,10 +101,20 @@ tap('Filtros da Biblioteca');tap('Filtrar por estrelas');tap('★★★★★');
 tap('Voltar aos apps');tap('Notas');tap('Criar registro');tap('Título da nota');adb('shell','input','text','NotaQA036')
 tap('Conteúdo da nota');adb('shell','input','text','TextoQA036');tap('Negrito');adb('shell','input','text','Bold');tap('Fechar teclado');tap('Salvar');wait('NotaQA036');tap('NotaQA036');wait('Título da nota');wait('Conteúdo da nota');screenshot('rich-note-reopened');tap('Voltar das notas');tap('Início')
 # Capsules uses the same production widget, editor and scheduled native notifications.
-tap('Apps');tap('Cápsulas');wait('Tomei Capsula QA às 00:01');screenshot('capsules-today')
+tap('Apps');tap('Cápsulas');wait('Tomei Capsula QA às 00:01');
+qa_node=next(n for n in tree().iter('node') if n.get('content-desc','').startswith('QA notifications '))
+qa=json.loads(qa_node.get('content-desc')[len('QA notifications '):]);assert isinstance(qa.get('exact'),bool),'Native alarm permission bridge absent'
+alarms=[n for n in qa['alarms'] if n['identifier'].startswith('sofia-capsule:') and n['content']['data'].get('planId')=='capsuleqa' and n['content']['data'].get('time')=='23:59']
+assert any('aviso 30 min antes' in n['content']['body'] for n in alarms) and any('Está no horário' in n['content']['body'] for n in alarms),'Capsule paired reminders not scheduled'
+print('PASS native capsule alarm permission bridge and both scheduled reminders',flush=True)
+screenshot('capsules-today')
 tap('Tomei Capsula QA às 00:01');time.sleep(.4);assert find(tree(),'Tomei Capsula QA às 00:01') is None
 wait('Tomei Capsula QA às 23:59');tap('Cápsulas · Histórico');wait('Capsula QA');screenshot('capsules-history-preserved')
-tap('Cápsulas · Rotinas');tap('Editar cápsula Capsula QA');wait('Nome');wait('Dose conforme sua orientação');wait('Lembrar quantos minutos antes? (0 = só no horário)');screenshot('capsules-two-reminders-editor');tap('Fechar cadastro de cápsula')
+tap('Cápsulas · Rotinas');tap('Editar cápsula Capsula QA');wait('Nome');wait('Dose conforme sua orientação');
+for _ in range(5):
+ if find(tree(),'Lembrar quantos minutos antes? (0 = só no horário)') is not None:break
+ adb('shell','input','swipe','360','1150','360','450','400');time.sleep(.3)
+wait('Lembrar quantos minutos antes? (0 = só no horário)');screenshot('capsules-two-reminders-editor');tap('Fechar cadastro de cápsula')
 tap('Nova cápsula');tap('Nome');adb('shell','input','text','NovaCapsulaQA');tap('Dose conforme sua orientação');adb('shell','input','text','1');adb('shell','input','keyevent','BACK')
 for _ in range(5):
  if find(tree(),'Salvar cápsula') is not None:break

@@ -3,7 +3,7 @@ import * as QA_Notifications from 'expo-notifications';
 import {notificationWarning} from './src/lib/agenda-notifications';
 // SOFIA_FULL_APP_FIXTURE_ONLY: actual production App and screens; synthetic transport only.
 import React,{useEffect,useState} from 'react';
-import {View,Text,Pressable} from 'react-native';
+import {NativeModules,View,Text,Pressable} from 'react-native';
 import ProductionApp from './ProductionApp';
 import {saveAuth} from './src/lib/api';
 import type {Entity} from './src/lib/types';
@@ -14,7 +14,7 @@ const make=(id:string,title:string,parent=''):Entity=>({id,title,kind:'user_page
 let pages=[make('parent','Teste principal'),make('other','Outra pagina'),make('child','Teste filha','parent'),make('grandchild','Teste neta','child')];
 const longParent=make('long-parent','Pagina longa');longParent.data={...longParent.data,cover_type:'color',cover_value:'#DAD2FF',blocks_json:JSON.stringify([{id:'long-body',type:'text',text:Array.from({length:28},(_,i)=>'Linha '+(i+1)+' da pagina longa.').join('\n')}])};pages.push(longParent,make('long-child','Filha da pagina longa','long-parent'));
 let qaNotificationState:any={},moves=0,deletes=0,uploads=0,taskDelay=0;
-setInterval(()=>{void Promise.all([QA_Notifications.getPermissionsAsync(),QA_Notifications.getAllScheduledNotificationsAsync()]).then(([permission,alarms])=>{qaNotificationState={permission,alarms,warning:notificationWarning};}).catch(e=>{qaNotificationState={error:String(e)};});},700);
+setInterval(()=>{void Promise.all([QA_Notifications.getPermissionsAsync(),QA_Notifications.getAllScheduledNotificationsAsync(),NativeModules.SofiaAlarms?.canScheduleExact()]).then(([permission,alarms,exact])=>{qaNotificationState={permission,alarms,exact,warning:notificationWarning};}).catch(e=>{qaNotificationState={error:String(e)};});},700);
 const today=new Date();today.setHours(10,0,0,0);const tomorrow=new Date(today);tomorrow.setDate(tomorrow.getDate()+1);
 const events:Entity[]=[{...make('native-notice','Notificacao nativa Sofia'),kind:'commitment',state:'planned',data:{start_at:new Date(Date.now()+20000).toISOString()}},{...make('event1','Consulta de hoje'),kind:'commitment',data:{start_at:today.toISOString()}},{...make('event2','Compromisso de amanha'),kind:'commitment',data:{start_at:tomorrow.toISOString()}}];
 for(let i=0;i<497;i++){const d=new Date(today);d.setDate(d.getDate()-(i%60));events.push({...make('google'+i,'Evento Google '+i),kind:'commitment',state:'confirmed',data:{start_at:d.toISOString(),end_at:new Date(d.getTime()+3600000).toISOString()}});}
