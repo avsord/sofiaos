@@ -16,10 +16,33 @@ def wait(label):
  raise AssertionError('Missing '+label+ET.tostring(r,encoding='unicode'))
 def tap(label):
  n=wait(label);a,b,c,d=map(int,re.findall(r'\d+',n.get('bounds')));adb('shell','input','tap',str((a+c)//2),str((b+d)//2))
+def dismiss_keyboard():
+ # BACK closes a sheet when the IME is already hidden. Never send it blindly.
+ state=adb('shell','dumpsys','input_method').decode(errors='replace')
+ if re.search(r'mInputShown=true|isInputViewShown=true',state):
+  adb('shell','input','keyevent','BACK');time.sleep(.4)
+def scroll_to(label):
+ for _ in range(6):
+  r=tree()
+  if find(r,label) is not None:return
+  assert find(r,'Descrição') is not None,'Task editor unexpectedly closed'
+  adb('shell','input','swipe','360','1200','360','550','400');time.sleep(.3)
+ raise AssertionError('Task editor cannot reveal '+label)
 def screenshot(name):
  r=tree();(out/(name+'.xml')).write_text(ET.tostring(r,encoding='unicode'));(out/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'));return r
 wait('Olá, Teste.');r=screenshot('home-500');text=ET.tostring(r,encoding='unicode');assert 'PERF_PASS' in text and 'PERF_FAIL' not in text,text
 pid=adb('shell','pidof','com.avsord.sofiaapp').strip()
+adb('shell','input','swipe','360','1200','360','450','400');time.sleep(.4)
+tap('Filtrar níveis das tarefas do Início');wait('Nível das tarefas');screenshot('home-task-filter');tap('Todas');time.sleep(.3)
+# Home row opens details; only the separate checkbox concludes.
+tap('Abrir tarefa Projeto urgente');wait('Detalhes da tarefa');wait('Descricao da tarefa QA');screenshot('home-task-details')
+tap('Editar tarefa');wait('Descrição');screenshot('home-task-edit');tap('Descrição');adb('shell','input','keyevent','123');tap('Negrito na descrição');assert wait('Negrito na descrição').get('selected')=='true','Bold toolbar tap was intercepted';tap('Descrição');adb('shell','input','keyevent','123');adb('shell','input','text','%satualizada');time.sleep(.3);screenshot('home-task-after-typing');dismiss_keyboard();screenshot('home-task-keyboard-dismissed')
+scroll_to('Salvar tarefa');tap('Salvar tarefa');wait('Detalhes da tarefa');wait('Descricao da tarefa QA atualizada');screenshot('home-task-saved');tap('Fechar detalhes da tarefa');time.sleep(.4);qa_task=json.loads(next(n.get('content-desc')[9:] for n in tree().iter('node') if n.get('content-desc','').startswith('QA tasks ')));assert any(m.get('bold') for t in qa_task if t['id']=='filter0' for m in t['document']['marks']),'Bold description was not persisted';tap('Abrir tarefa Projeto urgente');wait('Detalhes da tarefa');tap('Levar para conversa');wait('Tarefa em contexto');wait('Projeto urgente');tap('Mensagem para a Sofia');adb('shell','input','text','ContextoQA');tap('Enviar mensagem');time.sleep(1);wait('QA task context filter0');tap('Remover tarefa da conversa');adb('shell','input','keyevent','BACK');tap('Início');wait('Olá, Teste.');time.sleep(.4)
+wait('Concluir Projeto urgente');tap('Concluir Projeto urgente');time.sleep(.6);assert find(tree(),'Abrir tarefa Projeto urgente') is None,'Row tap must not complete; checkbox must complete'
+adb('shell','input','swipe','360','400','360','1200','400');time.sleep(.4)
+
+for _ in range(2):adb('shell','input','swipe','705','400','705','1300','500');time.sleep(.4)
+wait('Olá, Teste.');print('PASS rich task format persists and selected task reaches Sofia',flush=True)
 def calendar_bounds(root):
  rows=[n.get('bounds') for n in root.iter('node') if n.get('resource-id','').endswith('agenda-split-row')]
  assert rows,'Calendar geometry absent'
@@ -75,14 +98,6 @@ calendar_swipes('home');tap('Voltar ao dia de hoje')
 tap('Agenda');wait('Sua agenda');calendar_swipes('agenda');tap('Voltar para hoje');tap('Início');wait('Olá, Teste.')
 adb('shell','input','swipe','500','160','440','160','450');time.sleep(1)
 wait('Sofia');screenshot('short-menu-swipe');tap('Início');wait('Olá, Teste.')
-adb('shell','input','swipe','360','1200','360','450','400');time.sleep(.4)
-tap('Filtrar níveis das tarefas do Início');wait('Nível das tarefas');screenshot('home-task-filter');tap('Todas');time.sleep(.3)
-# Home row opens details; only the separate checkbox concludes.
-tap('Abrir tarefa Projeto urgente');wait('Detalhes da tarefa');wait('Descricao da tarefa QA');screenshot('home-task-details')
-tap('Editar tarefa');wait('Descrição');screenshot('home-task-edit');tap('Descrição');adb('shell','input','keyevent','123');tap('Negrito na descrição');adb('shell','input','text','%satualizada');adb('shell','input','keyevent','BACK');time.sleep(.3)
-adb('shell','input','swipe','360','1200','360','550','400');time.sleep(.3);tap('Salvar tarefa');wait('Detalhes da tarefa');wait('Descricao da tarefa QA atualizada');screenshot('home-task-saved');qa_task=json.loads(next(n.get('content-desc')[9:] for n in tree().iter('node') if n.get('content-desc','').startswith('QA tasks ')));assert any(m.get('bold') for t in qa_task if t['id']=='filter0' for m in t['document']['marks']),'Bold description was not persisted';tap('Levar para conversa');wait('Tarefa em contexto');wait('Projeto urgente');tap('Mensagem para a Sofia');adb('shell','input','text','ContextoQA');tap('Enviar mensagem');time.sleep(1);wait('QA task context filter0');tap('Remover tarefa da conversa');adb('shell','input','keyevent','BACK');tap('Início');wait('Olá, Teste.');time.sleep(.4)
-wait('Concluir Projeto urgente');tap('Concluir Projeto urgente');time.sleep(.6);assert find(tree(),'Abrir tarefa Projeto urgente') is None,'Row tap must not complete; checkbox must complete'
-adb('shell','input','swipe','360','400','360','1200','400');time.sleep(.4)
 tap('Conversa');tap('Mensagem para a Sofia');adb('shell','input','text','Teste%srolagem');tap('Enviar mensagem');time.sleep(1.5);wait('FIM DA RESPOSTA QA');time.sleep(3);wait('FIM DA RESPOSTA QA');screenshot('chat-growing-reply');adb('shell','input','keyevent','BACK');time.sleep(.4)
 for _ in range(4):adb('shell','input','swipe','360','430','360','1120','300');time.sleep(.2)
 wait('Descer para a última mensagem');screenshot('chat-jump-button');tap('Descer para a última mensagem');time.sleep(1);wait('FIM DA RESPOSTA QA');screenshot('chat-jump-bottom');tap('Início');wait('Olá, Teste.')
