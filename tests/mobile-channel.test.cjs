@@ -119,3 +119,10 @@ test('mobile: perfil, agenda e tarefas usam o armazenamento da Sofia', async t =
   const done=await f.request('/tasks/'+task.id,{state:'done',revision:task.revision},'PATCH',token);assert.equal(done.status,200,JSON.stringify(done.body));assert.equal(f.store.task(task.id).state,'done');
   assert.equal((await f.request('/notifications',undefined,'GET',token)).body.push_enabled,false);
 });
+test('mobile: tarefa escolhida chega ao Core em texto e áudio com o registro real, sem criar outra tarefa',async t=>{
+ const f=await setup(t),token=await f.login(),c=await f.create(token),task=f.store.saveTask({title:'Assunto selecionado',description:'Descrição atual',privacy:'private'});
+ const text=await f.request('/messages',{conversation_id:c.id,client_message_id:crypto.randomUUID(),message:'Só estou contando sobre essa tarefa',selected_task_id:task.id},'POST',token);assert.equal(text.status,200,JSON.stringify(text.body));
+ assert.ok(f.calls.filter(c=>c.kind==='structured').at(-1).input.some(m=>m.content.includes('TAREFA SELECIONADA')&&m.content.includes(task.id)));
+ const voice=await f.request('/messages/audio',{conversation_id:c.id,client_message_id:crypto.randomUUID(),audio_base64:Buffer.from('isolated test audio').toString('base64'),mime:'audio/mp4',duration_ms:1000,selected_task_id:task.id},'POST',token);assert.equal(voice.status,200,JSON.stringify(voice.body));
+ assert.ok(f.calls.filter(c=>c.kind==='structured').at(-1).input.some(m=>m.content.includes('TAREFA SELECIONADA')&&m.content.includes(task.description)));assert.equal(f.store.tasks().length,1);assert.equal(f.store.task(task.id).revision,task.revision);
+});

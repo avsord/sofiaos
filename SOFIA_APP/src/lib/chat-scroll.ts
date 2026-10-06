@@ -73,7 +73,7 @@ export function useChatAutoscroll(list:RefObject<FlatList<any>|null>,active:bool
   follow:()=>{pendingFollow.current=!enabled.current;setShowJump(false);lastDrag.current=0;target.current=-1;intent.follow();settle();},
   pause:()=>{lastDrag.current=0;cancel();intent.pause();},
   onContentSizeChange:(_width:number,height:number)=>{if(height<=0)return;const changed=Math.abs(height-intent.contentHeight)>1;intent.contentHeight=height;if(changed){target.current=-1;settle();}},
-  onLayout:(e:LayoutChangeEvent)=>{const height=e.nativeEvent.layout.height;if(!enabled.current||height<=0||Math.abs(height-intent.viewportHeight)<1)return;target.current=-1;intent.viewportHeight=height;settle();},
+  onLayout:(e:LayoutChangeEvent)=>{const height=e.nativeEvent.layout.height;if(height<=0||Math.abs(height-intent.viewportHeight)<1)return;target.current=-1;intent.viewportHeight=height;settle();},
   onScroll:position,
   onScrollBeginDrag:()=>{lastDrag.current=Date.now();target.current=-1;cancel();intent.begin();},
   onScrollEndDrag:(e:NativeSyntheticEvent<NativeScrollEvent>)=>{lastDrag.current=Date.now();position(e);intent.end();settle();},
