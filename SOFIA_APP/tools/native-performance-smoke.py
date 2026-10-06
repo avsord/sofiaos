@@ -157,7 +157,14 @@ tap('Abrir página principal Teste principal');tap('Abrir subpágina Teste filha
 for _ in range(3):
  if find(tree(),'agenda-split-row') is not None:break
  adb('shell','input','swipe','360','400','360','1200','250');time.sleep(.4)
-day=adb('shell','date','+%Y-%m-%d').decode().strip();node=wait('agenda-day-'+day);x,y,z,w=map(int,re.findall(r'\d+',node.get('bounds')));adb('shell','input','swipe',str((x+z)//2),str((y+w)//2),str((x+z)//2),str((y+w)//2),'800');wait('Criar · Compromisso');wait('Prioridade');screenshot('home-date-hold-create');tap('Prioridade');tap('Importante');screenshot('agenda-priority-editor');tap('Fechar editor');tap('Início')
+day=adb('shell','date','+%Y-%m-%d').decode().strip();node=wait('agenda-day-'+day);x,y,z,w=map(int,re.findall(r'\d+',node.get('bounds')));adb('shell','input','swipe',str((x+z)//2),str((y+w)//2),str((x+z)//2),str((y+w)//2),'800');wait('Criar · Compromisso');tap('Título');adb('shell','input','text','CompromissoInicioQA');dismiss_keyboard();wait('Prioridade');screenshot('home-date-hold-create');tap('Prioridade');tap('Importante');screenshot('agenda-priority-editor');
+for _ in range(6):
+ if find(tree(),'Salvar alterações') is not None:break
+ adb('shell','input','swipe','360','1200','360','500','400');time.sleep(.3)
+tap('Salvar alterações');assert wait('menu-home').get('selected')=='true','Saving Home commitment navigated away from Home';wait('Olá, Teste.')
+created=json.loads(next(n.get('content-desc')[23:] for n in tree().iter('node') if n.get('content-desc','').startswith('QA created commitments ')));assert any(e['title']=='CompromissoInicioQA' and e['start_at'].startswith(day) and e['priority_level']=='important' for e in created),'Home commitment date or priority was not saved'
+node=wait('agenda-day-'+day);x,y,z,w=map(int,re.findall(r'\d+',node.get('bounds')));adb('shell','input','swipe',str((x+z)//2),str((y+w)//2),str((x+z)//2),str((y+w)//2),'800');wait('Criar · Compromisso');tap('Fechar editor');assert wait('menu-home').get('selected')=='true','Closing Home commitment navigated away from Home';wait('Olá, Teste.')
+print('PASS Home date hold saves correct date and priority in place; cancel stays on Home',flush=True)
 print('PASS task rich description and selected context, chat jump, entry-path page back, Home date hold and Agenda priority',flush=True)
 logs=adb('logcat','-d').decode(errors='replace');(out/'native-log.txt').write_text(logs);assert 'FATAL EXCEPTION' not in logs;assert 'CALENDAR_PERF' in logs
 (out/'result.json').write_text(json.dumps({'passed':True,'events':500,'passes':10,'native_hermes_budget_ms':1000,'menu_roundtrips':3,'appointment_edges_isolated':True,'moderate_pull_ignored':True,'deliberate_pull_refreshes':True,'root_system_back_inert':True,'capsules_daily_widget_and_history':True}))
