@@ -54,6 +54,7 @@ class Workspace {
      if(cleanText(document.blocks.map(b=>b.text).join('\n\n'),'Texto da nota',16000,true)!==content)throw new AppError('BAD_NOTE_DOCUMENT','O texto e os blocos da nota não correspondem.');
      for(const p of document.properties)if(!p||typeof p.id!=='string'||typeof p.name!=='string'||typeof p.value!=='string')throw new AppError('BAD_NOTE_DOCUMENT','Propriedade da nota inválida.');
    }
+   if(kind==='capsule')require('../services/capsules').validateCapsule(data);
    if(kind==='user_page'){
      const allowedBlocks=new Set(['text','heading1','heading2','heading3','heading4','bullet','number','todo','toggle','code','quote','callout','equation','divider','page_link','image','file','table','date','task_link','commitment_link','bookmark','sofia','collection']);
      if(data.blocks_json){

@@ -1,5 +1,7 @@
 'use strict';
 const CATALOG={
+ capsule:{label:'Cápsula',group:'health',private:true,states:['active','paused','archived'],fields:[{key:'capsule_type',label:'Tipo',type:'select',options:['medicine','herbal','supplement']},{key:'dose_text',label:'Dose conforme sua orientação',type:'text',max:240},{key:'times_json',label:'Horários diários',type:'textarea',max:2000,developerOnly:true},{key:'start_date',label:'Primeiro dia',type:'date'},{key:'end_date',label:'Último dia (opcional)',type:'date'},{key:'remind_minutes',label:'Antecedência em minutos',type:'number'},{key:'notifications',label:'Notificar neste celular',type:'checkbox'}]},
+ capsule_dose:{label:'Dose tomada',group:'health',private:true,states:['done'],fields:[{key:'capsule_id',label:'Cápsula',type:'text'},{key:'day',label:'Dia da dose',type:'date'},{key:'time',label:'Horário da dose',type:'time'},{key:'taken_at',label:'Marcada em',type:'datetime'},{key:'dose_text',label:'Dose registrada',type:'text',max:240}]},
   "project": {
     "label": "Projeto",
     "group": "flow",

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sofia OS",
     "slug": "sofia-app",
-    "version": "0.3.39",
+    "version": "0.3.40",
     "scheme": "sofiaapp",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -14,11 +14,12 @@
     },
     "android": {
       "package": "com.avsord.sofiaapp",
-      "versionCode": 44,
+      "versionCode": 45,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.RECORD_AUDIO",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.SCHEDULE_EXACT_ALARM"
       ],
       "blockedPermissions": [
         "android.permission.READ_CONTACTS",
@@ -54,7 +55,8 @@
           "color": "#7258E8",
           "defaultChannel": "sofia-agenda"
         }
-      ]
+      ],
+      "./plugins/with-sofia-alarms.cjs"
     ]
   }
 }

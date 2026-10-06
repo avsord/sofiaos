@@ -46,7 +46,9 @@ function getMdRuntime(runtime){
  const save=workspace.save.bind(workspace),del=workspace.deleteEntity.bind(workspace);
  workspace.save=function(input,id){const result=save(input,id);if(!calendar.applying&&['commitment','reminder'].includes(result.kind))calendar.schedule();return result;};
  workspace.deleteEntity=function(id){const old=workspace.get(id),result=del(id);if(['commitment','reminder'].includes(old.kind))calendar.schedule();return result;};
- const service={calendar,move(input){
+ if(!store.settings().homeCapsulesWidget040Added){const widgets=[...store.settings().homeWidgets];if(!widgets.includes('capsules'))widgets.splice(Math.max(0,widgets.indexOf('tasks')+1),0,'capsules');store.updateSettings({homeWidgets:widgets});store.db.prepare('INSERT OR REPLACE INTO settings VALUES (?,?)').run('homeCapsulesWidget040Added','true');}
+ const capsules=new (require('../services/capsules').Capsules)(store,workspace);
+ const service={calendar,capsules,move(input){
   validId(input.id);validId(input.anchorId);if(input.parentId)validId(input.parentId);
   return store.tx(()=>{
    const ids=store.db.prepare("SELECT id FROM entities WHERE owner=? AND kind='user_page' AND state<>'archived'").all(OWNER);
@@ -64,10 +66,12 @@ function makeMdApi(runtime,{bodyJson,json}){
  return async function mdApi(req,res,p,m,url){
   if(!p.startsWith('/api/md/'))return false;
   const send=value=>{json(res,200,value);return true;};
-  if(p==='/api/md/capabilities'&&m==='GET')return send({version:2,task_intervals:true,dashboard_widgets:true,conversation_delete:true,notifications_unread:true,page_order:true,notifications_paged:true,google_calendar:service.calendar.status().configured});
+  if(p==='/api/md/capabilities'&&m==='GET')return send({version:2,capsules:true,task_intervals:true,dashboard_widgets:true,conversation_delete:true,notifications_unread:true,page_order:true,notifications_paged:true,google_calendar:service.calendar.status().configured});
+  if(p==='/api/md/capsules/doses'&&m==='GET')return send({items:service.capsules.history(url.searchParams.get('from'),url.searchParams.get('to'))});
+  if(p==='/api/md/capsules/doses'&&m==='POST')return send(service.capsules.take(await bodyJson(req,8192)));
   if(p==='/api/md/conversations'&&m==='DELETE'){const b=await bodyJson(req,8192);if(!Array.isArray(b.ids)||!b.ids.length||b.ids.length>50)throw new AppError('BAD_SELECTION','Selecione de 1 a 50 conversas.');b.ids.forEach(validId);return send(store.clearChatHistory([...new Set(b.ids)]));}
   if(p==='/api/md/dashboard'&&m==='GET')return send({widgets:store.settings().homeWidgets});
-  if(p==='/api/md/dashboard'&&m==='PATCH'){const b=await bodyJson(req,8192);if(!Array.isArray(b.widgets)||b.widgets.some(x=>!['monitoring','tasks','priorities','study','notifications'].includes(x)))throw new AppError('BAD_WIDGETS','Widgets inválidos.');store.updateSettings({homeWidgets:b.widgets});return send({widgets:store.settings().homeWidgets});}
+  if(p==='/api/md/dashboard'&&m==='PATCH'){const b=await bodyJson(req,8192);if(!Array.isArray(b.widgets)||b.widgets.some(x=>!['monitoring','tasks','capsules','priorities','study','notifications'].includes(x)))throw new AppError('BAD_WIDGETS','Widgets inválidos.');store.updateSettings({homeWidgets:b.widgets});return send({widgets:store.settings().homeWidgets});}
   if(p==='/api/md/pages/move'&&m==='POST')return send(service.move(await bodyJson(req,8192)));
   if(p==='/api/md/notifications'&&m==='GET'){
    const offset=Number(url.searchParams.get('offset')||0);if(!Number.isSafeInteger(offset)||offset<0||offset>1000000)throw new AppError('BAD_PAGE','Página inválida.');

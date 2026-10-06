@@ -100,6 +100,18 @@ tap('Filtros da Biblioteca');tap('Filtrar por estrelas');tap('★★★★★');
 # Persist a rich note and reopen the same entity through Apps/Notas.
 tap('Voltar aos apps');tap('Notas');tap('Criar registro');tap('Título da nota');adb('shell','input','text','NotaQA036')
 tap('Conteúdo da nota');adb('shell','input','text','TextoQA036');tap('Negrito');adb('shell','input','text','Bold');tap('Fechar teclado');tap('Salvar');wait('NotaQA036');tap('NotaQA036');wait('Título da nota');wait('Conteúdo da nota');screenshot('rich-note-reopened');tap('Voltar das notas');tap('Início')
+# Capsules uses the same production widget, editor and scheduled native notifications.
+tap('Apps');tap('Cápsulas');wait('Tomei Capsula QA às 00:01');screenshot('capsules-today')
+tap('Tomei Capsula QA às 00:01');time.sleep(.4);assert find(tree(),'Tomei Capsula QA às 00:01') is None
+wait('Tomei Capsula QA às 23:59');tap('Cápsulas · Histórico');wait('Capsula QA');screenshot('capsules-history-preserved')
+tap('Cápsulas · Rotinas');tap('Editar cápsula Capsula QA');wait('Nome');wait('Dose conforme sua orientação');wait('Lembrar quantos minutos antes? (0 = só no horário)');screenshot('capsules-two-reminders-editor');tap('Fechar cadastro de cápsula')
+tap('Nova cápsula');tap('Nome');adb('shell','input','text','NovaCapsulaQA');tap('Dose conforme sua orientação');adb('shell','input','text','1');adb('shell','input','keyevent','BACK')
+for _ in range(5):
+ if find(tree(),'Salvar cápsula') is not None:break
+ adb('shell','input','swipe','360','1150','360','450','400');time.sleep(.3)
+tap('Salvar cápsula');time.sleep(.8)
+wait('Editar cápsula NovaCapsulaQA');screenshot('capsules-routine-created');tap('Voltar aos apps');tap('Início')
+print('PASS capsule daily dose, preserved history, two-reminder editor and new routine',flush=True)
 logs=adb('logcat','-d').decode(errors='replace');(out/'native-log.txt').write_text(logs);assert 'FATAL EXCEPTION' not in logs;assert 'CALENDAR_PERF' in logs
-(out/'result.json').write_text(json.dumps({'passed':True,'events':500,'passes':10,'native_hermes_budget_ms':1000,'menu_roundtrips':3,'appointment_edges_isolated':True,'moderate_pull_ignored':True,'deliberate_pull_refreshes':True,'root_system_back_inert':True}))
+(out/'result.json').write_text(json.dumps({'passed':True,'events':500,'passes':10,'native_hermes_budget_ms':1000,'menu_roundtrips':3,'appointment_edges_isolated':True,'moderate_pull_ignored':True,'deliberate_pull_refreshes':True,'root_system_back_inert':True,'capsules_daily_widget_and_history':True}))
 print('PASS native calendar performance, 500 events, existing update signature and navigation')

@@ -58,6 +58,8 @@ export class SofiaApi {
   selectChat(id:string) { return this.request<ChatSnapshot>('/chat-sync/select',{conversation_id:id}); }
   deleteChatMessages(id:string,ids:string[]) { return this.request<{deleted_ids:string[];failed:{id:string;error:string}[]}>('/chat-sync/delete',{conversation_id:id,ids}); }
   conversations(offset = 0) { return this.request<{items: Conversation[]; has_more: boolean; next_offset: number}>('/conversations?offset=' + offset); }
+  capsuleHistory(from:string,to:string){return this.request<{items:Entity[]}>('/md/capsules/doses?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to));}
+  capsuleTake(capsule_id:string,day:string,time:string,taken=true){return this.request<{ok:boolean;item:Entity|null}>('/md/capsules/doses',{capsule_id,day,time,taken},'POST');}
   dashboardWidgets(){return this.request<{widgets:string[]}>('/md/dashboard');}
   async saveDashboardWidgets(widgets:string[]){if(!await this.feature('dashboard_widgets'))throw new Error('A sincronização dos widgets aguarda a atualização do servidor. A organização anterior foi mantida.');return this.request<{widgets:string[]}>('/md/dashboard',{widgets},'PATCH');}
   async deleteConversations(ids:string[]) { if(!await this.feature('conversation_delete'))throw new Error('A exclusão de conversas aguarda a atualização do servidor. Nenhuma conversa foi apagada.');return this.request<{ok:boolean}>('/md/conversations',{ids},'DELETE'); }
