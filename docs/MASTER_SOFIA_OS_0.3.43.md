@@ -4,7 +4,7 @@ Estado em 06/10/2026. Repositório: avsord/sofiaos. Branch de trabalho: work/sof
 
 ## Situação de entrega
 
-A última release estável publicada continua sendo 0.3.42, código Android 47. **0.3.43, código 48, ainda não foi publicada.** O código foi implementado e os testes locais passaram. A validação Android está em andamento, na execução 37479988326. Não entregar 0.3.42 como se fosse 0.3.43.
+A última release estável publicada continua sendo 0.3.42, código Android 47. **0.3.43, código 48, ainda não foi publicada.** O código foi implementado e os testes locais passaram. O APK foi compilado na execução 37479988326. A aceitação falhou em uma ação automática de teclado; a revalidação 37496001135 salvou a descrição com sucesso mas tentou ler a instrumentação atrás do modal nativo. A execução 37514479960 corrige as duas verificações e reutiliza os mesmos APKs, hash e fonte. A validação completa ainda precisa passar. Não entregar 0.3.42 como se fosse 0.3.43.
 
 Fonte em validação: 517d58acb4d41b47349a7f29602684597b79e3e7. Identidade Android: com.avsord.sofiaapp. Atualização pelo mesmo canal GitHub, tag esperada sofia-android-v0.3.43 e asset Sofia-OS.apk. Manter a assinatura existente; o workflow compara os certificados antes de permitir publicação.
 
@@ -22,11 +22,9 @@ Fonte em validação: 517d58acb4d41b47349a7f29602684597b79e3e7. Identidade Andro
 | Segurar data no Início | Abre criação de compromisso na data escolhida na Agenda. |
 | Salto/piscada ao passar pelo chat | Reativação e geometria inalterada não provocam rolagem. A altura do teclado continua sendo medida fora da tela sem rolar a conversa escondida. Novas mensagens e resposta crescente seguem descendo. |
 
-## Servidor: pronto, mas NÃO publicado nesta rodada
+## Servidor publicado nesta rodada
 
-A ferramenta Railway cancelou accept_deploy, retornando: “Cancelled — the user did not approve this action. No changes were made.” Apesar da autorização anterior na conversa, não tentar contornar essa negativa por outra operação equivalente. Obter aprovação específica para aplicar a mudança preparada.
-
-O patch eca3855e-7fb2-486f-9125-77614eab8d83 está STAGED em produção, contendo somente source.branch=work/sofia-refinements-043 e source.commitSha=3582bdf6e7e47b661b0f25ed5b6cdc31171302d1. Esse commit contém todos os novos recursos do servidor; os commits posteriores acrescentam ajustes do cliente, testes e CI.
+O usuário autorizou explicitamente a publicação novamente em 06/10/2026. accept_deploy foi aceito. Deployment 2daa256b-793c-4beb-bb01-a4712969436c terminou SUCCESS às 18:51 UTC (15:51 São Paulo). Fonte efetivamente implantada: 0e746b06c313072baf7eed58af9828d8b01b9620, branch work/sofia-refinements-043. Volume existente foi montado e o restore gate confirmou início normal com chave preservada. A checagem HTTP dos novos recursos será feita antes da publicação do APK. Não continuar dizendo que a autorização está pendente.
 
 Configuração preservada:
 
@@ -36,7 +34,7 @@ Configuração preservada:
 - Volume c93817c3-425f-4849-9ce3-df892558606c montado em /sofia.
 - Start command node tools/restore-gate.cjs.
 - Watch pattern __manual_deploy_only__/**; deploy permanece manual e fixado em commit.
-- Última fonte publicada do servidor: 5561178a2b931633aecbd4e2903f1b6e0190da0c, deployment 360612b3-cead-46ca-867a-470204bd9784, SUCCESS.
+- Fonte anterior preservada para rastreio: 5561178a2b931633aecbd4e2903f1b6e0190da0c, deployment 360612b3-cead-46ca-867a-470204bd9784.
 
 Não mexer em volume, credenciais, OAuth, backup de produção ou restore gate. Não restaurar backup antigo e não apagar mensagens para atualizar. A migração acrescenta task_details.description_document, mantendo o texto plano em description. Backups antigos recebem documento vazio; exportação, importação e reabertura preservam a formatação. Alterar outros campos preserva o documento; trocar texto por cliente antigo limpa apenas a formatação obsoleta.
 
@@ -54,7 +52,7 @@ Após deploy, /health deve indicar md_upgrade=0.3.43, task_description_format=tr
 ## Próximo passo
 
 1. Concluir a validação Android e inspecionar qualquer falha real antes de liberar.
-2. Com aprovação específica, aplicar somente o patch preparado da Railway e verificar deployment SUCCESS e /health.
+2. Deployment já SUCCESS; confirmar /health com os três novos recursos.
 3. Publicar o APK exatamente validado. Para reutilizar um artefato, verificar SOURCE_COMMIT, hash, assinatura e versão/código; nunca publicar o APK QA-ONLY-full-fixture.apk.
 4. Confirmar release estável, published_at, asset uploaded com tamanho positivo, atualização descoberta pelo cliente antigo e novo, e validação Android success.
 5. Atualizar este master com os IDs finais, hash, tamanho, publicação e link direto. Só então dizer que 0.3.43 JÁ FOI PUBLICADA.
