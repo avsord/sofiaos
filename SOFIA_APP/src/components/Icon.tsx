@@ -1,7 +1,7 @@
 import React from 'react';
 import Svg, { Path } from 'react-native-svg';
 const paths = {
- capsule:'M8 4a6 6 0 0 1 8 8l-4 4a6 6 0 0 1-8-8l4-4zm-1 5 8 8',
+ capsule:'M5 13l8-8a4.24 4.24 0 0 1 6 6l-8 8a4.24 4.24 0 0 1-6-6zM9 9l6 6',
  filter:'M4 6h16M7 12h10M10 18h4',
  more:'M5 12h.01M12 12h.01M19 12h.01',camera:'M3 7h4l2-3h6l2 3h4v14H3V7zm5 7a4 4 0 1 0 8 0 4 4 0 0 0-8 0',clip:'M8 12l7-7a4 4 0 0 1 6 6L10 22a6 6 0 0 1-8-8L13 3',
  settings:'M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1 1-3zm-1 9a4 4 0 1 0 8 0 4 4 0 0 0-8 0',
