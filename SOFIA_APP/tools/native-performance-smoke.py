@@ -105,6 +105,7 @@ tap('Apps');tap('Cápsulas');wait('Tomei Capsula QA às 00:01');
 qa_node=next(n for n in tree().iter('node') if n.get('content-desc','').startswith('QA notifications '))
 qa=json.loads(qa_node.get('content-desc')[len('QA notifications '):]);assert isinstance(qa.get('exact'),bool),'Native alarm permission bridge absent'
 alarms=[n for n in qa['alarms'] if n['identifier'].startswith('sofia-capsule:') and n['content']['data'].get('planId')=='capsuleqa' and n['content']['data'].get('time')=='23:59']
+assert len(qa['alarms'])<=256,'Shared notification budget exceeded'
 assert any('aviso 30 min antes' in n['content']['body'] for n in alarms) and any('Está no horário' in n['content']['body'] for n in alarms),'Capsule paired reminders not scheduled'
 print('PASS native capsule alarm permission bridge and both scheduled reminders',flush=True)
 screenshot('capsules-today')
@@ -130,6 +131,8 @@ for _ in range(5):
 tap('Salvar cápsula');time.sleep(.8)
 wait('Editar cápsula NovaCapsulaQA');wait('1 · 10:01');wait('Todo mês no dia '+str(int(adb('shell','date','+%d').strip()))+' · Aviso no horário');screenshot('capsules-routine-created');tap('Voltar aos apps');tap('Início')
 print('PASS capsule daily dose, preserved history, two-reminder editor and new routine',flush=True)
+tap('Apps');tap('Listas');wait('Compra preservada');wait('Descrição de compra preservada');tap('Filtros das listas');wait('Filtrar área das listas');wait('Filtrar estado das listas');screenshot('shopping-library-style-filters');tap('Ver registros');tap('Criar registro');wait('Novo registro nas listas');wait('Criar Item de compra');screenshot('shopping-library-style-create');adb('shell','input','keyevent','BACK');tap('Voltar aos apps');tap('Início')
+print('PASS shopping shared Library layout, Everything, filters and plus menu',flush=True)
 logs=adb('logcat','-d').decode(errors='replace');(out/'native-log.txt').write_text(logs);assert 'FATAL EXCEPTION' not in logs;assert 'CALENDAR_PERF' in logs
 (out/'result.json').write_text(json.dumps({'passed':True,'events':500,'passes':10,'native_hermes_budget_ms':1000,'menu_roundtrips':3,'appointment_edges_isolated':True,'moderate_pull_ignored':True,'deliberate_pull_refreshes':True,'root_system_back_inert':True,'capsules_daily_widget_and_history':True}))
 print('PASS native calendar performance, 500 events, existing update signature and navigation')

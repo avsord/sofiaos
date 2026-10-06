@@ -3,6 +3,8 @@ import type {Entity} from './types';
 import type {SofiaApi} from './api';
 import {errorText} from './chat-model';
 export const LIBRARY_ALL='@library';
+export const LISTS_ALL='@lists';
+export const LIST_KINDS=['list_collection','list_item','shopping_item','purchase_group','purchase'];
 type Entry={items:Entity[];loaded:boolean;hasMore:boolean;loading:boolean;refreshing:boolean;error:string;request:number};
 /** A category keeps its last confirmed snapshot during refresh and navigation. */
 export class WorkspaceRecords {
@@ -17,7 +19,7 @@ export class WorkspaceRecords {
  async load(api:Pick<SofiaApi,'entities'|'library'>,kind:string,query:string,changed:()=>void,more=false,manual=false,complete=false){
   if(!kind)return;const entry=this.view(kind,query),request=++entry.request;
   entry.loading=true;entry.refreshing=manual;changed();
-  try{const offset=more?entry.items.length:0;let result=await (kind===LIBRARY_ALL?api.library(query,offset):api.entities(kind,query,offset));if(request!==entry.request)return;
+  try{if(kind===LISTS_ALL){const groups=await Promise.all(LIST_KINDS.map(async type=>{const rows:Entity[]=[];let offset=0;while(true){const page=await api.entities(type,query,offset);if(page.items.length&&page.items.every(item=>rows.some(row=>row.id===item.id)))throw Error('Não foi possível completar as listas. Tente novamente.');rows.push(...page.items);if(page.items.length<100)break;offset+=page.items.length;}return rows;}));if(request!==entry.request)return;entry.items=[...new Map(groups.flat().map(row=>[row.id,row])).values()];entry.loaded=true;entry.hasMore=false;entry.error='';return;}const offset=more?entry.items.length:0;let result=await (kind===LIBRARY_ALL?api.library(query,offset):api.entities(kind,query,offset));if(request!==entry.request)return;
    // Library filters must cover the whole category, including later API pages.
    if((complete||kind==='film')&&!more){const all=new Map(result.items.map(row=>[row.id,row]));let page=result.items,nextOffset=page.length;
     while(page.length===100){const next=await (kind===LIBRARY_ALL?api.library(query,nextOffset):api.entities(kind,query,nextOffset));if(request!==entry.request)return;page=next.items;nextOffset+=page.length;const before=all.size;page.forEach(row=>all.set(row.id,row));if(page.length&&all.size===before)throw Error('Não foi possível completar a lista desta categoria. Tente novamente.');}
