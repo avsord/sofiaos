@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 517d58acb4d41b47349a7f29602684597b79e3e7
+          ref: 48d7a8fc0870fbe2df72cca009abaf784beca49b
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
@@ -25,7 +25,7 @@ jobs:
         run: git show origin/work/sofia-refinements-043:tools/native-043-revalidate.py > /tmp/native-043-revalidate.py
       - name: Download exact production APK and native acceptance APK
         run: |
-          gh run download 37479988326 --repo avsord/sofiaos --name Sofia-Android-0.3.43 --dir SOFIA_APP/dist
+          gh run download 37516141511 --repo avsord/sofiaos --name Sofia-Android-0.3.43 --dir SOFIA_APP/dist
           test "$(cat SOFIA_APP/dist/SOURCE_COMMIT.txt)" = "$(git rev-parse HEAD)"
           cd SOFIA_APP && sha256sum -c dist/Sofia-OS.apk.sha256
       - name: Upload first-run diagnostic evidence separately
@@ -108,3 +108,5 @@ jobs:
             SOFIA_APP/dist/release.json
 
 # Read fixture state after closing the native task modal.
+
+# Preserve Home scroll position after selected task context.
