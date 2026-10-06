@@ -1,6 +1,7 @@
 /** Agenda and Capsules share Android's per-app alarm quota and mutation queue. */
 export const NOTIFICATION_CHANNEL_LIMIT=128;
 export const NOTIFICATION_SIGNATURE_VERSION='scheduler-042';
+const failedIdentifiers=new Set<string>();
 let pending:Promise<unknown>=Promise.resolve();
 export function enqueueNotifications<T>(task:()=>Promise<T>):Promise<T>{const next=pending.catch(()=>{}).then(task);pending=next;return next;}
 type Request={identifier:string;content:{data?:Record<string,unknown>}};
@@ -11,10 +12,10 @@ export async function reconcileNotificationRequests(adapter:Adapter,prefix:strin
  const candidate=desired.slice(0,available),plan=candidate.filter(n=>!n.content.data?.early||candidate.some(d=>!d.content.data?.early&&d.content.data?.planId===n.content.data?.planId&&d.content.data?.day===n.content.data?.day&&d.content.data?.time===n.content.data?.time)),wanted=new Set(plan.map(n=>n.identifier));
  // Retire obsolete alarms first: editing a full schedule must not temporarily double it.
  for(const old of own){if(!active())return;if(!wanted.has(old.identifier))await adapter.cancelScheduledNotificationAsync(old.identifier);}
- for(const request of plan){if(!active())return;const old=own.find(n=>n.identifier===request.identifier);if(old?.content.data?.signature===request.content.data?.signature)continue;
+ for(const request of plan){if(!active())return;const old=own.find(n=>n.identifier===request.identifier);if(!failedIdentifiers.has(request.identifier)&&old?.content.data?.signature===request.content.data?.signature)continue;
   // Expo persists a request before installing its Android alarm. Remove failed writes.
   if(old)await adapter.cancelScheduledNotificationAsync(request.identifier);
-  try{await adapter.scheduleNotificationAsync(request);}catch(error){await adapter.cancelScheduledNotificationAsync(request.identifier).catch(()=>{});throw error;}
+  try{await adapter.scheduleNotificationAsync(request);failedIdentifiers.delete(request.identifier);}catch(error){failedIdentifiers.add(request.identifier);await adapter.cancelScheduledNotificationAsync(request.identifier).catch(()=>{});throw error;}
  }
  return plan.length;
 }
