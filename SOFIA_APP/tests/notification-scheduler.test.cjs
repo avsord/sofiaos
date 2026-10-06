@@ -8,3 +8,5 @@ test('shared queue serializes both channels and recovers from failure',async()=>
 
 const {WorkspaceRecords,LISTS_ALL}=load('src/lib/workspace-records.ts',{'react':{},'./chat-model':{errorText:e=>e.message}});
 test('shopping Everything includes every list kind and later pages',async()=>{const cache=new WorkspaceRecords();await cache.load({entities:async(kind,q,offset)=>({items:offset?[]:Array.from({length:kind==='shopping_item'?100:1},(_,i)=>({id:kind+i,kind,title:kind}))})},LISTS_ALL,'',()=>{});assert.equal(cache.view(LISTS_ALL,'').items.length,104);assert.equal(cache.view(LISTS_ALL,'').hasMore,false);});
+
+test('every app aggregate fetches only its selected categories',async()=>{const cache=new WorkspaceRecords(),seen=[];await cache.load({entities:async kind=>{seen.push(kind);return {items:[{id:kind,kind}]}}},'@records:annotation,project','',()=>{});assert.deepEqual(seen,['annotation','project']);assert.equal(cache.view('@records:annotation,project','').items.length,2);});
