@@ -106,3 +106,5 @@ jobs:
             SOFIA_APP/dist/performance-evidence/
             SOFIA_APP/dist/revalidate-startup.xml
             SOFIA_APP/dist/release.json
+
+# Read fixture state after closing the native task modal.
