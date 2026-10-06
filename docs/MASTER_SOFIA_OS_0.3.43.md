@@ -4,9 +4,9 @@ Estado em 06/10/2026. Repositório: avsord/sofiaos. Branch de trabalho: work/sof
 
 ## Situação de entrega
 
-A última release estável publicada continua sendo 0.3.42, código Android 47. **0.3.43, código 48, ainda não foi publicada.** O código foi implementado e os testes locais passaram. O APK foi compilado na execução 37479988326. A aceitação falhou em uma ação automática de teclado; a revalidação 37496001135 salvou a descrição com sucesso mas tentou ler a instrumentação atrás do modal nativo. A execução 37514479960 corrige as duas verificações e reutiliza os mesmos APKs, hash e fonte. A validação completa ainda precisa passar. Não entregar 0.3.42 como se fosse 0.3.43.
+A última release estável publicada continua sendo 0.3.42, código Android 47. **0.3.43, código 48, ainda não foi publicada.** O código foi implementado e os testes locais passaram. O APK foi compilado na execução 37479988326. A aceitação falhou em uma ação automática de teclado; a revalidação 37496001135 salvou a descrição com sucesso mas tentou ler a instrumentação atrás do modal nativo. A execução 37514479960 confirmou que o texto foi salvo mas o negrito não foi aplicado. Foram corrigidas as áreas de rolagem ancestrais, passando keyboardShouldPersistTaps=always no Início e nos editores, e acrescentada indicação acessível/visual do estilo ativo. A execução 37516141511 compila essa correção e executa o teste de formatação primeiro, seguido dos demais testes nativos. A validação completa ainda precisa passar. Não entregar 0.3.42 como se fosse 0.3.43.
 
-Fonte em validação: 517d58acb4d41b47349a7f29602684597b79e3e7. Identidade Android: com.avsord.sofiaapp. Atualização pelo mesmo canal GitHub, tag esperada sofia-android-v0.3.43 e asset Sofia-OS.apk. Manter a assinatura existente; o workflow compara os certificados antes de permitir publicação.
+Fonte atual em compilação e validação: 48d7a8fc0870fbe2df72cca009abaf784beca49b. O artefato antigo 517d58acb4d41b47349a7f29602684597b79e3e7 não deve ser publicado após a falha de negrito. Identidade Android: com.avsord.sofiaapp. Atualização pelo mesmo canal GitHub, tag esperada sofia-android-v0.3.43 e asset Sofia-OS.apk. Manter a assinatura existente; o workflow compara os certificados antes de permitir publicação.
 
 ## Pedidos implementados nesta rodada
 
