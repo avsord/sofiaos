@@ -61,7 +61,7 @@ export function useChatAutoscroll(list:RefObject<FlatList<any>|null>,active:bool
   // A scroll callback queued before the latest layout must not shrink the
   // measured reply or pull an in-flight animation back to its previous end.
   intent.position(n.contentOffset.y,intent.contentHeight||n.contentSize.height,intent.viewportHeight||n.layoutMeasurement.height);
-  setShowJump(intent.distanceFromEnd>100);
+  setShowJump(!intent.following&&intent.distanceFromEnd>100);
   // Android may restore the old scroll offset after its keyboard/focus resize.
   // Reconcile that native geometry only while following, never during a user drag.
   if(intent.following&&!intent.interacting&&intent.endOffset-n.contentOffset.y>2&&Math.abs(target.current-intent.endOffset)>1)settle();
