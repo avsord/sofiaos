@@ -117,10 +117,18 @@ for _ in range(5):
 wait('Lembrar quantos minutos antes? (0 = só no horário)');screenshot('capsules-two-reminders-editor');tap('Fechar cadastro de cápsula')
 tap('Nova cápsula');tap('Nome');adb('shell','input','text','NovaCapsulaQA');tap('Dose conforme sua orientação');adb('shell','input','text','1');adb('shell','input','keyevent','BACK')
 for _ in range(5):
+ if find(tree(),'Horário da dose 1') is not None:break
+ adb('shell','input','swipe','360','1150','360','450','400');time.sleep(.3)
+tap('Horário da dose 1');wait('Hora · 24h');tap('Hora 10');tap('Minuto 1');tap('Confirmar horário')
+for _ in range(5):
+ if find(tree(),'Repetir') is not None:break
+ adb('shell','input','swipe','360','1150','360','450','400');time.sleep(.3)
+tap('Repetir');tap('Todo mês')
+for _ in range(5):
  if find(tree(),'Salvar cápsula') is not None:break
  adb('shell','input','swipe','360','1150','360','450','400');time.sleep(.3)
 tap('Salvar cápsula');time.sleep(.8)
-wait('Editar cápsula NovaCapsulaQA');screenshot('capsules-routine-created');tap('Voltar aos apps');tap('Início')
+wait('Editar cápsula NovaCapsulaQA');wait('Todo mês no dia '+str(int(adb('shell','date','+%d').strip())));screenshot('capsules-routine-created');tap('Voltar aos apps');tap('Início')
 print('PASS capsule daily dose, preserved history, two-reminder editor and new routine',flush=True)
 logs=adb('logcat','-d').decode(errors='replace');(out/'native-log.txt').write_text(logs);assert 'FATAL EXCEPTION' not in logs;assert 'CALENDAR_PERF' in logs
 (out/'result.json').write_text(json.dumps({'passed':True,'events':500,'passes':10,'native_hermes_budget_ms':1000,'menu_roundtrips':3,'appointment_edges_isolated':True,'moderate_pull_ignored':True,'deliberate_pull_refreshes':True,'root_system_back_inert':True,'capsules_daily_widget_and_history':True}))
