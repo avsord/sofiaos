@@ -98,3 +98,12 @@ test('an open page owns horizontal back gesture before the main menu pager',()=>
  assert.ok(pages.includes('translateX:backX'));
  assert.ok(pages.includes('g.dx>8&&Math.abs(g.dx)>Math.abs(g.dy)*1.15'));
 });
+
+test('Apps exposes a dedicated capsule-style Rotinas surface backed by routine entities',()=>{
+ const workspace=fs.readFileSync(path.join(root,'src/screens/Workspace.tsx'),'utf8');
+ assert.ok(workspace.includes("id:'routines',title:'Rotinas'"));
+ assert.ok(workspace.includes("api.entities('routine')"));
+ assert.ok(workspace.includes('borderRadius:34'));
+ assert.ok(workspace.includes("d.delivery='task'"));
+ assert.ok(workspace.includes("module==='routines'"));
+});
