@@ -1,5 +1,4 @@
-# A completed change includes tested APK publication; no second user request.
-# Keep this workflow filename stable across versions.
+# Build once; run every native check in parallel; publish only the identical verified APK.
 name: Sofia Android - entrega automatica
 'on':
   workflow_dispatch: null
@@ -17,15 +16,27 @@ permissions:
 concurrency:
   group: sofia-android-release
   cancel-in-progress: false
+env:
+  CI: '1'
+  PYTHONDONTWRITEBYTECODE: '1'
+  EXPO_NO_TELEMETRY: '1'
+  EXPO_PUBLIC_API_URL: https://sofiaos.up.railway.app
+  GH_TOKEN: ${{ github.token }}
 jobs:
-  release:
+  build:
+    if: github.ref == 'refs/heads/sofia-app-android'
+    name: Build once and retain checked APKs
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
-    env:
-      CI: '1'
-      EXPO_NO_TELEMETRY: '1'
-      EXPO_PUBLIC_API_URL: https://sofiaos.up.railway.app
-      GH_TOKEN: ${{ github.token }}
+    timeout-minutes: 60
+    outputs:
+      release: ${{ steps.plan.outputs.release }}
+      version: ${{ steps.plan.outputs.version }}
+      version_code: ${{ steps.plan.outputs.version_code }}
+      baseline_version: ${{ steps.plan.outputs.baseline_version }}
+      baseline_tag: ${{ steps.plan.outputs.baseline_tag }}
+      reason: ${{ steps.plan.outputs.reason }}
+      source_sha: ${{ steps.source.outputs.sha }}
+      artifact_name: Sofia-build-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
     - uses: actions/checkout@v4
       with:
@@ -38,11 +49,12 @@ jobs:
         cache-dependency-path: |-
           SOFIA_APP/package-lock.json
           package-lock.json
-    - name: Plan delivery and prepare the next compatible version
+    - name: Plan compatible delivery and verify parallel test contracts
       id: plan
       run: |
         set -euo pipefail
         mkdir -p SOFIA_APP/dist
+        python3 SOFIA_APP/tools/native-delivery-test.py
         node --test SOFIA_APP/tools/delivery.test.cjs | tee SOFIA_APP/dist/delivery-tests.txt
         node SOFIA_APP/tools/delivery.cjs prepare
     - uses: actions/setup-java@v4
@@ -65,15 +77,15 @@ jobs:
         npm run check | tee dist/typecheck.txt
         npm test | tee dist/app-tests.txt
         node -e "const c=require('./app.json').expo;if(c.version!==process.env.SOFIA_RELEASE_VERSION||c.android.versionCode!==Number(process.env.SOFIA_RELEASE_CODE)||c.android.package!=='com.avsord.sofiaapp')throw Error('Unexpected update identity')"
-      if: steps.plan.outputs.release == 'true'
       id: validate
+      if: steps.plan.outputs.release == 'true'
     - name: Verify existing task description persistence with isolated backend data
       run: |
         set -euo pipefail
         npm ci
         npm test | tee SOFIA_APP/dist/backend-tests.txt
-      if: steps.plan.outputs.release == 'true'
       id: backend_tests
+      if: steps.plan.outputs.release == 'true'
     - name: Preserve exact source being tested
       run: |
         mkdir -p SOFIA_APP/dist
@@ -86,8 +98,9 @@ jobs:
         fi
         git rev-parse HEAD > SOFIA_APP/dist/SOURCE_COMMIT.txt
         git archive --format=zip --output=SOFIA_APP/dist/Sofia-OS-${SOFIA_RELEASE_VERSION}-source.zip HEAD
-      if: steps.plan.outputs.release == 'true'
+        printf "sha=%s\n" "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       id: source
+      if: steps.plan.outputs.release == 'true'
     - name: Verify existing server without restarting or changing its data
       run: |
         curl -fsS --max-time 30 https://sofiaos.up.railway.app/health > SOFIA_APP/dist/server-health.json
@@ -114,8 +127,8 @@ jobs:
         cd android
         chmod +x gradlew
         ./gradlew :app:assembleRelease --build-cache --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a,x86_64
-      if: steps.plan.outputs.release == 'true'
       id: build
+      if: steps.plan.outputs.release == 'true'
     - name: Verify package, increasing version code and existing update signature
       working-directory: SOFIA_APP
       run: |
@@ -137,8 +150,9 @@ jobs:
         ! grep -aq SOFIA_PAGE_TOUCH_FIXTURE_ONLY /tmp/sofia-release.bundle
         ! grep -aq SOFIA_FULL_APP_FIXTURE_ONLY /tmp/sofia-release.bundle
         python3 -c 'import hashlib,pathlib; p=pathlib.Path("dist/Sofia-OS.apk"); print(hashlib.sha256(p.read_bytes()).hexdigest()+"  dist/Sofia-OS.apk")' > dist/Sofia-OS.apk.sha256
-      if: steps.plan.outputs.release == 'true'
+        cp /tmp/sofia-baseline/Sofia-OS.apk dist/baseline-Sofia-OS.apk
       id: identity
+      if: steps.plan.outputs.release == 'true'
     - name: Build full production shell with isolated transport for acceptance
       working-directory: SOFIA_APP
       run: |
@@ -156,37 +170,89 @@ jobs:
         cp /tmp/sofia-production-App.tsx App.tsx
         rm ProductionApp.tsx
         git diff --exit-code -- App.tsx
-      if: steps.plan.outputs.release == 'true'
       id: fixture
-    - name: Install screenshot comparison tool
-      run: |
-        python3 -m venv /tmp/sofia-python
-        /tmp/sofia-python/bin/pip install Pillow==12.3.0
-        echo "/tmp/sofia-python/bin" >> "$GITHUB_PATH"
       if: steps.plan.outputs.release == 'true'
-    - name: Prepare native diagnostics wrapper
-      run: |
-        cat > /tmp/sofia-run-acceptance.py <<'PY_NATIVE'
-        import subprocess,pathlib,sys
-        result=subprocess.run([sys.executable,'tools/native-performance-smoke.py'])
-        out=pathlib.Path('dist/performance-evidence');out.mkdir(parents=True,exist_ok=True)
-        subprocess.run(['adb','shell','uiautomator','dump','/sdcard/final-qa.xml'])
-        xml=subprocess.run(['adb','shell','cat','/sdcard/final-qa.xml'],capture_output=True)
-        (out/'final-qa.xml').write_bytes(xml.stdout)
-        png=subprocess.run(['adb','exec-out','screencap','-p'],capture_output=True)
-        (out/'final-qa.png').write_bytes(png.stdout)
-        logs=subprocess.run(['adb','logcat','-d'],capture_output=True)
-        (out/'final-log.txt').write_bytes(logs.stdout)
-        sys.exit(result.returncode)
-        PY_NATIVE
+    - name: Seal exact production, test and baseline APK bundle
+      working-directory: SOFIA_APP
+      run: python3 tools/native-shards.py bundle
+      id: seal
       if: steps.plan.outputs.release == 'true'
+    - name: Retain compiled APKs for parallel verification and failed-job retries
+      id: bundle
+      uses: actions/upload-artifact@v4
+      with:
+        name: Sofia-build-${{ github.run_id }}-${{ github.run_attempt }}
+        path: SOFIA_APP/dist/
+        if-no-files-found: error
+        retention-days: 30
+        compression-level: 0
+      if: steps.plan.outputs.release == 'true'
+    - name: Report delivery outcome
+      id: delivery_status
+      if: always() && (failure() || steps.plan.outputs.release != 'true')
+      continue-on-error: true
+      env:
+        DELIVERY_STATUS: ${{ job.status }}
+        DELIVERY_PLANNED: ${{ steps.plan.outputs.release }}
+        DELIVERY_PUBLISHED: skipped
+        DELIVERY_VERSION: ${{ steps.plan.outputs.version }}
+        DELIVERY_REASON: ${{ steps.plan.outputs.reason }}
+        DELIVERY_STEPS: ${{ toJSON(steps) }}
+      run: node SOFIA_APP/tools/delivery.cjs report
+    - name: Retain build diagnostics
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: Sofia-build-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+        path: |-
+          SOFIA_APP/dist/*.txt
+          SOFIA_APP/dist/delivery-status.json
+        if-no-files-found: warn
+        retention-days: 30
+  native_tests:
+    name: Native checks - ${{ matrix.shard }}
+    needs:
+    - build
+    if: needs.build.outputs.release == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        shard:
+        - navigation
+        - workspace
+    env:
+      SOFIA_SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
+      SOFIA_RELEASE_VERSION: ${{ needs.build.outputs.version }}
+      SOFIA_RELEASE_CODE: ${{ needs.build.outputs.version_code }}
+      SOFIA_BASELINE_VERSION: ${{ needs.build.outputs.baseline_version }}
+      SOFIA_BASELINE_TAG: ${{ needs.build.outputs.baseline_tag }}
+      SOFIA_NATIVE_SHARD: ${{ matrix.shard }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: ${{ needs.build.outputs.source_sha }}
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+    - name: Restore exact compiled APKs; do not recompile in test jobs
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ needs.build.outputs.artifact_name }}
+        path: SOFIA_APP/dist
+    - name: Verify build identity and APK hashes before installing
+      working-directory: SOFIA_APP
+      run: python3 tools/native-shards.py verify-bundle
     - name: Enable KVM
-      if: steps.plan.outputs.release == 'true' && (runner.os == 'Linux')
       run: |
         echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
         sudo udevadm control --reload-rules
         sudo udevadm trigger --name-match=kvm
-    - name: Verify upgrade, responsive navigation, theme schedule, library filters and rich notes on Android
+    - name: Verify upgrade and isolated native acceptance shard
       uses: reactivecircus/android-emulator-runner@v2
       with:
         api-level: 33
@@ -196,7 +262,7 @@ jobs:
         script: |
           adb shell wm size 720x1600
           adb shell wm density 280
-          adb install /tmp/sofia-baseline/Sofia-OS.apk
+          adb install SOFIA_APP/dist/baseline-Sofia-OS.apk
           adb install -r SOFIA_APP/dist/Sofia-OS.apk
           adb shell pm grant com.avsord.sofiaapp android.permission.POST_NOTIFICATIONS
           adb logcat -c
@@ -207,24 +273,87 @@ jobs:
           adb logcat -d -s ReactNativeJS:E AndroidRuntime:E > SOFIA_APP/dist/native-errors.txt
           ! grep -q 'FATAL EXCEPTION' SOFIA_APP/dist/native-errors.txt
           grep -q Entrar SOFIA_APP/dist/startup.xml
-          adb install -r /tmp/sofia-full-fixture.apk
+          adb install -r SOFIA_APP/dist/QA-ONLY-full-fixture.apk
           adb shell pm grant com.avsord.sofiaapp android.permission.POST_NOTIFICATIONS
           adb logcat -c
           adb shell am force-stop com.avsord.sofiaapp
           adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
-          cd SOFIA_APP && python3 /tmp/sofia-run-acceptance.py
-      if: steps.plan.outputs.release == 'true'
+          cd SOFIA_APP && python3 tools/native-shards.py run --shard "$SOFIA_NATIVE_SHARD"
       id: native_tests
+    - name: Report the exact failed native shard
+      id: delivery_status
+      if: failure()
+      continue-on-error: true
+      env:
+        DELIVERY_STATUS: ${{ job.status }}
+        DELIVERY_PLANNED: ${{ needs.build.outputs.release }}
+        DELIVERY_PUBLISHED: skipped
+        DELIVERY_VERSION: ${{ needs.build.outputs.version }}
+        DELIVERY_REASON: Native shard ${{ matrix.shard }} failed; compiled APKs retained for retry
+        DELIVERY_STEPS: ${{ toJSON(steps) }}
+      run: node SOFIA_APP/tools/delivery.cjs report
+    - name: Retain evidence for this isolated shard
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: Sofia-native-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
+        path: |-
+          SOFIA_APP/dist/performance-evidence/
+          SOFIA_APP/dist/startup.*
+          SOFIA_APP/dist/native-errors.txt
+          SOFIA_APP/dist/delivery-status.json
+        if-no-files-found: error
+        retention-days: 30
+  release:
+    name: Publish only after every acceptance gate
+    needs: [build, native_tests]
+    if: needs.build.outputs.release == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    env:
+      SOFIA_SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
+      SOFIA_RELEASE_VERSION: ${{ needs.build.outputs.version }}
+      SOFIA_RELEASE_CODE: ${{ needs.build.outputs.version_code }}
+      SOFIA_BASELINE_VERSION: ${{ needs.build.outputs.baseline_version }}
+      SOFIA_BASELINE_TAG: ${{ needs.build.outputs.baseline_tag }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: ${{ needs.build.outputs.source_sha }}
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: npm
+        cache-dependency-path: |-
+          SOFIA_APP/package-lock.json
+          package-lock.json
+    - name: Restore exact compiled APKs; do not recompile in test jobs
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ needs.build.outputs.artifact_name }}
+        path: SOFIA_APP/dist
+    - name: Restore all attempts of the two native shards
+      uses: actions/download-artifact@v4
+      with:
+        pattern: Sofia-native-${{ github.run_id }}-*
+        path: SOFIA_APP/dist/native-evidence
+        merge-multiple: false
+    - name: Require both shards to pass on this exact APK and source
+      id: all_native_gates
+      working-directory: SOFIA_APP
+      run: python3 tools/native-shards.py verify-results
+    - name: Install locked tools for the verified publication
+      working-directory: SOFIA_APP
+      run: npm ci
     - name: Require live server support before publishing the APK
       run: |
         curl -fsS --max-time 30 https://sofiaos.up.railway.app/health > SOFIA_APP/dist/server-release-gate.json
         node -e "const h=require('./SOFIA_APP/dist/server-release-gate.json');if(!h.ok||!h.task_description_format||!h.selected_task_context||!h.agenda_priority||!h.persistent_sessions)throw Error('Server publication is required before the APK release; all existing records remain preserved')"
-      if: steps.plan.outputs.release == 'true'
       id: server_gate
     - name: Publish exact checked APK on existing update channel
       working-directory: SOFIA_APP
       run: node tools/publish-release.cjs
-      if: steps.plan.outputs.release == 'true'
       id: publish
     - name: Verify published APK discovery with both installed and new updater
       working-directory: SOFIA_APP
@@ -242,26 +371,25 @@ jobs:
         }})().catch(e=>{console.error(e);process.exitCode=1});
         NODE
         gh api "repos/avsord/sofiaos/releases/tags/sofia-android-v${SOFIA_RELEASE_VERSION}" > dist/release.json
-      if: steps.plan.outputs.release == 'true'
       id: discovery
-    - name: Report published APK or exact delivery blocker
+    - name: Report delivery outcome
       id: delivery_status
       if: always()
       continue-on-error: true
       env:
         DELIVERY_STATUS: ${{ job.status }}
-        DELIVERY_PLANNED: ${{ steps.plan.outputs.release }}
+        DELIVERY_PLANNED: ${{ needs.build.outputs.release }}
         DELIVERY_PUBLISHED: ${{ steps.publish.outcome }}
-        DELIVERY_VERSION: ${{ steps.plan.outputs.version }}
-        DELIVERY_REASON: ${{ steps.plan.outputs.reason }}
+        DELIVERY_VERSION: ${{ needs.build.outputs.version }}
+        DELIVERY_REASON: ${{ needs.build.outputs.reason }}
         DELIVERY_STEPS: ${{ toJSON(steps) }}
       run: node SOFIA_APP/tools/delivery.cjs report
-    - name: Upload APK, complete source and verification evidence
+    - name: Retain final publication and discovery evidence
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: Sofia-Android-${{ steps.plan.outputs.version || 'delivery' }}
+        name: Sofia-Android-${{ needs.build.outputs.version }}-${{ github.run_attempt }}
         path: SOFIA_APP/dist/
         if-no-files-found: warn
         retention-days: 30
-    if: github.ref == 'refs/heads/sofia-app-android'
+        compression-level: 0
