@@ -153,6 +153,6 @@ test('visible screen becomes active in the same urgent tab update',()=>{
  const source=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  assert.ok(!source.includes('useDeferredValue'),'main menu activity must not be deferred');
  assert.ok(!source.includes('screenTab'),'screen activity must use the selected tab directly');
- for(const id of ['home','chat','pages','agenda','apps'])assert.ok(source.includes(`active={tab==='\${id}'}`),id+' must activate from the urgent tab state');
+ for(const id of ['home','chat','pages','agenda','apps'])assert.ok(source.includes(`active={tab==='${id}'}`),id+' must activate from the urgent tab state');
  assert.ok(source.includes('pager.current?.goTo(next);setTab(next);'),'native jump must still happen before the React tab commit');
 });
