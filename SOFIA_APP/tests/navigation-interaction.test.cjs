@@ -148,3 +148,11 @@ test('a 30dp slow drag changes menu but a fling never starts competing JS moment
 
 test('20dp slow drag is enough in both directions, while tiny drift does not switch menu',()=>{for(const d of [-20,20]){const p=pager();p.scroll.onScrollBeginDrag(end(400));p.scroll.onScrollEndDrag(end(400+d,0));assert.deepEqual(p.commands,[{x:d>0?800:0,y:0,animated:true}]);}for(const d of [-8,8]){const p=pager();p.scroll.onScrollBeginDrag(end(400));p.scroll.onScrollEndDrag(end(400+d,0));assert.equal(p.commands.length,0);}});
 test('snap interval follows viewport resize rather than retaining a stale pixel distance',()=>{const p=pager();p.measure(600);assert.equal(p.scroll.snapToInterval,600);});
+
+test('visible screen becomes active in the same urgent tab update',()=>{
+ const source=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
+ assert.ok(!source.includes('useDeferredValue'),'main menu activity must not be deferred');
+ assert.ok(!source.includes('screenTab'),'screen activity must use the selected tab directly');
+ for(const id of ['home','chat','pages','agenda','apps'])assert.ok(source.includes(`active={tab==='\${id}'}`),id+' must activate from the urgent tab state');
+ assert.ok(source.includes('pager.current?.goTo(next);setTab(next);'),'native jump must still happen before the React tab commit');
+});
