@@ -77,8 +77,8 @@ test('notifications are outside the swipe sequence without losing the underlying
 test('Android identity, discovery prefix and version stay compatible',()=>{
   const config=JSON.parse(fs.readFileSync(path.join(root,'app.json'))).expo,pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json')));
   const update=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');
-  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,51);
-  assert.equal(config.version,'0.3.46');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
+  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,52);
+  assert.equal(config.version,'0.3.47');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
 });
 test('Pages opens a preloaded entity synchronously without a network wait',()=>{
  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');
@@ -95,4 +95,30 @@ test('an open page owns horizontal back gesture before the main menu pager',()=>
  assert.ok(pages.includes('PanResponder.create'));
  assert.ok(pages.includes('translateX:backX'));
  assert.ok(pages.includes('shouldBeginPageBack(g,'));
+});
+
+test('chat responses trigger immediate refreshes across synchronized app caches',()=>{
+ const api=fs.readFileSync(path.join(root,'src/lib/api.ts'),'utf8');
+ const home=fs.readFileSync(path.join(root,'src/screens/Home.tsx'),'utf8');
+ const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');
+ const agenda=fs.readFileSync(path.join(root,'src/lib/use-agenda-month.ts'),'utf8');
+ const capsules=fs.readFileSync(path.join(root,'src/lib/capsule-store.ts'),'utf8');
+ const records=fs.readFileSync(path.join(root,'src/lib/workspace-records.ts'),'utf8');
+ const notices=fs.readFileSync(path.join(root,'src/components/NotificationCenter.tsx'),'utf8');
+ assert.ok(api.includes("systemChanged(this);return result"));
+ for(const code of [home,pages,agenda,capsules,records,notices])assert.ok(code.includes('subscribeSystemChanged'));
+});
+test('Apps exposes Rotinas separately from Cápsulas and generic flow records',()=>{
+ const workspace=fs.readFileSync(path.join(root,'src/screens/Workspace.tsx'),'utf8');
+ const routines=fs.readFileSync(path.join(root,'src/screens/Routines.tsx'),'utf8');
+ assert.ok(workspace.includes("id:'routines',title:'Rotinas'"));
+ assert.ok(workspace.includes("module==='routines'"));
+ assert.ok(workspace.includes("k!=='routine'"));
+ assert.ok(routines.includes("kind:'routine'"));
+ assert.ok(routines.includes("d.delivery='task'"));
+ assert.ok(routines.includes('borderRadius:34'));
+});
+test('returning to Conversa explicitly resumes following the newest message',()=>{
+ const chat=fs.readFileSync(path.join(root,'src/screens/Chat.tsx'),'utf8');
+ assert.ok(chat.includes("if(!active){void silenceVoices();setSelectedIds(new Set());return;}followChat();"));
 });
