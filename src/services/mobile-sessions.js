@@ -2,7 +2,8 @@
 const crypto = require('node:crypto');
 const { AppError } = require('../core/util');
 const sha = value => crypto.createHash('sha256').update(String(value)).digest('hex');
-const TTL = 12 * 60 * 60 * 1000;
+// Finite ISO date for older clients; sessions end only through explicit revocation.
+const SESSION_END = Date.parse('9999-12-31T23:59:59.000Z');
 // Single-owner sessions. Store only the digest of the bearer token.
 class MobileSessions {
   constructor(store, auth, config) {
@@ -22,12 +23,9 @@ class MobileSessions {
     }
     return this.cachedStamp;
   }
-  prune() { this.store.db.prepare('DELETE FROM mobile_sessions WHERE expires_ms <= ?').run(Date.now()); }
   issue(device = 'Sofia App') {
-    this.prune();
-    this.store.db.exec('DELETE FROM mobile_sessions WHERE token_hash IN (SELECT token_hash FROM mobile_sessions ORDER BY created_ms DESC LIMIT -1 OFFSET 19)');
     const token = crypto.randomBytes(32).toString('base64url');
-    const expires = Date.now() + TTL;
+    const expires = SESSION_END;
     this.store.db.prepare('INSERT INTO mobile_sessions VALUES (?,?,?,?,?)')
       .run(sha(token), this.stamp(), String(device).slice(0, 80), Date.now(), expires);
     return { token, token_type: 'Bearer', expires_at: new Date(expires).toISOString() };
@@ -35,12 +33,12 @@ class MobileSessions {
   require(req) {
     const match = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(String(req.headers.authorization || ''));
     if (!match) throw new AppError('AUTH_REQUIRED', 'Entre com o e-mail e a senha da Sofia.', 401);
-    this.prune();
     const row = this.store.db.prepare('SELECT * FROM mobile_sessions WHERE token_hash=?').get(sha(match[1]));
     if (!row || row.credential_stamp !== this.stamp()) {
       if (row) this.revoke(row);
       throw new AppError('SESSION_EXPIRED', 'Sua sessão expirou. Entre novamente.', 401);
     }
+    if(row.expires_ms!==SESSION_END){this.store.db.prepare('UPDATE mobile_sessions SET expires_ms=? WHERE token_hash=?').run(SESSION_END,row.token_hash);row.expires_ms=SESSION_END;}
     return row;
   }
   revoke(session) { this.store.db.prepare('DELETE FROM mobile_sessions WHERE token_hash=?').run(session.token_hash); }

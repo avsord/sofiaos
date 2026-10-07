@@ -31,6 +31,7 @@ def scroll_to(label):
 def screenshot(name):
  r=tree();(out/(name+'.xml')).write_text(ET.tostring(r,encoding='unicode'));(out/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'));return r
 wait('Olá, Teste.');r=screenshot('home-500');text=ET.tostring(r,encoding='unicode');assert 'PERF_PASS' in text and 'PERF_FAIL' not in text,text
+wait('QA preload complete');print('PASS expired local session retained and Agenda/Apps requested before leaving Home',flush=True)
 pid=adb('shell','pidof','com.avsord.sofiaapp').strip()
 adb('shell','input','swipe','360','1200','360','450','400');time.sleep(.4)
 tap('Filtrar níveis das tarefas do Início');wait('Nível das tarefas');screenshot('home-task-filter');tap('Todas');time.sleep(.3)

@@ -52,9 +52,9 @@ test('mobile: logout revoga somente dispositivo atual', async t => {
   assert.equal((await f.request('/bootstrap', undefined, 'GET', a)).status, 401);
   assert.equal((await f.request('/bootstrap', undefined, 'GET', b)).status, 200);
 });
-test('mobile: troca de senha e expiração invalidam token', async t => {
+test('mobile: inatividade mantém token; troca de senha o invalida', async t => {
   const f = await setup(t), a = await f.login(); f.store.db.exec('UPDATE mobile_sessions SET expires_ms=0');
-  assert.equal((await f.request('/bootstrap', undefined, 'GET', a)).status, 401);
+  assert.equal((await f.request('/bootstrap', undefined, 'GET', a)).status, 200);
   const b = await f.login(); new OwnerAuth(f.config, f.store).setPassword('new-test-password-137');
   assert.equal((await f.request('/bootstrap', undefined, 'GET', b)).status, 401);
 });

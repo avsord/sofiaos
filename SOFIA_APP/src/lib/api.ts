@@ -1,4 +1,5 @@
 export type CalendarState={configured:boolean;connected:boolean;syncing?:boolean;last_sync?:string;error?:string;calendar_name?:string;calendar_id?:string;warnings?:string[];conflicts?:{id:string;reason:string}[];calendars?:{id:string;summary:string;accessRole:string}[]};
+import {StartupReads,preloadStartup} from './startup-preload';
 import {themeTimes} from './theme-schedule';
 import {agendaChanged} from './agenda-events';
 import {LegacyMdAdapter} from './legacy-md';
@@ -14,7 +15,7 @@ const secureOptions = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVIC
 export async function readAuth(): Promise<Auth | null> {
   const raw = await SecureStore.getItemAsync(AUTH_KEY);
   if (!raw) return null;
-  try { const a = JSON.parse(raw); if (typeof a.token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(a.token) || !Number.isFinite(Date.parse(a.expires_at)) || Date.parse(a.expires_at) <= Date.now() || !a.profile) { await forgetAuth(); return null; } return a as Auth; }
+  try { const a = JSON.parse(raw); if (typeof a.token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(a.token) || !Number.isFinite(Date.parse(a.expires_at)) || !a.profile) { await forgetAuth(); return null; } return a as Auth; }
   catch { await forgetAuth(); return null; }
 }
 export function saveAuth(auth: Auth) { return SecureStore.setItemAsync(AUTH_KEY, JSON.stringify(auth), secureOptions); }
@@ -29,9 +30,17 @@ export class ApiError extends Error {
 }
 export class SofiaApi {
   private readonly md:LegacyMdAdapter;
+  private readonly startupReads=new StartupReads();
+  private warming=false;
+  async preload(agenda:()=>Promise<unknown>){this.warming=true;try{await preloadStartup(this,agenda);}finally{this.warming=false;}}
   constructor(private token = '', private onExpired: () => void = () => {},scope='anonymous') {this.md=new LegacyMdAdapter(this.request.bind(this),AsyncStorage,scope);}
   get mdLocalOnly(){return this.md.localOnly;}
   private async request<T>(path: string, body?: unknown, method = body === undefined ? 'GET' : 'POST', timeout = 20000): Promise<T> {
+    if(method!=='GET'){this.startupReads.invalidate();return this.fetchRequest<T>(path,body,method,timeout);}
+    const read=()=>this.fetchRequest<T>(path,body,method,timeout);
+    return this.warming&&path!=='/bootstrap' ? this.startupReads.prime(path,read) : this.startupReads.read(path,read);
+  }
+  private async fetchRequest<T>(path:string,body:unknown,method:string,timeout:number):Promise<T>{
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), timeout);
     try {
       const response = await fetch(SITE + '/api/mobile' + path, { method, signal: controller.signal,
