@@ -2,6 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
 const root=path.resolve(__dirname,'..'),source=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
 const pager=fs.readFileSync(path.join(root,'src/components/TabPager.tsx'),'utf8');
+const menuMotion=fs.readFileSync(path.join(root,'src/lib/menu-motion.ts'),'utf8');
 const js=ts.transpileModule(fs.readFileSync(path.join(root,'src/lib/tab-navigation.ts'),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
 const exported={};vm.runInNewContext(js,{exports:exported});
 const {TAB_ORDER,tabAtOffset,createPagerSelection}=exported;
@@ -28,7 +29,8 @@ test('rapid taps use the latest selection, not a stale render closure',()=>{
 });
 test('tap selection has no timer, vertical translation, fade or animated jump',()=>{
   for(const token of ['PanResponder','Animated','Easing','transitioning','translateY','requestAnimationFrame','setTimeout'])assert.ok(!source.includes(token),token);
-  assert.ok(!pager.includes('animated:true'));assert.ok(pager.includes('animated:false'));assert.ok(!pager.includes('setTimeout'));
+  assert.ok(!pager.includes('animated:true'));assert.ok(pager.includes('animated:false'));assert.ok(!pager.includes('setTimeout'));assert.ok(!menuMotion.includes('Animated.spring('));
+  assert.ok(pager.indexOf('align();')<pager.indexOf('motion.select(next);'));
 });
 test('gestures use the native horizontal pager and do not steal vertical scrolls with JS responders',()=>{
   assert.match(pager,/horizontal pagingEnabled/);assert.ok(pager.includes('directionalLockEnabled nestedScrollEnabled'));
@@ -77,8 +79,8 @@ test('notifications are outside the swipe sequence without losing the underlying
 test('Android identity, discovery prefix and version stay compatible',()=>{
   const config=JSON.parse(fs.readFileSync(path.join(root,'app.json'))).expo,pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json')));
   const update=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');
-  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,27);
-  assert.equal(config.version,'0.3.22');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
+  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,28);
+  assert.equal(config.version,'0.3.23');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
 });
 test('Pages opens a preloaded entity synchronously without a network wait',()=>{
  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');
