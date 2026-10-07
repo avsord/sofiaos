@@ -25,6 +25,7 @@ import type {PageDrop} from '../lib/page-order';
 import {PageCreateMenu} from '../components/PageTemplatePicker';
 import {NativeCollectionBlock} from '../components/NativeCollectionBlock';
 import {freshTemplate,insertTemplateBlocks} from '../lib/page-templates';
+import {subscribeSystemChanged} from '../lib/system-events';
 import type {PageTemplate} from '../lib/page-templates';
 const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'null')??fallback;}catch{return fallback;}};
 
@@ -67,6 +68,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   onSaved:saved=>{mutationEpoch.current++;if(mounted.current)setPages(prev=>prev.map(p=>p.id===saved.id?{...saved,data:{...saved.data,...pendingPosition.current.get(saved.id)}}:p));}
  }),[api,key]);
  useEffect(()=>store.subscribe(()=>setTick(v=>v+1)),[store]);
+ useEffect(()=>subscribeSystemChanged(owner=>{if(owner===api)void load();}),[api,store]);
  async function load(manual=false){
   if(refreshFlight.current||moveBusy.current||(!manual&&pageInteractionRef.current))return;
   refreshFlight.current=true;const epoch=mutationEpoch.current;
