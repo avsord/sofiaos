@@ -116,7 +116,7 @@ last_y=int(re.findall(r'\d+',new.get('bounds'))[1]);assert last_y>int(re.findall
 screenshot('library-plus');tap('Fechar tipos da Biblioteca');tap('Tipo de registro');tap('Filme');time.sleep(2)
 tap('Filtros da Biblioteca');tap('Filtrar por estrelas');tap('★★★★★');tap('Ver registros');wait('Filme de Drama');r=screenshot('film-five-stars');assert find(r,'Filme de Acao') is None
 # Persist a rich note and reopen the same entity through Apps/Notas.
-tap('Voltar aos apps');tap('Notas');tap('Criar registro');tap('Criar Anotação');tap('Título da nota');adb('shell','input','text','NotaQA036')
+tap('Voltar aos apps');tap('Abrir Notas');tap('Criar registro');tap('Criar Anotação');tap('Título da nota');adb('shell','input','text','NotaQA036')
 tap('Conteúdo da nota');adb('shell','input','text','TextoQA036');tap('Negrito');adb('shell','input','text','Bold');tap('Fechar teclado');tap('Salvar');wait('NotaQA036');tap('NotaQA036');wait('Título da nota');wait('Conteúdo da nota');screenshot('rich-note-reopened');tap('Voltar das notas');tap('Início')
 # Capsules uses the same production widget, editor and scheduled native notifications.
 tap('Apps');tap('Cápsulas');wait('Tomei Capsula QA às 00:01');
