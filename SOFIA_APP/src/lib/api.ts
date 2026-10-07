@@ -2,6 +2,7 @@ export type CalendarState={configured:boolean;connected:boolean;syncing?:boolean
 import {StartupReads,preloadStartup} from './startup-preload';
 import {themeTimes} from './theme-schedule';
 import {agendaChanged} from './agenda-events';
+import {systemChanged} from './system-events';
 import {LegacyMdAdapter} from './legacy-md';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -76,8 +77,8 @@ export class SofiaApi {
   deleteMessage(id: string) { return this.request<{ok:boolean;id:string;conversation_id:string}>('/messages/' + encodeURIComponent(id), {}, 'DELETE'); }
   clearChatHistory() { return this.request<{ok:boolean;conversations:number;messages:number}>('/chat-history', {}, 'DELETE'); }
   history(id: string, before?: number) { return this.request<MessagePage>(`/conversations/${encodeURIComponent(id)}${before ? '?before=' + before : ''}`); }
-  chat(data: object) { return this.request<ChatResult>('/messages', data, 'POST', 180000); }
-  audio(data: object) { return this.request<ChatResult>('/messages/audio', data, 'POST', 180000); }
+  async chat(data: object) { const result=await this.request<ChatResult>('/messages', data, 'POST', 180000);systemChanged(this);return result; }
+  async audio(data: object) { const result=await this.request<ChatResult>('/messages/audio', data, 'POST', 180000);systemChanged(this);return result; }
   home() { return this.request<HomeData>('/home'); }
   movePage(input:{id:string;revision:number;parentId:string;kind:string;anchorId:string}) { return this.md.move(input); }
   allNotifications(offset=0) { return this.md.notices(offset); }
