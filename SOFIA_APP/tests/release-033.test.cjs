@@ -24,7 +24,7 @@ test('native keyboard resize and automatic momentum keep the latest reply visibl
  h.onScrollBeginDrag();const up={nativeEvent:{contentOffset:{y:2000},contentSize:{height:4000},layoutMeasurement:{height:700}}};h.onScroll(up);h.onScrollEndDrag(up);h.onMomentumScrollBegin();h.onMomentumScrollEnd(up);const count=commands.length;h.onContentSizeChange(400,5000);flush();assert.equal(commands.length,count);h.follow();flush();assert.equal(commands.at(-1),4300);
 });
 
-const {WorkspaceRecords}=load('src/lib/workspace-records.ts',{'react':{},'./chat-model':{errorText:e=>e.message}});
+const {WorkspaceRecords}=load('src/lib/workspace-records.ts',{'react':{},'./chat-model':{errorText:e=>e.message},'./system-events':{subscribeSystemChanged:()=>()=>{}}});
 test('module rows and confirmed empty state stay mounted during a slow refresh and reentry',async()=>{
  const cache=new WorkspaceRecords(),pending=[],api={entities:()=>new Promise(resolve=>pending.push(resolve))};
  assert.equal(cache.view('book','').loaded,false);const first=cache.load(api,'book','',()=>{});assert.equal(cache.view('book','').loaded,false);pending.shift()({items:[{id:'book1',title:'Livro'}]});await first;
