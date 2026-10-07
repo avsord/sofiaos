@@ -38,8 +38,8 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
   },[]);
   const goTo = useCallback((next: Tab) => {
     selection.current.select(next);
+    align(); // Dispatch the native jump before updating the six animated menu weights.
     motion.select(next);
-    align();
   },[align,motion]);
   useImperativeHandle(ref,() => ({goTo}),[goTo]);
   // The motion owner survives login/bootstrap; a fresh pager must not inherit its old tab.

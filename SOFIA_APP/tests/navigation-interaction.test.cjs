@@ -148,3 +148,11 @@ test('a 30dp slow drag changes menu but a fling never starts competing JS moment
 
 test('20dp slow drag is enough in both directions, while tiny drift does not switch menu',()=>{for(const d of [-20,20]){const p=pager();p.scroll.onScrollBeginDrag(end(400));p.scroll.onScrollEndDrag(end(400+d,0));assert.deepEqual(p.commands,[{x:d>0?800:0,y:0,animated:true}]);}for(const d of [-8,8]){const p=pager();p.scroll.onScrollBeginDrag(end(400));p.scroll.onScrollEndDrag(end(400+d,0));assert.equal(p.commands.length,0);}});
 test('snap interval follows viewport resize rather than retaining a stale pixel distance',()=>{const p=pager();p.measure(600);assert.equal(p.scroll.snapToInterval,600);});
+
+
+test('direct menu jump reaches native scroll before any highlight updates',()=>{
+ const motion=createMenuMotion(),original=motion.select;let p;
+ motion.select=tab=>{assert.equal(p.commands.at(-1).x,model.tabIndex(tab)*400);original(tab);};
+ p=pager({motion});for(const tab of ['profile','home','agenda','pages','apps','chat'])p.ref.current.goTo(tab);
+ assert.equal(p.commands.length,6);assert.ok(p.commands.every(c=>c.animated===false));
+});

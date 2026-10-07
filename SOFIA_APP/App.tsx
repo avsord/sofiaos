@@ -1,7 +1,7 @@
 import {preloadAgenda} from './src/lib/use-agenda-month';
 import {useCapsuleNotifications} from './src/lib/capsule-notifications';
 import {useAgendaNotifications} from './src/lib/agenda-notifications';
-import React,{Component,ErrorInfo,useCallback,useDeferredValue,useEffect,useMemo,useRef,useState} from 'react';
+import React,{Component,ErrorInfo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {View,Text,StatusBar,ActivityIndicator,AccessibilityInfo,useColorScheme,AppState,Alert,Keyboard,BackHandler,Linking,StyleSheet} from 'react-native';
 import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
 import {SofiaApi,readAuth,saveAuth,forgetAuth,readPrefs,savePrefs} from './src/lib/api';
@@ -40,7 +40,7 @@ function Shell(){
  const [agendaTarget,setAgendaTarget]=useState<{date:string;id?:string;create?:boolean;nonce:number}>({date:'',nonce:0});
  const tabHistory=useRef<Tab[]>([]),pager=useRef<TabPagerHandle>(null),navigation=useRef({tab,locked});
  navigation.current={tab,locked};
- const screenTab=useDeferredValue(tab);
+ const screenTab=tab;
  const menuMotion=useMemo(()=>createMenuMotion('home'),[]);
  useEffect(()=>{let mounted=true;void AccessibilityInfo.isReduceMotionEnabled().then(value=>{if(mounted)menuMotion.setReducedMotion(value);}).catch(()=>{});const sub=AccessibilityInfo.addEventListener('reduceMotionChanged',value=>menuMotion.setReducedMotion(value));return()=>{mounted=false;sub.remove();menuMotion.dispose();};},[menuMotion]);
  const [themeClock,setThemeClock]=useState(()=>new Date());
@@ -79,12 +79,13 @@ function Shell(){
  const switchTab=useCallback((next:Tab)=>{navigation.current.tab=next;pager.current?.goTo(next);setTab(next);},[]);
  const navigate=useCallback((next:Tab)=>{
   const current=navigation.current;
-  if(next==='apps'){setWorkspaceReset(v=>v+1);setWorkspaceDepth(false);}
-  if(next===current.tab)return;
+  if(next===current.tab){if(next==='apps'&&!current.locked){setWorkspaceReset(v=>v+1);setWorkspaceDepth(false);}return;}
   if(current.locked){pager.current?.goTo(current.tab);Alert.alert('Sua conversa','Pare a gravação ou aguarde a resposta antes de trocar de aba.');return;}
   tabHistory.current=[...tabHistory.current,current.tab].slice(-30);switchTab(next);
+  if(next==='apps'){setWorkspaceReset(v=>v+1);setWorkspaceDepth(false);}
  },[switchTab]);
  const [taskContext,setTaskContext]=useState<Task|null>(null);
+ const clearTaskContext=useCallback(()=>setTaskContext(null),[]);
  useEffect(()=>setTaskContext(null),[api]);
  const discussTask=useCallback((task:Task)=>{setTaskContext(task);navigate('chat');},[navigate]);
  const openAgenda=useCallback((date:string,id?:string,create=false)=>{setAgendaTarget({date,id,create,nonce:Date.now()});navigate('agenda');},[navigate]);
@@ -112,7 +113,7 @@ function Shell(){
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?0:1}]} pointerEvents={tab==='notifications'?'none':'auto'} accessibilityElementsHidden={tab==='notifications'} importantForAccessibility={tab==='notifications'?'no-hide-descendants':'auto'}>
   <TabPager motion={menuMotion} ref={pager} activeTab={tab} enabled={!gestureLocked&&!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)&&!(tab==='apps'&&workspaceDepth)} onSelect={navigate}>
    <Home onDiscussTask={discussTask} onOpenCapsules={openCapsules} onGestureLock={setGestureLocked} api={api} bootstrap={bootstrap} navigate={navigate} onOpenAgenda={openAgenda} active={screenTab==='home'}/>
-   <Chat taskContext={taskContext} onClearTaskContext={()=>setTaskContext(null)} key={'chat-'+chatEpoch} api={api} bootstrap={bootstrap} enterToSend={prefs.enterToSend} autoSendVoice={prefs.autoSendVoice} onLock={setLocked} active={screenTab==='chat'} onRefreshBootstrap={boot}/>
+   <Chat taskContext={taskContext} onClearTaskContext={clearTaskContext} key={'chat-'+chatEpoch} api={api} bootstrap={bootstrap} enterToSend={prefs.enterToSend} autoSendVoice={prefs.autoSendVoice} onLock={setLocked} active={screenTab==='chat'} onRefreshBootstrap={boot}/>
    <Pages key={bootstrap.profile.email} api={api} active={screenTab==='pages'} storageScope={bootstrap.profile.email} onDepthChange={setPagesDepth}/>
    <Agenda onGestureLock={setGestureLocked} api={api} target={agendaTarget} active={screenTab==='agenda'}/>
    <Workspace onDiscussTask={discussTask} openCapsulesKey={capsulesTarget} resetKey={workspaceReset} api={api} navigate={navigate} onDepthChange={setWorkspaceDepth} active={screenTab==='apps'}/>
