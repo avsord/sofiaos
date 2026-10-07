@@ -1,4 +1,4 @@
-import React,{useMemo,useState} from 'react';
+import React,{useMemo,useRef,useState} from 'react';
 import {Alert,Switch,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
 import type {PageBlock} from '../lib/page-editor';
 import {STATUS_COLORS,statusColorHex} from '../lib/page-templates';
@@ -28,10 +28,11 @@ function normalized(block:PageBlock):Data{
 function uniqueName(base:string,options:string[]){const clean=(base.trim()||'Nova coluna').slice(0,60);if(!options.includes(clean))return clean;let n=2;while(options.includes(clean+' '+n))n++;return clean+' '+n;}
 const alpha=(hex:string,a='22')=>hex.length===7?hex+a:hex;
 
-export function NativeCollectionBlock({block,onChange,onDelete}:{onDelete?:()=>void;block:PageBlock;onChange:(data:Record<string,any>,group?:string)=>void}){
+export function NativeCollectionBlock({block,onChange,onDelete,onInteractionChange}:{onDelete?:()=>void;onInteractionChange?:(active:boolean)=>void;block:PageBlock;onChange:(data:Record<string,any>,group?:string)=>void}){
  const c=useTheme(),d=useMemo(()=>normalized(block),[block]),active=d.views.find(v=>v.id===d.active_view)||d.views[0];
  const [statusEdit,setStatusEdit]=useState<{propKey:string;value:string|null;title:string;color:string}|null>(null);
- const [config,setConfig]=useState(false),[choose,setChoose]=useState<{row:Row;prop:Prop}|null>(null);
+ const [config,setConfig]=useState(false),[choose,setChoose]=useState<{row:Row;prop:Prop}|null>(null),[drag,setDrag]=useState<{rowId:string;origin:number;target:number;startX:number}|null>(null);
+ const dragRef=useRef<{rowId:string;origin:number;target:number;startX:number}|null>(null),boardScroll=useRef<ScrollView>(null);
  const commit=(next:Data,group='collection:'+block.id)=>onChange(next,group);
  const nameProp=d.properties.find(p=>p.key==='name')||d.properties[0];
  const addRow=(seed:Record<string,any>={})=>{const next=clone(d),values:Record<string,any>={};for(const p of next.properties)values[p.key]=p.type==='checkbox'?false:'';Object.assign(values,seed);next.rows.push({id:makeId(),values,page_content:''});commit(next);};
@@ -40,6 +41,10 @@ export function NativeCollectionBlock({block,onChange,onDelete}:{onDelete?:()=>v
  const updateDescription=(id:string,value:string)=>{const next=clone(d),row=next.rows.find(r=>r.id===id);if(!row)return;const prop=next.properties.find(p=>p.key==='description');if(prop)row.values[prop.key]=value;else row.page_content=value;commit(next,'collection-row:'+id+':description');};
  const descriptionInput=(row:Row)=><View style={{gap:4,marginTop:8}}><Text style={{color:c.muted,fontSize:11}}>Descrição</Text><TextInput accessibilityLabel={'Descrição de '+String(row.values[nameProp.key]||'nova tarefa')} multiline value={String(d.properties.some(p=>p.key==='description')?row.values.description||'':row.page_content||'')} onChangeText={v=>updateDescription(row.id,v)} placeholder="Adicionar descrição…" placeholderTextColor={c.muted} style={{minHeight:42,padding:0,color:c.text,fontSize:13,lineHeight:19,textAlignVertical:'top'}}/></View>;
  const removeRow=(id:string)=>Alert.alert('Excluir item?','Somente este item será removido desta coleção.',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{const next=clone(d);next.rows=next.rows.filter(r=>r.id!==id);commit(next);}}]);
+ const beginDrag=(rowId:string,origin:number,pageX:number)=>{const next={rowId,origin,target:origin,startX:pageX};dragRef.current=next;setDrag(next);onInteractionChange?.(true);};
+ const moveDrag=(pageX:number,columns:number)=>{const current=dragRef.current;if(!current)return;const dx=pageX-current.startX,shift=Math.abs(dx)<55?0:Math.sign(dx)*Math.max(1,Math.round(Math.abs(dx)/230)),target=Math.max(0,Math.min(columns-1,current.origin+shift));if(target===current.target)return;const next={...current,target};dragRef.current=next;setDrag(next);boardScroll.current?.scrollTo({x:Math.max(0,target*230-20),y:0,animated:true});};
+ const finishDrag=(group:Prop,options:string[])=>{const current=dragRef.current;dragRef.current=null;setDrag(null);onInteractionChange?.(false);if(!current||current.target===current.origin)return;const next=clone(d),row=next.rows.find(r=>r.id===current.rowId);if(!row)return;row.values[group.key]=options[current.target];commit(next,'collection-row:'+current.rowId+':'+group.key);};
+ const cancelDrag=()=>{dragRef.current=null;setDrag(null);onInteractionChange?.(false);};
  const editStatus=(prop:Prop,value:string|null)=>setStatusEdit({propKey:prop.key,value,title:value||'',color:value?(prop.option_colors?.[value]||'gray'):'gray'});
  const saveStatus=()=>{if(!statusEdit)return;const next=clone(d),prop=next.properties.find(p=>p.key===statusEdit.propKey);if(!prop)return;prop.options=prop.options||[];prop.option_colors=prop.option_colors||{};
    if(statusEdit.value===null){const name=uniqueName(statusEdit.title,prop.options);prop.options.push(name);prop.option_colors[name]=statusEdit.color;}
@@ -53,18 +58,22 @@ export function NativeCollectionBlock({block,onChange,onDelete}:{onDelete?:()=>v
  const fieldMove=(index:number,delta:number)=>{if(index+delta<0||index+delta>=d.properties.length)return;const next=clone(d);[next.properties[index],next.properties[index+delta]]=[next.properties[index+delta],next.properties[index]];commit(next);};
  const fieldRemove=(p:Prop)=>{const remove=()=>{const next=clone(d);next.properties=next.properties.filter(x=>x.key!==p.key);for(const row of next.rows)delete row.values[p.key];commit(next);};if(d.properties.length<2)return;const populated=d.rows.some(r=>r.values[p.key]!==''&&r.values[p.key]!=null);if(populated)Alert.alert('Excluir campo '+p.label+'?','Os valores deste campo também serão apagados.',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:remove}]);else remove();};
  const board=()=>{
-  const group=d.properties.find(p=>p.key===active?.group_by)||d.properties.find(p=>p.type==='select');if(!group)return <Text style={{color:c.muted,fontSize:12}}>Adicione um campo de status para usar o quadro.</Text>;
-  return <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:10,paddingVertical:4,paddingRight:16}}>
-   {(group.options||[]).map(option=>{const colorId=group.option_colors?.[option]||'gray',hex=statusColorHex(colorId),rows=d.rows.filter(r=>String(r.values[group.key]||'')===option);
-    return <View key={option} style={{width:220,padding:8,borderRadius:12,backgroundColor:alpha(hex,'12')}}>
+  const group=d.properties.find(p=>p.key===active?.group_by)||d.properties.find(p=>p.type==='select');if(!group)return <Text style={{color:c.muted,fontSize:12}}>Adicione um campo de status para usar o Kanban.</Text>;
+  const options=group.options||[];
+  return <ScrollView ref={boardScroll} horizontal nestedScrollEnabled directionalLockEnabled scrollEnabled={!drag} keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:10,paddingVertical:4,paddingRight:16}}>
+   {options.map((option,columnIndex)=>{const colorId=group.option_colors?.[option]||'gray',hex=statusColorHex(colorId),rows=d.rows.filter(r=>String(r.values[group.key]||'')===option),targeted=drag?.target===columnIndex;
+    return <View key={option} style={{width:220,padding:8,borderRadius:12,backgroundColor:alpha(hex,targeted?'28':'12'),borderWidth:targeted?2:0,borderColor:targeted?hex:'transparent'}}>
      <Pressable accessibilityRole="button" accessibilityLabel={'Configurar coluna '+option} onPress={()=>editStatus(group,option)} style={{flexDirection:'row',alignItems:'center',gap:7,paddingBottom:7}}>
       <View style={{width:9,height:9,borderRadius:9,backgroundColor:hex}}/><Text numberOfLines={1} style={{flex:1,color:c.text,fontSize:12,fontWeight:'700'}}>{option}</Text><Text style={{color:c.muted,fontSize:11}}>{rows.length}</Text><Text style={{color:c.muted}}>•••</Text>
      </Pressable>
-     {rows.map(row=><View key={row.id} style={{marginBottom:6,padding:9,borderRadius:9,backgroundColor:c.surface,borderWidth:1,borderColor:c.line}}>
-      <TextInput accessibilityLabel="Título do item" value={String(row.values[nameProp.key]||'')} onChangeText={v=>updateRow(row.id,nameProp.key,v)} placeholder="Nova tarefa" placeholderTextColor={c.muted} style={{color:c.text,fontSize:13,padding:0,minHeight:28}}/>
+     {rows.map(row=>{const dragging=drag?.rowId===row.id;const dragProps={onLongPress:(e:any)=>{e.stopPropagation?.();beginDrag(row.id,columnIndex,e.nativeEvent.pageX);},onTouchMove:(e:any)=>{if(dragRef.current?.rowId===row.id)moveDrag(e.nativeEvent.pageX,options.length);},onTouchEnd:()=>{if(dragRef.current?.rowId===row.id)finishDrag(group,options);},onTouchCancel:()=>{if(dragRef.current?.rowId===row.id)cancelDrag();}};return <Pressable key={row.id} accessible={false} delayLongPress={180} {...dragProps} style={{marginBottom:6,padding:9,borderRadius:9,backgroundColor:c.surface,borderWidth:dragging?2:1,borderColor:dragging?c.accent:c.line,opacity:dragging?0.82:1}}>
+      <TextInput editable={!dragging} accessibilityLabel="Título do item" value={String(row.values[nameProp.key]||'')} onChangeText={v=>updateRow(row.id,nameProp.key,v)} placeholder="Nova tarefa" placeholderTextColor={c.muted} style={{color:c.text,fontSize:13,padding:0,minHeight:28}}/>
       {descriptionInput(row)}
-      <Pressable onPress={()=>removeRow(row.id)} accessibilityLabel="Excluir item" style={{alignSelf:'flex-end',paddingTop:4}}><Text style={{fontSize:10,color:c.muted}}>Excluir</Text></Pressable>
-     </View>)}
+      <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8}}>
+       <Pressable delayLongPress={180} accessibilityLabel={'Mover '+String(row.values[nameProp.key]||'tarefa')+' para outra coluna'} {...dragProps} style={{flex:1,minHeight:38,justifyContent:'center'}}><Text style={{fontSize:10,color:dragging?c.accent:c.muted}}>{dragging?'↔ Arraste para a coluna':'↔ Segure e arraste'}</Text></Pressable>
+       <Pressable disabled={dragging} onPress={()=>removeRow(row.id)} accessibilityLabel="Excluir item" style={{padding:10}}><Text style={{fontSize:10,color:c.muted}}>Excluir</Text></Pressable>
+      </View>
+     </Pressable>;})}
      <Pressable accessibilityLabel={"Nova tarefa em "+option} onPress={()=>addRow({[group.key]:option})} style={{padding:8}}><Text style={{color:c.muted,fontSize:12}}>＋ Nova tarefa</Text></Pressable>
     </View>;
    })}
@@ -87,7 +96,7 @@ export function NativeCollectionBlock({block,onChange,onDelete}:{onDelete?:()=>v
   </View></ScrollView>;
  };
  if(d.mode==='notebooks'||active?.type==='pages')return <NotebookBlock data={d} onChange={onChange} onDelete={onDelete}/>;
- return <Pressable accessible={false} onLongPress={onDelete} delayLongPress={400} style={{marginVertical:5}}>
+ return <Pressable accessible={false} onLongPress={drag?undefined:onDelete} delayLongPress={400} style={{marginVertical:5}}>
   {d.show_title&&d.title?<Text style={{fontSize:15,fontWeight:'700',color:c.text,marginBottom:7}}>{d.title}</Text>:null}
   <View style={{flexDirection:'row',alignItems:'center',gap:6,marginBottom:8}}>
    {d.views.map(v=><Pressable key={v.id} onPress={()=>{const next=clone(d);next.active_view=v.id;commit(next);}} style={{paddingVertical:6,paddingHorizontal:10,borderRadius:8,backgroundColor:v.id===active?.id?c.input:'transparent'}}><Text style={{fontSize:11,color:v.id===active?.id?c.text:c.muted}}>{v.label}</Text></Pressable>)}
