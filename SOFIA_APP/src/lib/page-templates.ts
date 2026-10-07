@@ -20,14 +20,14 @@ export const statusColorHex=(id:string)=>STATUS_COLORS.find(x=>x.id===id)?.hex||
 
 export const PAGE_TEMPLATES:PageTemplate[]=[
  {
-  id:'tasks_personal',title:'Quadro de tarefas',description:'Quadro de tarefas com status editáveis.',icon:'✅',
+  id:'tasks_personal',title:'Kanban',description:'Quadro Kanban com colunas editáveis e cartões arrastáveis.',icon:'▦',
   blocks:[block('collection','',{
    title:'',show_title:false,
    properties:[
     {key:'name',label:'Nome',type:'text',options:[]},
     {key:'status',label:'Status',type:'select',options:['Não iniciada','Prioridade'],option_colors:{'Não iniciada':'gray','Prioridade':'red'}}
    ],
-   views:[{id:'board',label:'Quadro',type:'board',group_by:'status',filter_key:'',filter_value:'',sort_by:'',sort_dir:'desc'}],
+   views:[{id:'board',label:'Kanban',type:'board',group_by:'status',filter_key:'',filter_value:'',sort_by:'',sort_dir:'desc'}],
    active_view:'board',rows:[]
   })]
  },
