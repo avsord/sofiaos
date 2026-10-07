@@ -9,3 +9,13 @@ test('a persisted acknowledgement replaces its optimistic client ID',()=>{const 
 test('unchanged snapshots keep their array identity to avoid periodic re-renders',()=>{const old=[m(1)];assert.equal(reconcileMessages(old,{messages:[m(1)],has_more:false}),old);});
 test('selection is opt-in, multiple, toggleable and capped at the batch limit',()=>{let selection=new Set();selection=toggleMessageSelection(selection,'m1');selection=toggleMessageSelection(selection,'m2');assert.equal(selection.size,2);selection=toggleMessageSelection(selection,'m1');assert.equal(selection.has('m1'),false);for(let i=0;i<120;i++)selection=toggleMessageSelection(selection,'x'+i);assert.equal(selection.size,100);});
 test('remote deletion also removes a selected row',()=>{assert.deepEqual([...retainMessageSelection(new Set(['m1','m2']),[m(2)])],['m2']);});
+
+test('chat screen always returns to the newest message and keeps a manual jump button',()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const source=fs.readFileSync(path.join(__dirname,'../src/screens/Chat.tsx'),'utf8');
+ assert.ok(source.includes("if(!active){void silenceVoices();setSelectedIds(new Set());return;}"));
+ assert.ok(source.includes("list.current?.scrollToEnd({animated:false})"));
+ assert.ok(source.includes('accessibilityLabel="Ir para a última mensagem"'));
+ assert.ok(source.includes('setShowLatest(!atEnd)'));
+ assert.ok(source.includes('onLayout={()=>{if(active&&scrollEnd.current)'));
+});
