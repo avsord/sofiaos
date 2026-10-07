@@ -77,8 +77,8 @@ test('notifications are outside the swipe sequence without losing the underlying
 test('Android identity, discovery prefix and version stay compatible',()=>{
   const config=JSON.parse(fs.readFileSync(path.join(root,'app.json'))).expo,pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json')));
   const update=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');
-  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,52);
-  assert.equal(config.version,'0.3.47');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
+  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,53);
+  assert.equal(config.version,'0.3.48');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
 });
 test('Pages opens a preloaded entity synchronously without a network wait',()=>{
  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');
@@ -87,14 +87,14 @@ test('Pages opens a preloaded entity synchronously without a network wait',()=>{
  assert.ok(fn.includes('setSelectedId(page.id)'));assert.ok(!fn.includes('await '));assert.ok(!fn.includes('api.entity('));
 });
 
-test('an open page owns horizontal back gesture before the main menu pager',()=>{
+test('an open page disables the outer pager and uses Android Back without a custom page swipe',()=>{
  assert.ok(source.includes("[pagesDepth,setPagesDepth]=useState(false)"));
  assert.ok(source.includes("tab==='pages'&&pagesDepth"));
  assert.ok(source.includes('onDepthChange={setPagesDepth}'));
  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');
- assert.ok(pages.includes('PanResponder.create'));
- assert.ok(pages.includes('translateX:backX'));
- assert.ok(pages.includes('shouldBeginPageBack(g,'));
+ assert.ok(!pages.includes('PanResponder.create'));assert.ok(pages.includes("BackHandler.addEventListener('hardwareBackPress'"));
+ assert.ok(!pages.includes('translateX:backX'));
+ assert.ok(!pages.includes('pageBackResponder.panHandlers'));
 });
 
 test('chat responses trigger immediate refreshes across synchronized app caches',()=>{

@@ -36,7 +36,7 @@ export const PAGE_TEMPLATES:PageTemplate[]=[
   blocks:[block('collection','',{title:'Notas',show_title:true,mode:'notebooks',notebooks:[],properties:[{key:'name',label:'Nome',type:'text'}],views:[{id:'notebooks',label:'Notas',type:'pages'}],active_view:'notebooks',rows:[]})]
  },
  {
-  id:'playlist_links',title:'Coleção',description:'Campos livres para organizar o que você quiser.',icon:'🔗',
+  id:'playlist_links',title:'Formulário',description:'Campos livres para organizar o que você quiser.',icon:'📋',
   blocks:[
    block('collection','',{
     title:'',show_title:false,
@@ -46,7 +46,7 @@ export const PAGE_TEMPLATES:PageTemplate[]=[
      {key:'description',label:'Descrição',type:'text',placeholder:'Adicionar…'},
      {key:'created',label:'Criado em',type:'date',options:[]}
     ],
-    views:[{id:'links',label:'Coleção',type:'table',group_by:'',filter_key:'',filter_value:'',sort_by:'created',sort_dir:'desc'}],
+    views:[{id:'links',label:'Formulário',type:'table',group_by:'',filter_key:'',filter_value:'',sort_by:'created',sort_dir:'desc'}],
     active_view:'links',rows:[]
    })
   ]

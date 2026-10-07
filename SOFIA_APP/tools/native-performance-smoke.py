@@ -102,7 +102,7 @@ wait('Sofia');screenshot('short-menu-swipe');tap('Início');wait('Olá, Teste.')
 tap('Conversa');tap('Mensagem para a Sofia');adb('shell','input','text','Teste%srolagem');tap('Enviar mensagem');time.sleep(1.5);wait('FIM DA RESPOSTA QA');time.sleep(3);wait('FIM DA RESPOSTA QA');screenshot('chat-growing-reply');adb('shell','input','keyevent','BACK');time.sleep(.4)
 for _ in range(4):adb('shell','input','swipe','360','430','360','1120','300');time.sleep(.2)
 wait('Descer para a última mensagem');screenshot('chat-jump-button');tap('Descer para a última mensagem');time.sleep(1);wait('FIM DA RESPOSTA QA');screenshot('chat-jump-bottom');tap('Início');wait('Olá, Teste.')
-tap('Notificações: 2 não lidas');time.sleep(.35);screenshot('bell-origin');tap('Fechar notificações')
+tap('notification-bell');time.sleep(.35);screenshot('bell-origin');tap('Fechar notificações')
 
 for i in range(3):
  tap('Agenda');wait('Sua agenda');tap('Próximo mês');tap('Mês anterior');screenshot('agenda-'+str(i));tap('Início');wait('Olá, Teste.')
@@ -167,6 +167,28 @@ created=json.loads(next(n.get('content-desc')[23:] for n in tree().iter('node') 
 node=wait('agenda-day-'+day);x,y,z,w=map(int,re.findall(r'\d+',node.get('bounds')));adb('shell','input','swipe',str((x+z)//2),str((y+w)//2),str((x+z)//2),str((y+w)//2),'800');wait('Criar · Compromisso');tap('Fechar editor');assert wait('menu-home').get('selected')=='true','Closing Home commitment navigated away from Home';wait('Olá, Teste.')
 print('PASS Home date hold saves correct date and priority in place; cancel stays on Home',flush=True)
 print('PASS task rich description and selected context, chat jump, entry-path page back, Home date hold and Agenda priority',flush=True)
+# 048: native pointer-down menu dispatch is present for the real six-menu shell.
+menu_logs=adb('logcat','-d','-s','SofiaMenu:I').decode(errors='replace')
+assert 'TOUCH_DOWN index=' in menu_logs, 'Native menu touch-down path was not exercised'
+(out/'native-menu-dispatch.txt').write_text(menu_logs)
+# Last message has native offset zero, before and after re-entering the conversation.
+tap('Conversa');tap('Mensagem para a Sofia');adb('shell','input','text','Verificar%srolagem%sinicial');tap('Enviar mensagem');time.sleep(2)
+wait('FIM DA RESPOSTA QA');dismiss_keyboard();tap('Início');tap('Conversa');wait('FIM DA RESPOSTA QA')
+screenshot('chat-tail-on-entry');tap('Páginas');tap('Criar página');tap('Usar template de conteúdo');wait('Aplicar template Formulário');tap('Aplicar template Kanban');wait('Título da página')
+tap('Nova tarefa em Não iniciada');wait('Título do cartão');tap('Título do cartão');adb('shell','input','text','CartaoQA048');dismiss_keyboard();tap('Fechar cartão');wait('Cartão CartaoQA048')
+# Move by actual long-press + motion events; ordinary horizontal movement must not leave the page.
+node=wait('Cartão CartaoQA048');x,y,z,w=map(int,re.findall(r'\d+',node.get('bounds')));sx=(x+z)//2;sy=(y+w)//2
+adb('shell','input','touchscreen','motionevent','DOWN',str(sx),str(sy));time.sleep(.35)
+for dx in range(20,341,20):
+ adb('shell','input','touchscreen','motionevent','MOVE',str(min(685,sx+dx)),str(sy));time.sleep(.04)
+time.sleep(.4);adb('shell','input','touchscreen','motionevent','UP',str(min(685,sx+340)),str(sy));time.sleep(.6)
+wait('Título da página');tap('Cartão CartaoQA048');wait('Coluna');wait('Prioridade');screenshot('kanban-drag-persisted');tap('Fechar cartão')
+adb('shell','input','swipe','460','800','150','800','350');wait('Título da página');adb('shell','input','keyevent','BACK');wait('Criar página')
+print('PASS 048 native menu dispatch, chat tail, Formulário and measured Kanban drag without page-back',flush=True)
+tap('Início');wait('Olá, Teste.');time.sleep(1)
+adb('shell','am','force-stop','com.avsord.sofiaapp');adb('shell','am','start','-W','-n','com.avsord.sofiaapp/.MainActivity');wait('Olá, Teste.')
+cache_logs=adb('logcat','-d','-s','ReactNativeJS:I').decode(errors='replace');assert 'SOFIA_STARTUP_CACHE_READY' in cache_logs,'Encrypted startup snapshot did not restore'
+screenshot('warm-start-from-encrypted-cache');print('PASS 048 encrypted account snapshot restored on process restart',flush=True)
 logs=adb('logcat','-d').decode(errors='replace');(out/'native-log.txt').write_text(logs);assert 'FATAL EXCEPTION' not in logs;assert 'CALENDAR_PERF' in logs
 (out/'result.json').write_text(json.dumps({'passed':True,'events':500,'passes':10,'native_hermes_budget_ms':1000,'menu_roundtrips':3,'appointment_edges_isolated':True,'moderate_pull_ignored':True,'deliberate_pull_refreshes':True,'root_system_back_inert':True,'capsules_daily_widget_and_history':True}))
 print('PASS native calendar performance, 500 events, existing update signature and navigation')

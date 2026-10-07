@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {PAGE_TEMPLATES,STATUS_COLORS}=load('src/lib/page-templates.ts');
 test('exactly the three official page templates are exposed',()=>{
  assert.equal(Array.from(PAGE_TEMPLATES,x=>x.id).join('|'),'tasks_personal|notes_hub|playlist_links');
- assert.equal(Array.from(PAGE_TEMPLATES,x=>x.title).join('|'),'Kanban|Notas|Coleção');
+ assert.equal(Array.from(PAGE_TEMPLATES,x=>x.title).join('|'),'Kanban|Notas|Formulário');
 });
 test('tasks template has editable status columns with colors',()=>{
  const t=PAGE_TEMPLATES[0],collection=t.blocks.find(x=>x.type==='collection');
@@ -25,7 +25,7 @@ test('Pages + offers blank/template and renders collection blocks in the app',()
  const collection=fs.readFileSync(path.join(__dirname,'../src/components/NativeCollectionBlock.tsx'),'utf8');
  assert.ok(src.includes('PageCreateMenu'));assert.ok(!src.includes('template_id:'));assert.ok(src.includes("title:'Sem título'"));assert.ok(src.includes("icon:'',icon_mode:'default'"));assert.ok(src.includes("blocks_json:preset?JSON.stringify(preset.blocks):'[]'"));assert.ok(src.includes("applyTemplate(template:PageTemplate)"));assert.ok(src.includes("<NativeCollectionBlock"));
  assert.ok(picker.includes('＋ Página em branco'));assert.ok(picker.includes('▦ Usar template'));
- assert.ok(collection.includes('Duplicar coluna'));assert.ok(collection.includes('＋ Coluna'));assert.ok(collection.includes('Cor'));
+ assert.ok(collection.includes('Duplicar coluna'));assert.ok(fs.readFileSync(path.join(__dirname,'../src/components/KanbanBoard.tsx'),'utf8').includes('＋ Coluna'));assert.ok(collection.includes('Cor'));
 });
 
 test('stationary long press exposes a named delete action without reparenting',()=>{
@@ -35,11 +35,10 @@ test('stationary long press exposes a named delete action without reparenting',(
  assert.ok(tree.includes('if(cancelled)return;'));
 });
 
-test('page back swipe reveals the actual previous page instead of the pages list',()=>{
+test('page editor has no hidden back swipe or costly previous-page backdrop',()=>{
  const src=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
- assert.ok(src.includes('const previousBackdrop=previousEntry&&previousPage'));
- assert.ok(src.includes('{previousBackdrop}'));
- assert.ok(!src.includes("return <View style={{flex:1,backgroundColor:c.bg}} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>\n  {listView}\n  <Animated.View"));
+ assert.ok(!src.includes('previousBackdrop'));assert.ok(!src.includes('pageBackResponder'));
+ assert.ok(src.includes("BackHandler.addEventListener('hardwareBackPress'"));
 });
 
 test('page row drag disables the outer menu pager while active',()=>{
@@ -63,16 +62,16 @@ test('MD8: insertion retains written content and replaces only the untouched gui
  assert.equal(insertTemplateBlocks([{id:'guide',type:'text',text:''}],incoming).length,1);
 });
 
-test('Kanban owns horizontal scrolling and long-press card moves between columns',()=>{
+test('Kanban owns measured drag, supports reordering and cannot navigate out of a page',()=>{
  const pages=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
+ const board=fs.readFileSync(path.join(__dirname,'../src/components/KanbanBoard.tsx'),'utf8');
  const collection=fs.readFileSync(path.join(__dirname,'../src/components/NativeCollectionBlock.tsx'),'utf8');
- assert.ok(collection.includes('horizontal nestedScrollEnabled directionalLockEnabled'));
- assert.ok(collection.includes('scrollEnabled={!drag}'));
- assert.ok(collection.includes('delayLongPress={180}'));
- assert.ok(collection.includes("row.values[group.key]=options[current.target]"));
- assert.ok(collection.includes('onInteractionChange?.(true)'));
- assert.ok(pages.includes('onInteractionChange={changePageInteraction}'));
- assert.ok(pages.includes("g.dx>width*.42||g.vx>1.1"));
+ assert.ok(board.includes('horizontal nestedScrollEnabled directionalLockEnabled'));
+ assert.ok(board.includes('scrollEnabled={!drag}'));assert.ok(board.includes('delayLongPress={180}'));
+ assert.ok(board.includes('measureInWindow'));assert.ok(board.includes('columnAt('));assert.ok(board.includes('edgeSpeed('));
+ assert.ok(collection.includes('moveKanbanRow(next.rows,id,group.key,column,before)'));
+ assert.ok(collection.includes('onInteractionChange={onInteractionChange}'));
+ assert.ok(!pages.includes('pageBackResponder'));assert.ok(pages.includes('enabled={!pageDragging&&!kanbanInteractionRef.current}'));
 });
 test('page cover picker recovers Android pending results instead of losing the chosen photo',()=>{
  const appearance=fs.readFileSync(path.join(__dirname,'../src/components/PageAppearance.tsx'),'utf8');

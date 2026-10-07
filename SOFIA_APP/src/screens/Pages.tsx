@@ -1,9 +1,9 @@
 import {KeyboardViewport} from '../components/KeyboardViewport';
 import {KeyboardToolbar} from '../components/KeyboardToolbar';
-import {MOTION_EASE,useKeyboardVisible,useReducedMotion} from '../lib/motion';
+import {useKeyboardVisible} from '../lib/motion';
 import {legacyMovePlan} from '../lib/legacy-md';
 import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
-import {View,Text,ScrollView,TextInput,Pressable,Switch,Alert,RefreshControl,BackHandler,AppState,Keyboard,Image,Animated,PanResponder,Dimensions} from 'react-native';
+import {View,Text,ScrollView,TextInput,Pressable,Switch,Alert,RefreshControl,BackHandler,AppState,Keyboard,Image} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {SofiaApi,SITE} from '../lib/api';
 import type {Entity} from '../lib/types';
@@ -15,7 +15,7 @@ import {pageBodyIsEmpty,pageBlockHint,pageTitleHint} from '../lib/page-hints';
 import {Empty,ErrorBanner,IconButton,ScreenTitle} from '../components/UI';
 import {PageRefreshGuard} from '../lib/page-gesture';
 import {mergeRemotePages} from '../lib/page-sync';
-import {entryBackTarget,shouldBeginPageBack} from '../lib/page-navigation';
+import {entryBackTarget} from '../lib/page-navigation';
 import {Icon} from '../components/Icon';
 import {PageCover,PageAppearance,PAGE_COVERS} from '../components/PageAppearance';
 import {PageTreeList} from '../components/PageTreeList';
@@ -30,38 +30,23 @@ import type {PageTemplate} from '../lib/page-templates';
 const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'null')??fallback;}catch{return fallback;}};
 
 export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;active:boolean;storageScope:string;onDepthChange?:(open:boolean)=>void}){
- const keyboardVisible=useKeyboardVisible(),reduced=useReducedMotion(),reducedRef=useRef(reduced);reducedRef.current=reduced;
- const backCommitted=useRef(false),scrollPositions=useRef(new Map<string,number>());
+ const keyboardVisible=useKeyboardVisible(),scrollPositions=useRef(new Map<string,number>());
  const c=useTheme(),[pages,setPages]=useState<Entity[]>([]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>()),[pageInteraction,setPageInteraction]=useState(false),[pageDragging,setPageDragging]=useState(false);
  const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null),[createParent,setCreateParent]=useState<Entity|null|undefined>(undefined);
  const refreshFlight=useRef(false),mutationEpoch=useRef(0),moveBusy=useRef(false),pendingPosition=useRef(new Map<string,Record<string,any>>());
  const history=useRef<string[]>([]),mounted=useRef(true),expandDisk=useRef(Promise.resolve()),inputRefs=useRef(new Map<string,TextInput>());
- const backX=useRef(new Animated.Value(0)).current,selectedRef=useRef<string|null>(null),paneWidth=useRef(0),backAction=useRef<()=>void>(()=>{});
- const pageInteractionRef=useRef(false),refreshGuard=useRef(new PageRefreshGuard());
+ const selectedRef=useRef<string|null>(null),paneWidth=useRef(0),backAction=useRef<()=>void>(()=>{});
+ const pageInteractionRef=useRef(false),kanbanInteractionRef=useRef(false),refreshGuard=useRef(new PageRefreshGuard());
  function changePageInteraction(value:boolean){
   pageInteractionRef.current=value;refreshGuard.current.setActive(value);
   // RefreshControl is a composite component: its ref has no setNativeProps.
   // The synchronous guard rejects queued refresh callbacks; enabled controls native UI.
   setPageInteraction(value);onDepthChange?.(!!selectedRef.current||value);
  }
- function endPageTouch(){if(!pageInteractionRef.current)return;changePageInteraction(false);setPageDragging(false);}
+ function changeKanbanInteraction(value:boolean){kanbanInteractionRef.current=value;changePageInteraction(value);}
+ function endPageTouch(){if(kanbanInteractionRef.current||!pageInteractionRef.current)return;changePageInteraction(false);setPageDragging(false);}
  function refreshPages(){if(refreshGuard.current.canRefresh()&&!selectedRef.current)void load(true);}
  selectedRef.current=selectedId;
- const editingRef=useRef(false);editingRef.current=!!focus;
- const pageBackResponder=useMemo(()=>PanResponder.create({
-  onMoveShouldSetPanResponder:(_e,g)=>!!selectedRef.current&&!backCommitted.current&&shouldBeginPageBack(g,paneWidth.current||Dimensions.get('window').width,Dimensions.get('window').width,editingRef.current,pageInteractionRef.current),
-  onMoveShouldSetPanResponderCapture:(_e,g)=>!!selectedRef.current&&!backCommitted.current&&shouldBeginPageBack(g,paneWidth.current||Dimensions.get('window').width,Dimensions.get('window').width,editingRef.current,pageInteractionRef.current),
-  onPanResponderGrant:()=>backX.stopAnimation(),
-  onPanResponderMove:(_e,g)=>backX.setValue(Math.max(0,Math.min(paneWidth.current||420,g.dx))),
-  onPanResponderRelease:(_e,g)=>{
-   const width=paneWidth.current||420,leave=g.dx>width*.42||g.vx>1.1;
-   if(leave){backCommitted.current=true;Animated.timing(backX,{toValue:width,duration:reducedRef.current?0:200,easing:MOTION_EASE,useNativeDriver:true}).start(({finished})=>{if(finished)backAction.current();else backCommitted.current=false;});}
-   else Animated.spring(backX,{toValue:0,useNativeDriver:true,stiffness:300,damping:32,mass:.9,overshootClamping:true}).start();
-  },
-  onPanResponderTerminate:()=>Animated.spring(backX,{toValue:0,useNativeDriver:true,stiffness:300,damping:32,mass:.9,overshootClamping:true}).start(),
-  onPanResponderTerminationRequest:()=>false,
-  onShouldBlockNativeResponder:()=>true
- }),[backX]);
  const key='sofia.native.pages.v1:'+encodeURIComponent(SITE+'|'+storageScope);
  const store=useMemo(()=>new PageEditorStore({save:patch=>api.saveEntity(patch),read:id=>api.entity(id),
   persist:items=>items.length?AsyncStorage.setItem(key+':drafts',JSON.stringify(items)):AsyncStorage.removeItem(key+':drafts'),
@@ -99,9 +84,8 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   const keyboard=Keyboard.addListener('keyboardDidHide',()=>setFocus(null));
   return()=>{alive=false;mounted.current=false;state.remove();keyboard.remove();void store.flushAll().finally(()=>store.dispose());};
  },[store,key]);
- useEffect(()=>{if(!active){endPageTouch();setFocus(null);void store.flushAll();}},[active,store]);
- useLayoutEffect(()=>{backX.stopAnimation();backX.setValue(0);backCommitted.current=false;},[selectedId,backX]);
- useEffect(()=>{onDepthChange?.(!!selectedId||pageInteraction);},[selectedId,pageInteraction,onDepthChange,backX]);
+ useEffect(()=>{if(!active){kanbanInteractionRef.current=false;endPageTouch();setFocus(null);void store.flushAll();}},[active,store]);
+ useEffect(()=>{onDepthChange?.(!!selectedId||pageInteraction);},[selectedId,pageInteraction,onDepthChange]);
  useEffect(()=>()=>onDepthChange?.(false),[onDepthChange]);
  const displayPages=useMemo(()=>pages.map(p=>{const e=store.get(p.id);return e?{...p,title:e.draft.title.trim()||'Sem título',data:{...p.data,...e.draft.appearance}}:p;}),[pages,store,tick]);
  const byId=useMemo(()=>new Map(displayPages.map(p=>[p.id,p])),[displayPages]);
@@ -163,7 +147,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  function blockView(b:PageBlock,i:number,preview=false,bodyGuide=showBodyGuide,blockFocus=focus){
   if(b.type==='divider')return <Pressable key={b.id} accessibilityLabel="Divisor" onLongPress={()=>confirmRemoveBlock(b)} style={{paddingVertical:14}}><View style={{height:1,backgroundColor:c.line}}/></Pressable>;
   if(b.type==='image'&&b.data?.attachment_id)return <Pressable key={b.id} accessible={false} onLongPress={()=>confirmRemoveBlock(b)} style={{marginVertical:8}}><Image source={api.attachmentSource(String(b.data.attachment_id))} style={{width:'100%',height:210,borderRadius:8}} resizeMode="contain"/>{b.data.caption?<Text style={{color:c.muted,fontSize:12}}>{String(b.data.caption)}</Text>:null}</Pressable>;
-  if(b.type==='collection')return <NativeCollectionBlock key={b.id} block={b} onChange={(data,group)=>updateBlock(b,{data},group)} onDelete={()=>confirmRemoveBlock(b)} onInteractionChange={changePageInteraction}/>;
+  if(b.type==='collection')return <NativeCollectionBlock key={b.id} block={b} onChange={(data,group)=>updateBlock(b,{data},group)} onDelete={()=>confirmRemoveBlock(b)} onInteractionChange={changeKanbanInteraction}/>;
   if(['image','file','table','bookmark'].includes(b.type))return <Pressable key={b.id} accessible={false} onLongPress={()=>confirmRemoveBlock(b)} style={{padding:12,borderRadius:8,backgroundColor:c.input,marginVertical:5}}><Text style={{color:c.text,fontSize:13}}>{b.text||({table:'Tabela',image:'Imagem',file:'Arquivo',bookmark:'Link'} as Record<string,string>)[b.type]}</Text><Text style={{color:c.muted,fontSize:11,marginTop:4}}>Bloco preservado; edição completa no site.</Text></Pressable>;
   const heading=b.type==='heading1'?30:b.type==='heading2'?24:b.type==='heading3'?20:16;
   const prefix=b.type==='bullet'?'• ':b.type==='number'?String(i+1)+'. ':b.type==='quote'?'│ ':b.type==='callout'?'💡 ':'';
@@ -177,7 +161,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  function documentContent(selected:Entity,draft:PageDraft,preview=false){
   const hasCover=!!draft.appearance.cover_type,subpages=children.get(selected.id)||[];
   const emptyBody=pageBodyIsEmpty(draft.blocks),hasSubpageContent=!!subpages.length;
-  return <PageDocumentScroll key={selected.id} pageId={selected.id} preview={preview} enabled={!pageDragging} initialY={scrollPositions.current.get(selected.id)||0} onScrollY={y=>scrollPositions.current.set(selected.id,y)}>
+  return <PageDocumentScroll key={selected.id} pageId={selected.id} preview={preview} enabled={!pageDragging&&!kanbanInteractionRef.current} initialY={scrollPositions.current.get(selected.id)||0} onScrollY={y=>scrollPositions.current.set(selected.id,y)}>
    <Pressable accessibilityRole="button" accessibilityLabel={hasCover?'Alterar capa':'Adicionar capa'} onPress={()=>setAppearance('cover')} style={{height:hasCover?190:28,overflow:'hidden',backgroundColor:hasCover?c.accentSoft:'transparent'}}>
     {hasCover?<PageCover data={draft.appearance} api={api}/>:<View style={{alignSelf:'flex-end',padding:12,opacity:.55}}><Icon name="image" size={20} color={c.muted}/></View>}
    </Pressable>
@@ -204,22 +188,9 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   onBlank={()=>void create(createParent||undefined)} onTemplate={template=>selectedId?applyTemplate(template):void create(undefined,template)}/>;
  if(!entry)return <View style={{flex:1}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{listView}{createPicker}</View>;
  const draft=entry.draft,selected={...entry.base,data:{...entry.base.data,...draft.appearance}},subpages=children.get(selected.id)||[];
- const previousId=entryBackTarget(byId,selected.id,history.current);
- const previousEntry=previousId?store.get(previousId):undefined;
- const previousPage=previousId?byId.get(previousId):undefined;
  const path:Entity[]=[];let cur:Entity|undefined=selected;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&path.length<40){seen.add(cur.id);path.unshift(cur);cur=byId.get(String(cur.data?.parent_id||''));}
  const status=entry.state==='saving'?'Salvando…':entry.state==='pending'?'Sincronizando…':entry.state==='error'?'Não salvo':entry.state==='conflict'?'Conflito':selected.privacy==='private'?'Particular':selected.area;
  const hasCover=!!draft.appearance.cover_type;
- const previousBackdrop=previousEntry&&previousPage?(()=>{
-  const pd=previousEntry.draft,pp={...previousPage,data:{...previousPage.data,...pd.appearance}};
-  return <View pointerEvents="none" style={{flex:1,backgroundColor:c.bg}}>
-   <View style={{zIndex:20,elevation:5,minHeight:54,flexDirection:'row',alignItems:'center',paddingHorizontal:4,borderBottomWidth:1,borderColor:c.line,backgroundColor:c.surface}}>
-    <IconButton name="back" label="Voltar" size={34} disabled onPress={()=>{}}/>
-    <View style={{flex:1,minWidth:0,paddingHorizontal:5}}><Text numberOfLines={1} style={{color:c.text,fontSize:15,fontWeight:'700'}}>{pp.title}</Text><Text style={{color:c.muted,fontSize:9,marginTop:3}}>{pp.privacy==='private'?'Particular':pp.area}</Text></View>
-   </View>
-   {documentContent(pp,pd,true)}
-  </View>;
- })():listView;
  const editor=<View style={{flex:1,backgroundColor:c.bg,overflow:'hidden'}}>
   <View style={{zIndex:20,elevation:5,minHeight:54,flexDirection:'row',alignItems:'center',paddingHorizontal:4,borderBottomWidth:1,borderColor:c.line,backgroundColor:c.surface}}>
    <IconButton name="back" label="Voltar" size={34} onPress={back}/>
@@ -242,10 +213,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   {appearance?<PageAppearance key={selected.id+appearance} api={api} pageId={selected.id} kind={appearance} onClose={()=>setAppearance(null)} onApply={patch=>{store.edit(selected.id,d=>({...d,appearance:{...d.appearance,...patch}}));void store.flush(selected.id);}}/>:null}
  </View>;
  return <View style={{flex:1,backgroundColor:c.bg}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>
-  <View style={{flex:1}} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">{previousBackdrop}</View>
-  <Animated.View {...pageBackResponder.panHandlers} style={{position:'absolute',left:0,right:0,top:0,bottom:0,backgroundColor:c.bg,transform:[{translateX:backX}]}}>
-   <KeyboardViewport>{editor}</KeyboardViewport>
-  </Animated.View>
+  <KeyboardViewport>{editor}</KeyboardViewport>
   {createPicker}
  </View>;
 }

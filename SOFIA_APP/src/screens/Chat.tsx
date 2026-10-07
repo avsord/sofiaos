@@ -1,12 +1,14 @@
 import type {Task} from '../lib/types';
-import {hasChatArrival,useChatAutoscroll} from '../lib/chat-scroll';
+import {hasChatArrival} from '../lib/chat-scroll';
+import {newestFirst,useChatTail} from '../lib/chat-tail';
+import type {ChatSnapshot} from '../lib/types';
 import {attachmentText,parseAttachments} from '../lib/chat-attachments';
 import * as Sharing from 'expo-sharing';
 import {Paths} from 'expo-file-system';
 import type {AttachmentDraft} from '../lib/types';
 import {KeyboardViewport} from '../components/KeyboardViewport';
 import {Sheet} from '../components/Sheet';
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Image, FlatList, Modal, ScrollView, Pressable, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, AppState, BackHandler } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import * as Clipboard from 'expo-clipboard';
@@ -40,8 +42,10 @@ function Bubble({message,previous,api,onRetry,selecting,selected,onSelect}:{mess
 }
 export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRefreshBootstrap,taskContext,onClearTaskContext}:{taskContext?:Task|null;onClearTaskContext?:()=>void;api:SofiaApi;bootstrap:Bootstrap;enterToSend:boolean;autoSendVoice:boolean;onLock:(v:boolean)=>void;active:boolean;onRefreshBootstrap:()=>Promise<void>|void}) {
  const c=useTheme(),list=useRef<FlatList<Message>>(null);
- const {follow:followChat,pause:pauseChat,showJump,...chatScroll}=useChatAutoscroll(list,active);
- const [conversation,setConversation]=useState<Conversation|null>(null),[messages,setMessages]=useState<Message[]>([]),[hasMore,setHasMore]=useState(false);
+ const {follow:followChat,pause:pauseChat,showJump,...chatScroll}=useChatTail(list,active);
+ const cached=useMemo(()=>api.cached<ChatSnapshot>('/chat-sync/current'),[api]);
+ const [conversation,setConversation]=useState<Conversation|null>(cached?.conversation||null),[messages,setMessages]=useState<Message[]>(cached?.messages||[]),[hasMore,setHasMore]=useState(cached?.has_more||false);
+ const reverseMessages=useMemo(()=>newestFirst(messages),[messages]);
  const previousMessages=useRef<Message[]>([]);
  useLayoutEffect(()=>{
   // History prepends and unchanged polling must not move the viewport. New
@@ -49,7 +53,7 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
   if(hasChatArrival(previousMessages.current,messages))followChat();
   previousMessages.current=messages;
  },[messages]);
- const [loading,setLoading]=useState(true),[sending,setSending]=useState(false),[refreshing,setRefreshing]=useState(false),[dirty,setDirty]=useState(false),[recordingLock,setRecordingLock]=useState(false),[error,setError]=useState('');
+ const [loading,setLoading]=useState(!cached),[sending,setSending]=useState(false),[refreshing,setRefreshing]=useState(false),[dirty,setDirty]=useState(false),[recordingLock,setRecordingLock]=useState(false),[error,setError]=useState('');
  const [history,setHistory]=useState(false),[items,setItems]=useState<Conversation[]>([]),[historyMore,setHistoryMore]=useState(false),[query,setQuery]=useState('');
  const [selectedConversations,setSelectedConversations]=useState(new Set<string>());
  const [selectedIds,setSelectedIds]=useState(new Set<string>()),[deleting,setDeleting]=useState(false);
@@ -66,7 +70,7 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
   try{const page=publish&&['web','mobile'].includes(item.channel)?await api.selectChat(item.id):await api.history(item.id);if(!mounted.current||epoch!==syncEpoch.current||currentId.current!==item.id)return;setConversation(item);setMessages(page.messages);setHasMore(page.has_more);}catch(e){if(mounted.current)setError(errorText(e));}finally{if(mounted.current&&epoch===syncEpoch.current)setLoading(false);}
  }
  async function initialize(){
-  const epoch=++syncEpoch.current;setLoading(true);setError('');try{const page=await api.ensureChat();if(!mounted.current||epoch!==syncEpoch.current||!page.conversation)return;
+  const epoch=++syncEpoch.current;setLoading(!cached);setError('');try{const page=await api.ensureChat();if(!mounted.current||epoch!==syncEpoch.current||!page.conversation)return;
    followChat();currentId.current=page.conversation.id;setConversation(page.conversation);setMessages(page.messages);setHasMore(page.has_more);setSelectedIds(new Set());
   }catch(e){if(mounted.current)setError(errorText(e));}finally{if(mounted.current&&epoch===syncEpoch.current)setLoading(false);}
  }
@@ -146,11 +150,11 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
  {selectedIds.size>0?<View style={{paddingHorizontal:10,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:8,borderBottomWidth:1,borderColor:c.line,backgroundColor:c.surface}}><IconButton name="back" label="Sair da seleção" disabled={deleting} onPress={()=>setSelectedIds(new Set())}/><Text style={{flex:1,color:c.text,fontSize:18,fontWeight:'600'}}>{selectedIds.size} selecionada{selectedIds.size===1?'':'s'}</Text><IconButton name="copy" label="Copiar mensagens selecionadas" disabled={deleting} onPress={copySelected}/>{deleting?<ActivityIndicator color={c.accent}/>:<IconButton name="trash" label="Excluir mensagens selecionadas" onPress={deleteSelected}/>}</View>:<View style={{paddingHorizontal:16,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:11,borderBottomWidth:1,borderColor:c.line,backgroundColor:c.surface}}><Brand/><View style={{flex:1}}><Text style={{color:c.text,fontSize:19,fontWeight:'700'}}>Sofia</Text><Text numberOfLines={1} style={{color:c.muted,fontSize:11,marginTop:3}}>Sua assistente · mesma memória</Text></View><IconButton name="history" label="Histórico de conversas" onPress={()=>void openHistory()} disabled={dirty||sending||recordingLock}/><IconButton name="plus" label="Nova conversa" onPress={()=>void newChat()} disabled={dirty||sending||recordingLock}/></View>}
  {!bootstrap.ai.ready?<ErrorBanner text={bootstrap.ai.reason||'O Filtro Privado está sendo sincronizado com o servidor.'} onRetry={()=>void onRefreshBootstrap()}/>:null}{error?<ErrorBanner text={error} onRetry={()=>void (conversation?refresh():initialize())}/>:null}
  {taskContext?<View style={{paddingHorizontal:16,paddingVertical:8,flexDirection:'row',alignItems:'center',backgroundColor:c.accentSoft}}><View style={{flex:1}}><Text style={{color:c.accent,fontSize:11}}>Tarefa em contexto</Text><Text numberOfLines={1} style={{color:c.text,fontSize:14}}>{taskContext.title}</Text></View><IconButton name="close" label="Remover tarefa da conversa" onPress={()=>onClearTaskContext?.()}/></View>:null}
- <View style={{flex:1}}>{loading?<View style={{flex:1,justifyContent:'center'}}><ActivityIndicator color={c.accent}/></View>:<FlatList ref={list} data={messages} extraData={selectedIds} keyExtractor={m=>m.id} keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:16,paddingBottom:22,flexGrow:1}} refreshing={refreshing} onRefresh={()=>void refresh()} {...chatScroll} style={{flex:1}} scrollEventThrottle={16}
- ListHeaderComponent={hasMore?<Pressable onPress={()=>void older()} style={{alignItems:'center',padding:12,minHeight:44}}><Text style={{color:c.accent,fontSize:12}}>Carregar mensagens anteriores</Text></Pressable>:null}
+ <View style={{flex:1}}>{loading?<View style={{flex:1,justifyContent:'center'}}><ActivityIndicator color={c.accent}/></View>:<FlatList key={conversation?.id||'new-chat'} nativeID="sofia-chat-list" inverted initialNumToRender={12} maxToRenderPerBatch={8} windowSize={7} maintainVisibleContentPosition={{minIndexForVisible:0}} ref={list} data={reverseMessages} extraData={selectedIds} keyExtractor={m=>m.id} keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:16,paddingBottom:22,flexGrow:1}} refreshing={refreshing} onRefresh={()=>void refresh()} {...chatScroll} style={{flex:1}} scrollEventThrottle={16}
+ ListFooterComponent={hasMore?<Pressable onPress={()=>void older()} style={{alignItems:'center',padding:12,minHeight:44}}><Text style={{color:c.accent,fontSize:12}}>Carregar mensagens anteriores</Text></Pressable>:null}
  ListEmptyComponent={<View style={{flex:1,justifyContent:'center'}}><Empty title="Vamos conversar?" body="Escreva ou envie uma mensagem de voz. A mesma Sofia, o contexto e a memória da sua conta."/><Text style={{color:c.muted,textAlign:'center',fontSize:11,paddingHorizontal:30,lineHeight:17}}>Suas mensagens são processadas no servidor da Sofia e pelo provedor de IA configurado.</Text></View>}
- renderItem={({item,index})=><Bubble message={item} previous={messages[index-1]} api={api} onRetry={m=>{if(!sending)void send(m,true);}} selecting={selectedIds.size>0} selected={selectedIds.has(item.id)} onSelect={selectMessage}/>}
- ListFooterComponent={sending?<View style={{flexDirection:'row',gap:9,alignItems:'center',padding:10}}><ActivityIndicator size="small" color={c.accent}/><Text style={{color:c.muted,fontSize:12}}>Aguardando a Sofia…</Text></View>:null}/>}
+ renderItem={({item,index})=><Bubble message={item} previous={reverseMessages[index+1]} api={api} onRetry={m=>{if(!sending)void send(m,true);}} selecting={selectedIds.size>0} selected={selectedIds.has(item.id)} onSelect={selectMessage}/>}
+ ListHeaderComponent={sending?<View style={{flexDirection:'row',gap:9,alignItems:'center',padding:10}}><ActivityIndicator size="small" color={c.accent}/><Text style={{color:c.muted,fontSize:12}}>Aguardando a Sofia…</Text></View>:null}/>}
  {showJump&&!loading?<Pressable accessibilityRole="button" accessibilityLabel="Descer para a última mensagem" onPress={followChat} style={{position:'absolute',right:18,bottom:12,width:44,height:44,borderRadius:22,backgroundColor:c.surface,borderWidth:1,borderColor:c.line,alignItems:'center',justifyContent:'center',elevation:4}}><Text style={{color:c.accent,fontSize:24}}>↓</Text></Pressable>:null}</View>
  {<Composer key={conversation?.id||'draft'} disabled={loading||sending||deleting||selectedIds.size>0||!bootstrap.ai.ready} enterToSend={enterToSend} autoSendVoice={autoSendVoice} maxChars={bootstrap.limits.text_chars} onText={text} onVoice={audio} onAttachments={attachments} onActivity={setRecordingLock} onDraft={inputActivity}/>}
  <Sheet visible={history} onClose={()=>setHistory(false)}>

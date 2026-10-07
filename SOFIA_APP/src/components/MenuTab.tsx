@@ -7,10 +7,10 @@ import {createImmediateMenuPress,tabIndex} from '../lib/tab-navigation';
 import {Icon} from './Icon';
 import type {IconName} from './Icon';
 
-type Props={item:{id:Tab;label:string;icon:IconName};selected:boolean;onSelect:(tab:Tab)=>void;motion:MenuMotion};
+type Props={item:{id:Tab;label:string;icon:IconName};selected:boolean;locked?:boolean;onSelect:(tab:Tab)=>void;motion:MenuMotion};
 
 /** Touch-down navigation is independent of the native, continuous purple-label motion. */
-export const MenuTab=memo(function MenuTab({item,selected,onSelect,motion}:Props){
+export const MenuTab=memo(function MenuTab({item,selected,onSelect,motion,locked=false}:Props){
  const c=useTheme();
  const latest=useRef({item,onSelect});latest.current={item,onSelect};
  const input=useRef(createImmediateMenuPress(()=>latest.current.onSelect(latest.current.item.id))).current;
@@ -27,17 +27,17 @@ export const MenuTab=memo(function MenuTab({item,selected,onSelect,motion}:Props
   accessibilityActions={[{name:'activate'}]}
   onAccessibilityAction={event=>{if(event.nativeEvent.actionName==='activate')input.accessibilityActivate();}}
   accessibilityRole="tab" accessibilityLabel={item.label} accessibilityState={{selected}}
-  testID={'menu-'+item.id}
+  nativeID={locked?'sofia-menu-blocked':'sofia-menu-'+tabIndex(item.id)} testID={'menu-'+item.id}
   style={styles.button}>
   <View style={styles.iconSlot} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
    <Animated.View testID={'menu-pill-'+item.id} style={[styles.pill,{backgroundColor:c.accentSoft,
     opacity:visual.opacity,transform:[{scaleX:visual.pillX},{scaleY:visual.pillY}]}]}/>
-   <Animated.View style={[styles.icon,{opacity:visual.inactive,transform:[{scale:visual.icon}]}]}><Icon name={item.icon} color={c.muted}/></Animated.View>
+   <Animated.View testID={'menu-inactive-symbol-'+item.id} style={[styles.icon,{opacity:visual.inactive,transform:[{scale:visual.icon}]}]}><Icon name={item.icon} color={c.muted}/></Animated.View>
    <Animated.View testID={'menu-symbol-'+item.id} style={[styles.icon,{opacity:visual.opacity,transform:[{scale:visual.icon}]}]}><Icon name={item.icon} color={c.accent}/></Animated.View>
   </View>
   <Animated.View style={[styles.caption,{transform:[{scale:visual.caption}]}]} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-   <Animated.Text numberOfLines={1} style={[styles.text,{fontWeight:'500',color:c.muted,opacity:visual.inactive}]}>{item.label}</Animated.Text>
-   <Animated.Text numberOfLines={1} style={[styles.text,styles.overlay,{fontWeight:'700',color:c.accent,opacity:visual.opacity}]}>{item.label}</Animated.Text>
+   <Animated.Text testID={'menu-inactive-caption-'+item.id} numberOfLines={1} style={[styles.text,{fontWeight:'500',color:c.muted,opacity:visual.inactive}]}>{item.label}</Animated.Text>
+   <Animated.Text testID={'menu-active-caption-'+item.id} numberOfLines={1} style={[styles.text,styles.overlay,{fontWeight:'700',color:c.accent,opacity:visual.opacity}]}>{item.label}</Animated.Text>
   </Animated.View>
  </Pressable>;
 });

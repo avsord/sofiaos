@@ -4,6 +4,7 @@ export class StartupReads {
  private flights=new Map<string,Promise<unknown>>();
  private version=0;
  constructor(private now=Date.now){}
+ seed(key:string,value:unknown){this.entries.set(key,{promise:Promise.resolve(value),until:this.now()+60000,version:this.version});}
  invalidate(){this.version++;this.entries.clear();this.flights.clear();}
  prime<T>(key:string,fetch:()=>Promise<T>):Promise<T>{
   const existing=this.entries.get(key);if(existing&&existing.until>this.now())return existing.promise as Promise<T>;
@@ -31,7 +32,10 @@ export async function preloadStartup(api:{home:()=>Promise<unknown>;tasks:()=>Pr
  // Start the current month immediately, independent of the selected menu.
  const primary=Promise.allSettled([agenda(),api.home(),api.tasks(),api.library(),api.dashboardWidgets(),api.integrations(),api.calendarStatus()]);
  try{
-  const catalog=await api.catalog(),kinds=Object.keys(catalog.catalog);
+  const catalog=await api.catalog();
+  // Prioritize the actual menu surfaces. Do not flood startup with every backend entity kind.
+  const priority=['user_page','capsule','routine','monitor','film','book','shopping_item','annotation','note'];
+  const kinds=priority.filter(kind=>kind in catalog.catalog||['user_page','capsule','routine','monitor'].includes(kind));
   let next=0;
   // Bound background work so chat/navigation stay responsive on a slow connection.
   await Promise.all(Array.from({length:3},async()=>{while(next<kinds.length){const kind=kinds[next++];try{await api.entities(kind);}catch{/* Each screen retains its own retry and error state. */}}}));

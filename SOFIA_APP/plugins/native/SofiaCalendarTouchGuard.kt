@@ -30,6 +30,9 @@ internal class SofiaCalendarTouchGuard {
   fun beforeDispatch(root: View, event: MotionEvent) {
     if (event.actionMasked == MotionEvent.ACTION_DOWN) {
       release()
+      // Menu touches are outside the pager. Native navigation is dispatched
+      // before React event delivery, even when JS is processing refreshed data.
+      immediateMenu(root, event)
       downX = event.rawX; downY = event.rawY
       // Native wrappers can change after a keyboard/modal transition. Match the
       // visible Home independently of the pointer's edge and include the tagged
@@ -135,6 +138,50 @@ internal class SofiaCalendarTouchGuard {
     homeRefresh = null
     verticalParents.clear()
     refreshParents.clear()
+  }
+
+
+  private fun immediateMenu(root: View, event: MotionEvent) {
+    val tab = menuAt(root, event.rawX.toInt(), event.rawY.toInt()) ?: return
+    val index = (tab.getTag(com.facebook.react.R.id.view_tag_native_id) as? String)
+      ?.removePrefix("sofia-menu-")?.toIntOrNull() ?: return
+    if (index !in 0..5) return
+    val view = taggedVisible(root, "sofia-tab-pager") as? ReactHorizontalScrollView ?: return
+    if (view.width <= 0 || view.childCount == 0 || view.getChildAt(0).width < view.width * 6 - 2) return
+    val started = android.os.SystemClock.uptimeMillis()
+    // The inverted conversation is already at its newest message when revealed.
+    if (index == 1) (taggedVisible(root, "sofia-chat-list", false) as? ReactScrollView)?.scrollTo(0, 0)
+    view.scrollTo(index * view.width, 0)
+    val bar = taggedVisible(root, "sofia-menu-bar") ?: root
+    val names = arrayOf("home", "chat", "pages", "agenda", "apps", "profile")
+    for (i in names.indices) {
+      val value = if (i == index) 1f else 0f
+      testView(bar, "menu-pill-" + names[i])?.let { it.alpha = value; it.scaleX = 1f; it.scaleY = 1f }
+      testView(bar, "menu-symbol-" + names[i])?.alpha = value
+      testView(bar, "menu-active-caption-" + names[i])?.alpha = value
+      testView(bar, "menu-inactive-symbol-" + names[i])?.alpha = 1f - value
+      testView(bar, "menu-inactive-caption-" + names[i])?.alpha = 1f - value
+    }
+    android.util.Log.i("SofiaMenu", "TOUCH_DOWN index=$index dispatchMs=" + (android.os.SystemClock.uptimeMillis() - started))
+  }
+
+  private fun menuAt(view: View, x: Int, y: Int): View? {
+    if (view.visibility != View.VISIBLE || view.alpha <= 0f || !view.getGlobalVisibleRect(bounds) || !bounds.contains(x,y)) return null
+    val tag = view.getTag(com.facebook.react.R.id.view_tag_native_id) as? String
+    if (tag == "sofia-menu-blocked" || (tag != null && tag.matches(Regex("sofia-menu-[0-5]")))) return view
+    if (view is ViewGroup) for (i in view.childCount-1 downTo 0) { val found = menuAt(view.getChildAt(i), x, y); if (found != null) return found }
+    return null
+  }
+  private fun taggedVisible(view: View, id: String, visible: Boolean = true): View? {
+    if (view.visibility != View.VISIBLE || (visible && (view.alpha <= 0f || !view.getGlobalVisibleRect(bounds)))) return null
+    if (view.getTag(com.facebook.react.R.id.view_tag_native_id) == id) return view
+    if (view is ViewGroup) for (i in view.childCount-1 downTo 0) { val found = taggedVisible(view.getChildAt(i), id, visible); if (found != null) return found }
+    return null
+  }
+  private fun testView(view: View, id: String): View? {
+    if (view.getTag(com.facebook.react.R.id.react_test_id) == id) return view
+    if (view is ViewGroup) for (i in view.childCount-1 downTo 0) { val found = testView(view.getChildAt(i), id); if (found != null) return found }
+    return null
   }
 
   private fun visibleHome(view: View): View? {
