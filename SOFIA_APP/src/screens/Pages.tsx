@@ -54,7 +54,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   onPanResponderGrant:()=>backX.stopAnimation(),
   onPanResponderMove:(_e,g)=>backX.setValue(Math.max(0,Math.min(paneWidth.current||420,g.dx))),
   onPanResponderRelease:(_e,g)=>{
-   const width=paneWidth.current||420,leave=g.dx>width*.28||g.vx>.65;
+   const width=paneWidth.current||420,leave=g.dx>width*.42||g.vx>1.1;
    if(leave){backCommitted.current=true;Animated.timing(backX,{toValue:width,duration:reducedRef.current?0:200,easing:MOTION_EASE,useNativeDriver:true}).start(({finished})=>{if(finished)backAction.current();else backCommitted.current=false;});}
    else Animated.spring(backX,{toValue:0,useNativeDriver:true,stiffness:300,damping:32,mass:.9,overshootClamping:true}).start();
   },
@@ -163,7 +163,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  function blockView(b:PageBlock,i:number,preview=false,bodyGuide=showBodyGuide,blockFocus=focus){
   if(b.type==='divider')return <Pressable key={b.id} accessibilityLabel="Divisor" onLongPress={()=>confirmRemoveBlock(b)} style={{paddingVertical:14}}><View style={{height:1,backgroundColor:c.line}}/></Pressable>;
   if(b.type==='image'&&b.data?.attachment_id)return <Pressable key={b.id} accessible={false} onLongPress={()=>confirmRemoveBlock(b)} style={{marginVertical:8}}><Image source={api.attachmentSource(String(b.data.attachment_id))} style={{width:'100%',height:210,borderRadius:8}} resizeMode="contain"/>{b.data.caption?<Text style={{color:c.muted,fontSize:12}}>{String(b.data.caption)}</Text>:null}</Pressable>;
-  if(b.type==='collection')return <NativeCollectionBlock key={b.id} block={b} onChange={(data,group)=>updateBlock(b,{data},group)} onDelete={()=>confirmRemoveBlock(b)}/>;
+  if(b.type==='collection')return <NativeCollectionBlock key={b.id} block={b} onChange={(data,group)=>updateBlock(b,{data},group)} onDelete={()=>confirmRemoveBlock(b)} onInteractionChange={changePageInteraction}/>;
   if(['image','file','table','bookmark'].includes(b.type))return <Pressable key={b.id} accessible={false} onLongPress={()=>confirmRemoveBlock(b)} style={{padding:12,borderRadius:8,backgroundColor:c.input,marginVertical:5}}><Text style={{color:c.text,fontSize:13}}>{b.text||({table:'Tabela',image:'Imagem',file:'Arquivo',bookmark:'Link'} as Record<string,string>)[b.type]}</Text><Text style={{color:c.muted,fontSize:11,marginTop:4}}>Bloco preservado; edição completa no site.</Text></Pressable>;
   const heading=b.type==='heading1'?30:b.type==='heading2'?24:b.type==='heading3'?20:16;
   const prefix=b.type==='bullet'?'• ':b.type==='number'?String(i+1)+'. ':b.type==='quote'?'│ ':b.type==='callout'?'💡 ':'';
