@@ -8,6 +8,7 @@ import type {Notice} from '../lib/types';
 import {SofiaApi} from '../lib/api';
 import {useTheme} from '../lib/theme';
 import {errorText} from '../lib/chat-model';
+import {subscribeSystemChanged} from '../lib/system-events';
 import {Button,ErrorBanner,IconButton} from './UI';
 import {Icon} from './Icon';
 export const noticeArea=(n:Notice)=>{const category=String(n.category||'').toLowerCase();if(/course|curso|lesson|aula/.test(category))return 'Cursos';if(/study|estud/.test(category))return 'Estudos';if(/price|monitor|preço|compra|purchase/.test(category))return 'Monitoramento de produtos';if(/task|tarefa/.test(category))return 'Tarefas';if(/agenda|remind|commitment|routine|calendar|lembrete/.test(category))return 'Agenda';return 'Outros';};
@@ -17,7 +18,7 @@ export function NotificationProvider({api,enabled,children}:{api:SofiaApi;enable
  const [items,setItems]=useState<Notice[]>([]),[unread,setUnread]=useState(0),[loading,setLoading]=useState(false),[error,setError]=useState('');
  const generation=useRef(0),request=useRef(false);
  const refresh=useCallback(async()=>{if(!enabled||request.current)return;request.current=true;const current=generation.current;setLoading(true);try{const all:Notice[]=[];let offset:number|null=0,count=0;const seen=new Set<number>();while(offset!==null){if(seen.has(offset))throw Error('Paginação de notificações inválida.');seen.add(offset);const result=await api.allNotifications(offset);all.push(...result.items);offset=result.next_offset;count=result.unread;}if(current===generation.current){setItems([...new Map(all.map(n=>[n.id,n])).values()]);setUnread(count);setError('');}}catch(e){if(current===generation.current)setError(errorText(e));}finally{if(current===generation.current){setLoading(false);request.current=false;}}},[api,enabled]);
- useEffect(()=>{generation.current++;request.current=false;setItems([]);setUnread(0);setError('');void refresh();const timer=setInterval(()=>{if(AppState.currentState==='active')void refresh();},30000),subscription=AppState.addEventListener('change',state=>{if(state==='active')void refresh();});return()=>{generation.current++;request.current=false;clearInterval(timer);subscription.remove();};},[refresh]);
+ useEffect(()=>{generation.current++;request.current=false;setItems([]);setUnread(0);setError('');void refresh();const system=subscribeSystemChanged(owner=>{if(owner===api)void refresh();});const timer=setInterval(()=>{if(AppState.currentState==='active')void refresh();},30000),subscription=AppState.addEventListener('change',state=>{if(state==='active')void refresh();});return()=>{generation.current++;request.current=false;system();clearInterval(timer);subscription.remove();};},[api,refresh]);
  async function read(n:Notice){try{await api.markRead(n.id);setItems(old=>old.map(x=>x.id===n.id?{...x,state:'read'}:x));if(n.state==='unread')setUnread(v=>Math.max(0,v-1));await refresh();}catch(e){setError(errorText(e));}}
  async function clear(n:Notice){try{await api.clearNotification(n.id);setItems(old=>old.filter(x=>x.id!==n.id));if(n.state==='unread')setUnread(v=>Math.max(0,v-1));await refresh();}catch(e){setError(errorText(e));}}
  async function clearAll(){try{await api.clearNotification('all');setItems([]);setUnread(0);await refresh();}catch(e){setError(errorText(e));}}
