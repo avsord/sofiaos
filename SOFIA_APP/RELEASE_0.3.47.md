@@ -21,3 +21,5 @@ Base preservada: Sofia OS Android 0.3.46. Esta release mantém Cápsulas, agenda
 - versionCode: `52`
 - Atualiza por cima da versão instalada e preserva os dados do app.
 - Não exige desinstalação.
+
+A publicação só é válida após TypeScript, regressões, build nativo, instalação por cima e descoberta da atualização passarem no CI.
