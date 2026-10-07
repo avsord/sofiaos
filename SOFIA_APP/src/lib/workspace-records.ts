@@ -2,6 +2,7 @@ import {useEffect,useMemo,useReducer} from 'react';
 import type {Entity} from './types';
 import type {SofiaApi} from './api';
 import {errorText} from './chat-model';
+import {subscribeSystemChanged} from './system-events';
 export const LIBRARY_ALL='@library';
 export const LISTS_ALL='@lists';
 export function allRecordKinds(kinds:string[]){return '@records:'+kinds.join(',');}
@@ -36,5 +37,6 @@ export function useWorkspaceRecords(api:SofiaApi,kind:string,query:string,comple
  const cache=useMemo(()=>new WorkspaceRecords(),[api]),[,changed]=useReducer(n=>n+1,0);
  const load=(more=false,manual=false)=>cache.load(api,kind,query,changed,more,manual,complete);
  useEffect(()=>{if(!kind)return;const timer=setTimeout(()=>void load(),query?250:0);return()=>clearTimeout(timer);},[api,kind,query,cache,complete]);
+ useEffect(()=>subscribeSystemChanged(owner=>{if(owner===api&&kind)void load();}),[api,kind,query,cache,complete]);
  return {...cache.view(kind,query),load,merge:(record:Entity)=>{cache.upsert(kind,query,record);changed();}};
 }
