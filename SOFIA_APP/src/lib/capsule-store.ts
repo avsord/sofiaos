@@ -3,6 +3,7 @@ import {AppState} from 'react-native';
 import type {SofiaApi} from './api';
 import type {Entity} from './types';
 import {capsuleDay,capsuleKey} from './capsule-model';
+import {subscribeSystemChanged} from './system-events';
 type Snapshot={plans:Entity[];history:Entity[];loaded:boolean;error:string;saving:string};
 class CapsuleStore {
  snapshot:Snapshot={plans:[],history:[],loaded:false,error:'',saving:''};listeners=new Set<()=>void>();request=0;pending:Promise<void>|null=null;
@@ -14,4 +15,4 @@ class CapsuleStore {
 }
 const stores=new WeakMap<SofiaApi,CapsuleStore>();
 export function capsuleStore(api:SofiaApi){let store=stores.get(api);if(!store){store=new CapsuleStore(api);stores.set(api,store);}return store;}
-export function useCapsules(api:SofiaApi,active=true){const store=capsuleStore(api),[,tick]=useReducer(n=>n+1,0);useEffect(()=>{const changed=()=>tick();store.listeners.add(changed);const state=AppState.addEventListener('change',s=>{if(active&&s==='active')void store.load();});if(active)void store.load();let count=0;const timer=setInterval(()=>{if(active&&AppState.currentState==='active'){tick();if(++count%30===0)void store.load();}},1000);return()=>{store.listeners.delete(changed);state.remove();clearInterval(timer);};},[store,active]);return {...store.snapshot,load:()=>store.load(),save:(input:Partial<Entity>)=>store.save(input),take:(id:string,day:string,time:string,taken=true)=>store.take(id,day,time,taken)};}
+export function useCapsules(api:SofiaApi,active=true){const store=capsuleStore(api),[,tick]=useReducer(n=>n+1,0);useEffect(()=>{const changed=()=>tick();store.listeners.add(changed);const system=subscribeSystemChanged(owner=>{if(owner===api)void store.load();});const state=AppState.addEventListener('change',s=>{if(active&&s==='active')void store.load();});if(active)void store.load();let count=0;const timer=setInterval(()=>{if(active&&AppState.currentState==='active'){tick();if(++count%30===0)void store.load();}},1000);return()=>{store.listeners.delete(changed);system();state.remove();clearInterval(timer);};},[api,store,active]);return {...store.snapshot,load:()=>store.load(),save:(input:Partial<Entity>)=>store.save(input),take:(id:string,day:string,time:string,taken=true)=>store.take(id,day,time,taken)};}
