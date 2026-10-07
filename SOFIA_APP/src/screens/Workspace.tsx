@@ -16,6 +16,7 @@ import type {Repeat} from '../lib/agenda-recurrence';
 import {requestAgendaPermission} from '../lib/agenda-notifications';
 import {TASK_PRIORITIES,taskPriority,filterTasks} from '../lib/task-filters';
 import {TaskPriority} from '../components/TaskPriority';
+import {subscribeSystemChanged} from '../lib/system-events';
 import {MotionModal} from '../components/MotionModal';
 import {GoogleCalendarProperty} from '../components/GoogleCalendarProperty';
 import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
@@ -90,6 +91,7 @@ function Tasks({api,onBack,active,areas,onDiscussTask}:{onDiscussTask?:(task:Tas
  async function load(manual=false){const id=++requestId.current;if(manual)setRefreshing(true);try{const result=await api.tasks();if(id!==requestId.current)return;setItems(result.items);setError('');}catch(e){if(id===requestId.current)setError(errorText(e));}finally{if(id===requestId.current){setLoading(false);setRefreshing(false);}}}
  // Prefetch once while Apps is mounted, then keep rows mounted across module visits.
  useEffect(()=>{void load();return()=>{requestId.current++;};},[api]);
+ useEffect(()=>subscribeSystemChanged(owner=>{if(owner===api)void load();}),[api]);
  useEffect(()=>{if(active)void load();else setEditing(null);},[active]);
  const merge=(item:Task)=>{requestId.current++;setLoading(false);setRefreshing(false);setItems(previous=>previous.some(t=>t.id===item.id)?previous.map(t=>t.id===item.id?item:t):[item,...previous]);};
  async function save(){if(saving||!editing?.title?.trim())return;setSaving(true);setError('');try{if(!intervalValid(editing.start_at||editing.due_at,editing.end_at))throw Error('O fim precisa ser depois do início.');if(editing.end_at&&!await api.feature('task_intervals'))throw Error('O servidor ainda precisa ser atualizado para salvar início e fim das tarefas. Seus dados foram mantidos.');const result=await api.saveTask({...editing,area:editing.area?.trim()||'Pessoal',due_at:editing.due_at?new Date(editing.due_at.replace(' ','T')).toISOString():''});merge(result.item);setEditing(null);}catch(e){setError(errorText(e));}finally{setSaving(false);}}
