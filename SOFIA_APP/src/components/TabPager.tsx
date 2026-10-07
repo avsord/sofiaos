@@ -31,8 +31,9 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
   },[]);
   const goTo = useCallback((next: Tab) => {
     selection.current.select(next);
-    motion.select(next);
+    // Send the native page jump first; decorative menu state must never delay navigation.
     align();
+    motion.select(next);
   },[align,motion]);
   useImperativeHandle(ref,() => ({goTo}),[goTo]);
   // The motion owner survives login/bootstrap; a fresh pager must not inherit its old tab.
