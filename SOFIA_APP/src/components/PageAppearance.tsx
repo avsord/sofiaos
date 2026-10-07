@@ -2,6 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {View,Text,Pressable,Modal,ScrollView,TextInput,Image,StyleSheet,ActivityIndicator} from 'react-native';
 import Svg,{Defs,LinearGradient,Stop,Rect} from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {SofiaApi} from '../lib/api';
 import {useTheme} from '../lib/theme';
 import {Button,ErrorBanner,IconButton} from './UI';
@@ -14,6 +15,7 @@ export const PAGE_COVERS=[
 ];
 const EMOJIS='😀 😊 😎 🤔 🤖 ❤️ 💜 💙 💚 💡 🔥 ✨ ⭐ 🌙 🌈 🌱 🌿 🌊 🧪 🧠 🎯 🧭 🚀 🚲 🏠 💼 🛠️ ⚙️ 💻 📱 📷 🎥 🎬 🎨 ✏️ 📝 📌 📅 ⏰ 📚 📖 📁 📂 📦 📊 💰 🛒 🎁 💊 ☕ 🎵 🎧 🎮 🏋️ 🧘 🏆 🎓 🔗 🔎 🔐 ✅ ⚠️ 💬 🧩 💎'.split(' ');
 const SYMBOLS='♡ ♥ ☆ ★ ○ ● ◉ ◇ ◆ □ ■ △ ▲ ✓ ✔ ✕ × + − ≡ ∞ ⌂ ⌘ ⏱ ⚑ ⚙ ⚡ ☀ ☾ ☁ ☰ ▦ ⊞ ⊕ ↖ ↑ ↗ ← → ↙ ↓ ↘ ↔ ↕ ↳ ↪ ⇄ ✎ ✦ ✧ ❖ ☑ ☐ ♫ ♪ ✉ ☎ ⌚ ⚖ ◐ ◑'.split(' ');
+const PENDING_COVER_KEY='sofia.native.pending-page-cover.v1';
 export function PageCover({data,api}:{data:Record<string,any>;api:SofiaApi}){
  const c=useTheme(),[failed,setFailed]=useState(false);const attachment=String(data.cover_attachment_id||'');
  useEffect(()=>setFailed(false),[attachment]);
@@ -22,18 +24,38 @@ export function PageCover({data,api}:{data:Record<string,any>;api:SofiaApi}){
  return <Svg width="100%" height="100%"><Defs><LinearGradient id="cover" x1="0" y1="0" x2="1" y2="1">{colors.map((color,i)=><Stop key={i} offset={colors.length===1?0:i/(colors.length-1)} stopColor={color}/>)}</LinearGradient></Defs><Rect width="100%" height="100%" fill="url(#cover)"/></Svg>;
 }
 export function PageAppearance({kind,pageId,api,onApply,onClose}:{kind:'icon'|'cover';pageId:string;api:SofiaApi;onApply:(patch:Record<string,any>)=>void;onClose:()=>void}){
- const c=useTheme(),[mode,setMode]=useState<'emoji'|'icon'>('emoji'),[custom,setCustom]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),alive=useRef(true);
- useEffect(()=>()=>{alive.current=false;},[]);
+ const c=useTheme(),[mode,setMode]=useState<'emoji'|'icon'>('emoji'),[custom,setCustom]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),alive=useRef(true),recovering=useRef(false);
  function choose(patch:Record<string,any>){onApply(patch);onClose();}
- async function upload(){if(busy)return;setBusy(true);setError('');try{
-  const result=await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],allowsEditing:true,aspect:[3,1],quality:0.9,base64:true});
-  if(result.canceled||!result.assets[0]||!alive.current)return;
-  const base64=result.assets[0].base64;
+ async function clearPending(){try{await AsyncStorage.removeItem(PENDING_COVER_KEY);}catch{}}
+ async function finishPick(result:any){
+  if(!result)return false;
+  if(result.code)throw new Error(String(result.message||'O Android não conseguiu devolver a foto selecionada.'));
+  if(result.canceled){await clearPending();return false;}
+  const asset=result.assets?.[0],base64=asset?.base64;
   if(!base64)throw new Error('Não foi possível preparar a imagem. Escolha outra foto.');
   if(base64.length>Math.ceil(10*1024*1024/3)*4)throw new Error('A capa deve ter até 10 MB. Recorte a imagem ou escolha uma menor.');
   const attachment=await api.uploadAttachment(pageId,{name:'capa.jpg',mime:'image/jpeg',base64});
+  await clearPending();
   if(alive.current)choose({cover_type:'attachment',cover_value:'',cover_attachment_id:attachment.id});
- }catch(e){if(alive.current)setError(e instanceof Error?e.message:'Não foi possível trocar a capa.');}finally{if(alive.current)setBusy(false);}}
+  return true;
+ }
+ useEffect(()=>{
+  alive.current=true;
+  if(kind==='cover'&&!recovering.current){recovering.current=true;void(async()=>{try{
+    const pendingPage=await AsyncStorage.getItem(PENDING_COVER_KEY);
+    if(pendingPage!==pageId||!alive.current)return;
+    const pending=await ImagePicker.getPendingResultAsync();
+    if(pending&&alive.current){setBusy(true);setError('');await finishPick(pending);}
+   }catch(e){await clearPending();if(alive.current)setError(e instanceof Error?e.message:'Não foi possível recuperar a capa escolhida.');}
+   finally{recovering.current=false;if(alive.current)setBusy(false);}})();}
+  return()=>{alive.current=false;};
+ },[]);
+ async function upload(){if(busy)return;setBusy(true);setError('');try{
+  await AsyncStorage.setItem(PENDING_COVER_KEY,pageId);
+  const result=await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],allowsEditing:true,aspect:[3,1],quality:0.72,base64:true});
+  if(!alive.current)return;
+  await finishPick(result);
+ }catch(e){await clearPending();if(alive.current)setError(e instanceof Error?e.message:'Não foi possível trocar a capa.');}finally{if(alive.current)setBusy(false);}}
  return <Modal visible transparent animationType="fade" onRequestClose={()=>{if(!busy)onClose();}}>
   <Pressable onPress={()=>{if(!busy)onClose();}} style={{flex:1,backgroundColor:'#00000055',justifyContent:'flex-end'}}>
    <Pressable onPress={()=>{}} style={{maxHeight:'82%',borderTopLeftRadius:24,borderTopRightRadius:24,backgroundColor:c.surface,padding:20,paddingBottom:30}}>
