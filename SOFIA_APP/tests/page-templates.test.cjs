@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {PAGE_TEMPLATES,STATUS_COLORS}=load('src/lib/page-templates.ts');
 test('exactly the three official page templates are exposed',()=>{
  assert.equal(Array.from(PAGE_TEMPLATES,x=>x.id).join('|'),'tasks_personal|notes_hub|playlist_links');
- assert.equal(Array.from(PAGE_TEMPLATES,x=>x.title).join('|'),'Quadro de tarefas|Notas|Coleção');
+ assert.equal(Array.from(PAGE_TEMPLATES,x=>x.title).join('|'),'Kanban|Notas|Coleção');
 });
 test('tasks template has editable status columns with colors',()=>{
  const t=PAGE_TEMPLATES[0],collection=t.blocks.find(x=>x.type==='collection');
@@ -61,4 +61,24 @@ test('MD8: insertion retains written content and replaces only the untouched gui
  const result=insertTemplateBlocks(written,incoming);assert.equal(result.length,2);assert.equal(result[0].text,'Minha anotação');assert.equal(written.length,1);assert.equal(incoming.length,1);
  result[1].data.rows.push({id:'local'});assert.equal(incoming[0].data.rows.length,0);
  assert.equal(insertTemplateBlocks([{id:'guide',type:'text',text:''}],incoming).length,1);
+});
+
+test('Kanban owns horizontal scrolling and long-press card moves between columns',()=>{
+ const pages=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
+ const collection=fs.readFileSync(path.join(__dirname,'../src/components/NativeCollectionBlock.tsx'),'utf8');
+ assert.ok(collection.includes('horizontal nestedScrollEnabled directionalLockEnabled'));
+ assert.ok(collection.includes('scrollEnabled={!drag}'));
+ assert.ok(collection.includes('delayLongPress={180}'));
+ assert.ok(collection.includes("row.values[group.key]=options[current.target]"));
+ assert.ok(collection.includes('onInteractionChange?.(true)'));
+ assert.ok(pages.includes('onInteractionChange={changePageInteraction}'));
+ assert.ok(pages.includes("g.dx>width*.42||g.vx>1.1"));
+});
+test('page cover picker recovers Android pending results instead of losing the chosen photo',()=>{
+ const appearance=fs.readFileSync(path.join(__dirname,'../src/components/PageAppearance.tsx'),'utf8');
+ assert.ok(appearance.includes('ImagePicker.getPendingResultAsync()'));
+ assert.ok(appearance.includes("PENDING_COVER_KEY='sofia.native.pending-page-cover.v1'"));
+ assert.ok(appearance.includes('AsyncStorage.setItem(PENDING_COVER_KEY,pageId)'));
+ assert.ok(appearance.includes('quality:0.72,base64:true'));
+ assert.ok(appearance.includes("cover_attachment_id:attachment.id"));
 });
