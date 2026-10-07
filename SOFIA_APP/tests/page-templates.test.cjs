@@ -51,3 +51,12 @@ test('page row drag disables the outer menu pager while active',()=>{
  assert.ok(pages.includes('onInteractionChange={setPageInteraction}'));
  assert.ok(tree.includes('delayLongPress={140}'));
 });
+
+test('page cover picker survives Android activity recreation and keeps uploads light',()=>{
+ const appearance=fs.readFileSync(path.join(__dirname,'../src/components/PageAppearance.tsx'),'utf8');
+ assert.ok(appearance.includes('ImagePicker.getPendingResultAsync()'));
+ assert.ok(appearance.includes("PENDING_COVER_KEY='sofia.native.pending-page-cover.v1'"));
+ assert.ok(appearance.includes('AsyncStorage.setItem(PENDING_COVER_KEY,pageId)'));
+ assert.ok(appearance.includes('quality:0.72,base64:true'));
+ assert.ok(appearance.includes("cover_attachment_id:attachment.id"));
+});
