@@ -1,7 +1,7 @@
 import {preloadAgenda} from './src/lib/use-agenda-month';
 import {useCapsuleNotifications} from './src/lib/capsule-notifications';
 import {useAgendaNotifications} from './src/lib/agenda-notifications';
-import React,{Component,ErrorInfo,useCallback,useDeferredValue,useEffect,useMemo,useRef,useState} from 'react';
+import React,{Component,ErrorInfo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {View,Text,StatusBar,ActivityIndicator,AccessibilityInfo,useColorScheme,AppState,Alert,Keyboard,BackHandler,Linking,StyleSheet} from 'react-native';
 import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
 import {SofiaApi,readAuth,saveAuth,forgetAuth,readPrefs,savePrefs} from './src/lib/api';
@@ -40,7 +40,7 @@ function Shell(){
  const [agendaTarget,setAgendaTarget]=useState<{date:string;id?:string;create?:boolean;nonce:number}>({date:'',nonce:0});
  const tabHistory=useRef<Tab[]>([]),pager=useRef<TabPagerHandle>(null),navigation=useRef({tab,locked});
  navigation.current={tab,locked};
- const screenTab=useDeferredValue(tab);
+ // Keep the visible page and its active state in the same urgent render as the menu tap.
  const menuMotion=useMemo(()=>createMenuMotion('home'),[]);
  useEffect(()=>{let mounted=true;void AccessibilityInfo.isReduceMotionEnabled().then(value=>{if(mounted)menuMotion.setReducedMotion(value);}).catch(()=>{});const sub=AccessibilityInfo.addEventListener('reduceMotionChanged',value=>menuMotion.setReducedMotion(value));return()=>{mounted=false;sub.remove();menuMotion.dispose();};},[menuMotion]);
  const [themeClock,setThemeClock]=useState(()=>new Date());
@@ -111,11 +111,11 @@ function Shell(){
  {!ready?<View style={{flex:1,justifyContent:'center'}}><ActivityIndicator color={c.accent}/></View>:!auth?<Login onLogin={login}/>:!bootstrap?<View style={{flex:1,justifyContent:'center',padding:24,gap:14}}>{booting?<ActivityIndicator color={c.accent}/>:null}<Text style={{fontSize:23,fontWeight:'600',color:c.text}}>Abrindo sua Sofia…</Text>{error?<ErrorBanner text={error}/>:null}<Button title="Tentar novamente" onPress={()=>void boot()} loading={booting}/><Button title="Voltar para o login" secondary onPress={()=>void logout()}/></View>:<><View style={{flex:1}}>
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?0:1}]} pointerEvents={tab==='notifications'?'none':'auto'} accessibilityElementsHidden={tab==='notifications'} importantForAccessibility={tab==='notifications'?'no-hide-descendants':'auto'}>
   <TabPager motion={menuMotion} ref={pager} activeTab={tab} enabled={!gestureLocked&&!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)&&!(tab==='apps'&&workspaceDepth)} onSelect={navigate}>
-   <Home onDiscussTask={discussTask} onOpenCapsules={openCapsules} onGestureLock={setGestureLocked} api={api} bootstrap={bootstrap} navigate={navigate} onOpenAgenda={openAgenda} active={screenTab==='home'}/>
-   <Chat taskContext={taskContext} onClearTaskContext={()=>setTaskContext(null)} key={'chat-'+chatEpoch} api={api} bootstrap={bootstrap} enterToSend={prefs.enterToSend} autoSendVoice={prefs.autoSendVoice} onLock={setLocked} active={screenTab==='chat'} onRefreshBootstrap={boot}/>
-   <Pages key={bootstrap.profile.email} api={api} active={screenTab==='pages'} storageScope={bootstrap.profile.email} onDepthChange={setPagesDepth}/>
-   <Agenda onGestureLock={setGestureLocked} api={api} target={agendaTarget} active={screenTab==='agenda'}/>
-   <Workspace onDiscussTask={discussTask} openCapsulesKey={capsulesTarget} resetKey={workspaceReset} api={api} navigate={navigate} onDepthChange={setWorkspaceDepth} active={screenTab==='apps'}/>
+   <Home onDiscussTask={discussTask} onOpenCapsules={openCapsules} onGestureLock={setGestureLocked} api={api} bootstrap={bootstrap} navigate={navigate} onOpenAgenda={openAgenda} active={tab==='home'}/>
+   <Chat taskContext={taskContext} onClearTaskContext={()=>setTaskContext(null)} key={'chat-'+chatEpoch} api={api} bootstrap={bootstrap} enterToSend={prefs.enterToSend} autoSendVoice={prefs.autoSendVoice} onLock={setLocked} active={tab==='chat'} onRefreshBootstrap={boot}/>
+   <Pages key={bootstrap.profile.email} api={api} active={tab==='pages'} storageScope={bootstrap.profile.email} onDepthChange={setPagesDepth}/>
+   <Agenda onGestureLock={setGestureLocked} api={api} target={agendaTarget} active={tab==='agenda'}/>
+   <Workspace onDiscussTask={discussTask} openCapsulesKey={capsulesTarget} resetKey={workspaceReset} api={api} navigate={navigate} onDepthChange={setWorkspaceDepth} active={tab==='apps'}/>
    <Profile api={api} bootstrap={bootstrap} prefs={prefs} onPrefs={changePrefs} onProfile={profile} onLogout={logout} onCheckUpdate={manualUpdate} onChatHistoryCleared={clearChat}/>
   </TabPager>
  </View>
