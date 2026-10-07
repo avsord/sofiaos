@@ -1,0 +1,117 @@
+name: Sofia Android 0.3.45 validate existing APK
+on:
+  push:
+    branches: [work/sofia-persistent-login-045]
+    paths: [.github/workflows/sofia-native-045-recover.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: sofia-android-release
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EXPO_PUBLIC_API_URL: https://sofiaos.up.railway.app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: 8f5036944c701af28710f2ef2720fa1217e10add
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Recover the exact signed APK and fixture from the completed build
+        run: |
+          set -euo pipefail
+          gh api repos/avsord/sofiaos/actions/artifacts/11457917129/zip > /tmp/sofia-045.zip
+          echo '056a75ddf80cb1584fa294be265818f02a3f49a71f29c0aa955d414d5b80fd5c  /tmp/sofia-045.zip' | sha256sum -c -
+          mkdir -p SOFIA_APP/dist /tmp/sofia-baseline
+          unzip -q /tmp/sofia-045.zip -d SOFIA_APP/dist
+          test "$(cat SOFIA_APP/dist/SOURCE_COMMIT.txt)" = "$(git rev-parse HEAD)"
+          echo '963a9711b02e3600f32b40d85a803df927821e62b898cf993af72103304c944c  SOFIA_APP/dist/Sofia-OS.apk' | sha256sum -c -
+          gh release download sofia-android-v0.3.44 --repo "$GITHUB_REPOSITORY" --pattern Sofia-OS.apk --dir /tmp/sofia-baseline
+          npm ci --prefix SOFIA_APP
+          python3 -m venv /tmp/sofia-python
+          /tmp/sofia-python/bin/pip install Pillow==12.3.0
+          echo '/tmp/sofia-python/bin' >> "$GITHUB_PATH"
+      - name: Prepare diagnostics and strict acceptance script
+        run: |
+          cat > /tmp/sofia-045-accept.sh <<'SH'
+          set -euo pipefail
+          diagnostics(){
+            mkdir -p SOFIA_APP/dist/performance-evidence
+            adb shell uiautomator dump /sdcard/final-qa.xml || true
+            adb shell cat /sdcard/final-qa.xml > SOFIA_APP/dist/performance-evidence/final-qa.xml || true
+            adb exec-out screencap -p > SOFIA_APP/dist/performance-evidence/final-qa.png || true
+            adb logcat -d > SOFIA_APP/dist/performance-evidence/final-log.txt || true
+          }
+          trap diagnostics EXIT
+          adb shell wm size 720x1600
+          adb shell wm density 280
+          adb install /tmp/sofia-baseline/Sofia-OS.apk
+          adb install -r SOFIA_APP/dist/Sofia-OS.apk
+          adb shell pm grant com.avsord.sofiaapp android.permission.POST_NOTIFICATIONS
+          adb logcat -c
+          adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+          for attempt in $(seq 1 12); do
+            sleep 3
+            adb shell uiautomator dump /sdcard/startup.xml
+            adb pull /sdcard/startup.xml SOFIA_APP/dist/startup.xml
+            if grep -q Entrar SOFIA_APP/dist/startup.xml; then break; fi
+          done
+          adb exec-out screencap -p > SOFIA_APP/dist/startup.png
+          adb logcat -d -s ReactNativeJS:E AndroidRuntime:E > SOFIA_APP/dist/native-errors.txt
+          ! grep -q 'FATAL EXCEPTION' SOFIA_APP/dist/native-errors.txt
+          grep -q Entrar SOFIA_APP/dist/startup.xml
+          adb install -r SOFIA_APP/dist/QA-ONLY-full-fixture.apk
+          adb shell pm grant com.avsord.sofiaapp android.permission.POST_NOTIFICATIONS
+          adb logcat -c
+          adb shell am force-stop com.avsord.sofiaapp
+          adb shell am start -W -n com.avsord.sofiaapp/.MainActivity
+          cd SOFIA_APP
+          python3 tools/native-performance-smoke.py
+          SH
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Accept the existing production APK and real app with isolated data
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          target: default
+          disable-animations: false
+          script: bash /tmp/sofia-045-accept.sh
+      - name: Require persistent sessions in the live server
+        run: |
+          curl -fsS --max-time 30 https://sofiaos.up.railway.app/health > SOFIA_APP/dist/server-release-gate.json
+          node -e "const h=require('./SOFIA_APP/dist/server-release-gate.json');if(!h.ok||!h.persistent_sessions)throw Error('Persistent sessions are not published')"
+      - name: Publish the exact APK after successful acceptance
+        working-directory: SOFIA_APP
+        run: node tools/publish-release.cjs
+      - name: Verify the installed updater discovers the release
+        working-directory: SOFIA_APP
+        run: |
+          node <<'NODE'
+          const fs=require('fs'),ts=require('typescript'),vm=require('vm');
+          const exported={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/lib/update.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exported,fetch,AbortController,setTimeout,clearTimeout,Date,Error,Promise});
+          exported.checkForUpdate({currentVersion:'0.3.44'}).then(r=>{if(r?.version!=='0.3.45')throw Error('Update missing');console.log('DISCOVERED',r.version,r.url);}).catch(e=>{console.error(e);process.exitCode=1});
+          NODE
+      - name: Preserve all acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sofia-Android-0.3.45-accepted
+          path: SOFIA_APP/dist/
+          retention-days: 30
