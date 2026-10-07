@@ -10,6 +10,6 @@ export function preloadAgenda(api:SofiaApi){return cacheFor(api).warm(monthKey(n
 export function useAgendaMonth(api:SofiaApi,month:Date,active=true){
  const key=monthKey(month),cache=cacheFor(api),[,render]=useState(0);
  const refresh=useCallback(()=>cache.warm(key,true),[cache,key]);
- useEffect(()=>{const unsubscribe=cache.subscribe(key,()=>render(n=>n+1));void cache.warm(key);if(!active)return unsubscribe;const update=()=>{cache.invalidate();void refresh();};const changed=subscribeAgenda(owner=>{if(owner===api)update();});const system=subscribeSystemChanged(owner=>{if(owner===api)update();});const app=AppState.addEventListener('change',state=>{if(state==='active')void refresh();});return()=>{unsubscribe();changed();system();app.remove();};},[api,cache,key,active,refresh]);
+ useEffect(()=>{const unsubscribe=cache.subscribe(key,()=>render(n=>n+1));void cache.warm(key);const system=subscribeSystemChanged(owner=>{if(owner===api){cache.invalidate();if(active)void refresh();}});if(!active)return()=>{unsubscribe();system();};const changed=subscribeAgenda(owner=>{if(owner===api){cache.invalidate();void refresh();}});const app=AppState.addEventListener('change',state=>{if(state==='active')void refresh();});return()=>{unsubscribe();changed();system();app.remove();};},[api,cache,key,active,refresh]);
  return {...cache.snapshot(key),refresh};
 }
