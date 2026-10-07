@@ -59,7 +59,7 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
  const inputActivity=useCallback((v:boolean)=>setDirty(v),[]);
  useEffect(()=>{onLock(sending||recordingLock||deleting);},[sending,recordingLock,deleting,onLock]);
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;onLock(false);void silenceVoices();voices.current.forEach(deleteVoice);};},[onLock]);
- useEffect(()=>{if(!active){void silenceVoices();setSelectedIds(new Set());}},[active]);
+ useEffect(()=>{if(!active){void silenceVoices();setSelectedIds(new Set());return;}followChat();},[active]);
  useEffect(()=>{if(!active||!selectedIds.size)return;const s=BackHandler.addEventListener('hardwareBackPress',()=>{if(!deleting)setSelectedIds(new Set());return true;});return()=>s.remove();},[active,selectedIds.size,deleting]);
  async function select(item:Conversation,publish=true){
   if(sendLock.current||latest.current.deleting)return;const epoch=++syncEpoch.current;setLoading(true);setError('');setHistory(false);setSelectedIds(new Set());setClarification(null);followChat();currentId.current=item.id;
