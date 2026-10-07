@@ -49,6 +49,14 @@ class DeliveryTests(unittest.TestCase):
         (dist/'Sofia-OS.apk.sha256').write_text(shards.digest(dist/'Sofia-OS.apk')+'  dist/Sofia-OS.apk')
         return dist, shards.make_bundle(dist)
 
+    def test_048_chat_and_warm_start_stay_out_of_workspace_shard(self):
+        parts = shards.partition((ROOT/'tools/native-performance-smoke.py').read_text())
+        self.assertIn("chat-tail-on-entry", parts['navigation'])
+        self.assertIn("SOFIA_STARTUP_CACHE_READY", parts['navigation'])
+        self.assertNotIn("chat-tail-on-entry", parts['workspace'])
+        self.assertNotIn("SOFIA_STARTUP_CACHE_READY", parts['workspace'])
+        self.assertIn("CartaoQA048", parts['workspace'])
+
     def test_bundle_tampering_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(shards.subprocess,'check_output',return_value='a'*40):
             dist, manifest = self.fixture(Path(tmp))
