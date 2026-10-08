@@ -85,6 +85,6 @@ class SofiaSnapshotModule(private val app: ReactApplicationContext) : ReactConte
   } }
 }
 class SofiaAlarmPackage : ReactPackage {
-  override fun createNativeModules(context: ReactApplicationContext): List<NativeModule> = listOf(SofiaAlarmModule(context), SofiaSnapshotModule(context))
+  override fun createNativeModules(context: ReactApplicationContext): List<NativeModule> = listOf(SofiaAlarmModule(context), SofiaSnapshotModule(context), SofiaLaunchModule(context))
   override fun createViewManagers(context: ReactApplicationContext): List<ViewManager<*, *>> = emptyList()
 }
