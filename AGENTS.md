@@ -3,6 +3,16 @@
 ## Pedido de alteração inclui entrega
 Quando o usuário pede para corrigir ou alterar a Sofia, implemente, valide e publique a atualização aplicável no mesmo trabalho. Não espere outro pedido de “atualizar”, “subir”, “gerar APK” ou “enviar”. Não peça confirmação repetida para a publicação já solicitada. Uma conversa sobre ideias, por si só, não autoriza implementação.
 
+## Padrão de trabalho: Sofia Delta
+Use o padrão [Sofia Delta](docs/sofia-delta.md) em cada alteração: selecionar o caminho de menor tempo total entre os que cumprem o pedido e os critérios de aceite.
+- Retome `docs/startup-navigation-handoff.md`, o head e a execução relevante; leia apenas o código e os logs necessários ao delta. Reuse leituras atuais da mesma sessão.
+- Classifique o pedido antes de compilar: documentação, processo/testes, runtime Android, backend/web ou retomada de artefato existente. Não gere APK para registrar instruções.
+- Faça a menor mudança completa, com validação proporcional antes do build. Não acrescente refatorações ou novas dependências sem causa demonstrada.
+- Reuse o APK exato e os resultados válidos quando nenhuma entrada do build mudou. Se um teste ou critério mudou, revalide-o; nunca atribua aprovação antiga à nova condição.
+- Preserve caches saudáveis. Limpeza deve ser específica, motivada por evidência e comparada antes/depois; não apague dados do app, sessão ou histórico. Cache interno da OpenAI não é controlável por este repositório.
+- Registre tempo de investigação/edição e tempo de CI separadamente. Percentual de melhoria exige medições comparáveis; 70% é uma meta, não garantia.
+- Não encerre com promessa de acompanhamento em segundo plano. Diferencie instrução registrada, código alterado, candidato compilado e APK publicado.
+
 ## Fonte correta e entrega atômica
 - Antes de editar, leia a branch atual e a maior versão Android publicada. Não republique uma base antiga com número novo. Preserve funcionalidades e dados existentes.
 - Faça o conjunto de alterações em uma branch de trabalho baseada na versão atual. Promova o conjunto completo para `sofia-app-android` em um único commit ou avanço fast-forward protegido pelo SHA observado. Nunca faça uma publicação parcial por arquivo.

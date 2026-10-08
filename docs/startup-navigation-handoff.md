@@ -28,7 +28,7 @@ CI with locked dependencies passed TypeScript, 352/352 app tests, 165/165 isolat
 
 The 13 new tests cover independent slow/failed reads, snapshot retention, scoped deletion, late reads, bridge visibility/cancellation and static native-fade contracts. They include pure logic/mocks/source assertions, not handset visual proof. Final local focused checks passed 35/35; broader startup checks 106/106; native-delivery contract unit tests 10/10. The local full suite's absent React Native dependency check was not suppressed; CI installed the locked runtime and passed the complete suite.
 
-At the last check, native navigation job 113424502110 and workspace job 113424502179 were still in progress. Do not claim they passed; consult the same run rather than rebuilding identical code. The authenticated emulator suite uses the separate synthetic-transport fixture; a passed marker or that fixture's timings cannot be presented as production-handset startup evidence.
+Read-only follow-up on 2026-10-08: native navigation job 113424502110 and workspace job 113424502179 completed successfully. Release job 113428338504 failed at publish-release.cjs because the required physical-device acceptance report was absent. Run 37809157208 finished with failure at 16:45:54 UTC; 0.3.60 was not promoted. The authenticated emulator suite uses the separate synthetic-transport fixture; these passes are not production-handset startup evidence. Reuse the retained APK rather than rebuilding identical code to obtain a report that requires actual device validation.
 
 No physical device was available. Full icon-to-verified-interaction timing, 20 cold starts, 100 native sequences with representative real records, white-frame continuity through the fade and real-account in-place upgrade remain unproved for 0.3.60. No whole-app speed factor or <=1000 ms phone guarantee is claimed. Cache projections already missing in an older installation must be reconstructed from the legitimate origin, never fabricated.
 
@@ -45,3 +45,14 @@ Published baseline at inspection: 0.3.57, code 62, run 37789662903. Its two synt
 No backend, database, main branch, credential, encryption implementation, package or updater-channel mutation was made by this change. Install candidates in place; do not uninstall or clear data. Matching signing identity is necessary but does not by itself prove preservation of the owner's displayed records.
 
 startup-release-gate.cjs remains unchanged and requires SOFIA_APP/dist/startup-navigation-acceptance.json for the exact source/APK. Never synthesize it from unit-test fixtures, ready markers or QA transport. Missing physical acceptance intentionally blocks approved publication. This is an installable candidate, not an approved release.
+
+## Sofia Delta follow-up — 2026-10-08
+Use [Sofia Delta](sofia-delta.md) for subsequent changes. This review changes instructions only; no runtime optimization or new APK is claimed.
+
+Measured delivery: build job 435 s; native navigation 515 s and workspace 442 s in parallel; release job 39 s; total run 1001 s including inter-job overhead. Gradle reused 124 production tasks and 343 QA tasks were up-to-date. No cache corruption was demonstrated, so no cache was purged. OpenAI internal caches are outside this repository's control.
+
+Source inspection confirmed the configured 120 ms fade and the 0.3.60 cache/initialization changes. It also found a possible fade-skip ordering: on Android 12+, if reveal's posted callback runs before exitSystemSplash is assigned, completeReveal marks the app visible; a later system-splash callback then removes the splash immediately. This is a static code-path finding, not reproduction on the user's phone; inspect LOCAL_READY, FADE_START and DATA timing plus video before asserting the cause. Disabled animations and warm starts are separate intended cases.
+
+The fade-specific unit test checks source strings and bridge mocks, not this native callback ordering or a visible transition. Home's native ready marker still requires tasksReady and calendar.loadedAt; missing local records can therefore leave network completion in the launch path. The exact contribution to the user's delay remains unmeasured. Do not report a source edit or passed mock as a demonstrated visual fix.
+
+The [official OpenAI status page](https://status.openai.com/) reported operational when checked. The [Codex/Work degradation on October 7](https://status.openai.com/incidents/01M4BP5JE7DKJSP3VG2S2DCWF2) was marked resolved. There is no established causal link between that incident and this APK's missing fade or GitHub build/test duration.
