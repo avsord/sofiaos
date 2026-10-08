@@ -1,5 +1,5 @@
 'use strict';
-const test=require('node:test'),assert=require('node:assert/strict'),load=require('./load-ts.cjs');
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),load=require('./load-ts.cjs');
 const nav=load('src/lib/page-navigation.ts'),leaf=load('src/lib/leaf-document.ts'),priority=load('src/lib/task-filters.ts'),agenda=load('src/lib/agenda-priority.ts',{'./task-filters':priority});
 test('back follows entry path: direct subpage returns to menu, nested entry returns to prior page',()=>{const pages=new Map([['parent',{id:'parent',data:{}}],['child',{id:'child',data:{parent_id:'parent'}}],['leaf',{id:'leaf',data:{parent_id:'child'}}]]);assert.equal(nav.entryBackTarget(pages,'child',[]),null);assert.equal(nav.entryBackTarget(pages,'child',['parent']),'parent');assert.equal(nav.entryBackTarget(pages,'leaf',['parent','child']),'child');assert.equal(nav.entryBackTarget(pages,'leaf',['parent','deleted']),'parent');});
 test('calendar dots keep multiple priority colors visible even on selected days',()=>{const colors=agenda.dayPriorityColors([{data:{priority_level:'none'}},{data:{priority_level:'important'}},{data:{priority_level:'medium'}},{data:{priority_level:'important'}}],'#FFFFFF');assert.deepEqual(Array.from(colors),['#D94B57','#B77713','#FFFFFF']);assert.equal(agenda.agendaPriority({data:{}}).value,'none');});
@@ -11,4 +11,14 @@ test('page back requires a deliberate left-edge swipe and never starts during an
  assert.equal(nav.shouldBeginPageBack({x0:10,dx:20,dy:2},400,400,false,false),false);
  assert.equal(nav.shouldBeginPageBack({x0:50,dx:100,dy:1},400,400,false,false),false);
  assert.equal(nav.shouldBeginPageBack({x0:10,dx:100,dy:1},400,400,false,true),false);
+});
+
+test('tasks filter by user areas and create/edit reuses the Library-style creatable selector',()=>{
+ const workspace=fs.readFileSync(path.join(__dirname,'../src/screens/Workspace.tsx'),'utf8');
+ assert.ok(workspace.includes('Choice label="Filtrar por área"'));
+ assert.ok(workspace.includes("const areaOptions=[...new Set([...areas,...items.map(t=>t.area?.trim()||'Pessoal')])"));
+ assert.ok(workspace.includes('<Choice creatable label="Área da tarefa"'));
+ assert.ok(workspace.includes('options={areaOptions.map(value=>({value,label:value}))}'));
+ assert.ok(workspace.includes('Escolha uma área existente ou pesquise e crie uma nova.'));
+ assert.ok(workspace.includes("area:areaFilter||'Pessoal'"));
 });
