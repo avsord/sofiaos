@@ -19,18 +19,13 @@ import {NotificationProvider} from './src/components/NotificationCenter';
 import {createMenuMotion} from './src/lib/menu-motion';
 import type {TabPagerHandle} from './src/components/TabPager';
 import {useStartupMounts} from './src/lib/startup-mounts';
+import {DeferredScreen,loadAgenda,loadChat,loadNotifications,loadPages,loadProfile,loadWorkspace} from './src/lib/screen-loader';
 import {Login} from './src/screens/Login';
 import {Home as HomeScreen} from './src/screens/Home';
-import {Chat as ChatScreen} from './src/screens/Chat';
-import {Agenda as AgendaScreen} from './src/screens/Agenda';
-import {Notifications as NotificationsScreen} from './src/screens/Notifications';
-import {Profile as ProfileScreen} from './src/screens/Profile';
-import {Workspace as WorkspaceScreen} from './src/screens/Workspace';
-import {Pages as PagesScreen} from './src/screens/Pages';
 import {APP_VERSION,checkForUpdate} from './src/lib/update';
 
 // Keep screen instances and unchanged screen trees across menu taps and swipes.
-const Home=React.memo(HomeScreen),Chat=React.memo(ChatScreen),Agenda=React.memo(AgendaScreen),Notifications=React.memo(NotificationsScreen),Profile=React.memo(ProfileScreen),Workspace=React.memo(WorkspaceScreen),Pages=React.memo(PagesScreen);
+const Home=React.memo(HomeScreen);
 const tabs:{id:Tab;label:string;icon:IconName}[]=[{id:'home',label:'Início',icon:'home'},{id:'chat',label:'Conversa',icon:'chat'},{id:'pages',label:'Páginas',icon:'book'},{id:'agenda',label:'Agenda',icon:'calendar'},{id:'apps',label:'Apps',icon:'grid'},{id:'profile',label:'Perfil',icon:'user'}];
 class AppBoundary extends Component<{children:React.ReactNode},{failed:boolean}>{
  state={failed:false};static getDerivedStateFromError(){return {failed:true};}
@@ -117,14 +112,14 @@ function Shell(){
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?0:1}]} pointerEvents={tab==='notifications'?'none':'auto'} accessibilityElementsHidden={tab==='notifications'} importantForAccessibility={tab==='notifications'?'no-hide-descendants':'auto'}>
   <TabPager motion={menuMotion} ref={pager} activeTab={tab} enabled={!gestureLocked&&!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)&&!(tab==='apps'&&workspaceDepth)} onSelect={navigate}>
    <Home onDiscussTask={discussTask} onOpenCapsules={openCapsules} onGestureLock={setGestureLocked} api={api} bootstrap={bootstrap} navigate={navigate} onOpenAgenda={openAgenda} active={screenTab==='home'}/>
-   {mountedTabs.has('chat')?<Chat taskContext={taskContext} onClearTaskContext={clearTaskContext} key={'chat-'+chatEpoch} api={api} bootstrap={bootstrap} enterToSend={prefs.enterToSend} autoSendVoice={prefs.autoSendVoice} onLock={setLocked} active={screenTab==='chat'} onRefreshBootstrap={boot}/>:<View style={{flex:1}}/>}
-   {mountedTabs.has('pages')?<Pages key={bootstrap.profile.email} api={api} active={screenTab==='pages'} storageScope={bootstrap.profile.email} onDepthChange={setPagesDepth}/>:<View style={{flex:1}}/>}
-   {mountedTabs.has('agenda')?<Agenda onGestureLock={setGestureLocked} api={api} target={agendaTarget} active={screenTab==='agenda'}/>:<View style={{flex:1}}/>}
-   {mountedTabs.has('apps')?<Workspace onDiscussTask={discussTask} openCapsulesKey={capsulesTarget} resetKey={workspaceReset} api={api} navigate={navigate} onDepthChange={setWorkspaceDepth} active={screenTab==='apps'}/>:<View style={{flex:1}}/>}
-   {mountedTabs.has('profile')?<Profile api={api} bootstrap={bootstrap} prefs={prefs} onPrefs={changePrefs} onProfile={profile} onLogout={logout} onCheckUpdate={manualUpdate} onChatHistoryCleared={clearChat}/>:<View style={{flex:1}}/>}
+   {mountedTabs.has('chat')?<DeferredScreen key={'chat-'+chatEpoch} load={loadChat} screenProps={{taskContext,onClearTaskContext:clearTaskContext,api,bootstrap,enterToSend:prefs.enterToSend,autoSendVoice:prefs.autoSendVoice,onLock:setLocked,active:screenTab==='chat',onRefreshBootstrap:boot}}/>:<View style={{flex:1}}/>}
+   {mountedTabs.has('pages')?<DeferredScreen key={bootstrap.profile.email} load={loadPages} screenProps={{api,active:screenTab==='pages',storageScope:bootstrap.profile.email,onDepthChange:setPagesDepth}}/>:<View style={{flex:1}}/>}
+   {mountedTabs.has('agenda')?<DeferredScreen load={loadAgenda} screenProps={{onGestureLock:setGestureLocked,api,target:agendaTarget,active:screenTab==='agenda'}}/>:<View style={{flex:1}}/>}
+   {mountedTabs.has('apps')?<DeferredScreen load={loadWorkspace} screenProps={{onDiscussTask:discussTask,openCapsulesKey:capsulesTarget,resetKey:workspaceReset,api,navigate,onDepthChange:setWorkspaceDepth,active:screenTab==='apps'}}/>:<View style={{flex:1}}/>}
+   {mountedTabs.has('profile')?<DeferredScreen load={loadProfile} screenProps={{api,bootstrap,prefs,onPrefs:changePrefs,onProfile:profile,onLogout:logout,onCheckUpdate:manualUpdate,onChatHistoryCleared:clearChat}}/>:<View style={{flex:1}}/>}
   </TabPager>
  </View>
- <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?1:0,backgroundColor:c.bg}]} pointerEvents={tab==='notifications'?'auto':'none'} accessibilityElementsHidden={tab!=='notifications'} importantForAccessibility={tab==='notifications'?'auto':'no-hide-descendants'}><Notifications api={api} onBack={notificationBack}/></View>
+ <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?1:0,backgroundColor:c.bg}]} pointerEvents={tab==='notifications'?'auto':'none'} accessibilityElementsHidden={tab!=='notifications'} importantForAccessibility={tab==='notifications'?'auto':'no-hide-descendants'}>{tab==='notifications'?<DeferredScreen load={loadNotifications} screenProps={{api,onBack:notificationBack}}/>:null}</View>
  </View>
  {!keyboard?<View nativeID="sofia-menu-bar" style={{flexDirection:'row',backgroundColor:c.surface,borderTopWidth:1,borderColor:c.line,paddingHorizontal:8,paddingTop:7,paddingBottom:4}}>{tabs.map(item=><MenuTab locked={locked} motion={menuMotion} key={item.id} item={item} selected={tab===item.id} onSelect={navigate}/>)}</View>:null}</>}
  </View></SafeAreaView></NotificationProvider></ThemeContext.Provider>;
