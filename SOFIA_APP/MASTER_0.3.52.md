@@ -23,3 +23,14 @@ Instalação por cima da 0.3.51, preservando tarefas, áreas, mensagens, agenda,
 ## Critério de entrega
 
 A versão só é considerada entregue depois de typecheck, testes do app/backend, build Android, validação de upgrade/assinatura, shards nativos e publicação real no canal `sofia-android-v`.
+
+
+## Correção da Home / servidor
+
+A Home não pode falhar inteira por incompatibilidade de catálogo ou por um módulo secundário.
+
+- O backend deixa de assumir que todo registro persistido ainda possui uma definição no catálogo atual. Registros legados desconhecidos são preservados e ignorados apenas nos agrupamentos que exigem definição de catálogo.
+- O tipo `capsule` volta a fazer parte oficialmente do catálogo do servidor, compatível com os dados que o app de Cápsulas já grava.
+- A pré-carga Android consulta somente tipos anunciados pelo catálogo quando ele está disponível.
+- Falhas de Monitoramentos ficam restritas ao widget; Home, Agenda e Tarefas continuam utilizáveis.
+- Há regressão de backend garantindo que `/api/mobile/home` continue 200 mesmo quando existe um registro legado desconhecido.
