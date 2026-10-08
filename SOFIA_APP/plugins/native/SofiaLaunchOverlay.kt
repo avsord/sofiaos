@@ -17,11 +17,11 @@ import com.facebook.react.bridge.ReactMethod
  * so the user never sees an intermediate light/dark shell or an empty window.
  */
 object SofiaLaunchOverlay {
-  private var overlay = WeakReference<FrameLayout>(null)
+  private var overlay: WeakReference<FrameLayout>? = null
 
   fun install(activity: Activity) {
     val root = activity.window.decorView as? ViewGroup ?: return
-    overlay.get()?.let { old ->
+    overlay?.get()?.let { old ->
       (old.parent as? ViewGroup)?.removeView(old)
     }
     val layer = FrameLayout(activity).apply {
@@ -44,14 +44,15 @@ object SofiaLaunchOverlay {
   }
 
   private fun remove(view: FrameLayout?) {
-    val current = view ?: overlay.get() ?: return
+    val current = view ?: overlay?.get() ?: return
     (current.parent as? ViewGroup)?.removeView(current)
-    if (overlay.get() === current) overlay.clear()
+    if (overlay?.get() === current) overlay?.clear()
   }
 
   fun hide(activity: Activity?) {
-    val current = overlay.get() ?: return
-    (activity ?: current.context as? Activity)?.runOnUiThread { remove(current) } ?: remove(current)
+    val current = overlay?.get() ?: return
+    val host = activity ?: (current.context as? Activity)
+    if (host != null) host.runOnUiThread { remove(current) } else remove(current)
   }
 }
 
