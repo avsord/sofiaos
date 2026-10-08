@@ -6,7 +6,7 @@
     "scheme": "sofiaapp",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "backgroundColor": "#F7F6FA",
+    "backgroundColor": "#7258E8",
     "icon": "./assets/icon.png",
     "ios": {
       "bundleIdentifier": "com.avsord.sofiaapp",
@@ -48,6 +48,7 @@
         }
       ],
       "./plugins/with-sofia-logo.cjs",
+      "./plugins/with-sofia-launch.cjs",
       "./plugins/with-calendar-gesture.cjs",
       [
         "expo-notifications",
