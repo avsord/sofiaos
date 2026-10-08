@@ -110,7 +110,7 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
      if(mounted.current){setConversation(page.conversation);setMessages(mergeMessages(page.messages,[{...message,conversation_id:targetId,status:'sending'}]));}
     }
    }
-   if(message.localVoice){const file=new File(message.localVoice.uri);if(!file.exists)throw new Error('O áudio não está mais no celular. Grave novamente.');if(file.size>bootstrap.limits.audio_bytes)throw new Error('Este áudio ultrapassou 10 MB. Grave uma mensagem mais curta.');const base64=await file.base64();result=await api.audio({...data,audio_base64:base64,mime:'audio/mp4',duration_ms:message.localVoice.duration});}
+   if(message.localVoice){const file=new File(message.localVoice.uri);if(!file.exists)throw new Error('O áudio não está mais no celular. Grave novamente.');if(file.size>bootstrap.limits.audio_bytes)throw new Error('O áudio ficou grande demais para uma única mensagem. Grave em partes para concluir o envio.');const base64=await file.base64();result=await api.audio({...data,audio_base64:base64,mime:'audio/mp4',duration_ms:message.localVoice.duration});}
    else {
     let content=message.content;
     if(message.localAttachments?.length){
