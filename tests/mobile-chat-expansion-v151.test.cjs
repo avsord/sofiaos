@@ -4,7 +4,7 @@ const {fixture}=require('./helpers.cjs');
 const {createRuntime}=require('../src/core/runtime');
 const PASSWORD='test-only-password-151';
 async function setup(t){
- const f=fixture(t);f.config.loginPassword=PASSWORD;f.config.loginEmail='owner@example.com';
+ const f=fixture(t);f.config.loginPassword=PASSWORD;f.config.loginEmail='owner@example.com';f.config.maxMessageChars=1000000;
  const runtime=createRuntime(f.config,{store:f.store,provider:f.provider,secureDir:path.join(f.dir,'secure'),audioService:{transcribe:async()=>({text:'Áudio longo recebido.',languages:['pt']})}});
  const server=http.createServer(runtime.handler);await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;f.config.publicBaseUrl=base;
  t.after(async()=>{server.closeAllConnections();await new Promise(r=>server.close(r));});
