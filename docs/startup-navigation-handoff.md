@@ -1,5 +1,13 @@
 # Sofia OS — startup/navigation handoff, 2026-10-08
 
+## 0.3.63 direct candidate delivery checkpoint
+
+Exact source: 4ac25d8dc59add8a37dd098e629478760a799961. Run 37838702548. Build job 113522290371 succeeded; APK version 0.3.63/code68, 51,609,212 bytes, SHA256 fcd2c27dd8cd44da8ec27af14c635daaa856fe8fe20470ce9c771d308d164217. Production package and signing certificate match; six changed runtime/test source files match the compiled source archive byte-for-byte. 368 local app tests and TypeScript passed. Build artifact 11577306140; uploaded direct file Sofia-OS-0.3.63.apk (Library libfile_da67cbc8210081918d0776cf2f5ff768). User explicitly requested the APK immediately, without further progress messages.
+
+At this checkpoint the manual emulator job 113525118759 is still running. Do not claim its installation/pagination results or a speed improvement until its real result is retrieved. No official updater release was published. Next action: retrieve the exact job/evidence and record the measured five-start comparison; reuse this APK if no runtime changes are necessary.
+
+Railway verified the Android-only commit as SKIPPED (e1394b41-7a50-45e0-bb64-285d372fb69e); the existing server deployment stayed unchanged. Health check succeeded with HTTP 200 in 0.182413 s. Production Gradle build took 4m17s with 124 tasks from cache. The identified unnecessary-server-restart cause was corrected by root-anchored watch paths; do not infer a general guarantee against all 502s or an OpenAI outage.
+
 ## Current work: 0.3.63 faster native reveal
 
 User asked for further startup improvement after receiving 0.3.62. In run 37834460902, offline production-APK upgrade and authenticated Home/Chat checks passed. Exact delivered 0.3.62: source b03aa69646c178e556b17e871447c85a72826b9a, code67, APK SHA256 d8033b9566fdd9b0af74380d1a55e9856851f0285b3ca208a203597e86642013. Emulator medians were 1448 ms for 0.3.61 and 1394 ms for 0.3.62; this small three-sample difference is not proof of a substantial speedup on the user's phone.
@@ -11,6 +19,8 @@ The same 0.3.63 candidate now also opens with the latest 20 messages, restores o
 Run 37837214009 failed at 20:09:35 UTC before compilation when the public health endpoint returned HTTP 502. The next manual build retains server compatibility checks, retries transient HTTP failures up to three times within a bounded window, records request headers/timing and reuses that same fresh response for the adjacent capability check instead of making a duplicate request. This mitigates delivery interruption; it does not assert that the server fault itself is fixed.
 
 Railway diagnosis: deployment 5e26f014-2e0a-4f0c-9385-d2ea8f99c621 was triggered by Android-only commit 77464032. At 20:09:20 UTC the previous container stopped; /health and /api/mobile/chat-sync returned 502 at 20:09:35 after three 5-second connection-dial timeouts. Requests recovered at 20:09:36. Existing gitignore-style watch patterns included unanchored package.json/package-lock.json, which also match SOFIA_APP/package.json and its lockfile. Updated only watchPatterns to /src/**, /tools/**, /package.json, /package-lock.json in production, preserving the mounted /sofia volume and running deployment. Verify the next Android-only commit is skipped by Railway. No redeploy, reset, backend code edit or data write was requested/performed for this fix.
+
+Status discipline after the voice-response error: keep the exact run ID and source SHA as the resume checkpoint. A failed/interrupted status lookup is not evidence of a failed build or lost access. Report lookup failure, build failure, build completion and artifact delivery as separate observable states. Re-query the same run automatically under the existing delivery authorization. Never ask for authorization again solely because a status lookup was interrupted, restart a successful build for a lookup error, or announce an attached APK before upload/link completion. A failed response must be corrected explicitly rather than attributed to an unverified OpenAI outage.
 
 ## Current work: 0.3.62 local-first manual delivery
 
