@@ -17,6 +17,9 @@ export function useMotionPresence(visible:boolean,{enterReady=true,enterDuration
  const reduced=useReducedMotion(),progress=useRef(new Animated.Value(0)).current,epoch=useRef(0);
  const [mounted,setMounted]=useState(visible);
  useEffect(()=>{
+  // A closed panel has no native surface to animate. Previously every hidden
+  // sheet started a zero-to-zero animation during the first Home commit.
+  if(!visible&&!mounted)return;
   const token=++epoch.current;progress.stopAnimation();
   if(visible)setMounted(true);
   // A native Modal may attach after React's visibility effect. Keep it at the

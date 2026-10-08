@@ -39,26 +39,25 @@ class SofiaAlarmModule(private val context: ReactApplicationContext) : ReactCont
     } catch (e: Exception) { promise.reject("ALARM_SETTINGS", e) }
   }
 }
-/** Disposable cache only: never stores passwords/tokens and never edits server data. */
-class SofiaSnapshotModule(private val app: ReactApplicationContext) : ReactContextBaseJavaModule(app) {
-  private val io = Executors.newSingleThreadExecutor()
-  private val alias = "sofia.cache.aes.v1"
-  // Keystore handles stay inside Android. Access is serialized on the same I/O
-  // worker as reads/writes; no decrypted account data is cached across scopes.
+/** Process-local key handle, not decrypted records. All key access and cache
+ * I/O share one serial worker, including work started before React exists. */
+object SofiaSnapshotIO {
+  val worker = Executors.newSingleThreadExecutor()
+  private const val alias = "sofia.cache.aes.v1"
   private var cachedKey: SecretKey? = null
-  override fun getName() = "SofiaSnapshot"
-  @ReactMethod fun prepareLaunch() { io.execute {
-    try {
-      val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-      cachedKey = store.getKey(alias, null) as? SecretKey
-    } catch (_: Exception) { /* A cache optimization cannot prevent startup. */ }
-  } }
-  private fun file(scope: String): AtomicFile {
-    require(scope.isNotEmpty() && scope.length <= 1024)
-    val hash = MessageDigest.getInstance("SHA-256").digest(scope.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
-    return AtomicFile(File(app.noBackupFilesDir, "snapshot-" + hash))
+  private var prepared = false
+  @Synchronized fun prepareLaunch() {
+    if (prepared) return
+    prepared = true
+    worker.execute {
+      try {
+        val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        cachedKey = store.getKey(alias, null) as? SecretKey
+      } catch (_: Exception) { /* Cache misses still use normal recovery. */ }
+    }
   }
-  private fun key(): SecretKey {
+  // Called only on worker. Reads/writes cannot race key preparation/generation.
+  fun key(): SecretKey {
     cachedKey?.let { return it }
     val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
     (store.getKey(alias, null) as? SecretKey)?.let { cachedKey = it; return it }
@@ -67,6 +66,17 @@ class SofiaSnapshotModule(private val app: ReactApplicationContext) : ReactConte
         .setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build())
     }.generateKey().also { cachedKey = it }
   }
+}
+/** Disposable cache only: never stores passwords/tokens and never edits server data. */
+class SofiaSnapshotModule(private val app: ReactApplicationContext) : ReactContextBaseJavaModule(app) {
+  private val io = SofiaSnapshotIO.worker
+  override fun getName() = "SofiaSnapshot"
+  @ReactMethod fun prepareLaunch() { SofiaSnapshotIO.prepareLaunch() }
+  private fun file(scope: String): AtomicFile {
+    require(scope.isNotEmpty() && scope.length <= 1024)
+    val hash = MessageDigest.getInstance("SHA-256").digest(scope.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+    return AtomicFile(File(app.noBackupFilesDir, "snapshot-" + hash))
+  }
   @ReactMethod fun read(scope: String, promise: Promise) { io.execute {
     try {
       val f = file(scope)
@@ -74,7 +84,7 @@ class SofiaSnapshotModule(private val app: ReactApplicationContext) : ReactConte
       require(f.baseFile.length() <= 8 * 1024 * 1024)
       val bytes = f.readFully(); require(bytes.size > 28)
       val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-      cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes.copyOfRange(0, 12)))
+      cipher.init(Cipher.DECRYPT_MODE, SofiaSnapshotIO.key(), GCMParameterSpec(128, bytes.copyOfRange(0, 12)))
       cipher.updateAAD(scope.toByteArray(Charsets.UTF_8))
       promise.resolve(String(cipher.doFinal(bytes.copyOfRange(12, bytes.size)), Charsets.UTF_8))
     } catch (_: Exception) { promise.resolve(null) } // Corrupt cache is a miss, not a logout.
@@ -82,7 +92,7 @@ class SofiaSnapshotModule(private val app: ReactApplicationContext) : ReactConte
   @ReactMethod fun write(scope: String, value: String, promise: Promise) { io.execute {
     try {
       val bytes = value.toByteArray(Charsets.UTF_8); require(bytes.size <= 6 * 1024 * 1024)
-      val cipher = Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.ENCRYPT_MODE, key())
+      val cipher = Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.ENCRYPT_MODE, SofiaSnapshotIO.key())
       cipher.updateAAD(scope.toByteArray(Charsets.UTF_8))
       val encrypted = cipher.iv + cipher.doFinal(bytes)
       val f = file(scope); val stream = f.startWrite()

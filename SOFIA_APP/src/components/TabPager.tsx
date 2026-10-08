@@ -6,15 +6,31 @@ import type {MenuMotion} from '../lib/menu-motion';
 import {TAB_ORDER,tabIndex,createPagerSelection} from '../lib/tab-navigation';
 
 export type TabPagerHandle = {goTo: (tab: Tab) => void};
-type Props = {motion: MenuMotion; activeTab: Tab; enabled: boolean; onSelect: (tab: Tab) => void; children: React.ReactNode};
+type Props = {initialWidth?: number; motion: MenuMotion; activeTab: Tab; enabled: boolean; onSelect: (tab: Tab) => void; children: React.ReactNode};
+
+/** Read the same root metrics already used by SafeAreaProvider. A recreated
+ * window may differ, so this is only a render seed; onLayout is authoritative.
+ * Non-native/fixture environments retain the existing measured fallback. */
+function nativeInitialWidth():number {
+  try {
+    const metrics=require('react-native-safe-area-context').initialWindowMetrics;
+    if(!metrics)return 0;
+    const width=metrics.frame.width-metrics.insets.left-metrics.insets.right;
+    return Number.isFinite(width)?Math.max(0,Math.min(760,width)):0;
+  } catch { return 0; }
+}
 
 /** Native paging with a measured initial offset; taps never wait for an animation. */
-export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({activeTab,enabled,onSelect,children,motion},ref) {
+export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({activeTab,enabled,onSelect,children,motion,initialWidth},ref) {
   const scroll = useRef<ScrollView>(null);
   const aligned = useRef<{width:number;x:number}|null>(null);
   const dragStart=useRef(0);
-  const size = useRef(0),measured = useRef({viewport:0,content:0});
-  const [width,setWidth] = useState(0),[readyWidth,setReadyWidth] = useState(0);
+  // The native root frame is a render seed, never proof of measured geometry.
+  // Avoid mounting an empty pager, waiting for JS onLayout, then mounting Home.
+  const supplied=initialWidth??nativeInitialWidth();
+  const seed=Number.isFinite(supplied)&&supplied>0?supplied:0;
+  const size = useRef(seed),measured = useRef({viewport:0,content:0});
+  const [width,setWidth] = useState(seed),[readyWidth,setReadyWidth] = useState(0);
   const selection = useRef(createPagerSelection(activeTab));
   const latest = useRef({activeTab,enabled,onSelect});
   latest.current = {activeTab,enabled,onSelect};
@@ -43,7 +59,7 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
   },[align,motion]);
   useImperativeHandle(ref,() => ({goTo}),[goTo]);
   // The motion owner survives login/bootstrap; a fresh pager must not inherit its old tab.
-  useLayoutEffect(() => {motion.reset(selection.current.current());},[motion]);
+  useLayoutEffect(() => {if(size.current>0)motion.resize(size.current,selection.current.current());motion.reset(selection.current.current());},[motion]);
   useLayoutEffect(() => {if(activeTab!==selection.current.current())goTo(activeTab);},[activeTab,goTo]);
   useLayoutEffect(() => {if (!enabled) {selection.current.cancelDrag();align();}},[enabled,align]);
   const layout = useCallback((event: LayoutChangeEvent) => {

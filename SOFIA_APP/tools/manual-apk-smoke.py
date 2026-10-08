@@ -2,7 +2,7 @@
 Retained QA APK seeds synthetic records only, then is replaced by production.
 The test never authenticates against the owner's server account or edits its data.
 """
-import hashlib,json,re,statistics,subprocess,time,xml.etree.ElementTree as ET
+import hashlib,io,json,re,statistics,subprocess,time,zipfile,xml.etree.ElementTree as ET
 from pathlib import Path
 root=Path(__file__).resolve().parents[1];dist=root/'dist';out=dist/'manual-evidence';out.mkdir(parents=True,exist_ok=True)
 pkg='com.avsord.sofiaapp'
@@ -49,9 +49,14 @@ try:
  adb('shell','svc','wifi','disable');adb('shell','svc','data','disable')
  adb('shell','cmd','connectivity','airplane-mode','enable')
  result['offline']=True
- previous=dist/'previous-063/Sofia-OS.apk'
+ # Compare the exact last delivered 0.3.65, not the older retained seed.
+ previous=dist/'previous-065.apk'
+ baseline_zip=subprocess.check_output(['gh','api','repos/avsord/sofiaos/actions/artifacts/11578764274/zip'],timeout=120)
+ with zipfile.ZipFile(io.BytesIO(baseline_zip)) as archive:
+  previous.write_bytes(archive.read('Sofia-OS.apk'))
+ result['baseline_version']='0.3.65'
  result['baseline_apk_sha256']=hashlib.sha256(previous.read_bytes()).hexdigest()
- assert result['baseline_apk_sha256']=='fcd2c27dd8cd44da8ec27af14c635daaa856fe8fe20470ce9c771d308d164217'
+ assert result['baseline_apk_sha256']=='6b5a5732edf762cab14092ccb2e4da1577f0a87e94c0af8dcbe4de42205d3bc5'
  adb('install','-r',str(previous))
  for i in range(5):result['baseline_runs'].append(cold('baseline-'+str(i)))
  before=capture('baseline');assert 'Olá, Teste.' in before,'Previous production APK did not restore the saved account'

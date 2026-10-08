@@ -1,0 +1,62 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const load=require('./load-ts.cjs'),root=path.resolve(__dirname,'..');
+const model=load('src/lib/tab-navigation.ts'),animated=require('./animated-stub.cjs')();
+const {createMenuMotion}=load('src/lib/menu-motion.ts',{'react-native':{Animated:animated.Animated},'./tab-navigation':model});
+function hooks(){
+ const slots=[];let cursor=0,effects=[];
+ const memo=(fn,deps)=>{const i=cursor++,old=slots[i];if(!old||!deps||deps.some((x,n)=>x!==old.deps[n]))slots[i]={value:fn(),deps};return slots[i].value;};
+ const React={__esModule:true,forwardRef:fn=>fn,Children:{map:(kids,fn)=>kids.map(fn)},useRef:value=>{const i=cursor++;return slots[i]||(slots[i]={current:value});},useState:value=>{const i=cursor++;if(!slots[i])slots[i]={value:typeof value==='function'?value():value};return [slots[i].value,v=>{slots[i].value=typeof v==='function'?v(slots[i].value):v;}];},useMemo:memo,useCallback:(fn,deps)=>memo(()=>fn,deps),useLayoutEffect:(fn,deps)=>memo(()=>{effects.push(fn);},deps),useImperativeHandle:(ref,fn,deps)=>memo(()=>{effects.push(()=>{ref.current=fn();});},deps)};React.default=React;
+ return {React,render:fn=>{cursor=0;const value=fn();const list=effects;effects=[];list.forEach(f=>f());return value;}};
+}
+function pager(metrics){
+ const h=hooks(),commands=[],ref={current:null},native={scrollTo:command=>commands.push({...command})};
+ const jsx={jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})};
+ const {TabPager}=load('src/components/TabPager.tsx',{'react':h.React,'react/jsx-runtime':jsx,'react-native':{Platform:{OS:'android'},Animated:animated.Animated,View:'View',StyleSheet:{create:s=>s}},'react-native-safe-area-context':{initialWindowMetrics:metrics},'../lib/tab-navigation':model});
+ let props={motion:createMenuMotion(),activeTab:'home',enabled:true,onSelect(){},children:model.TAB_ORDER.map(id=>({id}))},outer,scroll;
+ function render(patch={}){props={...props,...patch};outer=h.render(()=>TabPager(props,ref)).props;scroll=outer.children?.props;if(scroll)scroll.ref.current=native;}
+ render();return {commands,ref,render,get outer(){return outer;},get scroll(){return scroll;}};
+}
+const metrics=(width,left=0,right=0)=>({frame:{width},insets:{left,right}});
+test('066 native frame mounts Home immediately but requires both real geometry callbacks',()=>{
+ for(const reverse of [false,true]){
+  const p=pager(metrics(400));assert.ok(p.scroll);assert.equal(p.scroll.children.length,6);assert.equal(p.scroll.contentOffset.x,0);assert.equal(p.scroll.scrollEnabled,false);assert.equal(p.scroll.style[1].opacity,0);
+  const viewport=()=>p.scroll.onLayout({nativeEvent:{layout:{width:400}}}),content=()=>p.scroll.onContentSizeChange(2400,700);
+  (reverse?content:viewport)();p.render();assert.equal(p.scroll.scrollEnabled,false);assert.equal(p.commands.length,0);
+  (reverse?viewport:content)();p.render();assert.equal(p.scroll.scrollEnabled,true);assert.equal(p.scroll.style[1].opacity,1);assert.equal(p.commands.at(-1).x,0);
+ }
+});
+test('066 stale frame recovers from actual layout without replaying Home over a new menu tap',()=>{
+ const p=pager(metrics(400));p.ref.current.goTo('profile');p.render({activeTab:'profile'});
+ p.outer.onLayout({nativeEvent:{layout:{width:360}}});p.render();
+ p.scroll.onLayout({nativeEvent:{layout:{width:400}}});p.scroll.onContentSizeChange(2400,700);assert.equal(p.commands.length,0);
+ p.scroll.onContentSizeChange(2160,700);p.scroll.onLayout({nativeEvent:{layout:{width:360}}});p.render();assert.equal(p.scroll.scrollEnabled,true);assert.equal(p.commands.at(-1).x,1800);
+});
+test('066 native frame respects side insets and the existing 760dp shell bound',()=>{
+ assert.equal(pager(metrics(440,20,20)).scroll.snapToInterval,400);assert.equal(pager(metrics(1200)).scroll.snapToInterval,760);
+});
+test('066 absent or invalid metrics preserve measured fallback rather than zero-width Home',()=>{
+ for(const m of [null,metrics(0),metrics(-1),metrics(NaN),metrics(Infinity)]){
+  const p=pager(m);assert.equal(p.scroll,undefined);p.outer.onLayout({nativeEvent:{layout:{width:360}}});p.render();p.scroll.onLayout({nativeEvent:{layout:{width:360}}});p.scroll.onContentSizeChange(2160,700);p.render();assert.equal(p.scroll.scrollEnabled,true);
+ }
+});
+test('066 hidden panels never schedule native zero-to-zero startup animations',()=>{
+ const effects=[],requests=[],stops=[];class Value{stopAnimation(){stops.push(true);}setValue(){}}
+ const {useMotionPresence}=load('src/lib/motion.ts',{'react':{useRef:v=>({current:v}),useState:v=>[v,()=>{}],useEffect:f=>effects.push(f)},'react-native':{AccessibilityInfo:{isReduceMotionEnabled:async()=>false,addEventListener:()=>({remove(){}})},Keyboard:{},Easing:{bezier:()=>null},Animated:{Value,timing:(_v,o)=>{requests.push(o);return {start(){},stop(){}};}}}});
+ assert.equal(useMotionPresence(false).mounted,false);effects.splice(0).forEach(f=>f());assert.equal(requests.length,0);assert.equal(stops.length,0);
+});
+test('066 native startup queues key preparation once in Application before React startup',()=>{
+ const code=fs.readFileSync(path.join(root,'plugins/with-sofia-alarms.cjs'),'utf8'),module={exports:{}};
+ vm.runInNewContext(code,{module,require:name=>name==='expo/config-plugins'?{withMainApplication:(config,fn)=>fn(config),withDangerousMod:config=>config}:require(name),__dirname:path.join(root,'plugins')});
+ const original='PackageList(this).packages.apply {\n}\noverride fun onCreate() {\n super.onCreate()\n loadReactNative(this)\n}';
+ const apply=contents=>module.exports({modResults:{language:'kt',contents}}).modResults.contents;
+ const once=apply(original);assert.equal(apply(once),once);assert.ok(once.indexOf('SofiaSnapshotIO.prepareLaunch()')<once.indexOf('loadReactNative(this)'));assert.equal((once.match(/SofiaSnapshotIO.prepareLaunch\(\)/g)||[]).length,1);
+ assert.throws(()=>apply('PackageList(this).packages.apply {'),/onCreate insertion point/);
+});
+test('066 native prewarm keeps existing encrypted storage and a single serialized worker',()=>{
+ const code=fs.readFileSync(path.join(root,'plugins/native/SofiaAlarmPackage.kt'),'utf8');
+ assert.equal((code.match(/newSingleThreadExecutor/g)||[]).length,1);
+ for(const marker of ['private val io = SofiaSnapshotIO.worker','@Synchronized fun prepareLaunch()','if (prepared) return','"sofia.cache.aes.v1"','app.noBackupFilesDir','cipher.updateAAD(scope.toByteArray(Charsets.UTF_8))','GCMParameterSpec(128','f.finishWrite(stream)'])assert.ok(code.includes(marker),marker);
+ const prewarm=code.slice(code.indexOf('object SofiaSnapshotIO'),code.indexOf('  // Called only on worker.'));
+ for(const forbidden of ['.get()', '.join()', 'runBlocking', 'Thread.sleep', 'delete(', 'promise.resolve'])assert.ok(!prewarm.includes(forbidden),forbidden);
+});
