@@ -24,6 +24,7 @@ import {useStartupMounts} from './src/lib/startup-mounts';
 import {DeferredScreen,loadAgenda,loadChat,loadHome,loadNotifications,loadPages,loadProfile,loadWorkspace} from './src/lib/screen-loader';
 import {Login} from './src/screens/Login';
 import {APP_VERSION,checkForUpdate} from './src/lib/update';
+import {finishLaunchHandoff} from './src/lib/launch-handoff';
 
 const tabs:{id:Tab;label:string;icon:IconName}[]=[{id:'home',label:'Início',icon:'home'},{id:'chat',label:'Conversa',icon:'chat'},{id:'pages',label:'Páginas',icon:'book'},{id:'agenda',label:'Agenda',icon:'calendar'},{id:'apps',label:'Apps',icon:'grid'},{id:'profile',label:'Perfil',icon:'user'}];
 class AppBoundary extends Component<{children:React.ReactNode},{failed:boolean}>{
@@ -42,6 +43,8 @@ function Shell(){
  const [themeClock,setThemeClock]=useState(()=>new Date());
  useEffect(()=>{const update=()=>setThemeClock(previous=>{const now=new Date();return now.getHours()!==previous.getHours()||now.getMinutes()!==previous.getMinutes()?now:previous;}),timer=setInterval(update,1000),sub=AppState.addEventListener('change',state=>{if(state==='active')update();});return()=>{clearInterval(timer);sub.remove();};},[]);
  const c=themeAppearance(prefs,system,themeClock)==='dark'?dark:light;
+ const launchReady=ready&&(!auth||!!bootstrap);
+ useEffect(()=>{if(!launchReady)return;return finishLaunchHandoff();},[launchReady,c.bg]);
  const expired=useCallback(()=>{tabHistory.current=[];setAuth(null);setBootstrap(null);setLocked(false);void forgetAuth().catch(()=>{});},[]);
  const api=useMemo(()=>new SofiaApi(auth?.token||'',expired,auth?.profile?.email||'anonymous'),[auth?.token,auth?.profile?.email,expired]);
  const servicesReady=useAfterFirstPaint(!!auth&&!!bootstrap),mountedTabs=useStartupMounts(!!auth&&!!bootstrap,tab);
