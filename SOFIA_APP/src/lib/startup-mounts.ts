@@ -7,7 +7,7 @@ const add=(current:Set<Tab>,tabs:Tab[])=>{let changed=false;const next=new Set(c
 
 /** Keep the first native frame small, then progressively mount permanent tab trees.
  * Once a tab mounts it is never unmounted, preserving drafts and scroll position.
- * A tab selected before its warm-up slot mounts immediately.
+ * A tab selected before its warm-up slot mounts immediately in the same render.
  */
 export function useStartupMounts(enabled:boolean,active:Tab){
  const [mounted,setMounted]=useState<Set<Tab>>(()=>new Set<Tab>(['home']));
@@ -17,12 +17,13 @@ export function useStartupMounts(enabled:boolean,active:Tab){
   let cancelled=false;const timers:ReturnType<typeof setTimeout>[]=[];
   const task=InteractionManager.runAfterInteractions(()=>{
    if(cancelled)return;
-   // Conversation + Agenda are the most likely adjacent destinations.
-   timers.push(setTimeout(()=>{if(!cancelled)setMounted(current=>add(current,['chat','agenda']));},90));
-   // Pages/Profile are lighter than the Apps workspace.
-   timers.push(setTimeout(()=>{if(!cancelled)setMounted(current=>add(current,['pages','profile']));},280));
-   // Apps mounts last because its catalog/editors have the largest React tree.
-   timers.push(setTimeout(()=>{if(!cancelled)setMounted(current=>add(current,['apps']));},520));
+   // One small batch at a time prevents a low-end phone from freezing after launch.
+   timers.push(setTimeout(()=>{if(!cancelled)setMounted(current=>add(current,['chat']));},650));
+   timers.push(setTimeout(()=>{if(!cancelled)setMounted(current=>add(current,['agenda']));},1150));
+   timers.push(setTimeout(()=>{if(!cancelled)setMounted(current=>add(current,['pages']));},1750));
+   timers.push(setTimeout(()=>{if(!cancelled)setMounted(current=>add(current,['profile']));},2350));
+   // Apps owns the largest editor/catalog tree and therefore warms last.
+   timers.push(setTimeout(()=>{if(!cancelled)setMounted(current=>add(current,['apps']));},3100));
   });
   return()=>{cancelled=true;task.cancel();for(const timer of timers)clearTimeout(timer);};
  },[enabled]);
