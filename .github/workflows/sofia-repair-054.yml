@@ -1,0 +1,20 @@
+name: Sofia 0.3.54 repair validation
+on:
+  push:
+    branches: [fix/profile-history-startup-054]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package tracked source for regression diagnosis
+        run: git archive --format=tar.gz -o sofia-source.tar.gz HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sofia-source-054
+          path: sofia-source.tar.gz
+          retention-days: 3
