@@ -1,4 +1,5 @@
 import {enqueueNotifications,reconcileNotificationRequests,NOTIFICATION_CHANNEL_LIMIT,NOTIFICATION_SIGNATURE_VERSION,notificationFailure} from './notification-scheduler';
+import {ensureSystemNotificationPermission} from './system-notification-permission';
 import {useEffect,useRef} from 'react';
 import {AppState} from 'react-native';
 import * as Notifications from 'expo-notifications';
@@ -12,22 +13,33 @@ const permissionListeners=new Set<()=>void>();
 let generation=0;
 export let notificationWarning='';
 Notifications.setNotificationHandler({handleNotification:async()=>({shouldShowBanner:true,shouldShowList:true,shouldPlaySound:true,shouldSetBadge:false})});
-export async function requestAgendaPermission(){await Notifications.setNotificationChannelAsync(CHANNEL,{name:'Agenda da Sofia',importance:Notifications.AndroidImportance.HIGH,sound:'default'});let p=await Notifications.getPermissionsAsync();if(!p.granted&&p.canAskAgain)p=await Notifications.requestPermissionsAsync();permissionListeners.forEach(f=>f());return p.granted;}
+export async function requestAgendaPermission(){
+ await Notifications.setNotificationChannelAsync(CHANNEL,{name:'Agenda da Sofia',importance:Notifications.AndroidImportance.HIGH,sound:'default',vibrationPattern:[0,250,120,250]});
+ const granted=await ensureSystemNotificationPermission();permissionListeners.forEach(f=>f());return granted;
+}
 export function notificationPlan(items:AgendaItem[],now=new Date()){
- const end=new Date(now.getFullYear()+2,now.getMonth(),now.getDate()),planned: {id:string;title:string;body:string;date:Date;day:string;entityId:string}[]=[];
- for(const item of items){if(item.tags?.includes('sofia-notify-v1:off'))continue;const ahead=Math.max(0,Math.min(525600,Number(item.data.remind_minutes)||0))*60000;const from=new Date(now.getTime()+ahead),to=readRepeat(item).frequency==='none'?new Date(8640000000000000):new Date(end.getTime()+ahead);
+ const end=new Date(now.getFullYear()+2,now.getMonth(),now.getDate()),planned:{id:string;title:string;body:string;date:Date;day:string;entityId:string}[]=[];
+ for(const item of items){
+  if(item.tags?.includes('sofia-notify-v1:off'))continue;
+  const ahead=Math.max(0,Math.min(525600,Number(item.data.remind_minutes)||0))*60000,from=new Date(now.getTime()+ahead),to=readRepeat(item).frequency==='none'?new Date(8640000000000000):new Date(end.getTime()+ahead);
   for(const event of occurrences(item,from,to)){const start=eventStart(event),date=new Date((start.length===10?new Date(start+'T09:00:00').getTime():Date.parse(start))-ahead);if(date<=now)continue;planned.push({id:item.id+':'+date.getTime(),entityId:item.id,title:item.title,body:event.data.location||'Seu compromisso na agenda da Sofia.',date,day:localDateKey(start)});}
- }return planned.sort((a,b)=>a.date.getTime()-b.date.getTime());
+ }
+ return planned.sort((a,b)=>a.date.getTime()-b.date.getTime());
 }
 function scopeId(scope:string){let hash=2166136261;for(const c of scope)hash=Math.imul(hash^c.charCodeAt(0),16777619);return (hash>>>0).toString(36);}
 async function reconcile(items:AgendaItem[],scope:string,epoch:number){
- if(epoch!==generation)return;await Notifications.setNotificationChannelAsync(CHANNEL,{name:'Agenda da Sofia',importance:Notifications.AndroidImportance.HIGH,sound:'default'});if(!(await Notifications.getPermissionsAsync()).granted)return;
+ if(epoch!==generation)return;
+ await Notifications.setNotificationChannelAsync(CHANNEL,{name:'Agenda da Sofia',importance:Notifications.AndroidImportance.HIGH,sound:'default',vibrationPattern:[0,250,120,250]});
  const all=notificationPlan(items),plan=all.slice(0,NOTIFICATION_CHANNEL_LIMIT);
+ if(all.length&&!(await ensureSystemNotificationPermission())){notificationWarning='Notificações desativadas neste celular. Ative-as para receber os lembretes da Agenda.';return;}
  const desired:Notifications.NotificationRequestInput[]=[];
- for(const event of plan){if(epoch!==generation)return;const id=PREFIX+scopeId(scope)+':'+event.id;const signature=JSON.stringify([NOTIFICATION_SIGNATURE_VERSION,event.title,event.body,event.day]);
-  desired.push({identifier:id,content:{title:event.title,body:event.body,sound:'default',data:{sofiaAgenda:true,scope:scopeId(scope),entityId:event.entityId,day:event.day,signature}},trigger:{type:Notifications.SchedulableTriggerInputTypes.DATE,date:event.date,channelId:CHANNEL}});
+ for(const event of plan){
+  if(epoch!==generation)return;
+  const id=PREFIX+scopeId(scope)+':'+event.id,signature=JSON.stringify([NOTIFICATION_SIGNATURE_VERSION,event.title,event.body,event.day]);
+  desired.push({identifier:id,content:{title:event.title,body:event.body,sound:'default',priority:Notifications.AndroidNotificationPriority.HIGH,data:{sofiaAgenda:true,scope:scopeId(scope),entityId:event.entityId,day:event.day,signature}},trigger:{type:Notifications.SchedulableTriggerInputTypes.DATE,date:event.date,channelId:CHANNEL}});
  }
- if(epoch!==generation)return;await reconcileNotificationRequests(Notifications,PREFIX,desired,()=>epoch===generation);
+ if(epoch!==generation)return;
+ await reconcileNotificationRequests(Notifications,PREFIX,desired,()=>epoch===generation);
  notificationWarning=all.length>NOTIFICATION_CHANNEL_LIMIT?'Há mais de 128 lembretes futuros. Os próximos estão agendados; a Sofia atualiza a lista ao abrir.':'';
 }
 export function useAgendaNotifications(api:SofiaApi,scope:string,enabled:boolean|null,onOpen:(day:string,id?:string)=>void){
