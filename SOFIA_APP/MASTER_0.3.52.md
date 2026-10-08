@@ -34,3 +34,5 @@ A Home não pode falhar inteira por incompatibilidade de catálogo ou por um mó
 - A pré-carga Android consulta somente tipos anunciados pelo catálogo quando ele está disponível.
 - Falhas de Monitoramentos ficam restritas ao widget; Home, Agenda e Tarefas continuam utilizáveis.
 - Há regressão de backend garantindo que `/api/mobile/home` continue 200 mesmo quando existe um registro legado desconhecido.
+
+A regressão automatizada usa um fixture de workspace completo para provar que a Home permanece 200 mesmo com registros legados incompatíveis com o catálogo atual.
