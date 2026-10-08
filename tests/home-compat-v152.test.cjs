@@ -16,7 +16,7 @@ async function setup(t){
  }
  const login=await request('/auth/login',{email:'owner@example.com',password:PASSWORD});
  assert.equal(login.status,200,JSON.stringify(login.body));
- return {...f,request,token:login.body.token};
+ return {...f,...runtime,request,token:login.body.token};
 }
 
 test('mobile Home survives a legacy entity kind and capsule remains queryable',async t=>{
