@@ -62,7 +62,7 @@ class SofiaLaunchModule(private val context: ReactApplicationContext) : ReactCon
   @ReactMethod
   fun hide(promise: Promise) {
     try {
-      SofiaLaunchOverlay.hide(currentActivity)
+      SofiaLaunchOverlay.hide(null)
       promise.resolve(true)
     } catch (e: Exception) {
       promise.reject("LAUNCH_HANDOFF", e)
