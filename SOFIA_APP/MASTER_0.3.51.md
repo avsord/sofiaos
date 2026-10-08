@@ -19,6 +19,8 @@ Não existe mais temporizador de cinco minutos no compositor. O servidor passa a
 
 O campo de mensagem não usa mais `maxLength`. O endpoint móvel aceita até um milhão de caracteres por mensagem e corpo HTTP ampliado. A capacidade real de resposta da IA ainda depende da janela de contexto do provedor; o app não corta silenciosamente o que o usuário digitou.
 
+Os testes de integração exercitam diretamente uma mensagem acima do antigo teto de 12 mil caracteres e uma gravação com duração superior aos antigos cinco minutos usando a mesma configuração ampliada do núcleo.
+
 ## Foto do perfil
 
 A foto é escolhida pela galeria ou câmera e passa pelo editor nativo do Android/iOS com proporção 1:1. O resultado é copiado para o diretório permanente do aplicativo e associado ao e-mail da conta. Remover a foto apaga somente esse arquivo local e retorna às iniciais. Esta entrega não apresenta a foto como sincronizada com o site ou com outro aparelho.
