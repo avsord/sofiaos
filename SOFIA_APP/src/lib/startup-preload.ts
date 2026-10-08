@@ -28,17 +28,25 @@ export class StartupReads {
   return promise;
  }
 }
-export async function preloadStartup(api:{home:()=>Promise<unknown>;tasks:()=>Promise<unknown>;catalog:()=>Promise<{catalog:Record<string,unknown>}>;library:()=>Promise<unknown>;entities:(kind:string)=>Promise<unknown>;dashboardWidgets:()=>Promise<unknown>;integrations:()=>Promise<unknown>;calendarStatus:()=>Promise<unknown>},agenda:()=>Promise<unknown>){
- // Start the current month immediately, independent of the selected menu.
- const primary=Promise.allSettled([agenda(),api.home(),api.tasks(),api.library(),api.dashboardWidgets(),api.integrations(),api.calendarStatus()]);
- try{
-  const catalog=await api.catalog();
-  // Prioritize the actual menu surfaces. Do not flood startup with every backend entity kind.
-  const priority=['user_page','capsule','routine','monitor','film','book','shopping_item','annotation','note'];
-  const kinds=priority.filter(kind=>kind in catalog.catalog||['user_page','capsule','routine','monitor'].includes(kind));
-  let next=0;
-  // Bound background work so chat/navigation stay responsive on a slow connection.
-  await Promise.all(Array.from({length:3},async()=>{while(next<kinds.length){const kind=kinds[next++];try{await api.entities(kind);}catch{/* Each screen retains its own retry and error state. */}}}));
- }catch{/* Failed catalog reads are retried by their consuming screens. */}
+type WarmApi={
+ home:()=>Promise<unknown>;tasks:()=>Promise<unknown>;catalog:()=>Promise<{catalog:Record<string,unknown>}>;
+ library:()=>Promise<unknown>;entities:(kind:string)=>Promise<unknown>;dashboardWidgets:()=>Promise<unknown>;
+ integrations:()=>Promise<unknown>;calendarStatus:()=>Promise<unknown>;ensureChat:()=>Promise<unknown>;
+};
+export async function preloadStartup(api:WarmApi,agenda:()=>Promise<unknown>){
+ // Warm only data after the first frame. The visible Home surface and current
+ // conversation get priority; catalog/library work is intentionally bounded.
+ const primary=Promise.allSettled([agenda(),api.home(),api.tasks(),api.dashboardWidgets(),api.ensureChat()]);
+ let catalog:{catalog:Record<string,unknown>}|null=null;
+ try{catalog=await api.catalog();}catch{/* Consuming screens retain their own retry. */}
  await primary;
+ const priority=['user_page','capsule','routine','monitor','film','book','shopping_item','annotation','note'];
+ const kinds=priority.filter(kind=>!catalog||kind in catalog.catalog||['user_page','capsule','routine','monitor'].includes(kind));
+ const queue:Array<()=>Promise<unknown>>=[
+  ()=>api.library(),()=>api.integrations(),()=>api.calendarStatus(),
+  ...kinds.map(kind=>()=>api.entities(kind))
+ ];
+ let next=0;
+ // Two workers avoid saturating JS/network while the user starts interacting.
+ await Promise.all(Array.from({length:2},async()=>{while(next<queue.length){const job=queue[next++];try{await job();}catch{/* Optional read-ahead never blocks the app. */}}}));
 }
