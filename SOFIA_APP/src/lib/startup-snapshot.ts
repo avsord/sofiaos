@@ -1,3 +1,4 @@
+import {recentChatPage} from './chat-window';
 /** A disposable encrypted view cache. The server remains authoritative. */
 export type SnapshotStorage={read:(scope:string)=>Promise<string|null>;write:(scope:string,value:string)=>Promise<unknown>;remove:(scope:string)=>Promise<unknown>};
 type Entry={at:number;value:unknown};
@@ -21,6 +22,7 @@ export function cacheableRead(path:string){
  return path.startsWith('/workspace/entities?')&&/(?:\?|&)offset=0(?:&|$)/.test(path)&&!/[?&]q=[^&]+/.test(path);
 }
 export class StartupSnapshot {
+ private launchEntries=new WeakSet<Entry>();
  private encoded=new WeakMap<Entry,string>();private exposed=new WeakSet<Entry>();
  private entries=new Map<string,Entry>();private timer:ReturnType<typeof setTimeout>|undefined;private closed=false;private revision=0;
  private hydration:Promise<void>|null=null;private launchOnly=false;private lastLaunch='';
@@ -30,7 +32,10 @@ export class StartupSnapshot {
   if(!raw||raw.length>MAX_BYTES*2||this.closed||revision!==this.revision)return;
   const parsed=JSON.parse(raw);if(parsed.schema!==1||!Array.isArray(parsed.entries))return;
   for(const pair of parsed.entries){if(!Array.isArray(pair)||pair.length!==2)continue;const [path,e]=pair;
-   if(typeof path==='string'&&cacheableRead(path)&&!this.forgotten.has(path)&&!(this.erasedChat&&chatRead(path))&&!(this.erasedData&&path!=='/bootstrap'&&!chatRead(path))&&(!onlyLaunch||launchRead(path,this.now()))&&!this.entries.has(path)&&e&&typeof e.at==='number'&&fresh(path,e.at,this.now()))this.entries.set(path,e);
+   if(typeof path==='string'&&cacheableRead(path)&&!this.forgotten.has(path)&&!(this.erasedChat&&chatRead(path))&&!(this.erasedData&&path!=='/bootstrap'&&!chatRead(path))&&(!onlyLaunch||launchRead(path,this.now()))&&e&&typeof e.at==='number'&&fresh(path,e.at,this.now())){
+    const existing=this.entries.get(path);
+    if(!existing||(!onlyLaunch&&this.launchEntries.has(existing)&&existing.at===e.at)){this.entries.set(path,e);if(onlyLaunch)this.launchEntries.add(e);}
+   }
   }
  }
  async hydrateLaunch(){
@@ -49,7 +54,10 @@ export class StartupSnapshot {
  }
  private async flushLaunch(){
   if(this.closed)return;
-  const pairs=[...this.entries].filter(([path])=>launchRead(path,this.now()));
+  const pairs=[...this.entries].filter(([path])=>launchRead(path,this.now())).map(([path,e])=>{
+   const value=e.value as {messages?:unknown};
+   return path==='/chat-sync/current'&&Array.isArray(value?.messages)?[path,{...e,value:recentChatPage(value as any)}]:[path,e];
+  });
   const raw=JSON.stringify({schema:1,entries:pairs});if(raw===this.lastLaunch)return;
   try{await this.storage.write(this.scope+'|home-v1',raw);this.lastLaunch=raw;}catch{}
  }

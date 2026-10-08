@@ -1,5 +1,16 @@
 import type {Message} from './types';
 import {mergeMessages} from './chat-model';
+import {recentChatPage} from './chat-window';
+/** Polls and send acknowledgements may update the window, never reopen hidden history. */
+export function reconcileChatWindow(current:Message[],snapshot:{messages:Message[];has_more:boolean;deleted_ids?:string[]}):Message[]{
+ if(!current.length)return reconcileMessages(current,recentChatPage(snapshot));
+ const persisted=current.filter(m=>m.sequence),floor=persisted.length?Math.min(...persisted.map(m=>m.sequence!)):0;
+ const known=new Set(current.map(m=>m.id));
+ const overlap=snapshot.messages.findIndex(m=>known.has(m.id));
+ const allowed=new Set((overlap>=0?snapshot.messages.slice(overlap):recentChatPage(snapshot).messages).map(m=>m.id));
+ const next=reconcileMessages(current,snapshot).filter(m=>known.has(m.id)||(floor&&m.sequence?m.sequence>=floor:allowed.has(m.id)));
+ return JSON.stringify(next)===JSON.stringify(current)?current:next;
+}
 /** The returned window is authoritative; tombstones also remove older loaded rows. */
 export function reconcileMessages(current:Message[],snapshot:{messages:Message[];has_more:boolean;deleted_ids?:string[]}):Message[]{
  const incoming=snapshot.messages,deleted=new Set(snapshot.deleted_ids||[]);

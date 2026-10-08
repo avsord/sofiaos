@@ -39,6 +39,12 @@ try:
  adb('shell','pm','grant',pkg,'android.permission.POST_NOTIFICATIONS')
  cold('seed-060');time.sleep(3)
  seed=capture('seed-060');assert 'Olá, Teste.' in seed,'Synthetic account did not reach Home'
+ tap_label(seed,'Conversa');time.sleep(1)
+ tap_label(xml(),'Mensagem para a Sofia');adb('shell','input','text','Teste%srolagem')
+ tap_label(xml(),'Enviar mensagem');time.sleep(4)
+ adb('shell','input','keyevent','BACK');time.sleep(.4)
+ seeded_chat=capture('seeded-history');assert 'FIM DA RESPOSTA QA' in seeded_chat,'Long synthetic conversation was not seeded'
+ tap_label(seeded_chat,'Início');time.sleep(2)
  adb('shell','am','force-stop',pkg)
  adb('shell','svc','wifi','disable');adb('shell','svc','data','disable')
  adb('shell','cmd','connectivity','airplane-mode','enable')
@@ -57,7 +63,16 @@ try:
  # Verify that an actual menu touch works and retained conversation survives.
  tap_label(after,'Conversa');time.sleep(1)
  conversation=capture('conversation')
- assert 'Mensagem preservada' in conversation or 'Resposta preservada' in conversation,'Retained conversation was lost after fast startup'
+ assert 'FIM DA RESPOSTA QA' in conversation,'Recent saved messages were lost after fast startup'
+ width,height=map(int,re.findall(r'(\d+)x(\d+)',adb('shell','wm','size').decode())[0])
+ older_visible=False
+ for group in range(6):
+  for _ in range(4):
+   adb('shell','input','swipe',str(width//2),str(int(height*.30)),str(width//2),str(int(height*.75)),'350');time.sleep(.3)
+  older_tree=xml()
+  if 'Mensagem preservada' in older_tree or 'Resposta preservada' in older_tree:older_visible=True;break
+ assert older_visible,'Scrolling did not automatically restore the previous local page'
+ capture('older-page-by-scroll');result['automatic_local_pagination_tested']=True
  result['saved_conversation_preserved']=True
  result['first_menu_touch_works']=True
  result['baseline_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['baseline_runs'])

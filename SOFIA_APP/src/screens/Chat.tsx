@@ -1,4 +1,5 @@
-import type {Task} from '../lib/types';
+import type {Task,MessagePage} from '../lib/types';
+import {recentChatPage,olderChatPage,ChatHistoryGesture} from '../lib/chat-window';
 import {hasChatArrival} from '../lib/chat-scroll';
 import {newestFirst,useChatTail} from '../lib/chat-tail';
 import type {ChatSnapshot} from '../lib/types';
@@ -16,7 +17,7 @@ import { File } from 'expo-file-system';
 import type { Bootstrap, Conversation, Message, VoiceDraft, ChatResult } from '../lib/types';
 import { SITE,SofiaApi } from '../lib/api';
 import { dayKey, errorText, mergeMessages, statusLabel } from '../lib/chat-model';
-import {reconcileMessages,toggleMessageSelection,retainMessageSelection} from '../lib/chat-sync';
+import {reconcileChatWindow,toggleMessageSelection,retainMessageSelection} from '../lib/chat-sync';
 import {Icon} from '../components/Icon';
 import { useTheme } from '../lib/theme';
 import { silenceVoices } from '../lib/audio-focus';
@@ -43,7 +44,9 @@ function Bubble({message,previous,api,onRetry,selecting,selected,onSelect}:{mess
 export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRefreshBootstrap,taskContext,onClearTaskContext}:{taskContext?:Task|null;onClearTaskContext?:()=>void;api:SofiaApi;bootstrap:Bootstrap;enterToSend:boolean;autoSendVoice:boolean;onLock:(v:boolean)=>void;active:boolean;onRefreshBootstrap:()=>Promise<void>|void}) {
  const c=useTheme(),list=useRef<FlatList<Message>>(null);
  const {follow:followChat,pause:pauseChat,showJump,...chatScroll}=useChatTail(list,active);
- const cached=useMemo(()=>api.cached<ChatSnapshot>('/chat-sync/current'),[api]);
+ const cached=useMemo(()=>{const saved=api.cached<ChatSnapshot>('/chat-sync/current');return saved?recentChatPage(saved):undefined;},[api]);
+ const historyGesture=useRef(new ChatHistoryGesture()),olderBusy=useRef(false),historyBuffer=useRef<MessagePage|null>(null);
+ const [loadingOlder,setLoadingOlder]=useState(false);
  const [conversation,setConversation]=useState<Conversation|null>(cached?.conversation||null),[messages,setMessages]=useState<Message[]>(cached?.messages||[]),[hasMore,setHasMore]=useState(cached?.has_more||false);
  const reverseMessages=useMemo(()=>newestFirst(messages),[messages]);
  const previousMessages=useRef<Message[]>([]);
@@ -67,11 +70,11 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
  useEffect(()=>{if(!active||!selectedIds.size)return;const s=BackHandler.addEventListener('hardwareBackPress',()=>{if(!deleting)setSelectedIds(new Set());return true;});return()=>s.remove();},[active,selectedIds.size,deleting]);
  async function select(item:Conversation,publish=true){
   if(sendLock.current||latest.current.deleting)return;const epoch=++syncEpoch.current;setLoading(true);setError('');setHistory(false);setSelectedIds(new Set());setClarification(null);followChat();currentId.current=item.id;
-  try{const page=publish&&['web','mobile'].includes(item.channel)&&(!item.state||item.state==='active')?await api.selectChat(item.id):await api.history(item.id);if(!mounted.current||epoch!==syncEpoch.current||currentId.current!==item.id)return;setConversation(item);setMessages(previous=>previous.length&&conversation?.id===item.id?reconcileMessages(previous,page):page.messages);setHasMore(page.has_more);}catch(e){if(mounted.current&&epoch===syncEpoch.current){const saved=api.cached<{messages:Message[];has_more:boolean}>('/conversations/'+item.id);if(saved){setConversation(item);setMessages(saved.messages);setHasMore(saved.has_more);}setError(errorText(e));}}finally{if(mounted.current&&epoch===syncEpoch.current)setLoading(false);}
+  try{const page=publish&&['web','mobile'].includes(item.channel)&&(!item.state||item.state==='active')?await api.selectChat(item.id):await api.history(item.id);if(!mounted.current||epoch!==syncEpoch.current||currentId.current!==item.id)return;setConversation(item);setMessages(previous=>previous.length&&conversation?.id===item.id?reconcileChatWindow(previous,page):recentChatPage(page).messages);setHasMore(recentChatPage(page).has_more);}catch(e){if(mounted.current&&epoch===syncEpoch.current){const saved=api.cached<{messages:Message[];has_more:boolean}>('/conversations/'+item.id);if(saved){setConversation(item);setMessages(recentChatPage(saved).messages);setHasMore(recentChatPage(saved).has_more);}setError(errorText(e));}}finally{if(mounted.current&&epoch===syncEpoch.current)setLoading(false);}
  }
  async function initialize(){
   const epoch=++syncEpoch.current;setLoading(!api.cached<ChatSnapshot>('/chat-sync/current'));setError('');try{await api.hydrate();const page=await api.ensureChat();if(!mounted.current||epoch!==syncEpoch.current)return;if(!page.conversation){if(cached?.conversation&&cached.messages.length){setConversation(cached.conversation);setMessages(cached.messages);setHasMore(cached.has_more);setError('A conversa salva permanece disponível. Atualize a conexão para sincronizar.');}return;}
-   followChat();const before=currentId.current;currentId.current=page.conversation.id;setConversation(page.conversation);setMessages(previous=>before===page.conversation!.id?reconcileMessages(previous,page):page.messages);setHasMore(page.has_more);setSelectedIds(new Set());
+   followChat();const before=currentId.current;currentId.current=page.conversation.id;setConversation(page.conversation);setMessages(previous=>before===page.conversation!.id?reconcileChatWindow(previous,page):recentChatPage(page).messages);setHasMore(recentChatPage(page).has_more);setSelectedIds(new Set());
   }catch(e){if(mounted.current)setError(errorText(e));}finally{if(mounted.current&&epoch===syncEpoch.current)setLoading(false);}
  }
  useEffect(()=>{void initialize();},[api]);
@@ -81,16 +84,33 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
    const page=personal?await api.syncChat(hold?id:undefined):await api.history(id);
    if(!mounted.current||epoch!==syncEpoch.current||currentId.current!==id||sendLock.current)return;
    if('conversation' in page&&!page.conversation){if(!latest.current.dirty){await initialize();}return;}
-   if(page.conversation&&page.conversation.id!==id){if(latest.current.dirty||latest.current.recordingLock||latest.current.selectedIds.size)return;++syncEpoch.current;followChat();currentId.current=page.conversation.id;setConversation(page.conversation);setMessages(page.messages);setHasMore(page.has_more);setSelectedIds(new Set());setClarification(null);return;}
-   setMessages(prev=>{const next=reconcileMessages(prev,page);return next;});setHasMore(page.has_more);
-   if('deleted_ids' in page){const removed=new Set(page.deleted_ids as string[]);setSelectedIds(prev=>{const next=new Set([...prev].filter(key=>!removed.has(key)));return next.size===prev.size?prev:next;});}
+   if(page.conversation&&page.conversation.id!==id){if(latest.current.dirty||latest.current.recordingLock||latest.current.selectedIds.size)return;++syncEpoch.current;followChat();currentId.current=page.conversation.id;setConversation(page.conversation);setMessages(recentChatPage(page).messages);setHasMore(recentChatPage(page).has_more);setSelectedIds(new Set());setClarification(null);return;}
+   setMessages(prev=>reconcileChatWindow(prev,page));
+   if('deleted_ids' in page){const removed=new Set(page.deleted_ids as string[]);if(historyBuffer.current)historyBuffer.current={...historyBuffer.current,messages:historyBuffer.current.messages.filter(m=>!removed.has(m.id))};setSelectedIds(prev=>{const next=new Set([...prev].filter(key=>!removed.has(key)));return next.size===prev.size?prev:next;});}
    if(!silent)setError('');
   }catch(e:any){if(e?.status===404&&!latest.current.dirty&&!latest.current.selectedIds.size){await initialize();}else if(!silent&&mounted.current)setError(errorText(e));}
   finally{syncBusy.current=false;if(!silent&&mounted.current)setRefreshing(false);}
  }
  useEffect(()=>{if(!active||!conversation)return;void refresh(true);const sub=AppState.addEventListener('change',state=>{if(state==='active')void refresh(true);});const timer=setInterval(()=>{if(AppState.currentState==='active')void refresh(true);},2000);return()=>{clearInterval(timer);sub.remove();};},[active,conversation,api]);
- async function older(){if(!conversation||!hasMore||refreshing||deleting)return;const id=conversation.id,epoch=++syncEpoch.current;const before=messages.find(m=>m.sequence)?.sequence;if(!before)return;setRefreshing(true);pauseChat();
-  try{const page=await api.history(id,before);if(!mounted.current||currentId.current!==id||syncEpoch.current!==epoch)return;setMessages(prev=>mergeMessages(page.messages,prev));setHasMore(page.has_more);}catch(e){setError(errorText(e));}finally{setRefreshing(false);}}
+ async function older(){
+  if(!conversation||!hasMore||olderBusy.current||refreshing||deleting||sending||!messages.length)return;
+  const id=conversation.id,epoch=++syncEpoch.current,oldest=messages[0];olderBusy.current=true;setLoadingOlder(true);pauseChat();historyGesture.current.reset();
+  try{
+   await api.hydrate();
+   const saved=api.cached<MessagePage>('/conversations/'+id);
+   let page=olderChatPage(historyBuffer.current||undefined,oldest)||olderChatPage(saved,oldest);
+   if(!page){
+    if(!oldest.sequence)throw new Error('Conecte para carregar as mensagens anteriores.');
+    const fetched=await api.history(id,oldest.sequence);page=recentChatPage(fetched);
+    if(!mounted.current||currentId.current!==id||syncEpoch.current!==epoch)return;
+    historyBuffer.current=fetched;
+   }
+   if(!mounted.current||currentId.current!==id||syncEpoch.current!==epoch)return;
+   setMessages(prev=>mergeMessages(page!.messages,prev));setHasMore(page.has_more);setError('');
+  }catch(e){if(mounted.current&&currentId.current===id)setError(errorText(e));}
+  finally{olderBusy.current=false;if(mounted.current)setLoadingOlder(false);}
+ }
+ useEffect(()=>{historyBuffer.current=null;historyGesture.current.reset();},[conversation?.id]);
  async function newChat(){if(dirty||sending)return;followChat();++syncEpoch.current;currentId.current='';setConversation(null);setMessages([]);setHasMore(false);setHistory(false);setSelectedIds(new Set());setClarification(null);setLoading(false);setError('');}
  async function openHistory(){if(dirty||sending)return;const stored=api.cached<{items:Conversation[];has_more:boolean}>('/conversations?offset=0');if(stored){setItems(stored.items);setHistoryMore(stored.has_more);}setHistory(true);setSelectedConversations(new Set());setQuery('');try{const h=await api.conversations();const saved=api.cached<{items:Conversation[]}>('/conversations?offset=0');const rows=h.items.length?h.items:(saved?.items||[]);const all=conversation&&messages.length?[conversation,...rows]:rows;setItems([...new Map(all.map(c=>[c.id,c])).values()]);setHistoryMore(h.has_more);}catch(e){const saved=api.cached<{items:Conversation[];has_more:boolean}>('/conversations?offset=0');if(saved){setItems(saved.items);setHistoryMore(saved.has_more);}setError(errorText(e));}}
  async function moreHistory(){try{const h=await api.conversations(items.length);setItems(prev=>[...prev,...h.items]);setHistoryMore(h.has_more);}catch(e){setError(errorText(e));}}
@@ -107,7 +127,7 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
     try{await api.selectChat(targetId);}catch(e:any){if(e?.status!==404)throw e;
      const page=await api.ensureChat();if(!page.conversation)throw new Error('Não foi possível reabrir a conversa.');
      targetId=page.conversation.id;data.conversation_id=targetId;currentId.current=targetId;
-     if(mounted.current){setConversation(page.conversation);setMessages(mergeMessages(page.messages,[{...message,conversation_id:targetId,status:'sending'}]));}
+     if(mounted.current){setConversation(page.conversation);setMessages(mergeMessages(recentChatPage(page).messages,[{...message,conversation_id:targetId,status:'sending'}]));}
     }
    }
    if(message.localVoice){const file=new File(message.localVoice.uri);if(!file.exists)throw new Error('O áudio não está mais no celular. Grave novamente.');if(file.size>bootstrap.limits.audio_bytes)throw new Error('O áudio ficou grande demais para uma única mensagem. Grave em partes para concluir o envio.');const base64=await file.base64();result=await api.audio({...data,audio_base64:base64,mime:'audio/mp4',duration_ms:message.localVoice.duration});}
@@ -119,9 +139,9 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
     }
     result=await api.chat({...data,message:content});
    }
-   if(!mounted.current)return;setMessages(prev=>mergeMessages(prev,result.messages));setClarification(result.clarification);
+   if(!mounted.current)return;setMessages(prev=>reconcileChatWindow(prev,result));setClarification(result.clarification);
    if(message.localVoice){deleteVoice(message.localVoice.uri);voices.current.delete(message.localVoice.uri);}
-  }catch(e){if(!mounted.current)return;const explanation=errorText(e);setError(explanation);setMessages(prev=>mergeMessages(prev,[{...message,status:'failed',error:explanation}]));try{const page=await api.history(targetId);if(mounted.current&&currentId.current===targetId)setMessages(prev=>mergeMessages(prev,page.messages));}catch{}}
+  }catch(e){if(!mounted.current)return;const explanation=errorText(e);setError(explanation);setMessages(prev=>mergeMessages(prev,[{...message,status:'failed',error:explanation}]));try{const page=await api.history(targetId);if(mounted.current&&currentId.current===targetId)setMessages(prev=>reconcileChatWindow(prev,page));}catch{}}
   finally{sendLock.current=false;if(mounted.current)setSending(false);}
  }
  function text(content:string){const id=Crypto.randomUUID();void send({id,client_id:id,conversation_id:conversation?.id,role:'user',content,created_at:new Date().toISOString(),status:'sending'});}
@@ -138,7 +158,7 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
     const local=chosen.filter(m=>!m.sequence&&m.status==='failed'),remote=chosen.filter(m=>!local.includes(m));
     let removed=local.map(m=>m.id);
     try{await silenceVoices();if(remote.length){const result=await api.deleteChatMessages(id,remote.map(m=>m.id));removed.push(...result.deleted_ids);if(result.failed.length)setError('Algumas mensagens não foram excluídas. Elas continuam selecionadas para tentar novamente.');}
-     const done=new Set(removed);local.forEach(m=>{if(m.localVoice){deleteVoice(m.localVoice.uri);voices.current.delete(m.localVoice.uri);}});
+     const done=new Set(removed);historyBuffer.current=null;local.forEach(m=>{if(m.localVoice){deleteVoice(m.localVoice.uri);voices.current.delete(m.localVoice.uri);}});
      if(mounted.current&&currentId.current===id){setMessages(prev=>prev.filter(m=>!done.has(m.id)));setSelectedIds(prev=>new Set([...prev].filter(key=>!done.has(key))));}
     }catch(e){if(mounted.current)setError(errorText(e));}finally{if(mounted.current)setDeleting(false);}
    })();}}
@@ -150,8 +170,8 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
  {selectedIds.size>0?<View style={{paddingHorizontal:10,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:8,borderBottomWidth:1,borderColor:c.line,backgroundColor:c.surface}}><IconButton name="back" label="Sair da seleção" disabled={deleting} onPress={()=>setSelectedIds(new Set())}/><Text style={{flex:1,color:c.text,fontSize:18,fontWeight:'600'}}>{selectedIds.size} selecionada{selectedIds.size===1?'':'s'}</Text><IconButton name="copy" label="Copiar mensagens selecionadas" disabled={deleting} onPress={copySelected}/>{deleting?<ActivityIndicator color={c.accent}/>:<IconButton name="trash" label="Excluir mensagens selecionadas" onPress={deleteSelected}/>}</View>:<View style={{paddingHorizontal:16,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:11,borderBottomWidth:1,borderColor:c.line,backgroundColor:c.surface}}><Brand/><View style={{flex:1}}><Text style={{color:c.text,fontSize:19,fontWeight:'700'}}>Sofia</Text><Text numberOfLines={1} style={{color:c.muted,fontSize:11,marginTop:3}}>Sua assistente · mesma memória</Text></View><IconButton name="history" label="Histórico de conversas" onPress={()=>void openHistory()} disabled={dirty||sending||recordingLock}/><IconButton name="plus" label="Nova conversa" onPress={()=>void newChat()} disabled={dirty||sending||recordingLock}/></View>}
  {!bootstrap.ai.ready?<ErrorBanner text={bootstrap.ai.reason||'O Filtro Privado está sendo sincronizado com o servidor.'} onRetry={()=>void onRefreshBootstrap()}/>:null}{error?<ErrorBanner text={error} onRetry={()=>void (conversation?refresh():initialize())}/>:null}
  {taskContext?<View style={{paddingHorizontal:16,paddingVertical:8,flexDirection:'row',alignItems:'center',backgroundColor:c.accentSoft}}><View style={{flex:1}}><Text style={{color:c.accent,fontSize:11}}>Tarefa em contexto</Text><Text numberOfLines={1} style={{color:c.text,fontSize:14}}>{taskContext.title}</Text></View><IconButton name="close" label="Remover tarefa da conversa" onPress={()=>onClearTaskContext?.()}/></View>:null}
- <View style={{flex:1}}>{loading?<View style={{flex:1,justifyContent:'center'}}><ActivityIndicator color={c.accent}/></View>:<FlatList key={conversation?.id||'new-chat'} nativeID="sofia-chat-list" inverted initialNumToRender={12} maxToRenderPerBatch={8} windowSize={7} maintainVisibleContentPosition={{minIndexForVisible:0}} ref={list} data={reverseMessages} extraData={selectedIds} keyExtractor={m=>m.id} keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:16,paddingBottom:22,flexGrow:1}} refreshing={refreshing} onRefresh={()=>void refresh()} {...chatScroll} style={{flex:1}} scrollEventThrottle={16}
- ListFooterComponent={hasMore?<Pressable onPress={()=>void older()} style={{alignItems:'center',padding:12,minHeight:44}}><Text style={{color:c.accent,fontSize:12}}>Carregar mensagens anteriores</Text></Pressable>:null}
+ <View style={{flex:1}}>{loading?<View style={{flex:1,justifyContent:'center'}}><ActivityIndicator color={c.accent}/></View>:<FlatList key={conversation?.id||'new-chat'} nativeID="sofia-chat-list" inverted initialNumToRender={12} maxToRenderPerBatch={8} windowSize={7} maintainVisibleContentPosition={{minIndexForVisible:0}} ref={list} data={reverseMessages} extraData={selectedIds} keyExtractor={m=>m.id} keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:16,paddingBottom:22,flexGrow:1}} refreshing={refreshing} onRefresh={()=>void refresh()} {...chatScroll} onScrollBeginDrag={()=>{chatScroll.onScrollBeginDrag();historyGesture.current.begin();}} onScroll={e=>{chatScroll.onScroll(e);const n=e.nativeEvent;if(n.contentSize.height-n.layoutMeasurement.height-n.contentOffset.y<Math.max(100,n.layoutMeasurement.height*0.3)&&historyGesture.current.consume())void older();}} onEndReachedThreshold={0.3} onEndReached={()=>{if(historyGesture.current.consume())void older();}} style={{flex:1}} scrollEventThrottle={16}
+ ListFooterComponent={loadingOlder?<ActivityIndicator accessibilityLabel="Carregando mensagens anteriores" color={c.accent}/>:hasMore?<Pressable onPress={()=>void older()} style={{alignItems:'center',padding:12,minHeight:44}}><Text style={{color:c.accent,fontSize:12}}>Carregar mensagens anteriores</Text></Pressable>:null}
  ListEmptyComponent={<View style={{flex:1,justifyContent:'center'}}><Empty title="Vamos conversar?" body="Escreva ou envie uma mensagem de voz. A mesma Sofia, o contexto e a memória da sua conta."/><Text style={{color:c.muted,textAlign:'center',fontSize:11,paddingHorizontal:30,lineHeight:17}}>Suas mensagens são processadas no servidor da Sofia e pelo provedor de IA configurado.</Text></View>}
  renderItem={({item,index})=><Bubble message={item} previous={reverseMessages[index+1]} api={api} onRetry={m=>{if(!sending)void send(m,true);}} selecting={selectedIds.size>0} selected={selectedIds.has(item.id)} onSelect={selectMessage}/>}
  ListHeaderComponent={sending?<View style={{flexDirection:'row',gap:9,alignItems:'center',padding:10}}><ActivityIndicator size="small" color={c.accent}/><Text style={{color:c.muted,fontSize:12}}>Aguardando a Sofia…</Text></View>:null}/>}
