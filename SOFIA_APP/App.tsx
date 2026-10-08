@@ -43,11 +43,11 @@ function Shell(){
  const [themeClock,setThemeClock]=useState(()=>new Date());
  useEffect(()=>{const update=()=>setThemeClock(previous=>{const now=new Date();return now.getHours()!==previous.getHours()||now.getMinutes()!==previous.getMinutes()?now:previous;}),timer=setInterval(update,1000),sub=AppState.addEventListener('change',state=>{if(state==='active')update();});return()=>{clearInterval(timer);sub.remove();};},[]);
  const c=themeAppearance(prefs,system,themeClock)==='dark'?dark:light;
- const launchReady=ready&&(!auth||!!bootstrap);
- useEffect(()=>{if(!launchReady)return;return finishLaunchHandoff();},[launchReady,c.bg]);
  const expired=useCallback(()=>{tabHistory.current=[];setAuth(null);setBootstrap(null);setLocked(false);void forgetAuth().catch(()=>{});},[]);
  const api=useMemo(()=>new SofiaApi(auth?.token||'',expired,auth?.profile?.email||'anonymous'),[auth?.token,auth?.profile?.email,expired]);
  const servicesReady=useAfterFirstPaint(!!auth&&!!bootstrap),mountedTabs=useStartupMounts(!!auth&&!!bootstrap,tab);
+ const launchReady=ready&&(!auth||(!!bootstrap&&servicesReady));
+ useEffect(()=>{if(!launchReady)return;return finishLaunchHandoff();},[launchReady,c.bg]);
  useEffect(()=>{if(!auth)return;let live=true;void api.hydrate().then(()=>{if(!live)return;const saved=api.cached<Bootstrap>('/bootstrap');if(saved&&saved.profile?.email?.toLowerCase()===auth.profile.email.toLowerCase()){setBootstrap(saved);console.info('SOFIA_STARTUP_CACHE_READY');}});return()=>{live=false;};},[api,auth?.token]);
  useEffect(()=>{if(servicesReady)void api.preload(()=>preloadAgenda(api));},[api,servicesReady]);
  const checkingUpdate=useRef(false),lastUpdateCheck=useRef(0),lastUpdatePrompt=useRef('');
