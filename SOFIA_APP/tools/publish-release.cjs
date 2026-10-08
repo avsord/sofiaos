@@ -15,6 +15,8 @@ if(git('status','--porcelain','--','SOFIA_APP').split('\n').some(line=>line && !
 const bytes=fs.readFileSync(path.join(app,'dist/Sofia-OS.apk')),hash=crypto.createHash('sha256').update(bytes).digest('hex');
 const originalHash=fs.readFileSync(path.join(app,'dist/Sofia-OS.apk.sha256'),'utf8').split(/\s+/)[0];
 if(hash!==originalHash||bytes.length===0)throw Error('APK hash mismatch');
+// Do not repeat 0.3.57: passing smoke tests did not prove the requested 1000 ms limit.
+require('./startup-release-gate.cjs').verifyFile(path.join(app,'dist/startup-navigation-acceptance.json'),{source_sha:source,apk_sha256:hash});
 // main's workflows remain unchanged in the release snapshot. The release integration
 // needs contents permission only, and is not asked to create or modify workflow files.
 git('fetch','--no-tags','origin','main');
