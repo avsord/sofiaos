@@ -1,0 +1,87 @@
+name: Sofia 056 history and startup preflight
+on:
+  push:
+    branches: ['repair/sofia-history-startup-056-preflight']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: sofia-history-startup-056-preflight
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            SOFIA_APP/package-lock.json
+      - name: Verify exact repair and apply to approved baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64,gzip,hashlib,pathlib
+          root=pathlib.Path('.repair-056')
+          parts=[(root/f'part{i}.txt').read_text() for i in [1,2,3]]
+          # Normalize a verified transport-only transcription; the decoded patch
+          # is always authenticated by its independent SHA-256 before use.
+          assert parts[1].count('SCKbCdZZLDtVF')==1
+          parts[1]=parts[1].replace('SCKbCdZZLDtVF','SCKbCdZLDtVF')
+          patch=gzip.decompress(base64.b64decode(''.join(parts),validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='386795df2a587eedf16408fe577394b20f3767742866d2567caa5c2b98085907'
+          pathlib.Path('/tmp/sofia-056.patch').write_bytes(patch)
+          PY
+          git checkout --detach edf0f226ada2bdccfd1f927e73f72e0e9c69169e
+          git apply --unidiff-zero --check /tmp/sofia-056.patch
+          git apply --unidiff-zero /tmp/sofia-056.patch
+          git diff --check
+          mkdir -p /tmp/sofia-056-results
+      - name: Install exact app dependencies
+        working-directory: SOFIA_APP
+        run: npm ci
+      - name: Full Android TypeScript and behavior validation
+        working-directory: SOFIA_APP
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run check | tee /tmp/sofia-056-results/typecheck.txt
+          npm test | tee /tmp/sofia-056-results/app-tests.txt
+      - name: Verify isolated backend, encrypted backup and complete existing suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm test | tee /tmp/sofia-056-results/backend-tests.txt
+          python3 SOFIA_APP/tools/native-delivery-test.py
+          node --test SOFIA_APP/tools/delivery.test.cjs
+      - name: Retain only the validated source on a non-production branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Sofia repair validation'
+          git config user.email 'sofia-build@users.noreply.github.com'
+          git add -- SOFIA_APP src tests
+          git diff --cached --check
+          git commit -m 'fix: retain existing conversations and remove redundant Android launch cover'
+          test "$(git rev-parse HEAD^)" = 'edf0f226ada2bdccfd1f927e73f72e0e9c69169e'
+          git push origin HEAD:refs/heads/repair/sofia-history-startup-056-validated
+          git rev-parse HEAD | tee /tmp/sofia-056-results/validated-commit.txt
+          git show --stat --oneline HEAD | tee /tmp/sofia-056-results/changes.txt
+          printf 'Validated source is on repair/sofia-history-startup-056-validated. Production branch and backend were not modified.\n' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sofia-056-preflight-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/sofia-056-results/
+          retention-days: 14
