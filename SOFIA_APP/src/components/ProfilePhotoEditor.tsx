@@ -3,7 +3,7 @@ import {ActivityIndicator,Alert,Image,Pressable,View} from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import {Brand} from './UI';
 import {useTheme} from '../lib/theme';
-import {errorText} from '../lib/chat-model';
+import {errorText,initials} from '../lib/chat-model';
 import {readProfilePhoto,removeProfilePhoto,saveProfilePhoto} from '../lib/profile-photo';
 
 export function ProfilePhotoEditor({scope,name}:{scope:string;name:string}){
@@ -25,7 +25,7 @@ export function ProfilePhotoEditor({scope,name}:{scope:string;name:string}){
   {text:'Cancelar',style:'cancel'}
  ]);}
  return <Pressable accessibilityRole="button" accessibilityLabel="Alterar foto do perfil" accessibilityHint="Escolha uma foto, ajuste o enquadramento e salve" onPress={menu} disabled={busy} style={{width:82,height:82,borderRadius:41,overflow:'hidden',alignItems:'center',justifyContent:'center',backgroundColor:c.input,borderWidth:2,borderColor:c.line}}>
-  {uri?<Image source={{uri}} style={{width:'100%',height:'100%'}} resizeMode="cover"/>:<Brand size={72} label={name}/>} 
-  {busy?<View style={{position:'absolute',inset:0,backgroundColor:'#00000055',alignItems:'center',justifyContent:'center'}}><ActivityIndicator color="#fff"/></View>:null}
+  {uri?<Image source={{uri}} style={{width:'100%',height:'100%'}} resizeMode="cover"/>:<Brand size={72} label={initials(name)}/>} 
+  {busy?<View style={{position:'absolute',top:0,right:0,bottom:0,left:0,backgroundColor:'#00000055',alignItems:'center',justifyContent:'center'}}><ActivityIndicator color="#fff"/></View>:null}
  </Pressable>;
 }
