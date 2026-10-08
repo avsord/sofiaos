@@ -1,43 +1,47 @@
 # Sofia OS — startup/navigation handoff, 2026-10-08
 
-## Current deliverable: 0.3.59 candidate, not promoted
+## Current deliverable: 0.3.60 candidate, not promoted
 
-Implementation: 8d1adcc8baae65424c44ee569944b18bb510d18d.
-Version metadata: 4944996300961b16262f7c69d344cfa42a5b91c.
-Exact compiled source, including candidate notes: 164e973858852f20a96f477cf983987c192a94a8.
-Run: https://github.com/avsord/sofiaos/actions/runs/37804038235
-Successful build job: 113403489355.
-Artifact: 11561524863, Sofia-build-37804038235-1.
-Production APK: 51,596,228 bytes; SHA-256 c946d2fc1fe219805eaf664c0d794b83c9e15e3d1cfc7fe50e23e2743d6c587e.
-Package com.avsord.sofiaapp; versionCode 64; versionName 0.3.59.
-Certificate SHA-256 fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c, matching the preceding signing identity.
+Base branch commit: 089c97e2aac31b0db5204e0a9b5d0f927a40ec0e (0.3.59 runtime plus documentation).
+Change commit: b1810474986b832fc7015ad6a409a3ce6dd80b7a.
+Exact compiled source: 60ee20d7a6333cf235d60cb1ff5acb877817d285 (CI-aligned version metadata).
+Run: https://github.com/avsord/sofiaos/actions/runs/37809157208
+Successful build job: 113421197079.
+Artifact: 11564921396, Sofia-build-37809157208-1.
+Production APK: 51,599,876 bytes; SHA-256 18fb2a5f3a4d541fe6bed174a7751890227ee172a10627ee7624bd33807d8652.
+Package com.avsord.sofiaapp; versionCode 65; versionName 0.3.60.
+Certificate SHA-256 fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c, matching the preceding installed-candidate/published signing identity.
 
-Deliver Sofia-OS.apk as the candidate, never QA-ONLY-full-fixture.apk. The extracted production bytes were compared with both the SHA-256 file and sealed bundle; the source archive matched the changed runtime files; QA sentinels were absent from the production bundle.
+Deliver Sofia-OS.apk as an explicitly unapproved candidate, never QA-ONLY-full-fixture.apk. The extracted production bytes match both the SHA-256 file and sealed bundle. Changed runtime/test files in the compiled source ZIP match the locally tested files byte-for-byte. The manually staged SOFIA_APP tree also matched local git hashing before the atomic delivery-branch update.
 
-## Focused changes after 0.3.58
+## Confirmed causes and focused changes
 
-1. Issue one-use native session and preferences reads before evaluating App and its providers. Preserve original keys, validation and encryption. Invalidate prefetched values before writes/logout so an old account read cannot be consumed afterward.
-2. Reuse serialized snapshot entries only while unexposed; exposed mutable references retain legacy behavior. Apply the existing priority, size and 32-entry limits in a single pass instead of repeatedly serializing the entire payload while dropping its tail. Preserve schema 1, complete values, chat safeguards and explicit deletions.
-3. Defer only the initial automatic update lookup to an idle opportunity. Periodic/foreground update checks and notification scheduling remain unchanged. Require the speech module on use rather than at application import.
+1. Any DELETE previously discarded all non-chat startup snapshots, even before server success. Acknowledged task/entity removal now reconciles only affected cached rows. Failed deletions preserve the existing snapshot. A second request-generation fence prevents reads begun during deletion from repopulating removed rows. Chat erasure remains explicit and scoped.
+2. The 32-entry retention order previously allowed secondary history windows to evict Home/Tasks/Agenda. These essential reads now rank ahead of secondary detail windows. Schema 1, storage keys, encryption, account scope, age policy and size/entry limits are preserved. A deterministic before/after test with 50 history windows reproduced loss of all three essential paths in 0.3.59 and retention of all three after the change. This is a cache regression test, NOT an Android speed benchmark.
+3. Home previously held a successfully resolved task list behind Promise.all with a slow Home summary. Independent read callbacks now publish each result immediately. Failed reads are not converted into confirmed empty lists.
+4. Layout-based whenInteractive remains permission for essential network progress. New whenRevealed is a separate visual-completion fence: hidden-screen warming, BackgroundServices module mounting and optional notification inventory no longer compete under the S. Existing notification scheduling logic was not removed or rewritten. Selected tabs remain directly mountable.
+5. The user explicitly requested a short fade. The original Android 12+ splash now fades opacity over the real app for a configured 120 ms, with no minimum splash dwell or second logo. Legacy Android fades the actual content over its existing window drawable. Cancellation, disabled Android animations and explicit error recovery are handled. LOCAL_READY and FADE_START diagnostics distinguish readiness from the final DATA marker, which includes the fade.
 
-No new startup projection or persistence migration was implemented. No native splash/menu changes were added in 0.3.59. Backend, database, encryption, credentials, package and update channel were not changed by this optimization.
+## Completed validation and remaining acceptance
 
-## Completed validation and exact remaining work
+CI with locked dependencies passed TypeScript, 352/352 app tests, 165/165 isolated backend tests, 17/17 delivery tests, production Gradle compilation, package/version/certificate checks, separate QA fixture compilation and sealed artifact retention.
 
-Locked-dependency CI passed TypeScript, 339/339 app tests, 165/165 isolated backend tests, 17/17 delivery tests, production Gradle compilation and identity/signature checks. Local focused tests passed 95/95, including 13 new tests. These counts are recorded in the retained artifact, not inferred from an earlier APK.
+The 13 new tests cover independent slow/failed reads, snapshot retention, scoped deletion, late reads, bridge visibility/cancellation and static native-fade contracts. They include pure logic/mocks/source assertions, not handset visual proof. Final local focused checks passed 35/35; broader startup checks 106/106; native-delivery contract unit tests 10/10. The local full suite's absent React Native dependency check was not suppressed; CI installed the locked runtime and passed the complete suite.
 
-The first attempt of run 37803188983 stopped before Gradle because /health returned HTTP 502. Its old-commit retry was skipped by the planner after metadata had already been committed. Run 37804038235 resumed from the prepared metadata without another version increment; both live-server checks passed. No production restart/redeploy was performed by this work.
+At the last check, native navigation job 113424502110 and workspace job 113424502179 were still in progress. Do not claim they passed; consult the same run rather than rebuilding identical code. The authenticated emulator suite uses the separate synthetic-transport fixture; a passed marker or that fixture's timings cannot be presented as production-handset startup evidence.
 
-At delivery, native navigation job 113406710753 and workspace job 113406710829 were still running. Do not claim they passed. Read this same run for their results instead of recompiling the identical app. No physical device was available: full icon-to-verified-interaction timing, white-frame continuity, 20 cold runs, 100 native navigation sequences and real-account data-preserving upgrade remain unproved for this APK.
-
-A synthetic Node serialization microbenchmark (24 entries, 5 warmups, 30 samples) generated byte-identical payloads. Medians: unexposed/below-limit 14.36 -> 1.80 ms; exposed/below-limit 14.83 -> 15.99 ms (slight regression); exposed/over-limit 123.07 -> 17.70 ms. This is NOT Android launch, native disk, encryption or first-touch evidence, and must not be marketed as a whole-app speed factor.
+No physical device was available. Full icon-to-verified-interaction timing, 20 cold starts, 100 native sequences with representative real records, white-frame continuity through the fade and real-account in-place upgrade remain unproved for 0.3.60. No whole-app speed factor or <=1000 ms phone guarantee is claimed. Cache projections already missing in an older installation must be reconstructed from the legitimate origin, never fabricated.
 
 ## Earlier relevant state
 
-Published baseline at inspection: 0.3.57, versionCode 62; run 37789662903. Its two synthetic UI samples 1319/1254 ms and DATA samples 1583/1255 ms did not meet the requested 1000 ms threshold, despite smoke success.
+Published baseline at inspection: 0.3.57, code 62, run 37789662903. Its two synthetic DATA samples 1583/1255 ms failed the requested 1000 ms goal despite smoke success.
 
-0.3.58 candidate: source 724c70139cca79e59ca5dabfa041009d6a92e895, versionCode 63, run 37797262718, APK SHA-256 e334175fafa00437d16721773274a2be2624f27993c71c581416740bd73d6ff8. It removed native menu scroll/Animated-property writes competing with React selection and retained the original splash until local readiness. Its native shards subsequently passed, but those results are not evidence for the new APK or the owner's phone.
+0.3.58: source 724c70139cca79e59ca5dabfa041009d6a92e895; code 63; run 37797262718; APK e334175fafa00437d16721773274a2be2624f27993c71c581416740bd73d6ff8. Removed competing native menu writes and retained the original system splash. Its subsequent native passes are not evidence for a different APK.
 
-## Publication boundary
+0.3.59: source 164e973858852f20a96f477cf983987c192a94a8; code 64; run 37804038235; APK c946d2fc1fe219805eaf664c0d794b83c9e15e3d1cfc7fe50e23e2743d6c587e. Added early one-use session/preferences reads, bounded snapshot serialization and deferred speech/update discovery. 339 app tests passed. No physical acceptance was supplied. Historical detailed reports remain in repository history.
 
-startup-release-gate.cjs remains unchanged and requires SOFIA_APP/dist/startup-navigation-acceptance.json for the exact source/APK. Never synthesize this report from unit-test fixtures, ready markers or the QA transport. Missing physical acceptance is a publication block, not permission to disable the gate. This delivery is an installable candidate, not an approved release or a verified <=1000 ms handset result.
+## Safety and publication boundary
+
+No backend, database, main branch, credential, encryption implementation, package or updater-channel mutation was made by this change. Install candidates in place; do not uninstall or clear data. Matching signing identity is necessary but does not by itself prove preservation of the owner's displayed records.
+
+startup-release-gate.cjs remains unchanged and requires SOFIA_APP/dist/startup-navigation-acceptance.json for the exact source/APK. Never synthesize it from unit-test fixtures, ready markers or QA transport. Missing physical acceptance intentionally blocks approved publication. This is an installable candidate, not an approved release.
