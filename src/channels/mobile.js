@@ -5,7 +5,9 @@ const { AppError, validId, cleanText } = require('../core/util');
 const { VERSION } = require('../config/sofia');
 const { makeApi45 } = require('../core/api45');
 const OWNER = 'owner-local';
-const MAX_AUDIO = 10 * 1024 * 1024;
+// Product UI has no short message/audio ceiling. These generous values are only
+// transport and memory safety rails for a single HTTP request.
+const MAX_AUDIO = 64 * 1024 * 1024, MAX_AUDIO_DURATION = 6 * 60 * 60 * 1000, MAX_TEXT = 1000000;
 const fail = (code, message, status = 400) => { throw new AppError(code, message, status); };
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 function checkMobileOrigin(req, config) {
@@ -116,7 +118,7 @@ function makeMobileApi(runtime, deps) {
     }
     if (p === '/api/mobile/bootstrap' && m === 'GET') return send({ ok: true, version: VERSION, profile: profile(),
       expires_at: new Date(session.expires_ms).toISOString(), ai: aiStatus(),
-      limits: { audio_bytes: MAX_AUDIO, audio_seconds: 300, text_chars: config.maxMessageChars || 12000 },
+      limits: { audio_bytes: MAX_AUDIO, audio_seconds: Math.trunc(MAX_AUDIO_DURATION/1000), text_chars: MAX_TEXT },
       capabilities: { text: true, voice_notes: true, notifications_push: false, multi_user: false, e2ee: false, workspace: true, protected_diary: true } });
     if (p === '/api/mobile/conversations' && m === 'GET') {
       const offset = Math.max(0, Math.min(100000, Number(url.searchParams.get('offset')) || 0));
@@ -135,21 +137,21 @@ function makeMobileApi(runtime, deps) {
       return send({ conversation: c, ...messages(c.id, before) });
     }
     if (p === '/api/mobile/messages' && m === 'POST') {
-      rate(session, 'message'); const b = await bodyJson(req, 65536);
-      return send(await receive(payload(b, cleanText(b.message, 'Mensagem', config.maxMessageChars || 12000))));
+      rate(session, 'message'); const b = await bodyJson(req, 2 * 1024 * 1024);
+      return send(await receive(payload(b, cleanText(b.message, 'Mensagem', MAX_TEXT))));
     }
     match = p.match(/^\/api\/mobile\/messages\/([\w-]+)$/);
     if (match && m === 'DELETE') { rate(session, 'delete', 30); const row=store.message(validId(match[1]));conversation(row.conversation_id);return send(store.deleteMessage(row.id)); }
     if (p === '/api/mobile/messages/audio' && m === 'POST') {
-      rate(session, 'audio', 12); const b = await bodyJson(req, 14 * 1024 * 1024), input = payload(b, ''), key = input.client_message_id;
+      rate(session, 'audio', 12); const b = await bodyJson(req, Math.ceil(MAX_AUDIO * 4 / 3) + 65536), input = payload(b, ''), key = input.client_message_id;
       const raw = String(b.audio_base64 || '');
       if (!raw || raw.length % 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(raw)) fail('VOICE_INVALID', 'Áudio inválido. Grave novamente.');
       const bytes = Buffer.from(raw, 'base64');
-      if (!bytes.length || bytes.length > MAX_AUDIO) fail('VOICE_SIZE', 'O áudio deve ter até 10 MB.', 413);
+      if (!bytes.length || bytes.length > MAX_AUDIO) fail('VOICE_SIZE', 'Este arquivo de áudio excede o limite técnico de transporte.', 413);
       const mime = String(b.mime || 'audio/mp4').toLowerCase();
       if (!/^audio\/(mp4|m4a|x-m4a|mpeg|wav|webm|ogg)$/.test(mime)) fail('VOICE_FORMAT', 'Formato de áudio não aceito.', 415);
       const duration = Number(b.duration_ms);
-      if (!Number.isSafeInteger(duration) || duration < 1 || duration > 300000) fail('VOICE_DURATION', 'Grave um áudio de até cinco minutos.');
+      if (!Number.isSafeInteger(duration) || duration < 1 || duration > MAX_AUDIO_DURATION) fail('VOICE_DURATION', 'A gravação excede o limite técnico de uma única mensagem.');
       if (inAudio.has(key) || core.busy) fail('IN_PROGRESS', 'A Sofia ainda está processando uma mensagem. Aguarde.', 409);
       const hash = digest(bytes); store.db.prepare('DELETE FROM mobile_voice_receipts WHERE created_ms < ?').run(Date.now() - 86400000);
       let receipt = store.db.prepare('SELECT * FROM mobile_voice_receipts WHERE client_id=?').get(key);
@@ -162,7 +164,7 @@ function makeMobileApi(runtime, deps) {
         routing.profile('private');
         if (!transcript) {
           const t = await audioService.transcribe(bytes, { mime, filename: 'sofia-voice.' + (mime.includes('wav') ? 'wav' : mime.includes('mp4') || mime.includes('m4a') ? 'm4a' : mime.split('/')[1]), route: 'private' });
-          transcript = cleanText(t.text, 'Transcrição', config.maxMessageChars || 12000);
+          transcript = cleanText(t.text, 'Transcrição', MAX_TEXT);
           store.db.prepare('INSERT OR REPLACE INTO mobile_voice_receipts VALUES (?,?,?,?,?)').run(key, input.conversation_id, hash, transcript, Date.now());
         }
         let result;
