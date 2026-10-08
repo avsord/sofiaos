@@ -60,3 +60,20 @@ test('066 native prewarm keeps existing encrypted storage and a single serialize
  const prewarm=code.slice(code.indexOf('object SofiaSnapshotIO'),code.indexOf('  // Called only on worker.'));
  for(const forbidden of ['.get()', '.join()', 'runBlocking', 'Thread.sleep', 'delete(', 'promise.resolve'])assert.ok(!prewarm.includes(forbidden),forbidden);
 });
+
+test('067 cached Home and Agenda remain primary; catalog, widgets and monitors start only after reveal and idle',()=>{
+ const home=fs.readFileSync(path.join(root,'src/screens/Home.tsx'),'utf8');
+ assert.ok(home.includes('readHomeRows(api,'),'primary Home/Tasks loader must remain');
+ assert.ok(home.includes('useAgendaMonth(api,calendarDate,active,launchVisible)'),'current Agenda month remains essential');
+ assert.ok(home.includes("api.cached<HomeData>('/home')"),'retained Home projection must remain');
+ assert.ok(home.includes("api.cached<{items:Task[]}>('/tasks')"),'retained Tasks must remain');
+ const catalog=home.indexOf('void api.catalog().then(cat=>');
+ const widgets=home.indexOf('void api.dashboardWidgets().then(r=>');
+ const monitors=home.indexOf("api.entities('monitor'");
+ assert.ok(catalog>=0&&widgets>=0&&monitors>=0);
+ assert.ok(home.slice(catalog-100,catalog).includes('scheduleIdleTask('),'catalog startup deferred');
+ assert.ok(home.slice(widgets-100,widgets).includes('scheduleIdleTask('),'widget refresh deferred');
+ assert.ok(home.slice(monitors,monitors+1400).includes('scheduleIdleTask(()=>{void load();})'),'monitors startup deferred');
+ assert.ok(home.includes('if(!active||!launchVisible||agendaCatalog)return'),'catalog waits for real Home');
+ assert.ok(home.includes('if(!launchVisible||!active)return'),'widgets wait for real Home');
+});
