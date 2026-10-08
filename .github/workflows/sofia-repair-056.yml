@@ -35,19 +35,21 @@ jobs:
           test "$GITHUB_REF" = refs/heads/sofia-fix-launch-history-056
           mkdir -p /tmp/sofia-056-logs
           python3 - <<'PY'
-          import base64,gzip,hashlib,json,pathlib,subprocess
+          import base64,gzip,hashlib,json,pathlib,subprocess,runpy
           raw=gzip.decompress(base64.b64decode(pathlib.Path('.github/repairs/056.patch.gz.b64').read_text(),validate=False))
           assert hashlib.sha256(raw).hexdigest()=='86f6445b598b2c556df715fbab32256d509614f92ecd89ed5009c76493da35bd', 'Patch checksum mismatch'
           patch='/tmp/sofia-056.patch';pathlib.Path(patch).write_bytes(raw)
           subprocess.run(['git','apply','--check','--unidiff-zero',patch],check=True)
           subprocess.run(['git','apply','--index','--unidiff-zero',patch],check=True)
+          runpy.run_path('.github/repairs/056-extra.py')
+          subprocess.run(['git','add','--','SOFIA_APP/src/lib/startup-mounts.ts','SOFIA_APP/tests/navigation.test.cjs'],check=True)
           expected=json.loads(pathlib.Path('.github/repairs/056-expected.json').read_text())
           changed=subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines()
           assert sorted(changed)==sorted(e['path'] for e in expected), 'Unexpected changed paths'
           for e in expected:
             actual=subprocess.check_output(['git','hash-object',e['path']],text=True).strip()
             assert actual==e['sha'], 'Unexpected file content: '+e['path']
-          print('Exact 13-file patch applied; production branch and data untouched')
+          print('Exact 14-file patch applied; production branch and data untouched')
           PY
       - name: Install locked dependencies
         run: |
