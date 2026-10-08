@@ -39,15 +39,19 @@ test('gestures use the native horizontal pager and do not steal vertical scrolls
 test('pager keeps six fixed slots while heavy screen trees mount progressively after Home',()=>{
   assert.deepEqual(Array.from(TAB_ORDER),['home','chat','pages','agenda','apps','profile']);
   const body=source.slice(source.indexOf('<TabPager'),source.indexOf('</TabPager>'));
-  let previous=-1;for(const name of ['Home','Chat','Pages','Agenda','Workspace','Profile']){const index=body.indexOf('<'+name+' ');assert.ok(index>previous,name);previous=index;}
+  const markers=['<Home ','load={loadChat}','load={loadPages}','load={loadAgenda}','load={loadWorkspace}','load={loadProfile}'];
+  let previous=-1;for(const marker of markers){const index=body.indexOf(marker);assert.ok(index>previous,marker);previous=index;}
   for(const tab of ['chat','pages','agenda','apps','profile'])assert.ok(body.includes("mountedTabs.has('"+tab+"')"));
   const startup=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
   assert.ok(startup.includes("new Set<Tab>(['home'])"));assert.ok(startup.includes("['chat','agenda']"));assert.ok(startup.includes("['pages','profile']"));assert.ok(startup.includes("['apps']"));
   assert.ok(startup.includes("return MENU_TABS.includes(active)?add(mounted,[active]):mounted"));
   assert.ok(pager.includes('removeClippedSubviews={false}'));assert.ok(!source.includes('setBootstrap(null);setTab('));
 });
-test('unchanged screen trees and callback props are memoized, preserving drafts and scroll positions',()=>{
-  for(const name of ['Home','Chat','Pages','Agenda','Workspace','Profile','Notifications'])assert.ok(source.includes(name+'=React.memo('+name+'Screen)'),name);
+test('screen instances stay cached after lazy loading, preserving drafts and scroll positions',()=>{
+  const loader=fs.readFileSync(path.join(root,'src/lib/screen-loader.tsx'),'utf8');
+  assert.ok(source.includes('const Home=React.memo(HomeScreen)'));
+  assert.ok(loader.includes('React.memo(load())'));assert.ok(loader.includes('const cache=new Map<string,Screen>()'));
+  for(const name of ['loadChat','loadPages','loadAgenda','loadWorkspace','loadProfile','loadNotifications'])assert.ok(source.includes(name),name);
   for(const name of ['navigate','goBack','changePrefs','logout','profile','manualUpdate','clearChat','notificationBack'])assert.ok(source.includes('const '+name+'=useCallback('),name);
   assert.ok(source.includes("key={'chat-'+chatEpoch}"));assert.ok(!source.includes('key={tab}'));
 });
