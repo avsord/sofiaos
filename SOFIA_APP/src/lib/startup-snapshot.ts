@@ -16,7 +16,16 @@ export class StartupSnapshot {
  async hydrate(){const revision=this.revision;try{const raw=await this.storage.read(this.scope);if(!raw||raw.length>MAX_BYTES*2||this.closed||revision!==this.revision)return;const parsed=JSON.parse(raw);if(parsed.schema!==1||!Array.isArray(parsed.entries))return;for(const pair of parsed.entries){if(!Array.isArray(pair)||pair.length!==2)continue;const [path,e]=pair;if(typeof path==='string'&&cacheableRead(path)&&!this.entries.has(path)&&e&&typeof e.at==='number'&&fresh(path,e.at,this.now()))this.entries.set(path,e);}}catch{/* Cache failure must not prevent a normal network login. */}}
  peek<T>(path:string):T|undefined {const e=this.entries.get(path);return e&&fresh(path,e.at,this.now())?e.value as T:undefined;}
  all(){return [...this.entries].map(([key,e])=>[key,e.value] as const);}
- remember(path:string,value:unknown){if(this.closed||!cacheableRead(path))return;try{const text=JSON.stringify(value);if(text.length>1024*1024)return;this.entries.set(path,{at:this.now(),value:JSON.parse(text)});this.schedule();}catch{}}
+ remember(path:string,value:unknown){if(this.closed||!cacheableRead(path))return;
+  const prior=this.entries.get(path)?.value as any,latest=value as any;
+  // Protect chat history against unexplained empty API responses.
+  // Confirmed user deletions use forgetChat()/forget(), never this path.
+  if(chatRead(path)&&prior&&latest){
+   if(Array.isArray(prior.messages)&&prior.messages.length&&Array.isArray(latest.messages)&&!latest.messages.length&&
+      prior.conversation?.id===latest.conversation?.id&&!(latest.deleted_ids||[]).length)return;
+   if(path==='/conversations?offset=0'&&Array.isArray(prior.items)&&prior.items.length&&Array.isArray(latest.items)&&!latest.items.length)return;
+  }
+  try{const text=JSON.stringify(value);if(text.length>1024*1024)return;this.entries.set(path,{at:this.now(),value:JSON.parse(text)});this.schedule();}catch{}}
  forgetData(){if(this.closed)return;this.revision++;for(const key of this.entries.keys())if(key!=='/bootstrap'&&!chatRead(key))this.entries.delete(key);this.schedule();}
  forgetChat(){if(this.closed)return;this.revision++;for(const key of this.entries.keys())if(chatRead(key))this.entries.delete(key);this.schedule();}
  forget(path:string){if(this.closed)return;this.revision++;this.entries.delete(path);this.schedule();}
