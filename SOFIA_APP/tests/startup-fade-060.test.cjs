@@ -82,10 +82,12 @@ test('060 unmount or launch failure cannot release stale optional services',asyn
 test('060 old platforms without the visibility bridge keep a cancellable fallback',async()=>{
  const f=visibilityFixture(false);assert.deepEqual(f.states,[false]);f.frames.shift()();f.frames.shift()();assert.deepEqual(f.states,[false,true]);f.dispose();
 });
-test('060 native exit uses a 120ms opacity fade, includes it in readiness timing and respects disabled animation',()=>{
+test('063 ready content exits directly while readiness still includes the next display frame',()=>{
  const native=file('plugins/native/SofiaLaunchOverlay.kt');
- for(const token of ['EXIT_FADE_MS = 120L','.setDuration(EXIT_FADE_MS).setStartDelay(0L)','ValueAnimator.areAnimatorsEnabled()','override fun onAnimationCancel','fun whenRevealed','SOFIA_LAUNCH_${stage}_PROCESS_MS=','record(activity, "LOCAL_READY")'])assert.ok(native.includes(token),token);
+ for(const token of ['fun whenRevealed','SOFIA_LAUNCH_${stage}_PROCESS_MS=','record(activity, "LOCAL_READY")','record(activity, "SPLASH_REMOVED")'])assert.ok(native.includes(token),token);
  assert.ok(native.includes('splash.remove(); removeSystemSplash = null'));
- assert.ok(!native.includes('root.addView'));assert.ok(!native.includes('Thread.sleep'));assert.ok(!native.includes('.translationY('));
- assert.ok(native.indexOf('cleanup()\n        completeReveal')>0);
+ for(const absent of ['root.addView','Thread.sleep','.translationY(','.animate()', 'content.alpha = 0f','EXIT_FADE_MS'])assert.ok(!native.includes(absent),absent);
+ const completion=native.slice(native.indexOf('private fun completeReveal'),native.indexOf('private fun reveal'));
+ assert.ok(completion.indexOf('postOnAnimation')<completion.indexOf('visible = true'));
+ assert.ok(completion.indexOf('visible = true')<completion.indexOf('record(activity, if (success) "DATA"'));
 });

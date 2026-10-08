@@ -20,7 +20,7 @@ def cold(label):
   time.sleep(.2)
  (out/(label+'.txt')).write_text(logs)
  assert 'FATAL EXCEPTION' not in logs,logs
- stages={name:int(value) for name,value in re.findall(r'SOFIA_LAUNCH_(UI|LOCAL_READY|FADE_START|DATA)_PROCESS_MS=(\d+)',logs)}
+ stages={name:int(value) for name,value in re.findall(r'SOFIA_LAUNCH_(UI|LOCAL_READY|FADE_START|SPLASH_REMOVED|DATA)_PROCESS_MS=(\d+)',logs)}
  assert 'DATA' in stages,logs
  assert stages['UI']<=stages['LOCAL_READY']<=stages['DATA'],stages
  return {'stages_ms':stages,'activity_manager':manager}
@@ -43,15 +43,15 @@ try:
  adb('shell','svc','wifi','disable');adb('shell','svc','data','disable')
  adb('shell','cmd','connectivity','airplane-mode','enable')
  result['offline']=True
- previous=dist/'previous-061/Sofia-OS.apk'
+ previous=dist/'previous-062/Sofia-OS.apk'
  result['baseline_apk_sha256']=hashlib.sha256(previous.read_bytes()).hexdigest()
- assert result['baseline_apk_sha256']=='926164e359d88f45bfc46e8773e15492a80172fe4fa9b7a746d4b1be97de9899'
+ assert result['baseline_apk_sha256']=='d8033b9566fdd9b0af74380d1a55e9856851f0285b3ca208a203597e86642013'
  adb('install','-r',str(previous))
- for i in range(3):result['baseline_runs'].append(cold('baseline-'+str(i)))
+ for i in range(5):result['baseline_runs'].append(cold('baseline-'+str(i)))
  before=capture('baseline');assert 'Olá, Teste.' in before,'Previous production APK did not restore the saved account'
  adb('install','-r',str(dist/'Sofia-OS.apk'));result['in_place_install']=True
  result['migration_run']=cold('candidate-migration')
- for i in range(3):result['candidate_runs'].append(cold('candidate-'+str(i)))
+ for i in range(5):result['candidate_runs'].append(cold('candidate-'+str(i)))
  after=capture('candidate');assert 'Olá, Teste.' in after,'Production authenticated Home is not visible';assert 'com compromissos' in after,'Saved agenda records are not available at startup'
  result['authenticated_home_tested']=True
  # Verify that an actual menu touch works and retained conversation survives.

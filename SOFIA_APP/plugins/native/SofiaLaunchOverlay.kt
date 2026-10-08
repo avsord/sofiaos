@@ -1,8 +1,5 @@
 package com.avsord.sofiaapp
 
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
-import android.animation.ValueAnimator
 import android.app.Activity
 import android.os.Build
 import android.os.Process
@@ -12,7 +9,6 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
-import android.view.animation.LinearInterpolator
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -23,8 +19,8 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 
-/** Retain Android's original splash. Essential layout/network can progress under
- * it, but optional work waits until the real app is visible after the short fade. */
+/** Retain Android's original splash until the saved Home is ready. Remove it
+ * directly; optional work still waits for the following usable display frame. */
 object SofiaLaunchOverlay {
   private var host: WeakReference<Activity>? = null
   private var observer: ViewTreeObserver? = null
@@ -43,7 +39,6 @@ object SofiaLaunchOverlay {
   private val waiting = mutableListOf<Promise>()
   private val visibleWaiting = mutableListOf<Promise>()
   private const val STORE = "sofia.launch.timings.v1"
-  private const val EXIT_FADE_MS = 120L
 
   fun start(activity: Activity) {
     // A hot start reuses this Activity and does not call start. Configuration
@@ -63,13 +58,13 @@ object SofiaLaunchOverlay {
       activity.splashScreen.setOnExitAnimationListener { splash ->
         if (host?.get() !== activity) splash.remove()
         else {
-          removeSystemSplash = { splash.animate().setListener(null).cancel(); splash.remove() }
+          removeSystemSplash = { splash.remove() }
           exitSystemSplash = { success ->
             if (!exitStarted && host?.get() === activity) {
               exitStarted = true
-              fade(activity, splash, 0f, success) {
-                splash.remove(); removeSystemSplash = null; exitSystemSplash = null
-              }
+              splash.remove(); removeSystemSplash = null; exitSystemSplash = null
+              record(activity, "SPLASH_REMOVED")
+              completeReveal(activity, success)
             }
           }
           when (transition.splashReady()) {
@@ -103,7 +98,7 @@ object SofiaLaunchOverlay {
       .putLong("activity_started_uptime_ms", activityStartedAt).apply()
     val listener = ViewTreeObserver.OnPreDrawListener {
       inspect(activity)
-      // Layout/network permission cannot wait for this draw or for the fade.
+      // Layout/network permission cannot wait for the visibility fence.
       Build.VERSION.SDK_INT >= 31 || revealed
     }
     observer = root.viewTreeObserver
@@ -125,37 +120,15 @@ object SofiaLaunchOverlay {
       .putLong("measured_at_ms", System.currentTimeMillis()).apply()
   }
 
-  private fun fade(activity: Activity, view: View, alpha: Float, success: Boolean, cleanup: () -> Unit) {
-    var ended = false
-    val finish = {
-      if (!ended) {
-        ended = true
-        view.animate().setListener(null)
-        view.alpha = alpha
-        cleanup()
-        completeReveal(activity, success)
-      }
-    }
-    val animations = Build.VERSION.SDK_INT < 26 || ValueAnimator.areAnimatorsEnabled()
-    record(activity, "FADE_START")
-    if (!success || !animations) { finish(); return }
-    // No minimum splash time, icon-animation wait, translation, scale or JS fade.
-    view.animate().alpha(alpha).setDuration(EXIT_FADE_MS).setStartDelay(0L)
-      .setInterpolator(LinearInterpolator())
-      .setListener(object : AnimatorListenerAdapter() {
-        override fun onAnimationEnd(animation: Animator) { finish() }
-        override fun onAnimationCancel(animation: Animator) { finish() }
-      }).start()
-  }
-
   private fun completeReveal(activity: Activity, success: Boolean) {
     if (visible || host?.get() !== activity) return
     if (!transition.finish()) return
-    visible = true
     detach()
-    // Include the native fade in DATA timing; it is not free startup time.
+    // Keep the same next-frame DATA boundary used by the comparison APK.
+    // Layout readiness alone must never be reported as usable presentation.
     activity.window.decorView.postOnAnimation {
       if (host?.get() !== activity || activity.isFinishing) return@postOnAnimation
+      visible = true
       record(activity, if (success) "DATA" else "ERROR")
       val callbacks = visibleWaiting.toList(); visibleWaiting.clear()
       callbacks.forEach { it.resolve(success) }
@@ -167,17 +140,14 @@ object SofiaLaunchOverlay {
     if (revealed || host?.get() !== activity) return
     revealed = true; failed = !success
     record(activity, "LOCAL_READY")
-    val content = activity.findViewById<View>(android.R.id.content)
-    // Legacy Android fades the real content over its unchanged starting-window
-    // drawable. It does not add an overlay, another logo or a second Activity.
-    if (Build.VERSION.SDK_INT < 31 && success) content.alpha = 0f
+    // Wait for the prepared Home draw before removing the original starting
+    // surface. No extra logo, transparent content or timed opacity animation.
     activity.window.decorView.postOnAnimation {
       if (host?.get() !== activity || activity.isFinishing) return@postOnAnimation
       when (transition.contentReady()) {
         SofiaLaunchTransition.Exit.SYSTEM_SPLASH -> exitSystemSplash?.invoke(success)
         SofiaLaunchTransition.Exit.CONTENT -> {
-          if (Build.VERSION.SDK_INT < 31 && success) fade(activity, content, 1f, true) {}
-          else completeReveal(activity, success) // recreation without a starting window
+          completeReveal(activity, success) // legacy/recreation without a starting window
         }
         else -> Unit // Android owns a splash: wait for its exit callback, not a timer.
       }

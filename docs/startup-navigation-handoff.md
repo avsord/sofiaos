@@ -1,5 +1,11 @@
 # Sofia OS — startup/navigation handoff, 2026-10-08
 
+## Current work: 0.3.63 faster native reveal
+
+User asked for further startup improvement after receiving 0.3.62. In run 37834460902, offline production-APK upgrade and authenticated Home/Chat checks passed. Exact delivered 0.3.62: source b03aa69646c178e556b17e871447c85a72826b9a, code67, APK SHA256 d8033b9566fdd9b0af74380d1a55e9856851f0285b3ca208a203597e86642013. Emulator medians were 1448 ms for 0.3.61 and 1394 ms for 0.3.62; this small three-sample difference is not proof of a substantial speedup on the user's phone.
+
+Candidate 0.3.63/code68 removes the additional native opacity animation once the real Home's data/layout requirements are met. The original system splash still stays until that readiness condition. The same next-frame DATA timing boundary remains, and visibility subscribers cannot run early. No cache, API, data, login or ready markers are removed. Manual CI compares five cold starts of the exact 0.3.62 and new production APKs on the same offline seeded account, with in-place installation and Home/Chat checks; record the result before claiming a speed gain.
+
 ## Current work: 0.3.62 local-first manual delivery
 
 The user reported that 0.3.61 remained slow and explicitly prioritized startup over fade. Home must already contain the current-month agenda and tasks; Chat must open with saved recent messages. Older conversations must stay preserved. The user authorized one candidate APK delivered directly for phone testing, without updater publication.
