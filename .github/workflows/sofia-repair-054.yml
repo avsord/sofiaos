@@ -4,19 +4,83 @@ on:
     branches: [fix/profile-history-startup-054]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
+concurrency:
+  group: sofia-repair-054-validation
+  cancel-in-progress: true
 jobs:
-  source:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+  verify:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 4d41d6ea6657478bdc2c667cf54a56f11829f781
-      - name: Package exact live source for regression diagnosis
-        run: git archive --format=tar.gz -o sofia-live-source.tar.gz HEAD
-      - uses: actions/upload-artifact@v4
+          path: repair
+      - uses: actions/checkout@v4
         with:
-          name: sofia-live-source-054
-          path: sofia-live-source.tar.gz
-          retention-days: 3
+          ref: 4d41d6ea6657478bdc2c667cf54a56f11829f781
+          path: source
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: source/SOFIA_APP/package-lock.json
+      - name: Apply checksum-verified changes to app only
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,shutil
+          from pathlib import Path
+          root=Path('source').resolve()
+          digest=lambda text:hashlib.sha256(text.encode()).hexdigest()
+          for item in json.loads(Path('repair/tools/repair054-payload1.json').read_text())['files']:
+            path=root/item['path']
+            assert path.is_relative_to(root/'SOFIA_APP')
+            text=path.read_text() if path.exists() else ''
+            assert digest(text)==item['before'], 'Base mismatch: '+item['path']
+            for start,end,replacement in reversed(item['edits']):
+              text=text[:start]+replacement+text[end:]
+            assert digest(text)==item['after'], 'Result mismatch: '+item['path']
+            path.parent.mkdir(parents=True,exist_ok=True)
+            path.write_text(text)
+          shutil.copyfile('repair/tools/repair054.test.cjs',root/'SOFIA_APP/tests/profile-history-startup-054.test.cjs')
+          PY
+          git -C source diff --check
+          test -z "$(git -C source diff --name-only -- src tools package.json package-lock.json)"
+      - name: Install locked dependencies and typecheck
+        working-directory: source/SOFIA_APP
+        run: |
+          npm ci
+          npm run check
+      - name: Full app regression suite
+        working-directory: source/SOFIA_APP
+        run: |
+          set -o pipefail
+          npm test | tee app-regression-054.log
+      - name: Existing backend regression suite with isolated test databases
+        working-directory: source
+        run: |
+          set -o pipefail
+          npm ci
+          npm test | tee backend-regression-054.log
+      - name: Commit only verified app changes; leave production untouched
+        working-directory: source
+        run: |
+          git config user.name 'Sofia repair validation'
+          git config user.email 'sofia-build@users.noreply.github.com'
+          git add SOFIA_APP/App.tsx SOFIA_APP/package.json SOFIA_APP/src SOFIA_APP/tests
+          git commit -m 'fix(android): transactional profile photo, preserved history and data-ready startup'
+          git push origin HEAD:refs/heads/fix/verified-profile-history-startup-054
+          git rev-parse HEAD > VERIFIED_SOURCE.txt
+          git archive --format=tar.gz -o verified-source-054.tar.gz HEAD
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sofia-054-repair-validation
+          path: |
+            source/SOFIA_APP/app-regression-054.log
+            source/backend-regression-054.log
+            source/VERIFIED_SOURCE.txt
+            source/verified-source-054.tar.gz
+          retention-days: 7
