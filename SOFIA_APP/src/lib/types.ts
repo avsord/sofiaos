@@ -1,11 +1,11 @@
 export type Profile = { name: string; email: string; role: 'owner' };
-export type Auth = { token: string; token_type: 'Bearer'; expires_at: string; profile: Profile };
 export type Bootstrap = {
   version: string; profile: Profile; expires_at: string;
   ai: { ready: boolean; reason: string | null };
   limits: { audio_bytes: number; audio_seconds: number; text_chars: number };
   capabilities: { text: boolean; voice_notes: boolean; notifications_push: boolean; multi_user: boolean; e2ee: boolean; workspace?: boolean };
 };
+export type Auth = { token: string; token_type: 'Bearer'; expires_at: string; profile: Profile; startup?: Bootstrap };
 export type VoiceDraft = { uri: string; duration: number };
 export type AttachmentDraft={uri:string;name:string;mime:string;size:number;entityId?:string;attachmentId?:string};
 export type Message = {
@@ -18,17 +18,15 @@ export type Message = {
 };
 export type Conversation = { id: string; title: string; channel: string; created_at: string; updated_at: string };
 export type MessagePage = { conversation?: Conversation; messages: Message[]; has_more: boolean };
-export type ChatResult = MessagePage & { conversation_id: string; reply: string; clarification?: { id: string; options?: { id: string; label: string }[] } | null };
-export type Task = { id: string; title: string; state: string; due_at?: string; start_at?:string;end_at?:string;description?:string;location?:string;color?:string; description_document?:{version:1;text:string;marks:import('./leaf-document').Mark[]};created_at?:string; revision: number; priority?: number; priority_level?: string; area?: string };
-export type Notice = { id: string; title: string; body: string; state: string; created_at: string; category?: string };
+export type ChatResult = { conversation_id: string; messages: Message[]; has_more: boolean; reply?: string; clarification?: any };
+export type ChatSnapshot = { conversation?: Conversation; messages: Message[]; has_more: boolean; deleted_ids?: string[]; current_id?: string; cursor_revision?: number };
+export type Prefs = { appearance: 'system' | 'light' | 'dark' | 'schedule'; enterToSend: boolean; autoSendVoice: boolean; lightAt:string; darkAt:string };
+export type Tab = 'home' | 'chat' | 'pages' | 'agenda' | 'apps' | 'profile' | 'notifications';
+export type Task = { id: string; title: string; description?: string; description_document?: any; state: string; area?: string; due_at?: string; start_at?: string; end_at?: string; created_at?: string; revision: number; priority_level?: string };
+export type AgendaItem = { id: string; kind:string; title: string; content?: string; state: string; area: string; privacy:string; tags:string[]; data:Record<string,any>; revision:number; created_at:string; updated_at:string };
+export type Notice = { id: string; title: string; body: string; state: string; category?: string; created_at: string; dedup?: string; [key:string]:any };
 export type HomeData = { tasks: Task[]; notifications: Notice[]; today_tasks: Task[]; profile: Profile };
-export type AgendaItem = { tags?:string[];content?:string; id: string; title: string; kind: string; state: string; revision: number; data: { priority_level?:string;end_at?:string;remind_minutes?:number|string;start_at?: string; due_at?: string; remind_at?: string; calendar_all_day?:boolean;calendar_date_start?:string;calendar_date_end?:string; location?: string } };
-export type Tab = 'home' | 'chat' | 'pages' | 'agenda' | 'apps' | 'notifications' | 'profile';
-export type Appearance = 'system' | 'light' | 'dark' | 'schedule';
-export type Prefs = { appearance: Appearance; enterToSend: boolean; autoSendVoice: boolean; lightAt?: string; darkAt?: string };
-export type Field = { key: string; label: string; type: string; options?: string[]; max?: number; developerOnly?: boolean };
-export type Definition = { label: string; group: string; description?: string; states: string[]; fields: Field[]; private?: boolean };
-export type Entity = { id: string; kind: string; title: string; content: string; area: string; state: string; privacy: string; tags: string[]; data: Record<string, any>; revision: number; updated_at?: string };
-export type Catalog = { catalog: Record<string, Definition>; areas: string[] };
-
-export type ChatSnapshot=Omit<MessagePage,'conversation'> & {conversation:Conversation|null;deleted_ids:string[];current_id:string|null;cursor_revision:number};
+export type CatalogField={key:string;label:string;type:string;required?:boolean;options?:string[];default?:any};
+export type CatalogDefinition={label:string;icon:string;group:string;fields:CatalogField[]};
+export type Catalog={catalog:Record<string,CatalogDefinition>;areas:string[]};
+export type Entity={id:string;kind:string;title:string;content:string;area:string;privacy:string;state:string;tags:string[];data:Record<string,any>;revision:number;created_at:string;updated_at:string;[key:string]:any};
