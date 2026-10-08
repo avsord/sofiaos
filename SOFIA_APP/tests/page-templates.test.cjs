@@ -73,11 +73,16 @@ test('Kanban owns measured drag, supports reordering and cannot navigate out of 
  assert.ok(collection.includes('onInteractionChange={onInteractionChange}'));
  assert.ok(!pages.includes('pageBackResponder'));assert.ok(pages.includes('enabled={!pageDragging&&!kanbanInteractionRef.current}'));
 });
-test('page cover picker recovers Android pending results instead of losing the chosen photo',()=>{
+test('page cover picker uploads the actual edited file with its real MIME and retries image rendering',()=>{
  const appearance=fs.readFileSync(path.join(__dirname,'../src/components/PageAppearance.tsx'),'utf8');
+ const cover=load('src/lib/page-cover-upload.ts');
  assert.ok(appearance.includes('ImagePicker.getPendingResultAsync()'));
  assert.ok(appearance.includes("PENDING_COVER_KEY='sofia.native.pending-page-cover.v1'"));
  assert.ok(appearance.includes('AsyncStorage.setItem(PENDING_COVER_KEY,pageId)'));
- assert.ok(appearance.includes('quality:0.72,base64:true'));
- assert.ok(appearance.includes("cover_attachment_id:attachment.id"));
+ assert.ok(appearance.includes('new File(asset.uri)'));assert.ok(appearance.includes('await file.base64()'));
+ assert.ok(appearance.includes('coverMime(base64,asset.mimeType)'));assert.ok(!appearance.includes('base64:true'));
+ assert.ok(appearance.includes("cover_attempt="));assert.ok(appearance.includes("cover_attachment_id:attachment.id"));
+ assert.equal(cover.coverMime('/9j/AAAA','image/png'),'image/jpeg');
+ assert.equal(cover.coverMime('iVBORw0KGgoAAAA','image/jpeg'),'image/png');
+ assert.equal(cover.coverName('image/webp'),'capa.webp');
 });
