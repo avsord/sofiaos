@@ -19,8 +19,6 @@ Não existe mais temporizador de cinco minutos no compositor. O servidor passa a
 
 O campo de mensagem não usa mais `maxLength`. O endpoint móvel aceita até um milhão de caracteres por mensagem e corpo HTTP ampliado. A capacidade real de resposta da IA ainda depende da janela de contexto do provedor; o app não corta silenciosamente o que o usuário digitou.
 
-Os testes de integração exercitam diretamente uma mensagem acima do antigo teto de 12 mil caracteres e uma gravação com duração superior aos antigos cinco minutos usando a mesma configuração ampliada do núcleo. O conteúdo integral da mensagem continua salvo e enviado à interpretação; somente a frase usada pelo índice para procurar contexto antigo é projetada para até 500 caracteres, preservando início e fim, para que uma mensagem longa não seja rejeitada pela busca auxiliar.
-
 ## Foto do perfil
 
 A foto é escolhida pela galeria ou câmera e passa pelo editor nativo do Android/iOS com proporção 1:1. O resultado é copiado para o diretório permanente do aplicativo e associado ao e-mail da conta. Remover a foto apaga somente esse arquivo local e retorna às iniciais. Esta entrega não apresenta a foto como sincronizada com o site ou com outro aparelho.
@@ -42,3 +40,37 @@ Instalação por cima, sem desinstalar, limpar dados, apagar mensagens, páginas
 ## Critério de entrega
 
 Só informar como publicado após typecheck, regressões do aplicativo, testes de backend, build de produção, instalação sobre a versão anterior, assinatura, dois grupos nativos aprovados, backend compatível/deployado e release real descoberta pelo atualizador.
+
+
+## Complemento — perfil, sino, tarefas e cold start
+
+### Foto de perfil
+O Perfil do usuário exibe um avatar tocável com badge de câmera. O fluxo oferece galeria, câmera e remoção. Galeria/câmera usam o editor nativo com proporção 1:1, permitindo zoom e reposicionamento antes de confirmar. O arquivo final é copiado para armazenamento permanente do app por conta e sobrevive a atualizações do APK. Esta versão não afirma sincronização automática da foto entre dispositivos.
+
+### Marcar tudo como lido
+O sino e a tela completa de notificações passam a oferecer **Marcar tudo como lido**. Avisos locais (Agenda, Cápsulas, Rotinas e tarefas derivadas no aparelho) são atualizados de uma vez e persistidos. Avisos remotos recebem confirmação no servidor em lotes; a interface atualiza imediatamente e reconcilia novamente se alguma chamada falhar. Essa ação não apaga notificações nem conclui tarefas/doses.
+
+### Excluir tarefa dentro da edição
+Ao editar uma tarefa existente, a lixeira fica visível no cabeçalho e o botão **Excluir tarefa** permanece no fim do formulário. Ambos usam a mesma confirmação destrutiva e removem o registro do app/site somente depois da confirmação.
+
+### Cold start sem flick claro/escuro
+Quando o processo do app não está em memória, o Android usa uma única superfície nativa roxa com a marca Sofia. Essa superfície cobre a transição entre splash do sistema e React. O React carrega sessão, preferências, tema e o Home final por trás; somente depois de duas pinturas com o estado correto o overlay nativo é removido.
+
+Com isso, não devem aparecer:
+- frame claro seguido de escuro (ou o contrário);
+- janela vazia entre splash e React;
+- skeleton visível por poucos frames antes do Home completo;
+- “estouro” da interface quando o tema termina de carregar.
+
+Há fallback nativo de 5 segundos apenas para não esconder indefinidamente uma tela de erro em caso de falha real de inicialização.
+
+## Critério adicional de aceite da 0.3.51
+
+- cold start entrega uma transição única da marca para a interface final;
+- tema já está correto no primeiro frame visível do React;
+- foto de perfil pode ser escolhida, enquadrada, persistida e removida;
+- sino marca todas as notificações como lidas sem apagá-las;
+- editor de tarefa contém exclusão explícita com confirmação;
+- áudio continua cancelável por gesto para a esquerda;
+- Agenda e Cápsulas continuam agendando notificações nativas no celular;
+- texto/áudio longos usam apenas limites técnicos amplos de transporte, sem o teto curto anterior.
