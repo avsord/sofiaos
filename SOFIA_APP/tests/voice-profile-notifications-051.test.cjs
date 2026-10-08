@@ -16,11 +16,13 @@ test('agenda and capsule schedules request permission and use high-priority phon
  for(const source of [agenda,capsules]){assert.ok(source.includes('ensureSystemNotificationPermission'));assert.ok(source.includes('AndroidImportance.HIGH'));assert.ok(source.includes('AndroidNotificationPriority.HIGH'));assert.ok(source.includes("sound:'default'"));}
  assert.ok(permission.includes('requestPermissionsAsync'));assert.ok(permission.includes('permissionFlight'));
 });
-test('backend advertises expanded chat transport and core accepts long text/audio duration',()=>{
- const backend=file('../src/channels/mobile.js'),runtime=file('../src/config/runtime.js');
- assert.ok(backend.includes('MAX_TEXT = 1000000'));assert.ok(backend.includes('MAX_AUDIO_DURATION = 6 * 60 * 60 * 1000'));assert.ok(backend.includes('MAX_AUDIO = 64 * 1024 * 1024'));
- assert.ok(backend.includes("bodyJson(req, 2 * 1024 * 1024)"));assert.ok(!backend.includes("duration > 300000"));
- assert.ok(runtime.includes('maxMessageChars: 1000000'));
+test('chat has no product character or audio-duration ceiling',()=>{
+ const backend=file('../src/channels/mobile.js'),core=file('../src/core/sofia-core.js'),store=file('../src/memory/store.js'),composer=file('src/components/Composer.tsx'),chat=file('src/screens/Chat.tsx');
+ assert.ok(backend.includes('MAX_AUDIO = 64 * 1024 * 1024'));assert.ok(backend.includes('MAX_MESSAGE_BODY = 8 * 1024 * 1024'));
+ assert.ok(!backend.includes('MAX_TEXT'));assert.ok(!backend.includes('MAX_AUDIO_DURATION'));assert.ok(!backend.includes('duration > 300000'));
+ assert.ok(backend.includes("audio_seconds: 0, text_chars: 0"));assert.ok(backend.includes("cleanMessage(b.message, 'Mensagem')"));
+ assert.ok(core.includes("cleanMessage(input.message,'Mensagem')"));assert.ok(store.includes("cleanMessage(transcript,'Transcrição',true)"));
+ assert.ok(!composer.includes('maxChars'));assert.ok(!composer.includes('maxLength='));assert.ok(!chat.includes('maxChars={'));
 });
 
 test('notification bell can mark local and remote notices read in one action',()=>{
@@ -41,5 +43,5 @@ test('cold start stays on one native brand surface until the final themed Home i
 });
 test('instant fallback bootstrap uses the same expanded transport ceiling as the mobile server',()=>{
  const fast=file('src/lib/fast-bootstrap.ts');
- assert.ok(fast.includes('audio_bytes:64*1024*1024'));assert.ok(fast.includes('audio_seconds:6*60*60'));assert.ok(fast.includes('text_chars:1000000'));
+ assert.ok(fast.includes('audio_bytes:64*1024*1024'));assert.ok(fast.includes('audio_seconds:0'));assert.ok(fast.includes('text_chars:0'));
 });
