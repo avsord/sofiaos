@@ -1,5 +1,5 @@
 import {scheduleIdleTask} from './src/lib/idle-task';
-import {prepareLocalLaunch} from './src/lib/local-launch';
+import {prepareLocalLaunch,createLaunchPreparation} from './src/lib/local-launch';
 import type {LocalLaunch} from './src/lib/local-launch';
 import {prepareInitialData} from './src/lib/startup-preparation';
 import {useAfterFirstPaint} from './src/lib/use-after-first-paint';
@@ -7,7 +7,7 @@ import {useLaunchVisible} from './src/lib/use-launch-visible';
 import {preloadAgenda} from './src/lib/use-agenda-month';
 import React,{Component,ErrorInfo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {View,Text,StatusBar,ActivityIndicator,AccessibilityInfo,useColorScheme,AppState,Alert,Keyboard,BackHandler,Linking,StyleSheet} from 'react-native';
-import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
+import {SafeAreaProvider,SafeAreaView,initialWindowMetrics} from 'react-native-safe-area-context';
 import {SofiaApi,readAuth,saveAuth,forgetAuth,readPrefs,savePrefs,startupSnapshotFor} from './src/lib/api';
 import type {Auth,Bootstrap,Prefs,Tab,Task,Profile as UserProfile} from './src/lib/types';
 import {fastBootstrap,authWithBootstrap} from './src/lib/fast-bootstrap';
@@ -133,11 +133,13 @@ function Shell({startup}:{startup:LocalLaunch}){
  {!keyboard?<View nativeID="sofia-menu-bar" style={{flexDirection:'row',backgroundColor:c.surface,borderTopWidth:1,borderColor:c.line,paddingHorizontal:8,paddingTop:7,paddingBottom:4}}>{tabs.map(item=><MenuTab locked={locked} motion={menuMotion} key={item.id} item={item} selected={tab===item.id} onSelect={navigate}/>)}</View>:null}</>}
  {visible?<DeferredScreen load={loadBackgroundServices} screenProps={{api,scope:auth?.profile.email||'',enabled:!auth?false:servicesReady?true:null,onCapsules:openCapsules,onAgenda:openAgenda}}/>:null}</View></SafeAreaView></NotificationProvider></ThemeContext.Provider>;
 }
+const launchPreparation=createLaunchPreparation(()=>prepareLocalLaunch(readAuth,readPrefs,startupSnapshotFor));
+export function prepareStartup(){launchPreparation.prime();}
 function LocalLaunchGate(){
  const [startup,setStartup]=useState<LocalLaunch|null>(null),[error,setError]=useState(''),[attempt,setAttempt]=useState(0);
- useEffect(()=>{let live=true;setError('');void prepareLocalLaunch(readAuth,readPrefs,startupSnapshotFor).then(value=>{if(live)setStartup(value);}).catch(e=>{if(live)setError(errorText(e));});return()=>{live=false;};},[attempt]);
+ useEffect(()=>{let live=true;setError('');void launchPreparation.take().then(value=>{if(live)setStartup(value);}).catch(e=>{if(live)setError(errorText(e));});return()=>{live=false;};},[attempt]);
  // Do not display a wrongly-themed/empty dashboard before local reads resolve.
  if(!startup)return error?<View nativeID="sofia-launch-error" style={{flex:1,padding:24,justifyContent:'center',backgroundColor:'#F7F6FA'}}><ErrorBanner text={error}/><Button title="Tentar novamente" onPress={()=>setAttempt(n=>n+1)}/></View>:null;
  return <Shell startup={startup}/>;
 }
-export default function App(){return <AppBoundary><SafeAreaProvider><LocalLaunchGate/></SafeAreaProvider></AppBoundary>;}
+export default function App(){return <AppBoundary><SafeAreaProvider initialMetrics={initialWindowMetrics}><LocalLaunchGate/></SafeAreaProvider></AppBoundary>;}

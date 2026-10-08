@@ -49,9 +49,9 @@ try:
  adb('shell','svc','wifi','disable');adb('shell','svc','data','disable')
  adb('shell','cmd','connectivity','airplane-mode','enable')
  result['offline']=True
- previous=dist/'previous-062/Sofia-OS.apk'
+ previous=dist/'previous-063/Sofia-OS.apk'
  result['baseline_apk_sha256']=hashlib.sha256(previous.read_bytes()).hexdigest()
- assert result['baseline_apk_sha256']=='d8033b9566fdd9b0af74380d1a55e9856851f0285b3ca208a203597e86642013'
+ assert result['baseline_apk_sha256']=='fcd2c27dd8cd44da8ec27af14c635daaa856fe8fe20470ce9c771d308d164217'
  adb('install','-r',str(previous))
  for i in range(5):result['baseline_runs'].append(cold('baseline-'+str(i)))
  before=capture('baseline');assert 'Olá, Teste.' in before,'Previous production APK did not restore the saved account'
@@ -60,18 +60,26 @@ try:
  for i in range(5):result['candidate_runs'].append(cold('candidate-'+str(i)))
  after=capture('candidate');assert 'Olá, Teste.' in after,'Production authenticated Home is not visible';assert 'com compromissos' in after,'Saved agenda records are not available at startup'
  result['authenticated_home_tested']=True
+ result['baseline_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['baseline_runs'])
+ result['candidate_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['candidate_runs'])
  # Verify that an actual menu touch works and retained conversation survives.
  tap_label(after,'Conversa');time.sleep(1)
  conversation=capture('conversation')
  assert 'FIM DA RESPOSTA QA' in conversation,'Recent saved messages were lost after fast startup'
- width,height=map(int,re.findall(r'(\d+)x(\d+)',adb('shell','wm','size').decode())[0])
+ # Target the actual chat viewport. Offline banners can place it below 30%
+ # of the display, where the previous test incorrectly began every swipe.
+ scrolls=[n for n in ET.fromstring(conversation).iter('node') if n.get('scrollable')=='true' and n.get('class')=='android.widget.ScrollView']
+ assert scrolls,'Missing conversation viewport'
+ viewport=min(scrolls,key=lambda n:(lambda b:(b[2]-b[0])*(b[3]-b[1]))(list(map(int,re.findall(r'\d+',n.attrib['bounds'])))))
+ x1,y1,x2,y2=map(int,re.findall(r'\d+',viewport.attrib['bounds']));x=(x1+x2)//2;top=y1+max(12,(y2-y1)//8);bottom=y2-max(12,(y2-y1)//8)
+ result['pagination_swipe_bounds']=[x,top,x,bottom]
  older_visible=False
- for group in range(6):
+ for group in range(10):
   for _ in range(4):
-   adb('shell','input','swipe',str(width//2),str(int(height*.30)),str(width//2),str(int(height*.75)),'350');time.sleep(.3)
-  older_tree=xml()
+   adb('shell','input','swipe',str(x),str(top),str(x),str(bottom),'350');time.sleep(.3)
+  older_tree=xml();(out/('older-page-'+str(group)+'.xml')).write_text(older_tree)
   if 'Mensagem preservada' in older_tree or 'Resposta preservada' in older_tree:older_visible=True;break
- assert older_visible,'Scrolling did not automatically restore the previous local page'
+ capture('older-page-final');assert older_visible,'Scrolling did not automatically restore the previous local page'
  capture('older-page-by-scroll');result['automatic_local_pagination_tested']=True
  result['saved_conversation_preserved']=True
  result['first_menu_touch_works']=True

@@ -332,10 +332,10 @@ jobs:
     - name: Restore exact previously delivered production APK for comparison
       uses: actions/download-artifact@v4
       with:
-        name: Sofia-build-37834460902-1
-        run-id: 37834460902
+        name: Sofia-build-37838702548-1
+        run-id: 37838702548
         github-token: ${{ github.token }}
-        path: SOFIA_APP/dist/previous-062
+        path: SOFIA_APP/dist/previous-063
     - name: Verify exact candidate source and bytes
       working-directory: SOFIA_APP
       env:

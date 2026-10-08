@@ -1,5 +1,5 @@
 import type {Message} from './types';
-export const CHAT_PAGE_SIZE=20;
+export const CHAT_PAGE_SIZE=10;
 type Page={messages:Message[];has_more:boolean};
 /** Keep the archive intact; only the visible/launch window is shortened. */
 export function recentChatPage<T extends Page>(page:T):T{

@@ -43,19 +43,29 @@ class SofiaAlarmModule(private val context: ReactApplicationContext) : ReactCont
 class SofiaSnapshotModule(private val app: ReactApplicationContext) : ReactContextBaseJavaModule(app) {
   private val io = Executors.newSingleThreadExecutor()
   private val alias = "sofia.cache.aes.v1"
+  // Keystore handles stay inside Android. Access is serialized on the same I/O
+  // worker as reads/writes; no decrypted account data is cached across scopes.
+  private var cachedKey: SecretKey? = null
   override fun getName() = "SofiaSnapshot"
+  @ReactMethod fun prepareLaunch() { io.execute {
+    try {
+      val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+      cachedKey = store.getKey(alias, null) as? SecretKey
+    } catch (_: Exception) { /* A cache optimization cannot prevent startup. */ }
+  } }
   private fun file(scope: String): AtomicFile {
     require(scope.isNotEmpty() && scope.length <= 1024)
     val hash = MessageDigest.getInstance("SHA-256").digest(scope.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
     return AtomicFile(File(app.noBackupFilesDir, "snapshot-" + hash))
   }
   private fun key(): SecretKey {
+    cachedKey?.let { return it }
     val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-    (store.getKey(alias, null) as? SecretKey)?.let { return it }
+    (store.getKey(alias, null) as? SecretKey)?.let { cachedKey = it; return it }
     return KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore").apply {
       init(KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
         .setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build())
-    }.generateKey()
+    }.generateKey().also { cachedKey = it }
   }
   @ReactMethod fun read(scope: String, promise: Promise) { io.execute {
     try {

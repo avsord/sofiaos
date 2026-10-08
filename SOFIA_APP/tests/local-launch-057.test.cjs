@@ -35,3 +35,18 @@ test('057 no duplicate logo, timer or touch blocker is installed; process-to-dat
  for(const present of ['Process.getStartUptimeMillis()','sofia-home-data-ready','reportFullyDrawn()','whenInteractive'])assert.ok(native.includes(present),present);
  const app=fs.readFileSync(path.join(__dirname,'../App.tsx'),'utf8');assert.ok(app.includes('startup.snapshot||undefined'));assert.ok(!app.includes("from './src/lib/capsule-notifications'"));
 });
+
+test('064 full launch preparation begins before mount, runs once and is consumed once',async()=>{
+ const {createLaunchPreparation}=load('src/lib/local-launch.ts');let calls=0,resolve;const value={auth,prefs,snapshot:null};
+ const preparation=createLaunchPreparation(()=>{calls++;return new Promise(r=>resolve=r);});
+ preparation.prime();preparation.prime();assert.equal(calls,1);const mounted=preparation.take();assert.equal(calls,1);resolve(value);assert.equal(await mounted,value);
+ const later=preparation.take();assert.equal(calls,2);resolve({...value,auth:null});assert.equal((await later).auth,null);
+});
+test('064 failed early preparation is reported and a retry reads storage again',async()=>{
+ const {createLaunchPreparation}=load('src/lib/local-launch.ts');let calls=0;const preparation=createLaunchPreparation(()=>{if(++calls===1)throw Error('locked');return Promise.resolve({auth:null,prefs,snapshot:null});});
+ preparation.prime();await assert.rejects(preparation.take(),/locked/);assert.equal((await preparation.take()).auth,null);assert.equal(calls,2);
+});
+test('064 entrypoint warms native storage and starts local preparation before registering React',()=>{
+ const events=[],Component=()=>{};load('index.ts',{'expo':{registerRootComponent:c=>{assert.equal(c,Component);events.push('register');}},'./src/lib/startup-read-ahead':{AUTH_STORAGE_KEY:'auth',PREFS_STORAGE_KEY:'prefs',primeStartupReads:()=>events.push('session')},'react-native':{NativeModules:{SofiaSnapshot:{prepareLaunch:()=>events.push('key')}}},'./App':{default:Component,prepareStartup:()=>events.push('local')}});
+ assert.deepEqual(events,['session','key','local','register']);
+});

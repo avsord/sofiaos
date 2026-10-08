@@ -6,5 +6,9 @@ primeStartupReads(
  ()=>require('expo-secure-store').getItemAsync(AUTH_STORAGE_KEY),
  ()=>require('@react-native-async-storage/async-storage').default.getItem(PREFS_STORAGE_KEY)
 );
-const App=require('./App').default;
-registerRootComponent(App);
+// Warm only the existing Keystore handle on the native I/O worker. No secrets
+// are exported, and a missing/corrupt key still follows normal cache recovery.
+try{require('react-native').NativeModules.SofiaSnapshot?.prepareLaunch?.();}catch{}
+const entry=require('./App');
+entry.prepareStartup?.();
+registerRootComponent(entry.default);

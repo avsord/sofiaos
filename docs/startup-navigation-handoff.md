@@ -1,5 +1,11 @@
 # Sofia OS — startup/navigation handoff, 2026-10-08
 
+## Current work: 0.3.64 earlier local preparation
+
+User reports 0.3.63 opens faster on their phone and authorized another attempt. Evidence 11576479261 from run 37838702548 recorded five offline cold starts: 0.3.62 DATA median 1377 ms, 0.3.63 median 876 ms. The production upgrade, saved Home agenda and recent-chat display worked. The overall native job failed on the older-message scroll assertion: the swipe began at y=192 on the offline error banner, above the actual chat viewport y=226..478 in the retained XML. The next smoke derives both gesture endpoints from the actual vertical ScrollView, retains final failure screenshots and compares the exact 0.3.63 APK.
+
+The next candidate starts full local preparation before registering React, seeds SafeAreaProvider with the native initial window metrics, and warms/reuses the existing Android Keystore handle on the serial snapshot I/O worker. No plaintext storage, scope changes, data loss, server deployment or readiness-gate removal. Cache/UI readiness remains mandatory. It may reduce pre-Home work; only the measured same-emulator result may be described as faster. User additionally requested exactly 10 recent messages as the default. The shared launch/UI page size is now 10, with older batches loaded only after upward scrolling; polling does not reopen hidden history. Full archives remain intact. Version 0.3.64/code69; build/test results pending.
+
 ## 0.3.63 direct candidate delivery checkpoint
 
 Exact source: 4ac25d8dc59add8a37dd098e629478760a799961. Run 37838702548. Build job 113522290371 succeeded; APK version 0.3.63/code68, 51,609,212 bytes, SHA256 fcd2c27dd8cd44da8ec27af14c635daaa856fe8fe20470ce9c771d308d164217. Production package and signing certificate match; six changed runtime/test source files match the compiled source archive byte-for-byte. 368 local app tests and TypeScript passed. Build artifact 11577306140; uploaded direct file Sofia-OS-0.3.63.apk (Library libfile_da67cbc8210081918d0776cf2f5ff768). User explicitly requested the APK immediately, without further progress messages.

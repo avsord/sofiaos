@@ -1,6 +1,13 @@
 import type {Auth,Prefs} from './types';
 import type {StartupSnapshot} from './startup-snapshot';
 export type LocalLaunch={auth:Auth|null;prefs:Prefs;snapshot:StartupSnapshot|null};
+/** The entrypoint starts disk preparation before React's first mount. Consume
+ * it once; retries and later mounts must read the current account again. */
+export function createLaunchPreparation(start:()=>Promise<LocalLaunch>){
+ let pending:Promise<LocalLaunch>|null=null;
+ const begin=()=>{let work:Promise<LocalLaunch>;try{work=start();}catch(e){work=Promise.reject(e);}void work.catch(()=>{});return work;};
+ return {prime(){if(!pending)pending=begin();},take(){const work=pending;pending=null;return work||begin();}};
+}
 /** Disk-only launch lane: authentication, theme and existing encrypted records.
  * No requests, timers, notification inventory or offscreen view work here. */
 export async function prepareLocalLaunch(
