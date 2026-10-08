@@ -41,7 +41,9 @@ export async function preloadStartup(api:WarmApi,agenda:()=>Promise<unknown>){
  try{catalog=await api.catalog();}catch{/* Consuming screens retain their own retry. */}
  await primary;
  const priority=['user_page','capsule','routine','monitor','film','book','shopping_item','annotation','note'];
- const kinds=priority.filter(kind=>!catalog||kind in catalog.catalog||['user_page','capsule','routine','monitor'].includes(kind));
+ // Once the catalog is known, never probe a kind the server did not advertise.
+ // On a catalog failure, warm only long-lived core kinds; consuming screens keep their own retry.
+ const kinds=catalog?priority.filter(kind=>kind in catalog.catalog):['user_page','routine','monitor'];
  const queue:Array<()=>Promise<unknown>>=[
   ()=>api.library(),()=>api.integrations(),()=>api.calendarStatus(),
   ...kinds.map(kind=>()=>api.entities(kind))
