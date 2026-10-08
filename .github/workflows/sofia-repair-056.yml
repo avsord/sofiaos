@@ -1,0 +1,92 @@
+name: Sofia 056 isolated repair validation
+on:
+  push:
+    branches: [sofia-fix-launch-history-056]
+    paths: ['.github/repairs/056*', '.github/workflows/sofia-repair-056.yml']
+permissions:
+  contents: write
+concurrency:
+  group: sofia-056-isolated-validation
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+      EXPO_PUBLIC_API_URL: https://sofiaos.up.railway.app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            SOFIA_APP/package-lock.json
+      - name: Apply exact locally tested patch on isolated branch only
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/sofia-fix-launch-history-056
+          mkdir -p /tmp/sofia-056-logs
+          python3 - <<'PY'
+          import base64,gzip,hashlib,json,pathlib,subprocess
+          raw=gzip.decompress(base64.b64decode(pathlib.Path('.github/repairs/056.patch.gz.b64').read_text(),validate=False))
+          assert hashlib.sha256(raw).hexdigest()=='86f6445b598b2c556df715fbab32256d509614f92ecd89ed5009c76493da35bd', 'Patch checksum mismatch'
+          patch='/tmp/sofia-056.patch';pathlib.Path(patch).write_bytes(raw)
+          subprocess.run(['git','apply','--check','--unidiff-zero',patch],check=True)
+          subprocess.run(['git','apply','--index','--unidiff-zero',patch],check=True)
+          expected=json.loads(pathlib.Path('.github/repairs/056-expected.json').read_text())
+          changed=subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines()
+          assert sorted(changed)==sorted(e['path'] for e in expected), 'Unexpected changed paths'
+          for e in expected:
+            actual=subprocess.check_output(['git','hash-object',e['path']],text=True).strip()
+            assert actual==e['sha'], 'Unexpected file content: '+e['path']
+          print('Exact 13-file patch applied; production branch and data untouched')
+          PY
+      - name: Install locked dependencies
+        run: |
+          set -euo pipefail
+          npm ci
+          npm ci --prefix SOFIA_APP
+      - name: Validate Android TypeScript and all application tests
+        working-directory: SOFIA_APP
+        run: |
+          set -euo pipefail
+          npm run check | tee /tmp/sofia-056-logs/typecheck.txt
+          npm test | tee /tmp/sofia-056-logs/app-tests.txt
+      - name: Validate all isolated backend and native test contracts
+        run: |
+          set -euo pipefail
+          npm test | tee /tmp/sofia-056-logs/backend-tests.txt
+          python3 SOFIA_APP/tools/native-delivery-test.py | tee /tmp/sofia-056-logs/native-contracts.txt
+          git diff --cached --check
+      - name: Retain validated source on work branch; no deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/sofia-fix-launch-history-056
+          test "$(git ls-remote origin refs/heads/sofia-fix-launch-history-056 | cut -f1)" = "$GITHUB_SHA"
+          python3 - <<'PY'
+          import json,pathlib,os
+          entries=json.loads(pathlib.Path('.github/repairs/056-expected.json').read_text())
+          result={'validated':True,'base':'edf0f226ada2bdccfd1f927e73f72e0e9c69169e','run_id':os.environ['GITHUB_RUN_ID'],'files':entries,'native_emulator_verified':False}
+          pathlib.Path('.github/repairs/056-result.json').write_text(json.dumps(result,indent=2)+'\n')
+          PY
+          git add -- .github/repairs/056-result.json
+          git config user.name 'Sofia repair validation'
+          git config user.email 'sofia-build@users.noreply.github.com'
+          git commit -m 'fix: validated 056 history visibility and native first-frame handoff'
+          git push origin HEAD:refs/heads/sofia-fix-launch-history-056
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sofia-056-isolated-validation-${{ github.run_id }}
+          path: /tmp/sofia-056-logs
+          retention-days: 14
