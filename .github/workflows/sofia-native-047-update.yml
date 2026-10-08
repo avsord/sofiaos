@@ -322,6 +322,20 @@ jobs:
       with:
         name: ${{ needs.build.outputs.artifact_name }}
         path: SOFIA_APP/dist
+    - name: Restore retained synthetic seed without rebuilding the app
+      uses: actions/download-artifact@v4
+      with:
+        name: Sofia-build-37809157208-1
+        run-id: 37809157208
+        github-token: ${{ github.token }}
+        path: SOFIA_APP/dist/seed-060
+    - name: Restore exact previously delivered production APK for comparison
+      uses: actions/download-artifact@v4
+      with:
+        name: Sofia-build-37817768023-2
+        run-id: 37817768023
+        github-token: ${{ github.token }}
+        path: SOFIA_APP/dist/previous-061
     - name: Verify exact candidate source and bytes
       working-directory: SOFIA_APP
       env:
@@ -336,7 +350,7 @@ jobs:
         echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
         sudo udevadm control --reload-rules
         sudo udevadm trigger --name-match=kvm
-    - name: Test in-place upgrade and native fade on that production APK
+    - name: Compare offline authenticated startup and verify retained conversation
       uses: reactivecircus/android-emulator-runner@v2
       with:
         api-level: 33

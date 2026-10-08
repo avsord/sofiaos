@@ -11,7 +11,7 @@ export async function prepareLocalLaunch(
  const restored=account.then(async auth=>{
   if(!auth)return {auth,snapshot:null};
   const snapshot=snapshotFor(auth.profile.email);
-  await snapshot.hydrate();
+  await snapshot.hydrateLaunch();
   console.info('SOFIA_STARTUP_CACHE_READY');
   return {auth,snapshot};
  });

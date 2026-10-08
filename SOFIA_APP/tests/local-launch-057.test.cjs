@@ -6,7 +6,7 @@ const prefs={appearance:'dark'};
 const next=()=>new Promise(r=>setTimeout(r,0));
 test('057 auth, preferences and encrypted reads overlap; shell receives one ready account snapshot',async()=>{
  const events=[];let resolveAuth,resolvePrefs,resolveDisk;
- const snapshot={hydrate:()=>{events.push('disk');return new Promise(r=>resolveDisk=r);}};
+ const snapshot={hydrateLaunch:()=>{events.push('disk');return new Promise(r=>resolveDisk=r);}};
  const work=prepareLocalLaunch(()=>{events.push('auth');return new Promise(r=>resolveAuth=r);},()=>{events.push('prefs');return new Promise(r=>resolvePrefs=r);},scope=>{assert.equal(scope,profile.email);return snapshot;});
  assert.deepEqual(events,['auth','prefs']);resolveAuth(auth);await next();assert.deepEqual(events,['auth','prefs','disk']);
  let done=false;work.then(()=>done=true);resolvePrefs(prefs);await next();assert.equal(done,false);resolveDisk();const actual=await work;

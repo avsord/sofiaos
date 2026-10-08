@@ -58,6 +58,7 @@ export class SofiaApi {
     this.snapshots.remember('/chat-sync/current',saved);this.snapshots.remember('/conversations/'+id,saved);
   }
   async hydrate(){if(!this.hydration)this.hydration=this.snapshots.hydrate().then(()=>{for(const [key,value] of this.snapshots.all())this.startupReads.seed(key,value);});return this.hydration;}
+  async persistLaunch(){await this.snapshots.flush();}
   cached<T>(path:string){return this.snapshots.peek<T>(path);}
   async discardCache(){this.cacheGeneration++;this.startupReads.invalidate();await this.snapshots.clear();}
   async liveBootstrap(){return this.fetchRequest<Bootstrap>('/bootstrap',undefined,'GET',20000);}
@@ -75,10 +76,13 @@ export class SofiaApi {
     let index=0;await Promise.all(Array.from({length:2},async()=>{while(index<refresh.length){const path=refresh[index++];try{const value=await this.fetchRequest(path,undefined,'GET',20000);this.startupReads.seed(path,value);}catch{}}}));
     if(refresh.length)systemChanged(this);
   }
-  constructor(private token = '', private onExpired: () => void = () => {},scope='anonymous',restored?:StartupSnapshot) {this.md=new LegacyMdAdapter(this.request.bind(this),AsyncStorage,scope);this.snapshots=restored||startupSnapshotFor(scope);if(restored){for(const [key,value] of restored.all())this.startupReads.seed(key,value);this.hydration=Promise.resolve();}}
+  constructor(private token = '', private onExpired: () => void = () => {},scope='anonymous',restored?:StartupSnapshot) {this.md=new LegacyMdAdapter(this.request.bind(this),AsyncStorage,scope);this.snapshots=restored||startupSnapshotFor(scope);if(restored){for(const [key,value] of restored.all())this.startupReads.seed(key,value);}}
   get mdLocalOnly(){return this.md.localOnly;}
   private async request<T>(path: string, body?: unknown, method = body === undefined ? 'GET' : 'POST', timeout = 20000): Promise<T> {
     if(method!=='GET'){
+      // Merge retained records before a mutation can reconcile or remove any
+      // projection restored by the lightweight launch path.
+      await this.hydrate();
       if(!path.startsWith('/chat-sync/current')&&!path.startsWith('/chat-sync/select')){this.cacheGeneration++;this.startupReads.invalidate();}
       const result=await this.fetchRequest<T>(path,body,method,timeout);
       if(method==='DELETE'){

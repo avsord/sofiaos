@@ -1,5 +1,13 @@
 # Sofia OS — startup/navigation handoff, 2026-10-08
 
+## Current work: 0.3.62 local-first manual delivery
+
+The user reported that 0.3.61 remained slow and explicitly prioritized startup over fade. Home must already contain the current-month agenda and tasks; Chat must open with saved recent messages. Older conversations must stay preserved. The user authorized one candidate APK delivered directly for phone testing, without updater publication.
+
+Base remote commit: bfea46be70a38e8b650ef0c13f0127e55fe127b2, delivered 0.3.61/code66. Candidate: 0.3.62/code67, same package/channel/signing configuration. A separate encrypted account-scoped launch projection restores current-month agenda, tasks, Home metadata and recent conversation without parsing all retained history. First upgrade falls back to the legacy archive and creates the projection. Before writes, deferred archive hydration merges older data so a lightweight launch cannot replace it. Live bootstrap waits for the visible Home; backgrounding flushes the saved projection. No fade or server changes.
+
+Local full app tests and the 11 focused launch/cache tests passed. The latter cover retained recent messages, agenda/tasks, legacy migration, saving after lightweight hydration, explicit deletion and account isolation. Fixture size reductions are not device timing results. Manual CI reuses the retained 0.3.60 QA APK only to seed an isolated emulator, then installs the exact 0.3.61 production APK and this candidate in place, offline. It compares cold-start markers and checks Home agenda and a real Chat menu tap with retained synthetic messages. No second APK is compiled; no real user account or physical-device result is fabricated. Compilation and native acceptance remain pending until the current run confirms them.
+
 ## Current work: 0.3.61 manual delivery
 User requested one production APK sent directly, without publishing on the updater channel. Base: 6c09f5e04fced6d507e0e2d33eee16e52ead031d; version 0.3.61/code66 prepared. This section supersedes the older delivery target below; no new build result is presumed.
 
