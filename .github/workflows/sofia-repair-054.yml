@@ -11,79 +11,64 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           path: repair
       - uses: actions/checkout@v4
         with:
-          ref: 4d41d6ea6657478bdc2c667cf54a56f11829f781
+          ref: 7b55928c2bc8b157c9391939668bda19adaf16d6
           path: source
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: source/SOFIA_APP/package-lock.json
-      - name: Apply checksum-verified changes to app only
-        shell: bash
+          cache-dependency-path: source/package-lock.json
+      - name: Apply checksum-verified backend changes without modifying the APK
         run: |
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
           root=Path('source').resolve()
+          allowed={'src/memory/store.js','src/services/chat-sync.js','src/core/runtime.js','tests/history-shutdown-recovery-054.test.cjs'}
           digest=lambda text:hashlib.sha256(text.encode()).hexdigest()
-          for item in json.loads(Path('repair/tools/repair054-payload1.json').read_text())['files']:
+          payload=json.loads(Path('repair/tools/repair054-backend.json').read_text())['files']
+          assert {x['path'] for x in payload}==allowed
+          for item in payload:
             path=root/item['path']
-            assert path.is_relative_to(root/'SOFIA_APP')
             text=path.read_text() if path.exists() else ''
-            assert digest(text)==item['before'], 'Base mismatch: '+item['path']
+            assert digest(text)==item['before'],'Base mismatch: '+item['path']
             for start,end,replacement in reversed(item['edits']):
               text=text[:start]+replacement+text[end:]
-            assert digest(text)==item['after'], 'Result mismatch: '+item['path']
-            path.parent.mkdir(parents=True,exist_ok=True)
+            assert digest(text)==item['after'],'Result mismatch: '+item['path']
             path.write_text(text)
-          tests=Path('repair/tools/repair054.test.cjs').read_text()
-          assert tests.count('{default:storage}')==1
-          tests=tests.replace('{default:storage}','{__esModule:true,default:storage}')
-          (root/'SOFIA_APP/tests/profile-history-startup-054.test.cjs').write_text(tests)
           PY
           git -C source diff --check
-          test -z "$(git -C source diff --name-only -- src tools package.json package-lock.json)"
-      - name: Install locked dependencies and typecheck
-        working-directory: source/SOFIA_APP
-        run: |
-          npm ci
-          npm run check
-      - name: Full app regression suite
-        working-directory: source/SOFIA_APP
-        run: |
-          set -o pipefail
-          npm test | tee app-regression-054.log
-      - name: Existing backend regression suite with isolated test databases
+          git -C source diff --exit-code -- SOFIA_APP
+      - name: Run all backend tests with isolated temporary databases
         working-directory: source
         run: |
-          set -o pipefail
+          set -euo pipefail
           npm ci
-          npm test | tee backend-regression-054.log
-      - name: Commit only verified app changes; leave production untouched
+          npm test | tee backend-history-054.log
+      - name: Commit only verified recovery code; do not deploy before review
         working-directory: source
         run: |
           git config user.name 'Sofia repair validation'
           git config user.email 'sofia-build@users.noreply.github.com'
-          git add SOFIA_APP/App.tsx SOFIA_APP/package.json SOFIA_APP/src SOFIA_APP/tests
-          git commit -m 'fix(android): transactional profile photo, preserved history and data-ready startup'
-          git push origin HEAD:refs/heads/fix/verified-profile-history-startup-054
-          git rev-parse HEAD > VERIFIED_SOURCE.txt
-          git archive --format=tar.gz -o verified-source-054.tar.gz HEAD
+          git add src/memory/store.js src/services/chat-sync.js src/core/runtime.js tests/history-shutdown-recovery-054.test.cjs
+          git commit -m 'fix(history): preserve shutdown conversations and recover legacy pauses after backup'
+          git push origin HEAD:refs/heads/fix/verified-history-recovery-054
+          git rev-parse HEAD > VERIFIED_BACKEND_SOURCE.txt
+          git archive --format=tar.gz -o verified-history-source-054.tar.gz HEAD
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Sofia-054-repair-validation
+          name: Sofia-054-history-validation
           path: |
-            source/SOFIA_APP/app-regression-054.log
-            source/backend-regression-054.log
-            source/VERIFIED_SOURCE.txt
-            source/verified-source-054.tar.gz
+            source/backend-history-054.log
+            source/VERIFIED_BACKEND_SOURCE.txt
+            source/verified-history-source-054.tar.gz
           retention-days: 7
