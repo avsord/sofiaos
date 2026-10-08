@@ -17,6 +17,7 @@ export const loadWorkspace=()=>once('apps',()=>require('../screens/Workspace').W
 export const loadEntityEditor=()=>once('entity-editor',()=>require('../screens/Workspace').EntityEditor);
 export const loadProfile=()=>once('profile',()=>require('../screens/Profile').Profile);
 export const loadNotifications=()=>once('notifications',()=>require('../screens/Notifications').Notifications);
+export const loadBackgroundServices=()=>once('background-services',()=>require('../components/BackgroundServices').BackgroundServices);
 
 export function DeferredScreen({load,screenProps}:{load:()=>Screen;screenProps:Record<string,unknown>}){
  const Component=load();return <Component {...screenProps}/>;
