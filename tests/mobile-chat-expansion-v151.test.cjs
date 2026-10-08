@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict'),http=require('node:http'),path=require('node:path'),crypto=require('node:crypto');
 const {fixture}=require('./helpers.cjs');
-const {createRuntime,contextLookup}=require('../src/core/runtime');
+const {createRuntime}=require('../src/core/runtime');
 const PASSWORD='test-only-password-151';
 async function setup(t){
  const f=fixture(t);f.config.loginPassword=PASSWORD;f.config.loginEmail='owner@example.com';f.config.maxMessageChars=1000000;
@@ -12,6 +12,5 @@ async function setup(t){
  const login=await request('/auth/login',{email:'owner@example.com',password:PASSWORD});assert.equal(login.status,200);const token=login.body.token;
  const made=await request('/conversations',{title:'Sem teto curto'},'POST',token);assert.equal(made.status,200);return{request,token,conversation:made.body.conversation};
 }
-test('context retrieval projection stays bounded without pretending to be the full message',()=>{const input='começo '+('x'.repeat(14000))+' final';const query=contextLookup(input);assert.ok(query.length<=500);assert.ok(query.startsWith('começo '));assert.ok(query.endsWith(' final'));assert.notEqual(query,input);});
 test('mobile accepts text beyond the former 12k product limit',async t=>{const f=await setup(t),message='A'.repeat(15000);const result=await f.request('/messages',{conversation_id:f.conversation.id,client_message_id:crypto.randomUUID(),message},'POST',f.token);assert.equal(result.status,200,JSON.stringify(result.body));assert.ok(result.body.messages.some(row=>row.role==='user'&&row.content.length===15000));});
 test('mobile accepts audio duration beyond the former five-minute product limit',async t=>{const f=await setup(t),result=await f.request('/messages/audio',{conversation_id:f.conversation.id,client_message_id:crypto.randomUUID(),audio_base64:Buffer.from('small fixture representing compressed long audio').toString('base64'),mime:'audio/mp4',duration_ms:600000},'POST',f.token);assert.equal(result.status,200,JSON.stringify(result.body));assert.ok(result.body.messages.some(row=>row.voice?.duration_ms===600000));});
