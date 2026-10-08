@@ -32,3 +32,11 @@ test('form template identity is updated without changing persistent template IDs
 
 test('native menu hit-testing cannot confuse the containing bar with a tab',()=>{const s=file('plugins/native/SofiaCalendarTouchGuard.kt');assert.ok(s.includes('tag.matches(Regex("sofia-menu-[0-5]"))'));assert.ok(!s.includes('tag.startsWith("sofia-menu-")'));});
 test('acknowledged chat replies enter the next-start snapshot and pre-write reads cannot replace it',()=>{const s=file('src/lib/api.ts');assert.ok(s.includes('this.rememberChatResult(result,data)'));assert.ok(s.includes('generation===this.cacheGeneration'));assert.ok(s.includes('messages:mergeMessages(before.messages,result.messages).slice(-100)'));});
+
+test('Home keeps monitoring failures local instead of showing a global error',()=>{
+ const home=file('src/screens/Home.tsx'),preload=file('src/lib/startup-preload.ts');
+ assert.ok(home.includes('One broken monitor must not turn the whole Home into an error.'));
+ assert.ok(home.includes('Monitoring is secondary; Home, Agenda and Tasks stay usable.'));
+ assert.ok(preload.includes("catalog?priority.filter(kind=>kind in catalog.catalog):['user_page','routine','monitor']"));
+ assert.ok(!preload.includes("['user_page','capsule','routine','monitor'].includes(kind)"));
+});
