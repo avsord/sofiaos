@@ -1,39 +1,43 @@
 # Sofia OS — startup/navigation handoff, 2026-10-08
 
-## Base and evidence
+## Current deliverable: 0.3.59 candidate, not promoted
 
-Base: sofia-app-android at 15e628d7699429d5ec8a5445bc47f55f2e9eb24c (published 0.3.57, com.avsord.sofiaapp, versionCode 62).
-Existing run: 37789662903; production APK SHA-256 f9a5055466cdf01034eefb1a8eb76750bb2881a7af766b9d19588a19301b72f9.
-Its synthetic-transport startup report contains UI samples 1319/1254 ms and DATA samples 1583/1255 ms, target_met=false. Only two samples; not a 20-run matrix, not the owner's phone. The existing smoke threshold was 5000 ms and the release was nevertheless published. Do not relabel that APK as the current correction.
+Implementation: 8d1adcc8baae65424c44ee569944b18bb510d18d.
+Version metadata: 4944996300961b16262f7c69d344cfa42a5b91c.
+Exact compiled source, including candidate notes: 164e973858852f20a96f477cf983987c192a94a8.
+Run: https://github.com/avsord/sofiaos/actions/runs/37804038235
+Successful build job: 113403489355.
+Artifact: 11561524863, Sofia-build-37804038235-1.
+Production APK: 51,596,228 bytes; SHA-256 c946d2fc1fe219805eaf664c0d794b83c9e15e3d1cfc7fe50e23e2743d6c587e.
+Package com.avsord.sofiaapp; versionCode 64; versionName 0.3.59.
+Certificate SHA-256 fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c, matching the preceding signing identity.
 
-## Confirmed source defects and focused changes
+Deliver Sofia-OS.apk as the candidate, never QA-ONLY-full-fixture.apk. The extracted production bytes were compared with both the SHA-256 file and sealed bundle; the source archive matched the changed runtime files; QA sentinels were absent from the production bundle.
 
-Change commit: b49cc34584fc0b4a903bffc2483c0fd541a8b0df.
+## Focused changes after 0.3.58
 
-1. SofiaCalendarTouchGuard.immediateMenu wrote native scroll offset plus menu alpha/scale before the React onPressIn handler changed activeTab, pointerEvents and accessibility state. Removed those independent writes. The native hook now observes input only; existing React touch-down selection and gesture guards remain. This removes a confirmed competing writer; reproduction/absence of the reported visual reversal on the owner's phone remains unverified.
-2. SofiaLaunchOverlay was only an observer returning true for every initial pre-draw. LocalLaunchGate returns null while local auth/preferences/snapshot load, so the system splash could end before the usable layout. Retain the original Android 12+ system splash until login or Home+local-data readiness; allow layouts/network progress underneath it. On legacy Android, keep the original window drawable and withhold incomplete content frames. No second splash view or artificial minimum wait. A 15-second failure watchdog presents retry without deleting storage; it is not a successful launch. Native ready markers remain diagnostics, not proof of full icon-to-interaction time.
-3. publish-release.cjs now fails closed before any publication write unless matching physical-device acceptance evidence exists. The validator checks APK/source identity, at least 20 principal cold runs, the requested scenarios, every run <=1000 ms, visual continuity, 100 navigation sequences, compatibility, preserved data and regressions. Unit-test fixtures are explicitly not device evidence.
+1. Issue one-use native session and preferences reads before evaluating App and its providers. Preserve original keys, validation and encryption. Invalidate prefetched values before writes/logout so an old account read cannot be consumed afterward.
+2. Reuse serialized snapshot entries only while unexposed; exposed mutable references retain legacy behavior. Apply the existing priority, size and 32-entry limits in a single pass instead of repeatedly serializing the entire payload while dropping its tail. Preserve schema 1, complete values, chat safeguards and explicit deletions.
+3. Defer only the initial automatic update lookup to an idle opportunity. Periodic/foreground update checks and notification scheduling remain unchanged. Require the speech module on use rather than at application import.
 
-## Built candidate and completed CI validation
+No new startup projection or persistence migration was implemented. No native splash/menu changes were added in 0.3.59. Backend, database, encryption, credentials, package and update channel were not changed by this optimization.
 
-Version 0.3.58; versionCode 63; package com.avsord.sofiaapp.
-Exact sealed APK source: 724c70139cca79e59ca5dabfa041009d6a92e895 (includes automatic version preparation).
-Workflow: https://github.com/avsord/sofiaos/actions/runs/37797262718
-Build job: 113379840623, completed successfully.
-Retained artifact: 11559636811, Sofia-build-37797262718-1.
-Production APK: 51,593,164 bytes; SHA-256 e334175fafa00437d16721773274a2be2624f27993c71c581416740bd73d6ff8.
-Signing certificate SHA-256: fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c, matching the 0.3.57 baseline.
+## Completed validation and exact remaining work
 
-Completed with locked dependencies in CI: TypeScript check; 326/326 app tests; 165/165 isolated backend tests; 17/17 delivery tests; production Gradle build; increasing package version and matching signature validation; separate QA fixture build; source/APK bundle hashes. The delivered candidate is Sofia-OS.apk, NOT QA-ONLY-full-fixture.apk.
+Locked-dependency CI passed TypeScript, 339/339 app tests, 165/165 isolated backend tests, 17/17 delivery tests, production Gradle compilation and identity/signature checks. Local focused tests passed 95/95, including 13 new tests. These counts are recorded in the retained artifact, not inferred from an earlier APK.
 
-Earlier local tests also included 59 focused existing checks and 10 new gate/navigation tests. The local full-suite missing-React-Native-dependency failure was resolved by CI npm ci: all 326 app tests passed there. The 100-sequence tests here are model-level tests, not the required native-device acceptance matrix.
+The first attempt of run 37803188983 stopped before Gradle because /health returned HTTP 502. Its old-commit retry was skipped by the planner after metadata had already been committed. Run 37804038235 resumed from the prepared metadata without another version increment; both live-server checks passed. No production restart/redeploy was performed by this work.
 
-At this report's last check, native navigation job 113383007649 and workspace job 113383007764 were still running. No native pass, physical-device upgrade or new startup timing is asserted by this report. Consult that same run for subsequent job results; do not recompile identical source just to poll status.
+At delivery, native navigation job 113406710753 and workspace job 113406710829 were still running. Do not claim they passed. Read this same run for their results instead of recompiling the identical app. No physical device was available: full icon-to-verified-interaction timing, white-frame continuity, 20 cold runs, 100 native navigation sequences and real-account data-preserving upgrade remain unproved for this APK.
 
-## Safety, publication and remaining acceptance
+A synthetic Node serialization microbenchmark (24 entries, 5 warmups, 30 samples) generated byte-identical payloads. Medians: unexposed/below-limit 14.36 -> 1.80 ms; exposed/below-limit 14.83 -> 15.99 ms (slight regression); exposed/over-limit 123.07 -> 17.70 ms. This is NOT Android launch, native disk, encryption or first-touch evidence, and must not be marketed as a whole-app speed factor.
 
-No persistence format, encryption, credentials, backend, main branch, installed package or updater channel was changed. The existing expo-sharing dependency declaration was pinned to the same locked 57.0.22 version; no runtime dependency upgrade was introduced.
+## Earlier relevant state
 
-This APK is a retained candidate, NOT a promoted or accepted release. There is no physical phone/ADB device available to this session. The required 20 cold starts and 100 native navigation sequences, complete <=1000 ms startup, visual continuity and data-preserving upgrade with representative account records remain unproved. Passing compilation and unit tests does not satisfy them.
+Published baseline at inspection: 0.3.57, versionCode 62; run 37789662903. Its two synthetic UI samples 1319/1254 ms and DATA samples 1583/1255 ms did not meet the requested 1000 ms threshold, despite smoke success.
 
-The publication report is expected at SOFIA_APP/dist/startup-navigation-acceptance.json. It must come from real measurements of this exact production APK/source, never from the validator's unit-test fixture or a synthetic-transport QA build. Missing evidence intentionally blocks publication; do not disable the gate to label the candidate approved.
+0.3.58 candidate: source 724c70139cca79e59ca5dabfa041009d6a92e895, versionCode 63, run 37797262718, APK SHA-256 e334175fafa00437d16721773274a2be2624f27993c71c581416740bd73d6ff8. It removed native menu scroll/Animated-property writes competing with React selection and retained the original splash until local readiness. Its native shards subsequently passed, but those results are not evidence for the new APK or the owner's phone.
+
+## Publication boundary
+
+startup-release-gate.cjs remains unchanged and requires SOFIA_APP/dist/startup-navigation-acceptance.json for the exact source/APK. Never synthesize this report from unit-test fixtures, ready markers or the QA transport. Missing physical acceptance is a publication block, not permission to disable the gate. This delivery is an installable candidate, not an approved release or a verified <=1000 ms handset result.
