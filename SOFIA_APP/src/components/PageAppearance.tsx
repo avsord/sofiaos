@@ -3,10 +3,12 @@ import {View,Text,Pressable,Modal,ScrollView,TextInput,Image,StyleSheet,Activity
 import Svg,{Defs,LinearGradient,Stop,Rect} from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {File} from 'expo-file-system';
 import {SofiaApi} from '../lib/api';
 import {useTheme} from '../lib/theme';
 import {Button,ErrorBanner,IconButton} from './UI';
 import {Icon} from './Icon';
+import {coverMime,coverName} from '../lib/page-cover-upload';
 export const PAGE_COVERS=[
  ['Lavanda','linear-gradient(135deg,#d9d2ff,#b8aaff)'],['Areia','linear-gradient(135deg,#efe9df,#d8cfc2)'],
  ['Azul','linear-gradient(135deg,#b9d7ff,#7da8ea)'],['Verde','linear-gradient(135deg,#cde8d8,#8fc9aa)'],
@@ -17,9 +19,13 @@ const EMOJIS='😀 😊 😎 🤔 🤖 ❤️ 💜 💙 💚 💡 🔥 ✨ ⭐ �
 const SYMBOLS='♡ ♥ ☆ ★ ○ ● ◉ ◇ ◆ □ ■ △ ▲ ✓ ✔ ✕ × + − ≡ ∞ ⌂ ⌘ ⏱ ⚑ ⚙ ⚡ ☀ ☾ ☁ ☰ ▦ ⊞ ⊕ ↖ ↑ ↗ ← → ↙ ↓ ↘ ↔ ↕ ↳ ↪ ⇄ ✎ ✦ ✧ ❖ ☑ ☐ ♫ ♪ ✉ ☎ ⌚ ⚖ ◐ ◑'.split(' ');
 const PENDING_COVER_KEY='sofia.native.pending-page-cover.v1';
 export function PageCover({data,api}:{data:Record<string,any>;api:SofiaApi}){
- const c=useTheme(),[failed,setFailed]=useState(false);const attachment=String(data.cover_attachment_id||'');
- useEffect(()=>setFailed(false),[attachment]);
- if(data.cover_type==='attachment'&&attachment)return failed?<View style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center',backgroundColor:c.input}]}><Icon name="image" color={c.muted}/></View>:<Image source={api.attachmentSource(attachment)} resizeMode="cover" style={StyleSheet.absoluteFill} onError={()=>setFailed(true)}/>;
+ const c=useTheme(),[failed,setFailed]=useState(false),[attempt,setAttempt]=useState(0);const attachment=String(data.cover_attachment_id||'');
+ useEffect(()=>{setFailed(false);setAttempt(0);},[attachment]);
+ if(data.cover_type==='attachment'&&attachment){
+  const source=api.attachmentSource(attachment),separator=source.uri.includes('?')?'&':'?';
+  const retrySource={...source,uri:source.uri+separator+'cover_attempt='+attempt};
+  return failed?<View style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center',backgroundColor:c.input}]}><Icon name="image" color={c.muted}/></View>:<Image key={attachment+':'+attempt} source={retrySource} resizeMode="cover" style={StyleSheet.absoluteFill} onError={()=>{if(attempt<2)setAttempt(value=>value+1);else setFailed(true);}}/>;
+ }
  const colors=String(data.cover_value||'').match(/#[0-9a-fA-F]{6}\b/g)||[c.accentSoft,c.accentSoft];
  return <Svg width="100%" height="100%"><Defs><LinearGradient id="cover" x1="0" y1="0" x2="1" y2="1">{colors.map((color,i)=><Stop key={i} offset={colors.length===1?0:i/(colors.length-1)} stopColor={color}/>)}</LinearGradient></Defs><Rect width="100%" height="100%" fill="url(#cover)"/></Svg>;
 }
@@ -31,10 +37,14 @@ export function PageAppearance({kind,pageId,api,onApply,onClose}:{kind:'icon'|'c
   if(!result)return false;
   if(result.code)throw new Error(String(result.message||'O Android não conseguiu devolver a foto selecionada.'));
   if(result.canceled){await clearPending();return false;}
-  const base64=result.assets?.[0]?.base64;
-  if(!base64)throw new Error('Não foi possível preparar a imagem. Escolha outra foto.');
-  if(base64.length>Math.ceil(10*1024*1024/3)*4)throw new Error('A capa deve ter até 10 MB. Recorte a imagem ou escolha uma menor.');
-  const attachment=await api.uploadAttachment(pageId,{name:'capa.jpg',mime:'image/jpeg',base64});
+  const asset=result.assets?.[0];
+  if(!asset?.uri)throw new Error('Não foi possível preparar a imagem. Escolha outra foto.');
+  const file=new File(asset.uri);
+  if(!file.exists||file.size<1)throw new Error('A foto selecionada não está mais disponível no aparelho.');
+  if(file.size>10*1024*1024)throw new Error('A capa deve ter até 10 MB. Recorte a imagem ou escolha uma menor.');
+  const base64=await file.base64();
+  const mime=coverMime(base64,asset.mimeType);
+  const attachment=await api.uploadAttachment(pageId,{name:coverName(mime),mime,base64});
   await clearPending();
   if(alive.current)choose({cover_type:'attachment',cover_value:'',cover_attachment_id:attachment.id});
   return true;
@@ -52,7 +62,7 @@ export function PageAppearance({kind,pageId,api,onApply,onClose}:{kind:'icon'|'c
  },[]);
  async function upload(){if(busy)return;setBusy(true);setError('');try{
   await AsyncStorage.setItem(PENDING_COVER_KEY,pageId);
-  const result=await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],allowsEditing:true,aspect:[3,1],quality:0.72,base64:true});
+  const result=await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],allowsEditing:true,aspect:[3,1],quality:0.78});
   if(!alive.current)return;
   await finishPick(result);
  }catch(e){await clearPending();if(alive.current)setError(e instanceof Error?e.message:'Não foi possível trocar a capa.');}finally{if(alive.current)setBusy(false);}}
