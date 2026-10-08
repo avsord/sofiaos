@@ -36,16 +36,25 @@ test('gestures use the native horizontal pager and do not steal vertical scrolls
   assert.ok(pager.includes('velocity !== undefined && Math.abs(velocity) < 0.01'));
   assert.ok(source.includes("enabled={!gestureLocked&&!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)&&!(tab==='apps'&&workspaceDepth)}"));
 });
-test('all six menus stay mounted in a fixed horizontal order',()=>{
+test('pager keeps six fixed slots while heavy screen trees mount progressively after Home',()=>{
   assert.deepEqual(Array.from(TAB_ORDER),['home','chat','pages','agenda','apps','profile']);
   const body=source.slice(source.indexOf('<TabPager'),source.indexOf('</TabPager>'));
   let previous=-1;for(const name of ['Home','Chat','Pages','Agenda','Workspace','Profile']){const index=body.indexOf('<'+name+' ');assert.ok(index>previous,name);previous=index;}
-  assert.ok(!source.includes('display:'));assert.ok(pager.includes('removeClippedSubviews={false}'));assert.ok(!source.includes('setBootstrap(null);setTab('));
+  for(const tab of ['chat','pages','agenda','apps','profile'])assert.ok(body.includes("mountedTabs.has('"+tab+"')"));
+  const startup=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
+  assert.ok(startup.includes("new Set<Tab>(['home'])"));assert.ok(startup.includes("['chat','agenda']"));assert.ok(startup.includes("['pages','profile']"));assert.ok(startup.includes("['apps']"));
+  assert.ok(startup.includes("return MENU_TABS.includes(active)?add(mounted,[active]):mounted"));
+  assert.ok(pager.includes('removeClippedSubviews={false}'));assert.ok(!source.includes('setBootstrap(null);setTab('));
 });
 test('unchanged screen trees and callback props are memoized, preserving drafts and scroll positions',()=>{
   for(const name of ['Home','Chat','Pages','Agenda','Workspace','Profile','Notifications'])assert.ok(source.includes(name+'=React.memo('+name+'Screen)'),name);
   for(const name of ['navigate','goBack','changePrefs','logout','profile','manualUpdate','clearChat','notificationBack'])assert.ok(source.includes('const '+name+'=useCallback('),name);
   assert.ok(source.includes("key={'chat-'+chatEpoch}"));assert.ok(!source.includes('key={tab}'));
+});
+test('automatic update checks and notifications wait until after the first native paint',()=>{
+  assert.ok(source.includes("if(!servicesReady)return;"));
+  assert.ok(source.includes("enabled={!!auth&&!!bootstrap&&servicesReady}"));
+  assert.ok(source.includes("if(servicesReady)void api.preload(()=>preloadAgenda(api))"));
 });
 test('notification overlay cannot capture touches or accessibility focus while hidden',()=>{
   assert.ok(source.includes("pointerEvents={tab==='notifications'?'auto':'none'}"));
