@@ -1,5 +1,16 @@
 # Sofia OS — startup/navigation handoff, 2026-10-08
 
+## Current work: 0.3.61 manual delivery
+User requested one production APK sent directly, without publishing on the updater channel. Base: 6c09f5e04fced6d507e0e2d33eee16e52ead031d; version 0.3.61/code66 prepared. This section supersedes the older delivery target below; no new build result is presumed.
+
+Changes: production SofiaLaunchTransition.java coordinates data readiness with Android's splash callback, preventing premature completion for both callback orders. Configuration/retry recreation without a starting window is handled separately. The actual Java class is compiled and executed in a JVM regression test. Home monitoring and adjacent-month warming wait for visual completion; tasks/current month remain in the essential path. No data/cache/authentication deletion.
+
+Manual delivery uses the existing workflow with an explicit [manual-apk] commit marker. Full app tests, isolated backend tests, package/signature/version checks, one production build and production-APK upgrade/login/native-transition smoke run; no separate QA APK and no release publication. The normal official route and physical-device gate remain unchanged. Manual smoke does not test authenticated Home, physical-device speed or the owner's real records. Preserve this distinction in the delivery report.
+
+Delivery diagnosis: prior run 37809157208 spent 274 s in production build, 41 s building QA, and 500 s in the navigation emulator step. About 101 s prepared SDK/emulator and booted; the native Python suite ran approximately 382 s. Both native shards were already parallel. Many checks repeatedly dump Android's complete UI tree. This identifies work/overhead, not a measured gain for the new route. Internal OpenAI cache, chat history and file length have no demonstrated causal attribution. As checked on 08/10, public OpenAI status reported operational, which does not exclude an individual-session issue.
+
+Project entry point: SOFIA_MASTER.md, then only the relevant Sofia Delta route. Do not reread historical masters for every change. The companion consolidated master preserves old sources separately.
+
 ## Current deliverable: 0.3.60 candidate, not promoted
 
 Base branch commit: 089c97e2aac31b0db5204e0a9b5d0f927a40ec0e (0.3.59 runtime plus documentation).

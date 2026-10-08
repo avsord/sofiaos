@@ -36,6 +36,8 @@ object SofiaLaunchOverlay {
   private var visible = false
   private var failed = false
   private var exitStarted = false
+  private var recreating = false
+  private var transition = SofiaLaunchTransition(false)
   private var removeSystemSplash: (() -> Unit)? = null
   private var exitSystemSplash: ((Boolean) -> Unit)? = null
   private val waiting = mutableListOf<Promise>()
@@ -44,6 +46,12 @@ object SofiaLaunchOverlay {
   private const val EXIT_FADE_MS = 120L
 
   fun start(activity: Activity) {
+    // A hot start reuses this Activity and does not call start. Configuration
+    // recreation has no new starting window; cold/warm launches do.
+    val expectsSplash = Build.VERSION.SDK_INT >= 31 &&
+      host?.get()?.isChangingConfigurations != true && !recreating
+    transition = SofiaLaunchTransition(expectsSplash)
+    recreating = false
     detach()
     removeSystemSplash?.invoke(); removeSystemSplash = null; exitSystemSplash = null
     waiting.toList().forEach { it.resolve(false) }; waiting.clear()
@@ -53,7 +61,7 @@ object SofiaLaunchOverlay {
     homeSeen = false; dataSeen = false; revealed = false; visible = false; failed = false; exitStarted = false
     if (Build.VERSION.SDK_INT >= 31) {
       activity.splashScreen.setOnExitAnimationListener { splash ->
-        if (host?.get() !== activity || visible) splash.remove()
+        if (host?.get() !== activity) splash.remove()
         else {
           removeSystemSplash = { splash.animate().setListener(null).cancel(); splash.remove() }
           exitSystemSplash = { success ->
@@ -64,7 +72,13 @@ object SofiaLaunchOverlay {
               }
             }
           }
-          if (revealed) exitSystemSplash?.invoke(!failed)
+          when (transition.splashReady()) {
+            SofiaLaunchTransition.Exit.SYSTEM_SPLASH -> exitSystemSplash?.invoke(!failed)
+            SofiaLaunchTransition.Exit.REMOVE_STALE_SPLASH -> {
+              splash.remove(); removeSystemSplash = null; exitSystemSplash = null
+            }
+            else -> Unit
+          }
         }
       }
     }
@@ -136,6 +150,7 @@ object SofiaLaunchOverlay {
 
   private fun completeReveal(activity: Activity, success: Boolean) {
     if (visible || host?.get() !== activity) return
+    if (!transition.finish()) return
     visible = true
     detach()
     // Include the native fade in DATA timing; it is not free startup time.
@@ -158,10 +173,14 @@ object SofiaLaunchOverlay {
     if (Build.VERSION.SDK_INT < 31 && success) content.alpha = 0f
     activity.window.decorView.postOnAnimation {
       if (host?.get() !== activity || activity.isFinishing) return@postOnAnimation
-      val exit = exitSystemSplash
-      if (exit != null) exit(success)
-      else if (Build.VERSION.SDK_INT < 31 && success) fade(activity, content, 1f, true) {}
-      else completeReveal(activity, success) // warm Activity with no system splash
+      when (transition.contentReady()) {
+        SofiaLaunchTransition.Exit.SYSTEM_SPLASH -> exitSystemSplash?.invoke(success)
+        SofiaLaunchTransition.Exit.CONTENT -> {
+          if (Build.VERSION.SDK_INT < 31 && success) fade(activity, content, 1f, true) {}
+          else completeReveal(activity, success) // recreation without a starting window
+        }
+        else -> Unit // Android owns a splash: wait for its exit callback, not a timer.
+      }
     }
   }
 
@@ -201,7 +220,7 @@ object SofiaLaunchOverlay {
       })
       addView(Button(activity).apply {
         text = "Tentar novamente"
-        setOnClickListener { activity.recreate() }
+        setOnClickListener { recreating = true; activity.recreate() }
       })
     }
     activity.setContentView(panel)

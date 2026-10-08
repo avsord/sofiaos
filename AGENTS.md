@@ -4,6 +4,10 @@
 Quando o usuário pede para corrigir ou alterar a Sofia, implemente, valide e publique a atualização aplicável no mesmo trabalho. Não espere outro pedido de “atualizar”, “subir”, “gerar APK” ou “enviar”. Não peça confirmação repetida para a publicação já solicitada. Uma conversa sobre ideias, por si só, não autoriza implementação.
 
 ## Padrão de trabalho: Sofia Delta
+Comece pelo mapa de leitura em [Master operacional](docs/SOFIA_MASTER.md). Ele separa estado atual, fluxo Delta, aplicação no projeto e histórico sob demanda. Não releia masters inteiras a cada pedido; essa orientação substitui a leitura integral rotineira indicada em documentos antigos.
+
+Se o usuário pedir entrega manual, use o caminho `[manual-apk]`: um único APK de produção, testes prévios identificados e envio direto, sem publicação no atualizador. Não apresente o smoke de login do emulador como teste da Home autenticada ou do aparelho físico. Os critérios de publicação oficial permanecem obrigatórios para a publicação oficial.
+
 Use o padrão [Sofia Delta](docs/sofia-delta.md) em cada alteração: selecionar o caminho de menor tempo total entre os que cumprem o pedido e os critérios de aceite.
 - Retome `docs/startup-navigation-handoff.md`, o head e a execução relevante; leia apenas o código e os logs necessários ao delta. Reuse leituras atuais da mesma sessão.
 - Classifique o pedido antes de compilar: documentação, processo/testes, runtime Android, backend/web ou retomada de artefato existente. Não gere APK para registrar instruções.

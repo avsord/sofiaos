@@ -171,12 +171,12 @@ jobs:
         rm ProductionApp.tsx
         git diff --exit-code -- App.tsx
       id: fixture
-      if: steps.plan.outputs.release == 'true'
+      if: steps.plan.outputs.release == 'true' && !contains(github.event.head_commit.message, '[manual-apk]')
     - name: Seal exact production, test and baseline APK bundle
       working-directory: SOFIA_APP
       run: python3 tools/native-shards.py bundle
       id: seal
-      if: steps.plan.outputs.release == 'true'
+      if: steps.plan.outputs.release == 'true' && !contains(github.event.head_commit.message, '[manual-apk]')
     - name: Retain compiled APKs for parallel verification and failed-job retries
       id: bundle
       uses: actions/upload-artifact@v4
@@ -213,7 +213,7 @@ jobs:
     name: Native checks - ${{ matrix.shard }}
     needs:
     - build
-    if: needs.build.outputs.release == 'true'
+    if: needs.build.outputs.release == 'true' && !contains(github.event.head_commit.message, '[manual-apk]')
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     strategy:
@@ -304,10 +304,58 @@ jobs:
           SOFIA_APP/dist/delivery-status.json
         if-no-files-found: error
         retention-days: 30
+  manual_apk:
+    name: Check the single production APK for manual delivery
+    needs: build
+    if: needs.build.outputs.release == 'true' && contains(github.event.head_commit.message, '[manual-apk]')
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ needs.build.outputs.source_sha }}
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+    - uses: actions/download-artifact@v4
+      with:
+        name: ${{ needs.build.outputs.artifact_name }}
+        path: SOFIA_APP/dist
+    - name: Verify exact candidate source and bytes
+      working-directory: SOFIA_APP
+      env:
+        SOFIA_SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
+      run: |
+        test "$(cat dist/SOURCE_COMMIT.txt)" = "$SOFIA_SOURCE_SHA"
+        test "$(git rev-parse HEAD)" = "$SOFIA_SOURCE_SHA"
+        sha256sum -c dist/Sofia-OS.apk.sha256
+        test ! -e dist/QA-ONLY-full-fixture.apk
+    - name: Enable KVM
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+    - name: Test in-place upgrade and native fade on that production APK
+      uses: reactivecircus/android-emulator-runner@v2
+      with:
+        api-level: 33
+        arch: x86_64
+        target: default
+        disable-animations: false
+        script: python3 SOFIA_APP/tools/manual-apk-smoke.py
+    - name: Retain manual candidate evidence without publication
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: Sofia-manual-${{ github.run_id }}-${{ github.run_attempt }}
+        path: SOFIA_APP/dist/manual-evidence/
+        if-no-files-found: error
+        retention-days: 30
   release:
     name: Publish only after every acceptance gate
     needs: [build, native_tests]
-    if: needs.build.outputs.release == 'true'
+    if: needs.build.outputs.release == 'true' && !contains(github.event.head_commit.message, '[manual-apk]')
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     env:

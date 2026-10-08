@@ -17,6 +17,7 @@ module.exports=config=>{
     const target=path.join(c.modRequest.platformProjectRoot,'app/src/main/java/com/avsord/sofiaapp/SofiaLaunchOverlay.kt');
     fs.mkdirSync(path.dirname(target),{recursive:true});
     fs.copyFileSync(path.join(__dirname,'native/SofiaLaunchOverlay.kt'),target);
+    fs.copyFileSync(path.join(__dirname,'native/SofiaLaunchTransition.java'),path.join(path.dirname(target),'SofiaLaunchTransition.java'));
     return c;
   }]);
 };
