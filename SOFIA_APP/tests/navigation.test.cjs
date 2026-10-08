@@ -36,24 +36,35 @@ test('gestures use the native horizontal pager and do not steal vertical scrolls
   assert.ok(pager.includes('velocity !== undefined && Math.abs(velocity) < 0.01'));
   assert.ok(source.includes("enabled={!gestureLocked&&!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)&&!(tab==='apps'&&workspaceDepth)}"));
 });
-test('pager keeps six fixed slots while heavy screen trees mount progressively after Home',()=>{
+test('pager keeps six fixed slots while heavy screen trees mount progressively after the launch shell',()=>{
   assert.deepEqual(Array.from(TAB_ORDER),['home','chat','pages','agenda','apps','profile']);
   const body=source.slice(source.indexOf('<TabPager'),source.indexOf('</TabPager>'));
-  const markers=['<Home ','load={loadChat}','load={loadPages}','load={loadAgenda}','load={loadWorkspace}','load={loadProfile}'];
+  const markers=['load={loadHome}','load={loadChat}','load={loadPages}','load={loadAgenda}','load={loadWorkspace}','load={loadProfile}'];
   let previous=-1;for(const marker of markers){const index=body.indexOf(marker);assert.ok(index>previous,marker);previous=index;}
   for(const tab of ['chat','pages','agenda','apps','profile'])assert.ok(body.includes("mountedTabs.has('"+tab+"')"));
   const startup=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
-  assert.ok(startup.includes("new Set<Tab>(['home'])"));assert.ok(startup.includes("['chat','agenda']"));assert.ok(startup.includes("['pages','profile']"));assert.ok(startup.includes("['apps']"));
+  assert.ok(startup.includes("new Set<Tab>(['home'])"));
+  for(const tab of ['chat','agenda','pages','profile','apps'])assert.ok(startup.includes("add(current,['"+tab+"'])"),tab);
   assert.ok(startup.includes("return MENU_TABS.includes(active)?add(mounted,[active]):mounted"));
   assert.ok(pager.includes('removeClippedSubviews={false}'));assert.ok(!source.includes('setBootstrap(null);setTab('));
 });
 test('screen instances stay cached after lazy loading, preserving drafts and scroll positions',()=>{
   const loader=fs.readFileSync(path.join(root,'src/lib/screen-loader.tsx'),'utf8');
-  assert.ok(source.includes('const Home=React.memo(HomeScreen)'));
   assert.ok(loader.includes('React.memo(load())'));assert.ok(loader.includes('const cache=new Map<string,Screen>()'));
-  for(const name of ['loadChat','loadPages','loadAgenda','loadWorkspace','loadProfile','loadNotifications'])assert.ok(source.includes(name),name);
+  for(const name of ['loadHome','loadChat','loadPages','loadAgenda','loadWorkspace','loadProfile','loadNotifications'])assert.ok(source.includes(name),name);
+  assert.ok(!source.includes("from './src/screens/Home'"));
   for(const name of ['navigate','goBack','changePrefs','logout','profile','manualUpdate','clearChat','notificationBack'])assert.ok(source.includes('const '+name+'=useCallback('),name);
   assert.ok(source.includes("key={'chat-'+chatEpoch}"));assert.ok(!source.includes('key={tab}'));
+});
+test('secure session opens a lightweight Home before cache decryption or live bootstrap',()=>{
+  const fast=fs.readFileSync(path.join(root,'src/lib/fast-bootstrap.ts'),'utf8');
+  const shell=fs.readFileSync(path.join(root,'src/components/StartupHome.tsx'),'utf8');
+  assert.ok(source.includes('setBootstrap(a?fastBootstrap(a):null)'));
+  assert.ok(source.includes("!ready?<StartupHome/>"));
+  assert.ok(source.includes("servicesReady?<DeferredScreen load={loadHome}"));
+  assert.ok(source.includes('authWithBootstrap(auth,b)'));
+  assert.ok(fast.includes('startup?:')||fs.readFileSync(path.join(root,'src/lib/types.ts'),'utf8').includes('startup?: Bootstrap'));
+  assert.ok(shell.includes('contains no data fetches')||shell.includes('no data fetches'));
 });
 test('automatic update checks and notifications wait until after the first native paint',()=>{
   assert.ok(source.includes("if(!servicesReady)return;"));
