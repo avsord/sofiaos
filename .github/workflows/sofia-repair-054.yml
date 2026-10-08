@@ -11,10 +11,12 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Package tracked source for regression diagnosis
-        run: git archive --format=tar.gz -o sofia-source.tar.gz HEAD
+        with:
+          ref: 4d41d6ea6657478bdc2c667cf54a56f11829f781
+      - name: Package exact live source for regression diagnosis
+        run: git archive --format=tar.gz -o sofia-live-source.tar.gz HEAD
       - uses: actions/upload-artifact@v4
         with:
-          name: sofia-source-054
-          path: sofia-source.tar.gz
+          name: sofia-live-source-054
+          path: sofia-live-source.tar.gz
           retention-days: 3
