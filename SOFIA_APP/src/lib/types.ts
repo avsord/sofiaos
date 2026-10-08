@@ -16,7 +16,7 @@ export type Message = {
   localVoice?: VoiceDraft;
   localAttachments?: AttachmentDraft[];
 };
-export type Conversation = { id: string; title: string; channel: string; created_at: string; updated_at: string };
+export type Conversation = { id: string; title: string; channel: string; state?:string; message_count?:number; created_at: string; updated_at: string };
 export type MessagePage = { conversation?: Conversation; messages: Message[]; has_more: boolean };
 export type ChatResult = MessagePage & { conversation_id: string; reply: string; clarification?: { id: string; options?: { id: string; label: string }[] } | null };
 export type Task = { id: string; title: string; state: string; due_at?: string; start_at?:string;end_at?:string;description?:string;location?:string;color?:string; description_document?:{version:1;text:string;marks:import('./leaf-document').Mark[]};created_at?:string; revision: number; priority?: number; priority_level?: string; area?: string };

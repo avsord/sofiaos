@@ -40,7 +40,14 @@ export class SofiaApi {
   private hydration:Promise<void>|null=null;
   private chatOpening:Promise<ChatSnapshot>|null=null;
   private cacheGeneration=0;
-  private rememberChatResult(result:ChatResult,input:object){const before=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');const id=(input as {conversation_id?:string}).conversation_id;if(before?.conversation?.id===id&&before)this.snapshots.remember('/chat-sync/current',{...before,messages:mergeMessages(before.messages,result.messages).slice(-100)});}
+  private rememberChatResult(result:ChatResult,input:object){
+    const id=result.conversation_id||(input as {conversation_id?:string}).conversation_id;if(!id)return;
+    const current=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');
+    const before=current?.conversation?.id===id?current:this.snapshots.peek<ChatSnapshot>('/conversations/'+id);
+    const conversation=before?.conversation||(result.conversation?.id===id?result.conversation:undefined)||{id,title:'Conversa com a Sofia',channel:'mobile',state:'active',created_at:result.messages[0]?.created_at||new Date().toISOString(),updated_at:new Date().toISOString()};
+    const saved:ChatSnapshot={...before,conversation,current_id:id,cursor_revision:before?.cursor_revision||0,deleted_ids:before?.deleted_ids||[],messages:mergeMessages(before?.messages||[],result.messages).slice(-100),has_more:result.has_more};
+    this.snapshots.remember('/chat-sync/current',saved);this.snapshots.remember('/conversations/'+id,saved);
+  }
   async hydrate(){if(!this.hydration)this.hydration=this.snapshots.hydrate().then(()=>{for(const [key,value] of this.snapshots.all())this.startupReads.seed(key,value);});return this.hydration;}
   cached<T>(path:string){return this.snapshots.peek<T>(path);}
   async discardCache(){this.cacheGeneration++;this.startupReads.invalidate();await this.snapshots.clear();}
@@ -71,7 +78,7 @@ export class SofiaApi {
       let data: Record<string, any>;
       try { data = await response.json(); } catch { throw new ApiError('O servidor não retornou dados válidos. A API móvel da Sofia precisa estar publicada.', 'INVALID_RESPONSE', response.status); }
       if (!response.ok && path === '/auth/login' && (response.status === 404 || response.status === 405 || data.code === 'AUTH_REQUIRED')) throw new ApiError('O servidor ainda precisa receber a API móvel da Sofia. Não é um erro da sua senha.', 'MOBILE_API_NOT_PUBLISHED', response.status);
-      if (!response.ok) { if (response.status === 401 && path !== '/auth/login') {void this.discardCache();this.onExpired();} throw new ApiError(data.error || 'Não foi possível concluir.', data.code || 'HTTP_ERROR', response.status, data); }
+      if (!response.ok) { if (response.status === 401 && path !== '/auth/login') {this.onExpired();} throw new ApiError(data.error || 'Não foi possível concluir.', data.code || 'HTTP_ERROR', response.status, data); }
       if(method==='GET'&&generation===this.cacheGeneration)this.snapshots.remember(path,data);
       if(generation===this.cacheGeneration&&path.startsWith('/chat-sync')&&data.conversation&&Array.isArray(data.messages)){this.snapshots.remember('/chat-sync/current',{...data,messages:data.messages.slice(-100)});this.snapshots.remember('/conversations/'+data.conversation.id,{...data,messages:data.messages.slice(-100)});}
       return data as T;
@@ -87,7 +94,26 @@ export class SofiaApi {
   logoutAll() { return this.request<{ok: boolean}>('/auth/logout-all', {}); }
   changePassword(currentPassword: string,newPassword: string,confirmPassword: string) { return this.request<{ok: boolean}>('/auth/change-password', {currentPassword,newPassword,confirmPassword}); }
   syncChat(id?:string) { return this.request<ChatSnapshot>('/chat-sync'+(id?'?conversation_id='+encodeURIComponent(id):'')); }
-  ensureChat() { if(!this.chatOpening){const opening=this.request<ChatSnapshot>('/chat-sync/current',{});this.chatOpening=opening;void opening.finally(()=>{if(this.chatOpening===opening)this.chatOpening=null;}).catch(()=>{});}return this.chatOpening; }
+  private async resumeChat():Promise<ChatSnapshot>{
+    await this.hydrate();
+    const current=await this.request<ChatSnapshot>('/chat-sync');
+    // An explicit deletion is authoritative. Do not recover deleted messages.
+    if(current.messages?.length||current.deleted_ids?.length)return current;
+    const listing=await this.conversations();
+    const candidates=listing.items.filter(c=>['web','mobile'].includes(c.channel)&&(!c.state||c.state==='active')&&c.id!==current.conversation?.id&&c.message_count!==0);
+    // Legacy servers omit counts; bound probes. New servers place populated threads first.
+    for(const item of candidates.slice(0,6)){
+      try{
+        const history=await this.history(item.id);
+        if(history.messages.length)return await this.selectChat(item.id);
+      }catch(e){if((e as ApiError).status!==404)throw e;}
+    }
+    return current;
+  }
+  ensureChat() {
+    if(!this.chatOpening){const opening=this.resumeChat().then(async page=>{await this.snapshots.flush();return page;});this.chatOpening=opening;void opening.finally(()=>{if(this.chatOpening===opening)this.chatOpening=null;}).catch(()=>{});}
+    return this.chatOpening;
+  }
   selectChat(id:string) { return this.request<ChatSnapshot>('/chat-sync/select',{conversation_id:id}); }
   async deleteChatMessages(id:string,ids:string[]) {const result=await this.request<{deleted_ids:string[];failed:{id:string;error:string}[]}>('/chat-sync/delete',{conversation_id:id,ids});this.cacheGeneration++;this.startupReads.invalidate();const before=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');if(before?.conversation?.id===id&&before){const removed=new Set(result.deleted_ids);this.snapshots.remember('/chat-sync/current',{...before,messages:before.messages.filter(m=>!removed.has(m.id)),deleted_ids:[...new Set([...before.deleted_ids,...result.deleted_ids])]});}this.snapshots.forget('/conversations/'+id);await this.snapshots.flush();return result;}
   conversations(offset = 0) { return this.request<{items: Conversation[]; has_more: boolean; next_offset: number}>('/conversations?offset=' + offset); }
@@ -100,8 +126,8 @@ export class SofiaApi {
   async deleteMessage(id: string) {const result=await this.request<{ok:boolean;id:string;conversation_id:string}>('/messages/' + encodeURIComponent(id), {}, 'DELETE');this.cacheGeneration++;this.startupReads.invalidate();this.snapshots.forget('/conversations/'+result.conversation_id);const current=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');if(current?.conversation?.id===result.conversation_id&&current)this.snapshots.remember('/chat-sync/current',{...current,messages:current.messages.filter(m=>m.id!==id),deleted_ids:[...current.deleted_ids,id]});await this.snapshots.flush();return result;}
   async clearChatHistory() {const result=await this.request<{ok:boolean;conversations:number;messages:number}>('/chat-history', {}, 'DELETE');this.cacheGeneration++;this.startupReads.invalidate();this.snapshots.forgetChat();await this.snapshots.flush();return result;}
   history(id: string, before?: number) { return this.request<MessagePage>(`/conversations/${encodeURIComponent(id)}${before ? '?before=' + before : ''}`); }
-  async chat(data: object) { const result=await this.request<ChatResult>('/messages', data, 'POST', 180000);this.rememberChatResult(result,data);systemChanged(this);return result; }
-  async audio(data: object) { const result=await this.request<ChatResult>('/messages/audio', data, 'POST', 180000);this.rememberChatResult(result,data);systemChanged(this);return result; }
+  async chat(data: object) { const result=await this.request<ChatResult>('/messages', data, 'POST', 180000);this.rememberChatResult(result,data);await this.snapshots.flush();systemChanged(this);return result; }
+  async audio(data: object) { const result=await this.request<ChatResult>('/messages/audio', data, 'POST', 180000);this.rememberChatResult(result,data);await this.snapshots.flush();systemChanged(this);return result; }
   home() { return this.request<HomeData>('/home'); }
   movePage(input:{id:string;revision:number;parentId:string;kind:string;anchorId:string}) { return this.md.move(input); }
   allNotifications(offset=0) { return this.md.notices(offset); }

@@ -119,3 +119,29 @@ test('mobile: perfil, agenda e tarefas usam o armazenamento da Sofia', async t =
   const done=await f.request('/tasks/'+task.id,{state:'done',revision:task.revision},'PATCH',token);assert.equal(done.status,200,JSON.stringify(done.body));assert.equal(f.store.task(task.id).state,'done');
   assert.equal((await f.request('/notifications',undefined,'GET',token)).body.push_enabled,false);
 });
+
+// 056: visibility is not lifecycle state; opening history is read-only.
+test('056 mobile history lists and reads paused/archived personal conversations without resuming or changing messages',async t=>{
+ const f=await setup(t),token=await f.login();
+ for(const state of ['paused','archived']){
+  const c=await f.create(token);
+  await f.request('/messages',{conversation_id:c.id,client_message_id:crypto.randomUUID(),message:'Historico que deve permanecer'},'POST',token);
+  f.store.db.prepare('UPDATE conversations SET state=? WHERE id=?').run(state,c.id);
+  const before=JSON.stringify(f.store.messages(c.id));
+  const listing=await f.request('/conversations',undefined,'GET',token);
+  const listed=listing.body.items.find(x=>x.id===c.id);assert.ok(listed);assert.equal(listed.message_count,2);
+  const read=await f.request('/conversations/'+c.id,undefined,'GET',token);assert.equal(read.status,200);assert.equal(read.body.messages.length,2);
+  assert.equal(f.store.conversation(c.id).state,state);assert.equal(JSON.stringify(f.store.messages(c.id)),before);
+ }
+});
+test('056 populated history is not hidden behind new empty conversations; deleted and foreign channels stay private',async t=>{
+ const f=await setup(t),token=await f.login(),kept=await f.create(token);
+ await f.request('/messages',{conversation_id:kept.id,client_message_id:crypto.randomUUID(),message:'Mensagem antiga'},'POST',token);
+ for(let n=0;n<65;n++)f.store.createConversation('Vazia '+n,'mobile');
+ const foreign=f.store.createConversation('Contato privado','whatsapp-simulator');
+ const deleted=f.store.createConversation('Apagada','web');f.store.db.prepare("UPDATE conversations SET state='deleted' WHERE id=?").run(deleted.id);
+ const rows=(await f.request('/conversations',undefined,'GET',token)).body.items;
+ assert.equal(rows[0].id,kept.id);assert.ok(!rows.some(x=>[deleted.id,foreign.id].includes(x.id)));
+ assert.equal((await f.request('/conversations/'+foreign.id,undefined,'GET',token)).status,404);
+ assert.equal((await f.request('/conversations/'+deleted.id,undefined,'GET',token)).status,404);
+});

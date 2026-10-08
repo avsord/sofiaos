@@ -4,6 +4,10 @@ import android.app.Activity
 import android.graphics.Color
 import android.view.Gravity
 import android.view.ViewGroup
+import android.view.View
+import android.view.ViewTreeObserver
+import android.os.SystemClock
+import android.util.Log
 import android.widget.FrameLayout
 import android.widget.ImageView
 import java.lang.ref.WeakReference
@@ -18,12 +22,22 @@ import com.facebook.react.bridge.ReactMethod
  */
 object SofiaLaunchOverlay {
   private var overlay: WeakReference<FrameLayout>? = null
+  private var observer: ViewTreeObserver? = null
+  private var drawing: ViewTreeObserver.OnPreDrawListener? = null
+  private var installedAt = 0L
+
+  private fun ready(view: View, cover: View): Boolean {
+    if (view === cover || view.visibility != View.VISIBLE || view.alpha <= 0f) return false
+    val tag = view.getTag(com.facebook.react.R.id.view_tag_native_id) as? String
+    if ((tag == "sofia-home-scroll" || tag == "sofia-login-ready" || tag == "sofia-launch-error") && view.width > 0 && view.height > 0) return true
+    if (view is ViewGroup) for (i in 0 until view.childCount) if (ready(view.getChildAt(i), cover)) return true
+    return false
+  }
 
   fun install(activity: Activity) {
     val root = activity.window.decorView as? ViewGroup ?: return
-    overlay?.get()?.let { old ->
-      (old.parent as? ViewGroup)?.removeView(old)
-    }
+    remove(overlay?.get())
+    installedAt = SystemClock.elapsedRealtime()
     val layer = FrameLayout(activity).apply {
       setBackgroundColor(Color.parseColor("#7258E8"))
       isClickable = true
@@ -39,20 +53,42 @@ object SofiaLaunchOverlay {
     root.addView(layer, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     root.bringChildToFront(layer)
     overlay = WeakReference(layer)
-    // Never mask a real crash forever. React normally removes this in a fraction of a second.
-    layer.postDelayed({ remove(layer) }, 5000)
+    // Native layout is authoritative, including Activity recreation with an existing JS runtime.
+    // No bridge callback, offscreen tab mount or network response is required to reveal Home.
+    val listener = ViewTreeObserver.OnPreDrawListener {
+      if (ready(root, layer)) remove(layer)
+      true
+    }
+    observer = root.viewTreeObserver
+    drawing = listener
+    observer?.addOnPreDrawListener(listener)
+    // Emergency escape only. A normal launch must be recorded as native-ready, never timeout.
+    layer.postDelayed({
+      if (overlay?.get() === layer) {
+        Log.w("SofiaLaunch", "SOFIA_LAUNCH_TIMEOUT")
+        remove(layer)
+      }
+    }, 5000)
   }
 
   private fun remove(view: FrameLayout?) {
     val current = view ?: overlay?.get() ?: return
+    if (overlay?.get() !== current) return
+    drawing?.let { listener -> if (observer?.isAlive == true) observer?.removeOnPreDrawListener(listener) }
+    drawing = null
+    observer = null
     (current.parent as? ViewGroup)?.removeView(current)
-    if (overlay?.get() === current) overlay?.clear()
+    overlay?.clear()
+    Log.i("SofiaLaunch", "SOFIA_LAUNCH_REVEALED_MS=" + (SystemClock.elapsedRealtime() - installedAt))
   }
 
   fun hide(activity: Activity?) {
     val current = overlay?.get() ?: return
     val host = activity ?: (current.context as? Activity)
-    if (host != null) host.runOnUiThread { remove(current) } else remove(current)
+    if (host != null) host.runOnUiThread {
+      val root = host.window.decorView
+      if (ready(root, current)) remove(current)
+    }
   }
 }
 
