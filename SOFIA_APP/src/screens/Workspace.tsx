@@ -118,7 +118,7 @@ export function Workspace({api,navigate,onDepthChange,active,resetKey=0,openCaps
  const handledCapsulesTarget=useRef(0);
  useLayoutEffect(()=>{if(active&&openCapsulesKey&&openCapsulesKey!==handledCapsulesTarget.current){handledCapsulesTarget.current=openCapsulesKey;setModule('capsules');setKind('');}},[openCapsulesKey,active]);
  useLayoutEffect(()=>{if(!active){setModule('');setKind('');setEditing(null);setFiltersOpen(false);setCreatePicker(false);setAreaEditing(null);setCustomEditing(null);}},[active]);
- useEffect(()=>{api.catalog().then(setCatalog).catch(e=>setError(errorText(e)));},[api]);
+ useEffect(()=>{let alive=true;const refresh=()=>{void api.catalog().then(value=>{if(alive)setCatalog(value);}).catch(e=>{if(alive)setError(errorText(e));});};refresh();const stop=subscribeSystemChanged(owner=>{if(owner===api)refresh();});return()=>{alive=false;stop();};},[api]);
  useEffect(()=>{onDepthChange(Boolean(module));},[module,onDepthChange]);
  useEffect(()=>()=>onDepthChange(false),[onDepthChange]);
  useEffect(()=>{if(!active)return;const sub=BackHandler.addEventListener('hardwareBackPress',()=>{if(editing){setEditing(null);return true;}if(module){setModule('');setKind('');setEditing(null);setFiltersOpen(false);setCreatePicker(false);setAreaEditing(null);setCustomEditing(null);return true;}return false;});return()=>sub.remove();},[active,module,editing]);
