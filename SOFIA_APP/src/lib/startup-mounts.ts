@@ -26,5 +26,5 @@ export function useStartupMounts(enabled:boolean,active:Tab){
   });
   return()=>{cancelled=true;task.cancel();for(const timer of timers)clearTimeout(timer);};
  },[enabled]);
- return mounted;
+ return MENU_TABS.includes(active)?add(mounted,[active]):mounted;
 }
