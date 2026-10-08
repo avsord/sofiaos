@@ -45,12 +45,14 @@ export class SofiaApi {
   async discardCache(){this.cacheGeneration++;this.startupReads.invalidate();await this.snapshots.clear();}
   async liveBootstrap(){return this.fetchRequest<Bootstrap>('/bootstrap',undefined,'GET',20000);}
   async preload(agenda:()=>Promise<unknown>){
-    // Read-ahead is bounded and shares in-flight requests. It never gates the first screen.
-    this.warming=true;try{await preloadStartup(this,agenda);}finally{this.warming=false;}
-    // Replace startup snapshots with current primary data, once, without polling cascades.
+    if(this.warming)return;
+    // Only paths that already came from disk need an explicit live refresh.
+    // On a cold cache preloadStartup fetches them once, so do not fetch twice.
     const paths=['/home','/tasks','/md/dashboard','/workspace/catalog',...['user_page','capsule','routine','monitor'].map(kind=>'/workspace/entities?limit=100&kind='+kind+'&q=&offset=0')];
-    let next=0;await Promise.all(Array.from({length:3},async()=>{while(next<paths.length){const path=paths[next++];try{const value=await this.fetchRequest(path,undefined,'GET',20000);this.startupReads.seed(path,value);}catch{}}}));
-    systemChanged(this);
+    const refresh=paths.filter(path=>this.snapshots.peek(path)!==undefined);
+    this.warming=true;try{await preloadStartup(this,agenda);}finally{this.warming=false;}
+    let index=0;await Promise.all(Array.from({length:2},async()=>{while(index<refresh.length){const path=refresh[index++];try{const value=await this.fetchRequest(path,undefined,'GET',20000);this.startupReads.seed(path,value);}catch{}}}));
+    if(refresh.length)systemChanged(this);
   }
   constructor(private token = '', private onExpired: () => void = () => {},scope='anonymous') {this.md=new LegacyMdAdapter(this.request.bind(this),AsyncStorage,scope);this.snapshots=new StartupSnapshot(encryptedStorage,SITE+'|'+scope.trim().toLowerCase()+'|startup-v1');}
   get mdLocalOnly(){return this.md.localOnly;}
