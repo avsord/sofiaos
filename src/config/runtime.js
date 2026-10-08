@@ -30,7 +30,9 @@ function makeConfig(overrides = {}) {
     smtpPass: process.env.SOFIA_SMTP_PASS || '',
     smtpFrom: process.env.SOFIA_SMTP_FROM?.trim() || process.env.SOFIA_SMTP_USER?.trim() || '',
     privateApiKey: process.env.OPENAI_PRIVATE_API_KEY?.trim() || '', sharedApiKey: process.env.OPENAI_SHARED_API_KEY?.trim() || '',
-    apiTimeoutMs: 90000, turnTimeoutMs: 120000, maxMessageChars: 12000, maxContextChars: 20000,
+    apiTimeoutMs: 90000, turnTimeoutMs: 120000,
+    // One million characters is a transport/memory safety rail, not a short product ceiling.
+    maxMessageChars: 1000000, maxContextChars: 20000,
     ...overrides
   };
 }
