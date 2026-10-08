@@ -68,7 +68,7 @@ function report(root){
  // Notify on actual release or failure, not on a docs-only/no-op validation.
  if(p.GITHUB_REPOSITORY===REPO&&(published||status==='failure')){
   const pulls=JSON.parse(run('gh',['api',`repos/${REPO}/pulls?state=open&head=avsord:${BRANCH}`],root));
-  const pr=pulls.find(pr=>pr.head.ref===BRANCH);if(pr)run('gh',['api',`repos/${REPO}/issues/${pr.number}/comments`,'--method','POST','--input','-'],root,{input:JSON.stringify({body:`@avsord\n\n${body}`})});
+  const pr=pulls.find(pr=>pr.head.ref===BRANCH);if(pr)try{run('gh',['api',`repos/${REPO}/issues/${pr.number}/comments`,'--method','POST','--input','-'],root,{input:JSON.stringify({body:`@avsord\n\n${body}`})});}catch{console.warn('GitHub PR notification unavailable; delivery and test results remain authoritative.');}
  }
  console.log(text);
 }
