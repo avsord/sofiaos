@@ -18,6 +18,7 @@ import {MenuTab} from './src/components/MenuTab';
 import {NotificationProvider} from './src/components/NotificationCenter';
 import {createMenuMotion} from './src/lib/menu-motion';
 import type {TabPagerHandle} from './src/components/TabPager';
+import {useStartupMounts} from './src/lib/startup-mounts';
 import {Login} from './src/screens/Login';
 import {Home as HomeScreen} from './src/screens/Home';
 import {Chat as ChatScreen} from './src/screens/Chat';
@@ -49,7 +50,9 @@ function Shell(){
  const c=themeAppearance(prefs,system,themeClock)==='dark'?dark:light;
  const expired=useCallback(()=>{tabHistory.current=[];setAuth(null);setBootstrap(null);setLocked(false);void forgetAuth().catch(()=>{});},[]);
  const api=useMemo(()=>new SofiaApi(auth?.token||'',expired,auth?.profile?.email||'anonymous'),[auth?.token,auth?.profile?.email,expired]);
- useEffect(()=>{if(!auth)return;let live=true;void api.hydrate().then(()=>{if(!live)return;const saved=api.cached<Bootstrap>('/bootstrap');if(saved&&saved.profile?.email?.toLowerCase()===auth.profile.email.toLowerCase()){setBootstrap(saved);console.info('SOFIA_STARTUP_CACHE_READY');}void api.preload(()=>preloadAgenda(api));});return()=>{live=false;};},[api,auth?.token]);
+ const servicesReady=useAfterFirstPaint(!!auth&&!!bootstrap),mountedTabs=useStartupMounts(!!auth&&!!bootstrap,tab);
+ useEffect(()=>{if(!auth)return;let live=true;void api.hydrate().then(()=>{if(!live)return;const saved=api.cached<Bootstrap>('/bootstrap');if(saved&&saved.profile?.email?.toLowerCase()===auth.profile.email.toLowerCase()){setBootstrap(saved);console.info('SOFIA_STARTUP_CACHE_READY');}});return()=>{live=false;};},[api,auth?.token]);
+ useEffect(()=>{if(servicesReady)void api.preload(()=>preloadAgenda(api));},[api,servicesReady]);
  const checkingUpdate=useRef(false),lastUpdateCheck=useRef(0),lastUpdatePrompt=useRef('');
  const checkUpdate=useCallback(async(manual=false)=>{
   if(checkingUpdate.current)return;
@@ -67,12 +70,12 @@ function Shell(){
  useEffect(()=>{const a=Keyboard.addListener('keyboardDidShow',()=>setKeyboard(true)),b=Keyboard.addListener('keyboardDidHide',()=>setKeyboard(false));return()=>{a.remove();b.remove();};},[]);
  useEffect(()=>{let active=true;Promise.all([readAuth(),readPrefs()]).then(([a,p])=>{if(active){setAuth(a);setPrefs(p);}}).catch(e=>{if(active)setError(errorText(e));}).finally(()=>{if(active)setReady(true);});return()=>{active=false;};},[]);
  useEffect(()=>{
-  if(!ready)return;
+  if(!servicesReady)return;
   void checkUpdate(false);
   const interval=setInterval(()=>void checkUpdate(false),300000);
   const sub=AppState.addEventListener('change',state=>{if(state==='active')void checkUpdate(false);});
   return()=>{clearInterval(interval);sub.remove();};
- },[ready,checkUpdate]);
+ },[servicesReady,checkUpdate]);
  const boot=useCallback(async()=>{if(!auth)return;setBooting(true);try{await api.hydrate();const b=await api.liveBootstrap();setBootstrap(previous=>JSON.stringify(previous)===JSON.stringify(b)?previous:b);setError('');}catch(e){setError(errorText(e));}finally{setBooting(false);}},[api,auth]);
  useEffect(()=>{if(auth)void boot();},[api]);
  useEffect(()=>{if(!auth)return;const sub=AppState.addEventListener('change',state=>{if(state==='active'&&!locked)void boot();else if(state!=='active')void silenceVoices();});return()=>sub.remove();},[auth,locked,boot]);
@@ -91,7 +94,6 @@ function Shell(){
  const discussTask=useCallback((task:Task)=>{setTaskContext(task);navigate('chat');},[navigate]);
  const openAgenda=useCallback((date:string,id?:string,create=false)=>{setAgendaTarget({date,id,create,nonce:Date.now()});navigate('agenda');},[navigate]);
  const openCapsules=useCallback(()=>{navigate('apps');setCapsulesTarget(v=>v+1);},[navigate]);
- const servicesReady=useAfterFirstPaint(!!auth&&!!bootstrap);
  useCapsuleNotifications(api,auth?.profile.email||'',!auth&&ready?false:servicesReady?true:null,openCapsules);
  useAgendaNotifications(api,auth?.profile.email||'',!auth&&ready?false:servicesReady?true:null,openAgenda);
  const goBack=useCallback(()=>{
@@ -110,16 +112,16 @@ function Shell(){
  const manualUpdate=useCallback(()=>checkUpdate(true),[checkUpdate]);
  const clearChat=useCallback(()=>setChatEpoch(v=>v+1),[]);
  const notificationBack=useCallback(()=>{void goBack();},[goBack]);
- return <ThemeContext.Provider value={c}><NotificationProvider api={api} enabled={!!auth&&!!bootstrap} scope={auth?.profile.email||''}><SafeAreaView style={{flex:1,backgroundColor:c.bg}} edges={['top','left','right','bottom']}><StatusBar barStyle={c===dark?'light-content':'dark-content'} backgroundColor={c.bg}/><View style={{flex:1,width:'100%',maxWidth:760,alignSelf:'center',backgroundColor:c.bg}}>
+ return <ThemeContext.Provider value={c}><NotificationProvider api={api} enabled={!!auth&&!!bootstrap&&servicesReady} scope={auth?.profile.email||''}><SafeAreaView style={{flex:1,backgroundColor:c.bg}} edges={['top','left','right','bottom']}><StatusBar barStyle={c===dark?'light-content':'dark-content'} backgroundColor={c.bg}/><View style={{flex:1,width:'100%',maxWidth:760,alignSelf:'center',backgroundColor:c.bg}}>
  {!ready?<View style={{flex:1,justifyContent:'center'}}><ActivityIndicator color={c.accent}/></View>:!auth?<Login onLogin={login}/>:!bootstrap?<View style={{flex:1,justifyContent:'center',padding:24,gap:14}}>{booting?<ActivityIndicator color={c.accent}/>:null}<Text style={{fontSize:23,fontWeight:'600',color:c.text}}>Abrindo sua Sofia…</Text>{error?<ErrorBanner text={error}/>:null}<Button title="Tentar novamente" onPress={()=>void boot()} loading={booting}/><Button title="Voltar para o login" secondary onPress={()=>void logout()}/></View>:<><View style={{flex:1}}>
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?0:1}]} pointerEvents={tab==='notifications'?'none':'auto'} accessibilityElementsHidden={tab==='notifications'} importantForAccessibility={tab==='notifications'?'no-hide-descendants':'auto'}>
   <TabPager motion={menuMotion} ref={pager} activeTab={tab} enabled={!gestureLocked&&!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)&&!(tab==='apps'&&workspaceDepth)} onSelect={navigate}>
    <Home onDiscussTask={discussTask} onOpenCapsules={openCapsules} onGestureLock={setGestureLocked} api={api} bootstrap={bootstrap} navigate={navigate} onOpenAgenda={openAgenda} active={screenTab==='home'}/>
-   <Chat taskContext={taskContext} onClearTaskContext={clearTaskContext} key={'chat-'+chatEpoch} api={api} bootstrap={bootstrap} enterToSend={prefs.enterToSend} autoSendVoice={prefs.autoSendVoice} onLock={setLocked} active={screenTab==='chat'} onRefreshBootstrap={boot}/>
-   <Pages key={bootstrap.profile.email} api={api} active={screenTab==='pages'} storageScope={bootstrap.profile.email} onDepthChange={setPagesDepth}/>
-   <Agenda onGestureLock={setGestureLocked} api={api} target={agendaTarget} active={screenTab==='agenda'}/>
-   <Workspace onDiscussTask={discussTask} openCapsulesKey={capsulesTarget} resetKey={workspaceReset} api={api} navigate={navigate} onDepthChange={setWorkspaceDepth} active={screenTab==='apps'}/>
-   <Profile api={api} bootstrap={bootstrap} prefs={prefs} onPrefs={changePrefs} onProfile={profile} onLogout={logout} onCheckUpdate={manualUpdate} onChatHistoryCleared={clearChat}/>
+   {mountedTabs.has('chat')?<Chat taskContext={taskContext} onClearTaskContext={clearTaskContext} key={'chat-'+chatEpoch} api={api} bootstrap={bootstrap} enterToSend={prefs.enterToSend} autoSendVoice={prefs.autoSendVoice} onLock={setLocked} active={screenTab==='chat'} onRefreshBootstrap={boot}/>:<View style={{flex:1}}/>}
+   {mountedTabs.has('pages')?<Pages key={bootstrap.profile.email} api={api} active={screenTab==='pages'} storageScope={bootstrap.profile.email} onDepthChange={setPagesDepth}/>:<View style={{flex:1}}/>}
+   {mountedTabs.has('agenda')?<Agenda onGestureLock={setGestureLocked} api={api} target={agendaTarget} active={screenTab==='agenda'}/>:<View style={{flex:1}}/>}
+   {mountedTabs.has('apps')?<Workspace onDiscussTask={discussTask} openCapsulesKey={capsulesTarget} resetKey={workspaceReset} api={api} navigate={navigate} onDepthChange={setWorkspaceDepth} active={screenTab==='apps'}/>:<View style={{flex:1}}/>}
+   {mountedTabs.has('profile')?<Profile api={api} bootstrap={bootstrap} prefs={prefs} onPrefs={changePrefs} onProfile={profile} onLogout={logout} onCheckUpdate={manualUpdate} onChatHistoryCleared={clearChat}/>:<View style={{flex:1}}/>}
   </TabPager>
  </View>
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?1:0,backgroundColor:c.bg}]} pointerEvents={tab==='notifications'?'auto':'none'} accessibilityElementsHidden={tab!=='notifications'} importantForAccessibility={tab==='notifications'?'auto':'no-hide-descendants'}><Notifications api={api} onBack={notificationBack}/></View>
