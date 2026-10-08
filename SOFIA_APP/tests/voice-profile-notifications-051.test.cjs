@@ -16,8 +16,9 @@ test('agenda and capsule schedules request permission and use high-priority phon
  for(const source of [agenda,capsules]){assert.ok(source.includes('ensureSystemNotificationPermission'));assert.ok(source.includes('AndroidImportance.HIGH'));assert.ok(source.includes('AndroidNotificationPriority.HIGH'));assert.ok(source.includes("sound:'default'"));}
  assert.ok(permission.includes('requestPermissionsAsync'));assert.ok(permission.includes('permissionFlight'));
 });
-test('backend advertises expanded chat transport and accepts long text/audio duration',()=>{
- const backend=file('../src/channels/mobile.js');
+test('backend advertises expanded chat transport and core accepts long text/audio duration',()=>{
+ const backend=file('../src/channels/mobile.js'),runtime=file('../src/config/runtime.js');
  assert.ok(backend.includes('MAX_TEXT = 1000000'));assert.ok(backend.includes('MAX_AUDIO_DURATION = 6 * 60 * 60 * 1000'));assert.ok(backend.includes('MAX_AUDIO = 64 * 1024 * 1024'));
  assert.ok(backend.includes("bodyJson(req, 2 * 1024 * 1024)"));assert.ok(!backend.includes("duration > 300000"));
+ assert.ok(runtime.includes('maxMessageChars: 1000000'));
 });
