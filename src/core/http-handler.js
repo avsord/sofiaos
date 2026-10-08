@@ -167,7 +167,7 @@ function createHandler(runtime) {
         revokeWebSessions();mobileSessions.revokeAll();return redirect(res,303,'/login?reset=1');
       }
       if(m==='GET'&&p==='/logout'){if(railwayEnv())clearSession(req,res);return redirect(res,303,railwayEnv()?'/login?logout=1':'/');}
-      if(m==='GET'&&p==='/health')return json(res,200,{ok:true,name:'Sofia OS',version:VERSION,storage:'sqlite-local'});
+      if(m==='GET'&&p==='/health')return json(res,200,{ok:true,name:'Sofia OS',version:VERSION,storage:'sqlite-local',task_description_format:true,selected_task_context:true,agenda_priority:true,persistent_sessions:true,unrestricted_chat_text:true,unrestricted_audio_duration:true});
       if(m==='GET'&&p==='/privacy')return plain(res,200,privacyPage(),'text/html; charset=utf-8');
       if(m==='GET'&&PUBLIC_STATIC[p]){const [file,type]=PUBLIC_STATIC[p];res.setHeader('Content-Type',type);res.end(fs.readFileSync(path.join(config.root,'public',file)));return;}
       if(m==='GET'&&p==='/whatsapp/onboarding-config'){if(!config.metaAppId||!config.metaLoginConfigId)throw new AppError('META_CONFIG_MISSING','Configure META_APP_ID e META_LOGIN_CONFIG_ID no servidor.',503);return json(res,200,{ok:true,appId:config.metaAppId,configId:config.metaLoginConfigId,graphVersion:config.metaGraphVersion,featureType:'whatsapp_business_app_onboarding',sessionInfoVersion:'3'});}
