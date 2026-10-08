@@ -22,6 +22,7 @@ env:
   EXPO_NO_TELEMETRY: '1'
   EXPO_PUBLIC_API_URL: https://sofiaos.up.railway.app
   GH_TOKEN: ${{ github.token }}
+  SOFIA_MANUAL_NO_TESTS: ${{ contains(github.event.head_commit.message, '[manual-apk]') && contains(github.event.head_commit.message, '[no-tests]') }}
 jobs:
   build:
     if: github.ref == 'refs/heads/sofia-app-android'
@@ -54,8 +55,12 @@ jobs:
       run: |
         set -euo pipefail
         mkdir -p SOFIA_APP/dist
-        python3 SOFIA_APP/tools/native-delivery-test.py
-        node --test SOFIA_APP/tools/delivery.test.cjs | tee SOFIA_APP/dist/delivery-tests.txt
+        if [ "$SOFIA_MANUAL_NO_TESTS" != "true" ]; then
+          python3 SOFIA_APP/tools/native-delivery-test.py
+          node --test SOFIA_APP/tools/delivery.test.cjs | tee SOFIA_APP/dist/delivery-tests.txt
+        else
+          printf '%s\n' 'Manual phone candidate: automated tests explicitly skipped at user request; not an approved release.' > SOFIA_APP/dist/manual-delivery.txt
+        fi
         node SOFIA_APP/tools/delivery.cjs prepare
     - uses: actions/setup-java@v4
       with:
@@ -78,14 +83,14 @@ jobs:
         npm test | tee dist/app-tests.txt
         node -e "const c=require('./app.json').expo;if(c.version!==process.env.SOFIA_RELEASE_VERSION||c.android.versionCode!==Number(process.env.SOFIA_RELEASE_CODE)||c.android.package!=='com.avsord.sofiaapp')throw Error('Unexpected update identity')"
       id: validate
-      if: steps.plan.outputs.release == 'true'
+      if: steps.plan.outputs.release == 'true' && env.SOFIA_MANUAL_NO_TESTS != 'true'
     - name: Verify existing task description persistence with isolated backend data
       run: |
         set -euo pipefail
         npm ci
         npm test | tee SOFIA_APP/dist/backend-tests.txt
       id: backend_tests
-      if: steps.plan.outputs.release == 'true'
+      if: steps.plan.outputs.release == 'true' && env.SOFIA_MANUAL_NO_TESTS != 'true'
     - name: Preserve exact source being tested
       run: |
         mkdir -p SOFIA_APP/dist
@@ -105,13 +110,13 @@ jobs:
       run: |
         curl -fsS --max-time 30 --retry 3 --retry-delay 2 --retry-max-time 60 --dump-header SOFIA_APP/dist/server-health-headers.txt --write-out '%{stderr}health_http=%{http_code} total_seconds=%{time_total}\n' https://sofiaos.up.railway.app/health > SOFIA_APP/dist/server-health.json
         node -e "const h=require('./SOFIA_APP/dist/server-health.json');if(!h.ok||Number(h.version.split('.')[0])<142)throw Error('Incompatible server');console.log('Existing server preserved:',h.version)"
-      if: steps.plan.outputs.release == 'true'
+      if: steps.plan.outputs.release == 'true' && env.SOFIA_MANUAL_NO_TESTS != 'true'
     - name: Fail early when the live backend cannot support the app
       run: |
         cp SOFIA_APP/dist/server-health.json SOFIA_APP/dist/server-release-gate.json
         node -e "const h=require('./SOFIA_APP/dist/server-release-gate.json');if(!h.ok||!h.task_description_format||!h.selected_task_context||!h.agenda_priority||!h.persistent_sessions)throw Error('Server publication is required before the APK release; all existing records remain preserved')"
       id: early_server
-      if: steps.plan.outputs.release == 'true'
+      if: steps.plan.outputs.release == 'true' && env.SOFIA_MANUAL_NO_TESTS != 'true'
     - uses: gradle/actions/setup-gradle@v4
       with:
         cache-read-only: false
@@ -307,7 +312,7 @@ jobs:
   manual_apk:
     name: Check the single production APK for manual delivery
     needs: build
-    if: needs.build.outputs.release == 'true' && contains(github.event.head_commit.message, '[manual-apk]')
+    if: needs.build.outputs.release == 'true' && contains(github.event.head_commit.message, '[manual-apk]') && !contains(github.event.head_commit.message, '[no-tests]')
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     steps:

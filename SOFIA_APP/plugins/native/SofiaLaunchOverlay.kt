@@ -79,14 +79,26 @@ object SofiaLaunchOverlay {
     }
   }
 
-  private fun has(view: View, name: String): Boolean {
-    if (view.visibility != View.VISIBLE || view.alpha <= 0f) return false
-    val tag = view.getTag(com.facebook.react.R.id.view_tag_native_id) as? String
-    if (tag == name && view.width > 0 && view.height > 0) return true
-    if (view is ViewGroup) for (i in 0 until view.childCount) {
-      if (has(view.getChildAt(i), name)) return true
+  private fun readySignals(root: View): Int {
+    var signals = 0
+    fun visit(view: View) {
+      if ((signals and 1) != 0 || (signals and 14) == 14) return
+      if (view.visibility != View.VISIBLE || view.alpha <= 0f) return
+      if (view.width > 0 && view.height > 0) {
+        signals = signals or when (view.getTag(com.facebook.react.R.id.view_tag_native_id) as? String) {
+          "sofia-login-ready" -> 1
+          "sofia-home-scroll" -> 2
+          "sofia-menu-bar" -> 4
+          "sofia-home-data-ready" -> 8
+          "sofia-launch-error" -> 16
+          else -> 0
+        }
+      }
+      if (view is ViewGroup) for (i in 0 until view.childCount) visit(view.getChildAt(i))
     }
-    return false
+    // One walk per frame, rather than a full traversal for each ready marker.
+    visit(root)
+    return signals
   }
 
   fun install(activity: Activity) {
@@ -157,8 +169,9 @@ object SofiaLaunchOverlay {
   private fun inspect(activity: Activity) {
     if (host?.get() !== activity || activity.isFinishing || revealed) return
     val root = activity.window.decorView
-    val login = has(root, "sofia-login-ready")
-    val home = has(root, "sofia-home-scroll") && has(root, "sofia-menu-bar")
+    val signals = readySignals(root)
+    val login = (signals and 1) != 0
+    val home = (signals and 6) == 6
     if (!homeSeen && (home || login)) {
       homeSeen = true
       record(activity, "UI")
@@ -166,10 +179,10 @@ object SofiaLaunchOverlay {
       val callbacks = waiting.toList(); waiting.clear()
       root.post { callbacks.forEach { it.resolve(true) } }
     }
-    if (login || (home && has(root, "sofia-home-data-ready"))) {
+    if (login || (home && (signals and 8) != 0)) {
       dataSeen = true
       reveal(activity, true)
-    } else if (has(root, "sofia-launch-error")) {
+    } else if ((signals and 16) != 0) {
       failed = true
       reveal(activity, false)
     }

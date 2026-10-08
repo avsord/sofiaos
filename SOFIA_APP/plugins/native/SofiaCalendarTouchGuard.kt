@@ -26,13 +26,17 @@ internal class SofiaCalendarTouchGuard {
   private var homeRefresh: ReactSwipeRefreshLayout? = null
   private val verticalParents = mutableListOf<Pair<ReactScrollView, Boolean>>()
   private val refreshParents = mutableListOf<Pair<ReactSwipeRefreshLayout, Boolean>>()
+  private var menuTouch = false
 
   fun beforeDispatch(root: View, event: MotionEvent) {
     if (event.actionMasked == MotionEvent.ACTION_DOWN) {
       release()
       // Observe input only. React owns selection, pager offset and menu motion;
       // writing them here races with its pending selection/layout commit.
-      immediateMenu(root, event)
+      menuTouch = immediateMenu(root, event)
+      // The fixed bar is outside every calendar/scroll surface. Dispatch its
+      // DOWN immediately instead of walking the active screen several times.
+      if (menuTouch) return
       downX = event.rawX; downY = event.rawY
       // Native wrappers can change after a keyboard/modal transition. Match the
       // visible Home independently of the pointer's edge and include the tagged
@@ -81,6 +85,7 @@ internal class SofiaCalendarTouchGuard {
         ancestor = ancestor.parent
       }
     }
+    if (menuTouch) return
     if (event.actionMasked == MotionEvent.ACTION_MOVE) {
       val view = menu
       val dx = abs(event.rawX - downX); val dy = abs(event.rawY - downY)
@@ -128,6 +133,7 @@ internal class SofiaCalendarTouchGuard {
   }
 
   fun release() {
+    menuTouch = false
     pager?.setScrollEnabled(wasEnabled)
     pager = null
     menu = null
@@ -141,15 +147,15 @@ internal class SofiaCalendarTouchGuard {
   }
 
 
-  private fun immediateMenu(root: View, event: MotionEvent) {
-    val tab = menuAt(root, event.rawX.toInt(), event.rawY.toInt()) ?: return
+  private fun immediateMenu(root: View, event: MotionEvent): Boolean {
+    val tab = menuAt(root, event.rawX.toInt(), event.rawY.toInt()) ?: return false
     val index = (tab.getTag(com.facebook.react.R.id.view_tag_native_id) as? String)
-      ?.removePrefix("sofia-menu-")?.toIntOrNull() ?: return
-    if (index !in 0..5) return
+      ?.removePrefix("sofia-menu-")?.toIntOrNull()
     // Do not scroll or write Animated properties before onPressIn runs.
     // The previous native shortcut displayed a different page while React still
     // owned the old activeTab, pointerEvents and accessibility selection.
-    android.util.Log.i("SofiaMenu", "TOUCH_DOWN index=$index observerOnly=true")
+    if (index != null && index in 0..5) android.util.Log.i("SofiaMenu", "TOUCH_DOWN index=$index observerOnly=true")
+    return true // Locked buttons still reach React's existing recording guard.
   }
 
   private fun menuAt(view: View, x: Int, y: Int): View? {

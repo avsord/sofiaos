@@ -1,3 +1,13 @@
+## 0.3.65 — toque dos menus, círculo na abertura e caminho manual sem testes
+
+Base exata entregue: 0.3.64/code69, fonte 55b2abae8512bf54a4a2bc595b10aa8b5a3f4ef0. Novo candidato 0.3.65/code70. O usuário relatou atraso ao tocar nos menus, pediu o S dentro do círculo e nova redução de espera inicial. Autorizou entrega manual sem testes e solicitou o arquivo pronto, sem sucessivos avisos de progresso. Publicação oficial aguarda retorno do usuário.
+
+Caminho observado: SofiaCalendarTouchGuard procurava calendário/agenda/Home mesmo após reconhecer um toque fora do pager, na barra de menus. O novo retorno antecipado preserva onPressIn e a decisão de navegação no React. Telas ocultas montam uma a uma após commit e oportunidade ociosa, com startTransition. A splash coleta os mesmos marcadores em uma varredura por frame; não reduz a condição de prontidão. O desenho circular substitui apenas a imagem da splash, sem uma segunda tela ou timer.
+
+Rota [manual-apk] [no-tests]: não roda suites de código, backend ou emulador. Retém build de produção e conferência de identidade/assinatura. Os caminhos de publicação oficial mantêm todos os gates. Nenhuma medição de melhora ou validação física é afirmada. Nenhuma mudança em main, servidor, banco, login ou histórico.
+
+0.3.64 foi enviada à conversa e salva como APK; após erro no download, foram gerados novo anexo e ZIP. O relato de atraso na navegação iniciou este delta. Não reutilizar a 0.3.64 como a nova correção.
+
 # Sofia OS — startup/navigation handoff, 2026-10-08
 
 ## Current work: 0.3.64 earlier local preparation
