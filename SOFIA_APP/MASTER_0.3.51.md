@@ -19,7 +19,7 @@ Não existe mais temporizador de cinco minutos no compositor. O servidor passa a
 
 O campo de mensagem não usa mais `maxLength`. O endpoint móvel aceita até um milhão de caracteres por mensagem e corpo HTTP ampliado. A capacidade real de resposta da IA ainda depende da janela de contexto do provedor; o app não corta silenciosamente o que o usuário digitou.
 
-Os testes de integração exercitam diretamente uma mensagem acima do antigo teto de 12 mil caracteres e uma gravação com duração superior aos antigos cinco minutos usando a mesma configuração ampliada do núcleo.
+Os testes de integração exercitam diretamente uma mensagem acima do antigo teto de 12 mil caracteres e uma gravação com duração superior aos antigos cinco minutos usando a mesma configuração ampliada do núcleo. O conteúdo integral da mensagem continua salvo e enviado à interpretação; somente a frase usada pelo índice para procurar contexto antigo é projetada para até 500 caracteres, preservando início e fim, para que uma mensagem longa não seja rejeitada pela busca auxiliar.
 
 ## Foto do perfil
 
