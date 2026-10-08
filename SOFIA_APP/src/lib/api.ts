@@ -1,3 +1,4 @@
+import {AUTH_STORAGE_KEY,PREFS_STORAGE_KEY,takeStartupAuth,takeStartupPrefs,invalidateStartupAuth,invalidateStartupPrefs} from './startup-read-ahead';
 import {StartupSnapshot} from './startup-snapshot';
 import {encryptedStorage} from './encrypted-storage';
 export type CalendarState={configured:boolean;connected:boolean;syncing?:boolean;last_sync?:string;error?:string;calendar_name?:string;calendar_id?:string;warnings?:string[];conflicts?:{id:string;reason:string}[];calendars?:{id:string;summary:string;accessRole:string}[]};
@@ -14,21 +15,21 @@ const rawBase = (process.env.EXPO_PUBLIC_API_URL || 'https://sofiaos.up.railway.
 const parsedBase = new URL(rawBase);
 if (parsedBase.protocol !== 'https:' || parsedBase.username || parsedBase.password || parsedBase.search || parsedBase.hash || parsedBase.pathname !== '/') throw new Error('Configure a raiz HTTPS do servidor Sofia.');
 export const SITE = rawBase;
-const AUTH_KEY = 'sofia.native.session.v1', PREFS_KEY = 'sofia.native.preferences.v1';
+const AUTH_KEY = AUTH_STORAGE_KEY, PREFS_KEY = PREFS_STORAGE_KEY;
 const secureOptions = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
 export async function readAuth(): Promise<Auth | null> {
-  const raw = await SecureStore.getItemAsync(AUTH_KEY);
+  const raw = await takeStartupAuth(()=>SecureStore.getItemAsync(AUTH_KEY));
   if (!raw) return null;
   try { const a = JSON.parse(raw); if (typeof a.token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(a.token) || !Number.isFinite(Date.parse(a.expires_at)) || !a.profile) { await forgetAuth(); return null; } return a as Auth; }
   catch { await forgetAuth(); return null; }
 }
-export function saveAuth(auth: Auth) { return SecureStore.setItemAsync(AUTH_KEY, JSON.stringify(auth), secureOptions); }
-export function forgetAuth() { return SecureStore.deleteItemAsync(AUTH_KEY); }
+export function saveAuth(auth: Auth) { invalidateStartupAuth(); return SecureStore.setItemAsync(AUTH_KEY, JSON.stringify(auth), secureOptions); }
+export function forgetAuth() { invalidateStartupAuth(); return SecureStore.deleteItemAsync(AUTH_KEY); }
 export async function readPrefs(): Promise<Prefs> {
-  try { const p = JSON.parse(await AsyncStorage.getItem(PREFS_KEY) || '{}'); return { appearance: ['system','light','dark','schedule'].includes(p.appearance) ? p.appearance : 'schedule', enterToSend: p.enterToSend === true, autoSendVoice: p.autoSendVoice !== false, ...themeTimes(p) }; }
+  try { const p = JSON.parse(await takeStartupPrefs(()=>AsyncStorage.getItem(PREFS_KEY)) || '{}'); return { appearance: ['system','light','dark','schedule'].includes(p.appearance) ? p.appearance : 'schedule', enterToSend: p.enterToSend === true, autoSendVoice: p.autoSendVoice !== false, ...themeTimes(p) }; }
   catch { return { appearance: 'schedule', enterToSend: false, autoSendVoice: true, lightAt:'05:00', darkAt:'19:00' }; }
 }
-export function savePrefs(p: Prefs) { return AsyncStorage.setItem(PREFS_KEY, JSON.stringify(p)); }
+export function savePrefs(p: Prefs) { invalidateStartupPrefs(); return AsyncStorage.setItem(PREFS_KEY, JSON.stringify(p)); }
 export class ApiError extends Error {
   constructor(message: string, public code: string, public status: number, public data?: Record<string, unknown>) { super(message); this.name = 'ApiError'; }
 }

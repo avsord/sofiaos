@@ -1,3 +1,4 @@
+import {scheduleIdleTask} from './src/lib/idle-task';
 import {prepareLocalLaunch} from './src/lib/local-launch';
 import type {LocalLaunch} from './src/lib/local-launch';
 import {prepareInitialData} from './src/lib/startup-preparation';
@@ -71,10 +72,10 @@ function Shell({startup}:{startup:LocalLaunch}){
 
  useEffect(()=>{
   if(!servicesReady)return;
-  void checkUpdate(false);
+  const cancel=scheduleIdleTask(()=>void checkUpdate(false));
   const interval=setInterval(()=>void checkUpdate(false),300000);
   const sub=AppState.addEventListener('change',state=>{if(state==='active')void checkUpdate(false);});
-  return()=>{clearInterval(interval);sub.remove();};
+  return()=>{cancel();clearInterval(interval);sub.remove();};
  },[servicesReady,checkUpdate]);
  const boot=useCallback(async()=>{if(!auth)return;setBooting(true);try{const b=await api.liveBootstrap();setBootstrap(previous=>JSON.stringify(previous)===JSON.stringify(b)?previous:b);const next=authWithBootstrap(auth,b);setAuth(next);if(JSON.stringify(auth.startup)!==JSON.stringify(next.startup))void saveAuth(next).catch(()=>{});setError('');}catch(e){setError(errorText(e));}finally{setBooting(false);}},[api,auth]);
  useEffect(()=>{if(auth)void boot();},[api]);

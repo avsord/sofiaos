@@ -3,8 +3,8 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 function apiFixture(){
  let stored=JSON.stringify({token:'a'.repeat(43),expires_at:'2000-01-01T00:00:00Z',profile:{email:'owner@test.invalid'}}),deleted=0;
  const secure={getItemAsync:async()=>stored,deleteItemAsync:async()=>{deleted++;stored=null;}};
- const exported={};
- vm.runInNewContext(ts.transpileModule(fs.readFileSync(require.resolve('../src/lib/api.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exported,require:name=>name==='expo-secure-store'?secure:name==='@react-native-async-storage/async-storage'?{}:{},URL,process:{env:{}},Date,JSON,Error,Number});
+ const exported={},early=require('./load-ts.cjs')('src/lib/startup-read-ahead.ts');
+ vm.runInNewContext(ts.transpileModule(fs.readFileSync(require.resolve('../src/lib/api.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exported,require:name=>name==='./startup-read-ahead'?early:name==='expo-secure-store'?secure:name==='@react-native-async-storage/async-storage'?{}:{},URL,process:{env:{}},Date,JSON,Error,Number});
  return {exported,deleted:()=>deleted,set:value=>{stored=value;}};
 }
 test('expired local deadline never discards a saved token before server validation',async()=>{const f=apiFixture();assert.equal((await f.exported.readAuth()).token,'a'.repeat(43));assert.equal(f.deleted(),0);await f.exported.forgetAuth();assert.equal(await f.exported.readAuth(),null);});
