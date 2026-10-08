@@ -7,25 +7,24 @@ import {View,Text,StatusBar,ActivityIndicator,AccessibilityInfo,useColorScheme,A
 import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
 import {SofiaApi,readAuth,saveAuth,forgetAuth,readPrefs,savePrefs} from './src/lib/api';
 import type {Auth,Bootstrap,Prefs,Tab,Task,Profile as UserProfile} from './src/lib/types';
+import {fastBootstrap,authWithBootstrap} from './src/lib/fast-bootstrap';
 import {themeAppearance} from './src/lib/theme-schedule';
 import {ThemeContext,light,dark} from './src/lib/theme';
 import {errorText} from './src/lib/chat-model';
 import {silenceVoices} from './src/lib/audio-focus';
 import {Icon,IconName} from './src/components/Icon';
 import {Button,ErrorBanner} from './src/components/UI';
+import {StartupHome} from './src/components/StartupHome';
 import {TabPager} from './src/components/TabPager';
 import {MenuTab} from './src/components/MenuTab';
 import {NotificationProvider} from './src/components/NotificationCenter';
 import {createMenuMotion} from './src/lib/menu-motion';
 import type {TabPagerHandle} from './src/components/TabPager';
 import {useStartupMounts} from './src/lib/startup-mounts';
-import {DeferredScreen,loadAgenda,loadChat,loadNotifications,loadPages,loadProfile,loadWorkspace} from './src/lib/screen-loader';
+import {DeferredScreen,loadAgenda,loadChat,loadHome,loadNotifications,loadPages,loadProfile,loadWorkspace} from './src/lib/screen-loader';
 import {Login} from './src/screens/Login';
-import {Home as HomeScreen} from './src/screens/Home';
 import {APP_VERSION,checkForUpdate} from './src/lib/update';
 
-// Keep screen instances and unchanged screen trees across menu taps and swipes.
-const Home=React.memo(HomeScreen);
 const tabs:{id:Tab;label:string;icon:IconName}[]=[{id:'home',label:'Início',icon:'home'},{id:'chat',label:'Conversa',icon:'chat'},{id:'pages',label:'Páginas',icon:'book'},{id:'agenda',label:'Agenda',icon:'calendar'},{id:'apps',label:'Apps',icon:'grid'},{id:'profile',label:'Perfil',icon:'user'}];
 class AppBoundary extends Component<{children:React.ReactNode},{failed:boolean}>{
  state={failed:false};static getDerivedStateFromError(){return {failed:true};}
@@ -63,7 +62,7 @@ function Shell(){
   finally{checkingUpdate.current=false;}
  },[]);
  useEffect(()=>{const a=Keyboard.addListener('keyboardDidShow',()=>setKeyboard(true)),b=Keyboard.addListener('keyboardDidHide',()=>setKeyboard(false));return()=>{a.remove();b.remove();};},[]);
- useEffect(()=>{let active=true;Promise.all([readAuth(),readPrefs()]).then(([a,p])=>{if(active){setAuth(a);setPrefs(p);}}).catch(e=>{if(active)setError(errorText(e));}).finally(()=>{if(active)setReady(true);});return()=>{active=false;};},[]);
+ useEffect(()=>{let active=true;Promise.all([readAuth(),readPrefs()]).then(([a,p])=>{if(active){setAuth(a);setBootstrap(a?fastBootstrap(a):null);setPrefs(p);}}).catch(e=>{if(active)setError(errorText(e));}).finally(()=>{if(active)setReady(true);});return()=>{active=false;};},[]);
  useEffect(()=>{
   if(!servicesReady)return;
   void checkUpdate(false);
@@ -71,7 +70,7 @@ function Shell(){
   const sub=AppState.addEventListener('change',state=>{if(state==='active')void checkUpdate(false);});
   return()=>{clearInterval(interval);sub.remove();};
  },[servicesReady,checkUpdate]);
- const boot=useCallback(async()=>{if(!auth)return;setBooting(true);try{await api.hydrate();const b=await api.liveBootstrap();setBootstrap(previous=>JSON.stringify(previous)===JSON.stringify(b)?previous:b);setError('');}catch(e){setError(errorText(e));}finally{setBooting(false);}},[api,auth]);
+ const boot=useCallback(async()=>{if(!auth)return;setBooting(true);try{const b=await api.liveBootstrap();setBootstrap(previous=>JSON.stringify(previous)===JSON.stringify(b)?previous:b);const next=authWithBootstrap(auth,b);setAuth(next);if(JSON.stringify(auth.startup)!==JSON.stringify(next.startup))void saveAuth(next).catch(()=>{});setError('');}catch(e){setError(errorText(e));}finally{setBooting(false);}},[api,auth]);
  useEffect(()=>{if(auth)void boot();},[api]);
  useEffect(()=>{if(!auth)return;const sub=AppState.addEventListener('change',state=>{if(state==='active'&&!locked)void boot();else if(state!=='active')void silenceVoices();});return()=>sub.remove();},[auth,locked,boot]);
  // Issue the native, non-animated jump before React updates the selected menu.
@@ -100,7 +99,7 @@ function Shell(){
  // Android back gestures never traverse the main-menu visit history.
  // Inner page/workspace handlers still own their explicit hierarchy.
  useEffect(()=>{const s=BackHandler.addEventListener('hardwareBackPress',()=>(tab==='apps'&&workspaceDepth)||(tab==='pages'&&pagesDepth)?false:!!auth);return()=>s.remove();},[tab,workspaceDepth,pagesDepth,auth]);
- const login=useCallback(async(a:Auth)=>{await saveAuth(a);tabHistory.current=[];setAuth(a);switchTab('home');setError('');},[switchTab]);
+ const login=useCallback(async(a:Auth)=>{await saveAuth(a);tabHistory.current=[];setAuth(a);setBootstrap(fastBootstrap(a));switchTab('home');setError('');},[switchTab]);
  const changePrefs=useCallback(async(p:Prefs)=>{await savePrefs(p);setPrefs(p);},[]);
  const logout=useCallback(async()=>{void silenceVoices();await api.discardCache();let revokeFailed=false;try{await api.logout();}catch{revokeFailed=true;}try{await forgetAuth();}catch{Alert.alert('Armazenamento','Não foi possível apagar a cópia local da sessão. Limpe os dados do aplicativo antes de compartilhar o aparelho.');}tabHistory.current=[];setAuth(null);setBootstrap(null);setLocked(false);if(revokeFailed)Alert.alert('Você saiu deste aparelho','Não foi possível confirmar a revogação no servidor. Use “Encerrar todas as sessões” no site para invalidar o acesso.');},[api]);
  const profile=useCallback((p:UserProfile)=>setBootstrap(prev=>prev?{...prev,profile:p}:prev),[]);
@@ -108,10 +107,10 @@ function Shell(){
  const clearChat=useCallback(()=>setChatEpoch(v=>v+1),[]);
  const notificationBack=useCallback(()=>{void goBack();},[goBack]);
  return <ThemeContext.Provider value={c}><NotificationProvider api={api} enabled={!!auth&&!!bootstrap&&servicesReady} scope={auth?.profile.email||''}><SafeAreaView style={{flex:1,backgroundColor:c.bg}} edges={['top','left','right','bottom']}><StatusBar barStyle={c===dark?'light-content':'dark-content'} backgroundColor={c.bg}/><View style={{flex:1,width:'100%',maxWidth:760,alignSelf:'center',backgroundColor:c.bg}}>
- {!ready?<View style={{flex:1,justifyContent:'center'}}><ActivityIndicator color={c.accent}/></View>:!auth?<Login onLogin={login}/>:!bootstrap?<View style={{flex:1,justifyContent:'center',padding:24,gap:14}}>{booting?<ActivityIndicator color={c.accent}/>:null}<Text style={{fontSize:23,fontWeight:'600',color:c.text}}>Abrindo sua Sofia…</Text>{error?<ErrorBanner text={error}/>:null}<Button title="Tentar novamente" onPress={()=>void boot()} loading={booting}/><Button title="Voltar para o login" secondary onPress={()=>void logout()}/></View>:<><View style={{flex:1}}>
+ {!ready?<StartupHome/>:!auth?<Login onLogin={login}/>:!bootstrap?<View style={{flex:1,justifyContent:'center',padding:24,gap:14}}>{booting?<ActivityIndicator color={c.accent}/>:null}<Text style={{fontSize:23,fontWeight:'600',color:c.text}}>Abrindo sua Sofia…</Text>{error?<ErrorBanner text={error}/>:null}<Button title="Tentar novamente" onPress={()=>void boot()} loading={booting}/><Button title="Voltar para o login" secondary onPress={()=>void logout()}/></View>:<><View style={{flex:1}}>
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?0:1}]} pointerEvents={tab==='notifications'?'none':'auto'} accessibilityElementsHidden={tab==='notifications'} importantForAccessibility={tab==='notifications'?'no-hide-descendants':'auto'}>
   <TabPager motion={menuMotion} ref={pager} activeTab={tab} enabled={!gestureLocked&&!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)&&!(tab==='apps'&&workspaceDepth)} onSelect={navigate}>
-   <Home onDiscussTask={discussTask} onOpenCapsules={openCapsules} onGestureLock={setGestureLocked} api={api} bootstrap={bootstrap} navigate={navigate} onOpenAgenda={openAgenda} active={screenTab==='home'}/>
+   {servicesReady?<DeferredScreen load={loadHome} screenProps={{onDiscussTask:discussTask,onOpenCapsules:openCapsules,onGestureLock:setGestureLocked,api,bootstrap,navigate,onOpenAgenda:openAgenda,active:screenTab==='home'}}/>:<StartupHome profile={bootstrap.profile}/>} 
    {mountedTabs.has('chat')?<DeferredScreen key={'chat-'+chatEpoch} load={loadChat} screenProps={{taskContext,onClearTaskContext:clearTaskContext,api,bootstrap,enterToSend:prefs.enterToSend,autoSendVoice:prefs.autoSendVoice,onLock:setLocked,active:screenTab==='chat',onRefreshBootstrap:boot}}/>:<View style={{flex:1}}/>}
    {mountedTabs.has('pages')?<DeferredScreen key={bootstrap.profile.email} load={loadPages} screenProps={{api,active:screenTab==='pages',storageScope:bootstrap.profile.email,onDepthChange:setPagesDepth}}/>:<View style={{flex:1}}/>}
    {mountedTabs.has('agenda')?<DeferredScreen load={loadAgenda} screenProps={{onGestureLock:setGestureLocked,api,target:agendaTarget,active:screenTab==='agenda'}}/>:<View style={{flex:1}}/>}
