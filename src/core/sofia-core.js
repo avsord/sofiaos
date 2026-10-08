@@ -2,7 +2,7 @@
 const {RoutingService}=require('../services/routing');
 const {Workspace}=require('./workspace');
 const {IntentEngine,DESTRUCTIVE_INTENTS}=require('../services/intent-engine');
-const {AppError,cleanText,rejectSecrets,validId,id,now,normalize}=require('./util');
+const {AppError,cleanText,cleanMessage,rejectSecrets,validId,id,now,normalize}=require('./util');
 const {zoned}=require('../services/scheduler');
 const {SOFIA_INSTRUCTIONS}=require('../config/sofia');
 const {assertAuthorized,derive}=require('./semantic-authority');
@@ -302,7 +302,7 @@ class SofiaCore{
     if(this.closing)throw new AppError('SERVER_CLOSING','O servidor está encerrando. Aguarde reiniciar.',503);
     if(this.busy)throw new AppError('BUSY','Já há uma mensagem em processamento. Aguarde a resposta.',409);
     const turnImages=normalizeTurnImages(input.images);const rawMessage=String(input.message??'');const message=rawMessage.trim()?rawMessage:(turnImages.length?'Veja a imagem que enviei.':'');input={...input,message};
-    cleanText(input.message,'Mensagem',this.config.maxMessageChars);
+    cleanMessage(input.message,'Mensagem');
     // Única barreira local antes da IA: credenciais/segredos explícitos nunca são enviados a modelo algum.
     rejectSecrets(input.message);
     const clientId=validId(input.client_message_id),conversationId=input.conversation_id?validId(input.conversation_id):null,settings=this.store.settings();
