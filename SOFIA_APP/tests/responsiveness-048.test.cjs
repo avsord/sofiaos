@@ -31,7 +31,7 @@ test('server routine notice replaces its derived duplicate and monitors remain v
 test('form template identity is updated without changing persistent template IDs',()=>{const templates=load('src/lib/page-templates.ts').PAGE_TEMPLATES;const f=templates.find(t=>t.id==='playlist_links');assert.equal(f.title,'Formulário');assert.equal(f.icon,'📋');assert.equal(f.blocks[0].data.views[0].label,'Formulário');});
 
 test('native menu hit-testing cannot confuse the containing bar with a tab',()=>{const s=file('plugins/native/SofiaCalendarTouchGuard.kt');assert.ok(s.includes('tag.matches(Regex("sofia-menu-[0-5]"))'));assert.ok(!s.includes('tag.startsWith("sofia-menu-")'));});
-test('acknowledged chat replies enter the next-start snapshot and pre-write reads cannot replace it',()=>{const s=file('src/lib/api.ts');assert.ok(s.includes('this.rememberChatResult(result,data)'));assert.ok(s.includes('generation===this.cacheGeneration'));assert.ok(s.includes('messages:mergeMessages(before.messages,result.messages).slice(-100)'));});
+test('acknowledged chat replies enter the next-start snapshot and pre-write reads cannot replace it',()=>{const s=file('src/lib/api.ts');assert.ok(s.includes('this.rememberChatResult(result,data)'));assert.ok(s.includes('generation===this.cacheGeneration'));assert.ok(s.includes('messages:mergeMessages(before?.messages||[],result.messages).slice(-100)'));});
 
 test('Home keeps monitoring failures local instead of showing a global error',()=>{
  const home=file('src/screens/Home.tsx'),preload=file('src/lib/startup-preload.ts');

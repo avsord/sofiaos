@@ -38,9 +38,9 @@ function makeMobileApi(runtime, deps) {
     rateBuckets.set(key, bucket);
   }
   function profile() { const s = store.settings(); return { name: s.profileName || 'Proprietário', email: ownerAuth.registeredEmail(), role: 'owner' }; }
-  function conversation(id) {
+  function conversation(id, { history = false } = {}) {
     const c = store.conversation(validId(id));
-    if (!['mobile', 'web', 'test'].includes(c.channel) || c.state !== 'active') fail('NOT_FOUND', 'Conversa não disponível neste canal.', 404);
+    if (!['mobile', 'web', 'test'].includes(c.channel) || !(history ? ['active','paused','archived'].includes(c.state) : c.state === 'active')) fail('NOT_FOUND', 'Conversa não disponível neste canal.', 404);
     return c;
   }
   function messages(id, before = Number.MAX_SAFE_INTEGER) {
@@ -122,8 +122,10 @@ function makeMobileApi(runtime, deps) {
       capabilities: { text: true, voice_notes: true, notifications_push: false, multi_user: false, e2ee: false, workspace: true, protected_diary: true } });
     if (p === '/api/mobile/conversations' && m === 'GET') {
       const offset = Math.max(0, Math.min(100000, Number(url.searchParams.get('offset')) || 0));
-      const rows = store.db.prepare(`SELECT * FROM conversations WHERE owner=? AND state='active'
-        AND channel IN ('mobile','web','test') ORDER BY updated_at DESC,rowid DESC LIMIT 51 OFFSET ?`).all(OWNER, Math.trunc(offset));
+      const rows = store.db.prepare(`SELECT c.*,
+        (SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.owner=c.owner AND m.status<>'deleted') AS message_count
+        FROM conversations c WHERE c.owner=? AND c.state IN ('active','paused','archived')
+        AND c.channel IN ('mobile','web','test') ORDER BY (message_count>0) DESC,c.updated_at DESC,c.rowid DESC LIMIT 51 OFFSET ?`).all(OWNER, Math.trunc(offset));
       return send({ items: rows.slice(0, 50), has_more: rows.length > 50, next_offset: offset + 50 });
     }
     if (p === '/api/mobile/conversations' && m === 'POST') {
@@ -133,7 +135,7 @@ function makeMobileApi(runtime, deps) {
     if (p === '/api/mobile/chat-history' && m === 'DELETE') { rate(session, 'delete', 10); return send(store.clearChatHistory()); }
     let match = p.match(/^\/api\/mobile\/conversations\/([\w-]+)$/);
     if (match && m === 'GET') {
-      const c = conversation(match[1]), before = Number(url.searchParams.get('before')) || Number.MAX_SAFE_INTEGER;
+      const c = conversation(match[1], { history: true }), before = Number(url.searchParams.get('before')) || Number.MAX_SAFE_INTEGER;
       return send({ conversation: c, ...messages(c.id, before) });
     }
     if (p === '/api/mobile/messages' && m === 'POST') {
@@ -178,7 +180,7 @@ function makeMobileApi(runtime, deps) {
     }
     match = p.match(/^\/api\/mobile\/messages\/([\w-]+)\/audio$/);
     if (match && m === 'GET') {
-      const row = store.message(validId(match[1])); conversation(row.conversation_id);
+      const row = store.message(validId(match[1])); conversation(row.conversation_id, { history: true });
       const voice = store.voiceMessage(row.id); if (!voice) fail('NOT_FOUND', 'Áudio não encontrado.', 404);
       const bytes = Buffer.from(voice.blob), range = /^bytes=(\d+)-(\d*)$/.exec(String(req.headers.range || ''));
       res.setHeader('Content-Type', voice.mime); res.setHeader('Accept-Ranges', 'bytes');

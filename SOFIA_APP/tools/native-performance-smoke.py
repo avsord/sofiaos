@@ -118,6 +118,13 @@ screenshot('chat-tail-on-entry');tap('Início');wait('Olá, Teste.');time.sleep(
 adb('shell','am','force-stop','com.avsord.sofiaapp');adb('shell','am','start','-W','-n','com.avsord.sofiaapp/.MainActivity');wait('Olá, Teste.')
 cache_logs=adb('logcat','-d','-s','ReactNativeJS:I').decode(errors='replace');assert 'SOFIA_STARTUP_CACHE_READY' in cache_logs,'Encrypted startup snapshot did not restore'
 screenshot('warm-start-from-encrypted-cache');print('PASS 048 native menu dispatch, chat tail and encrypted warm startup',flush=True)
+# 056: actual native reveal evidence; a timeout fallback is a regression, not a successful launch.
+launch_logs=adb('logcat','-d','-s','SofiaLaunch:I').decode(errors='replace')
+assert 'SOFIA_LAUNCH_TIMEOUT' not in launch_logs,'Logo remained until the emergency timeout'
+launch_ms=[int(x) for x in re.findall(r'SOFIA_LAUNCH_REVEALED_MS=(\d+)',launch_logs)]
+assert launch_ms,'Native first-frame reveal was not observed'
+(out/'startup-timing-056.json').write_text(json.dumps({'scope':'native-overlay-install-to-visible-local-screen','samples_ms':launch_ms,'target_ms':1000,'target_met':max(launch_ms)<=1000},indent=2))
+print('056 measured native reveal milliseconds: '+str(launch_ms),flush=True)
 # Actual production screens with synthetic transport: new layout/filter/note flows.
 tap('Perfil');tap('Configurações do aplicativo');tap('Horário');wait('Claro a partir de');wait('Escuro a partir de');screenshot('schedule-settings')
 tap('Início');tap('Apps');tap('Biblioteca');tap('Criar registro')
