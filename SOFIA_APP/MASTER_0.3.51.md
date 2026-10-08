@@ -5,7 +5,7 @@
 ## Escopo desta entrega
 
 1. Áudio pode ser cancelado deslizando para a esquerda durante a gravação, com indicação visual “Solte para cancelar”. Ao cruzar o limite e soltar, o arquivo é apagado e não é enviado.
-2. Removidos o corte visual de caracteres e a parada automática em cinco minutos. O backend aceita textos longos e gravações prolongadas, mantendo apenas limites técnicos amplos de uma única requisição para proteger memória e transporte.
+2. Removidos o corte visual de caracteres, o `maxChars`, a parada automática em cinco minutos e os tetos explícitos de caracteres/duração no backend. Permanecem apenas limites físicos de bytes de uma única requisição para proteger memória e transporte.
 3. Perfil ganha foto por conta neste aparelho: galeria, câmera, remoção e editor nativo com enquadramento quadrado, zoom e reposicionamento antes de salvar. A foto permanece após atualizar o APK.
 4. Agenda e Cápsulas solicitam a permissão de notificações do sistema quando existe um lembrete real e criam canais Android de alta prioridade, com som e vibração. Os avisos aparecem também na central de notificações do celular, mesmo quando a Sofia não está aberta, desde que o Android permita notificações e alarmes.
 
@@ -13,11 +13,11 @@
 
 A gravação continua usando um único canal AAC com bitrate reduzido para permitir mensagens mais longas sem crescimento desnecessário do arquivo. O gesto horizontal só assume o toque quando há movimento claro para a esquerda, evitando disputar com rolagem vertical ou botões. O botão de lixeira continua disponível como alternativa explícita.
 
-Não existe mais temporizador de cinco minutos no compositor. O servidor passa a aceitar até seis horas e 64 MB por requisição como proteção técnica; esses valores não são apresentados como limite de produto. Arquivos extremamente grandes continuam sujeitos a memória, rede, transcrição e limites do provedor.
+Não existe mais temporizador de cinco minutos no compositor nem teto de duração no endpoint móvel. O servidor valida apenas que a duração seja positiva e coerente. O arquivo de uma única mensagem continua sujeito ao orçamento técnico de bytes do transporte; gravações muito longas continuam dependendo de armazenamento, rede, transcrição e limites físicos do provedor.
 
 ## Texto
 
-O campo de mensagem não usa mais `maxLength`. O endpoint móvel aceita até um milhão de caracteres por mensagem e corpo HTTP ampliado. A capacidade real de resposta da IA ainda depende da janela de contexto do provedor; o app não corta silenciosamente o que o usuário digitou.
+O campo de mensagem não usa `maxLength` nem `maxChars`. O endpoint móvel e o núcleo deixam de aplicar teto explícito de caracteres à mensagem; o corpo HTTP possui somente um orçamento técnico em bytes para impedir exaustão de memória. A capacidade real de resposta da IA ainda depende da janela de contexto do provedor; o app não corta silenciosamente o que o usuário digitou.
 
 ## Foto do perfil
 
@@ -73,4 +73,4 @@ Há fallback nativo de 5 segundos apenas para não esconder indefinidamente uma 
 - editor de tarefa contém exclusão explícita com confirmação;
 - áudio continua cancelável por gesto para a esquerda;
 - Agenda e Cápsulas continuam agendando notificações nativas no celular;
-- texto/áudio longos usam apenas limites técnicos amplos de transporte, sem o teto curto anterior.
+- texto não possui teto explícito de caracteres e áudio não possui teto explícito de duração; ambos ficam apenas sujeitos aos limites físicos/técnicos de transporte e processamento.
