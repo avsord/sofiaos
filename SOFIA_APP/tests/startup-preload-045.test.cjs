@@ -29,7 +29,7 @@ test('cold start is not followed by an unconditional second fetch of the same st
 });
 test('secure session yields an immediate conservative bootstrap before server or encrypted cache',()=>{
  const auth={token:'a'.repeat(43),token_type:'Bearer',expires_at:'2030-01-01T00:00:00Z',profile:{name:'Pedro Silva',email:'owner@test.invalid',role:'owner'}};
- const first=fastBootstrap(auth);assert.equal(first.profile.name,'Pedro Silva');assert.equal(first.capabilities.text,true);assert.equal(first.capabilities.workspace,true);assert.equal(first.limits.audio_bytes,10*1024*1024);
+ const first=fastBootstrap(auth);assert.equal(first.profile.name,'Pedro Silva');assert.equal(first.capabilities.text,true);assert.equal(first.capabilities.workspace,true);assert.equal(first.limits.audio_bytes,64*1024*1024);assert.equal(first.limits.audio_seconds,0);assert.equal(first.limits.text_chars,0);
  const live={...first,version:'server-200',limits:{audio_bytes:7,audio_seconds:8,text_chars:9}};
  const stored=authWithBootstrap(auth,live);assert.equal(stored.token,auth.token);assert.equal(fastBootstrap(stored).version,'server-200');assert.deepEqual(fastBootstrap(stored).limits,live.limits);
  const wrong={...stored,startup:{...live,profile:{...live.profile,email:'other@test.invalid'}}};assert.equal(fastBootstrap(wrong).version,'startup');
