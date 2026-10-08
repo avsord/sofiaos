@@ -59,7 +59,7 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
  const [selectedIds,setSelectedIds]=useState(new Set<string>()),[deleting,setDeleting]=useState(false);
  const syncEpoch=useRef(0),syncBusy=useRef(false),latest=useRef({dirty,history,recordingLock,selectedIds,deleting});latest.current={dirty,history,recordingLock,selectedIds,deleting};
  const [clarification,setClarification]=useState<ChatResult['clarification']>(null);
- const mounted=useRef(true),sendLock=useRef(false),voices=useRef(new Set<string>()),currentId=useRef('');
+ const mounted=useRef(true),sendLock=useRef(false),voices=useRef(new Set<string>()),currentId=useRef(cached?.conversation?.id||'');
  const inputActivity=useCallback((v:boolean)=>setDirty(v),[]);
  useEffect(()=>{onLock(sending||recordingLock||deleting);},[sending,recordingLock,deleting,onLock]);
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;onLock(false);void silenceVoices();voices.current.forEach(deleteVoice);};},[onLock]);
@@ -67,10 +67,10 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
  useEffect(()=>{if(!active||!selectedIds.size)return;const s=BackHandler.addEventListener('hardwareBackPress',()=>{if(!deleting)setSelectedIds(new Set());return true;});return()=>s.remove();},[active,selectedIds.size,deleting]);
  async function select(item:Conversation,publish=true){
   if(sendLock.current||latest.current.deleting)return;const epoch=++syncEpoch.current;setLoading(true);setError('');setHistory(false);setSelectedIds(new Set());setClarification(null);followChat();currentId.current=item.id;
-  try{const page=publish&&['web','mobile'].includes(item.channel)?await api.selectChat(item.id):await api.history(item.id);if(!mounted.current||epoch!==syncEpoch.current||currentId.current!==item.id)return;setConversation(item);setMessages(page.messages);setHasMore(page.has_more);}catch(e){if(mounted.current)setError(errorText(e));}finally{if(mounted.current&&epoch===syncEpoch.current)setLoading(false);}
+  try{const page=publish&&['web','mobile'].includes(item.channel)?await api.selectChat(item.id):await api.history(item.id);if(!mounted.current||epoch!==syncEpoch.current||currentId.current!==item.id)return;setConversation(item);setMessages(page.messages);setHasMore(page.has_more);}catch(e){if(mounted.current&&epoch===syncEpoch.current){const saved=api.cached<{messages:Message[];has_more:boolean}>('/conversations/'+item.id);if(saved){setConversation(item);setMessages(saved.messages);setHasMore(saved.has_more);}setError(errorText(e));}}finally{if(mounted.current&&epoch===syncEpoch.current)setLoading(false);}
  }
  async function initialize(){
-  const epoch=++syncEpoch.current;setLoading(!cached);setError('');try{const page=await api.ensureChat();if(!mounted.current||epoch!==syncEpoch.current||!page.conversation)return;
+  const epoch=++syncEpoch.current;setLoading(!api.cached<ChatSnapshot>('/chat-sync/current'));setError('');try{await api.hydrate();const page=await api.ensureChat();if(!mounted.current||epoch!==syncEpoch.current||!page.conversation)return;
    followChat();currentId.current=page.conversation.id;setConversation(page.conversation);setMessages(page.messages);setHasMore(page.has_more);setSelectedIds(new Set());
   }catch(e){if(mounted.current)setError(errorText(e));}finally{if(mounted.current&&epoch===syncEpoch.current)setLoading(false);}
  }
@@ -80,7 +80,7 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
   try{const mode=latest.current,personal=['web','mobile'].includes(conversation.channel),hold=mode.dirty||mode.recordingLock||mode.history||mode.selectedIds.size>0;
    const page=personal?await api.syncChat(hold?id:undefined):await api.history(id);
    if(!mounted.current||epoch!==syncEpoch.current||currentId.current!==id||sendLock.current)return;
-   if('conversation' in page&&!page.conversation){if(!latest.current.dirty){setMessages([]);await initialize();}return;}
+   if('conversation' in page&&!page.conversation){if(!latest.current.dirty){await initialize();}return;}
    if(page.conversation&&page.conversation.id!==id){if(latest.current.dirty||latest.current.recordingLock||latest.current.selectedIds.size)return;++syncEpoch.current;followChat();currentId.current=page.conversation.id;setConversation(page.conversation);setMessages(page.messages);setHasMore(page.has_more);setSelectedIds(new Set());setClarification(null);return;}
    setMessages(prev=>{const next=reconcileMessages(prev,page);return next;});setHasMore(page.has_more);
    if('deleted_ids' in page){const removed=new Set(page.deleted_ids as string[]);setSelectedIds(prev=>{const next=new Set([...prev].filter(key=>!removed.has(key)));return next.size===prev.size?prev:next;});}
@@ -92,7 +92,7 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
  async function older(){if(!conversation||!hasMore||refreshing||deleting)return;const id=conversation.id,epoch=++syncEpoch.current;const before=messages.find(m=>m.sequence)?.sequence;if(!before)return;setRefreshing(true);pauseChat();
   try{const page=await api.history(id,before);if(!mounted.current||currentId.current!==id||syncEpoch.current!==epoch)return;setMessages(prev=>mergeMessages(page.messages,prev));setHasMore(page.has_more);}catch(e){setError(errorText(e));}finally{setRefreshing(false);}}
  async function newChat(){if(dirty||sending)return;followChat();++syncEpoch.current;currentId.current='';setConversation(null);setMessages([]);setHasMore(false);setHistory(false);setSelectedIds(new Set());setClarification(null);setLoading(false);setError('');}
- async function openHistory(){if(dirty||sending)return;setHistory(true);setSelectedConversations(new Set());setQuery('');try{const h=await api.conversations();const all=conversation&&messages.length?[conversation,...h.items]:h.items;setItems([...new Map(all.map(c=>[c.id,c])).values()]);setHistoryMore(h.has_more);}catch(e){setError(errorText(e));}}
+ async function openHistory(){if(dirty||sending)return;setHistory(true);setSelectedConversations(new Set());setQuery('');try{const h=await api.conversations();const all=conversation&&messages.length?[conversation,...h.items]:h.items;setItems([...new Map(all.map(c=>[c.id,c])).values()]);setHistoryMore(h.has_more);}catch(e){const saved=api.cached<{items:Conversation[];has_more:boolean}>('/conversations?offset=0');if(saved){setItems(saved.items);setHistoryMore(saved.has_more);}setError(errorText(e));}}
  async function moreHistory(){try{const h=await api.conversations(items.length);setItems(prev=>[...prev,...h.items]);setHistoryMore(h.has_more);}catch(e){setError(errorText(e));}}
  async function send(message:Message,retry=false){
   if(sendLock.current||deleting)return;++syncEpoch.current;sendLock.current=true;setSending(true);setError('');followChat();

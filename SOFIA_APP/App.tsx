@@ -1,3 +1,4 @@
+import {prepareInitialData} from './src/lib/startup-preparation';
 import {useAfterFirstPaint} from './src/lib/use-after-first-paint';
 import {preloadAgenda} from './src/lib/use-agenda-month';
 import {useCapsuleNotifications} from './src/lib/capsule-notifications';
@@ -45,11 +46,12 @@ function Shell(){
  const c=themeAppearance(prefs,system,themeClock)==='dark'?dark:light;
  const expired=useCallback(()=>{tabHistory.current=[];setAuth(null);setBootstrap(null);setLocked(false);void forgetAuth().catch(()=>{});},[]);
  const api=useMemo(()=>new SofiaApi(auth?.token||'',expired,auth?.profile?.email||'anonymous'),[auth?.token,auth?.profile?.email,expired]);
- const servicesReady=useAfterFirstPaint(!!auth&&!!bootstrap),mountedTabs=useStartupMounts(!!auth&&!!bootstrap,tab);
+ const [prepared,setPrepared]=useState<SofiaApi|null>(null),[preparationError,setPreparationError]=useState(''),[prepareAttempt,setPrepareAttempt]=useState(0);
+ const initialDataReady=prepared===api;
+ const servicesReady=useAfterFirstPaint(!!auth&&!!bootstrap&&initialDataReady),mountedTabs=useStartupMounts(!!auth&&!!bootstrap&&initialDataReady,tab);
+ useEffect(()=>{if(!auth)return;let live=true;setPreparationError('');void prepareInitialData(api,()=>preloadAgenda(api)).then(()=>{if(live){setPrepared(api);console.info('SOFIA_STARTUP_CACHE_READY');}}).catch(e=>{if(live)setPreparationError(errorText(e));});return()=>{live=false;};},[api,prepareAttempt]);
  const launchReady=ready&&(!auth||(!!bootstrap&&servicesReady));
  useEffect(()=>{if(!launchReady)return;return finishLaunchHandoff();},[launchReady,c.bg]);
- useEffect(()=>{if(!auth)return;let live=true;void api.hydrate().then(()=>{if(!live)return;const saved=api.cached<Bootstrap>('/bootstrap');if(saved&&saved.profile?.email?.toLowerCase()===auth.profile.email.toLowerCase()){setBootstrap(saved);console.info('SOFIA_STARTUP_CACHE_READY');}});return()=>{live=false;};},[api,auth?.token]);
- useEffect(()=>{if(servicesReady)void api.preload(()=>preloadAgenda(api));},[api,servicesReady]);
  const checkingUpdate=useRef(false),lastUpdateCheck=useRef(0),lastUpdatePrompt=useRef('');
  const checkUpdate=useCallback(async(manual=false)=>{
   if(checkingUpdate.current)return;
@@ -110,7 +112,7 @@ function Shell(){
  const clearChat=useCallback(()=>setChatEpoch(v=>v+1),[]);
  const notificationBack=useCallback(()=>{void goBack();},[goBack]);
  return <ThemeContext.Provider value={c}><NotificationProvider api={api} enabled={!!auth&&!!bootstrap&&servicesReady} scope={auth?.profile.email||''}><SafeAreaView style={{flex:1,backgroundColor:c.bg}} edges={['top','left','right','bottom']}><StatusBar barStyle={c===dark?'light-content':'dark-content'} backgroundColor={c.bg}/><View style={{flex:1,width:'100%',maxWidth:760,alignSelf:'center',backgroundColor:c.bg}}>
- {!ready?<StartupHome/>:!auth?<Login onLogin={login}/>:!bootstrap?<View style={{flex:1,justifyContent:'center',padding:24,gap:14}}>{booting?<ActivityIndicator color={c.accent}/>:null}<Text style={{fontSize:23,fontWeight:'600',color:c.text}}>Abrindo sua Sofia…</Text>{error?<ErrorBanner text={error}/>:null}<Button title="Tentar novamente" onPress={()=>void boot()} loading={booting}/><Button title="Voltar para o login" secondary onPress={()=>void logout()}/></View>:<><View style={{flex:1}}>
+ {!ready?<StartupHome/>:!auth?<Login onLogin={login}/>:!bootstrap?<View style={{flex:1,justifyContent:'center',padding:24,gap:14}}>{booting?<ActivityIndicator color={c.accent}/>:null}<Text style={{fontSize:23,fontWeight:'600',color:c.text}}>Abrindo sua Sofia…</Text>{error?<ErrorBanner text={error}/>:null}<Button title="Tentar novamente" onPress={()=>void boot()} loading={booting}/><Button title="Voltar para o login" secondary onPress={()=>void logout()}/></View>:!initialDataReady?<View style={{flex:1}}><StartupHome profile={bootstrap.profile}/>{preparationError?<View style={{padding:24,gap:12}}><ErrorBanner text={preparationError}/><Button title="Tentar novamente" onPress={()=>setPrepareAttempt(n=>n+1)}/></View>:null}</View>:<><View style={{flex:1}}>
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?0:1}]} pointerEvents={tab==='notifications'?'none':'auto'} accessibilityElementsHidden={tab==='notifications'} importantForAccessibility={tab==='notifications'?'no-hide-descendants':'auto'}>
   <TabPager motion={menuMotion} ref={pager} activeTab={tab} enabled={!gestureLocked&&!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)&&!(tab==='apps'&&workspaceDepth)} onSelect={navigate}>
    {servicesReady?<DeferredScreen load={loadHome} screenProps={{onDiscussTask:discussTask,onOpenCapsules:openCapsules,onGestureLock:setGestureLocked,api,bootstrap,navigate,onOpenAgenda:openAgenda,active:screenTab==='home'}}/>:<StartupHome profile={bootstrap.profile}/>} 

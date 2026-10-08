@@ -38,6 +38,7 @@ export class SofiaApi {
   private warming=false;
   private readonly snapshots:StartupSnapshot;
   private hydration:Promise<void>|null=null;
+  private chatOpening:Promise<ChatSnapshot>|null=null;
   private cacheGeneration=0;
   private rememberChatResult(result:ChatResult,input:object){const before=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');const id=(input as {conversation_id?:string}).conversation_id;if(before?.conversation?.id===id&&before)this.snapshots.remember('/chat-sync/current',{...before,messages:mergeMessages(before.messages,result.messages).slice(-100)});}
   async hydrate(){if(!this.hydration)this.hydration=this.snapshots.hydrate().then(()=>{for(const [key,value] of this.snapshots.all())this.startupReads.seed(key,value);});return this.hydration;}
@@ -50,7 +51,7 @@ export class SofiaApi {
     // On a cold cache preloadStartup fetches them once, so do not fetch twice.
     const paths=['/home','/tasks','/md/dashboard','/workspace/catalog',...['user_page','capsule','routine','monitor'].map(kind=>'/workspace/entities?limit=100&kind='+kind+'&q=&offset=0')];
     const refresh=paths.filter(path=>this.snapshots.peek(path)!==undefined);
-    this.warming=true;try{await preloadStartup(this,agenda);}finally{this.warming=false;}
+    this.warming=true;void this.conversations().catch(()=>{});try{await preloadStartup(this,agenda);}finally{this.warming=false;}
     let index=0;await Promise.all(Array.from({length:2},async()=>{while(index<refresh.length){const path=refresh[index++];try{const value=await this.fetchRequest(path,undefined,'GET',20000);this.startupReads.seed(path,value);}catch{}}}));
     if(refresh.length)systemChanged(this);
   }
@@ -72,7 +73,7 @@ export class SofiaApi {
       if (!response.ok && path === '/auth/login' && (response.status === 404 || response.status === 405 || data.code === 'AUTH_REQUIRED')) throw new ApiError('O servidor ainda precisa receber a API móvel da Sofia. Não é um erro da sua senha.', 'MOBILE_API_NOT_PUBLISHED', response.status);
       if (!response.ok) { if (response.status === 401 && path !== '/auth/login') {void this.discardCache();this.onExpired();} throw new ApiError(data.error || 'Não foi possível concluir.', data.code || 'HTTP_ERROR', response.status, data); }
       if(method==='GET'&&generation===this.cacheGeneration)this.snapshots.remember(path,data);
-      if(generation===this.cacheGeneration&&path.startsWith('/chat-sync')&&data.conversation&&Array.isArray(data.messages))this.snapshots.remember('/chat-sync/current',{...data,messages:data.messages.slice(-100)});
+      if(generation===this.cacheGeneration&&path.startsWith('/chat-sync')&&data.conversation&&Array.isArray(data.messages)){this.snapshots.remember('/chat-sync/current',{...data,messages:data.messages.slice(-100)});this.snapshots.remember('/conversations/'+data.conversation.id,{...data,messages:data.messages.slice(-100)});}
       return data as T;
     } catch (error) {
       if (error instanceof ApiError) throw error;
@@ -86,18 +87,18 @@ export class SofiaApi {
   logoutAll() { return this.request<{ok: boolean}>('/auth/logout-all', {}); }
   changePassword(currentPassword: string,newPassword: string,confirmPassword: string) { return this.request<{ok: boolean}>('/auth/change-password', {currentPassword,newPassword,confirmPassword}); }
   syncChat(id?:string) { return this.request<ChatSnapshot>('/chat-sync'+(id?'?conversation_id='+encodeURIComponent(id):'')); }
-  ensureChat() { return this.request<ChatSnapshot>('/chat-sync/current',{}); }
+  ensureChat() { if(!this.chatOpening){const opening=this.request<ChatSnapshot>('/chat-sync/current',{});this.chatOpening=opening;void opening.finally(()=>{if(this.chatOpening===opening)this.chatOpening=null;}).catch(()=>{});}return this.chatOpening; }
   selectChat(id:string) { return this.request<ChatSnapshot>('/chat-sync/select',{conversation_id:id}); }
-  deleteChatMessages(id:string,ids:string[]) { this.snapshots.forgetData();return this.request<{deleted_ids:string[];failed:{id:string;error:string}[]}>('/chat-sync/delete',{conversation_id:id,ids}); }
+  async deleteChatMessages(id:string,ids:string[]) {const result=await this.request<{deleted_ids:string[];failed:{id:string;error:string}[]}>('/chat-sync/delete',{conversation_id:id,ids});this.cacheGeneration++;this.startupReads.invalidate();const before=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');if(before?.conversation?.id===id&&before){const removed=new Set(result.deleted_ids);this.snapshots.remember('/chat-sync/current',{...before,messages:before.messages.filter(m=>!removed.has(m.id)),deleted_ids:[...new Set([...before.deleted_ids,...result.deleted_ids])]});}this.snapshots.forget('/conversations/'+id);await this.snapshots.flush();return result;}
   conversations(offset = 0) { return this.request<{items: Conversation[]; has_more: boolean; next_offset: number}>('/conversations?offset=' + offset); }
   capsuleHistory(from:string,to:string){return this.request<{items:Entity[]}>('/md/capsules/doses?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to));}
   capsuleTake(capsule_id:string,day:string,time:string,taken=true){return this.request<{ok:boolean;item:Entity|null}>('/md/capsules/doses',{capsule_id,day,time,taken},'POST');}
   dashboardWidgets(){return this.request<{widgets:string[]}>('/md/dashboard');}
   async saveDashboardWidgets(widgets:string[]){if(!await this.feature('dashboard_widgets'))throw new Error('A sincronização dos widgets aguarda a atualização do servidor. A organização anterior foi mantida.');return this.request<{widgets:string[]}>('/md/dashboard',{widgets},'PATCH');}
-  async deleteConversations(ids:string[]) { if(!await this.feature('conversation_delete'))throw new Error('A exclusão de conversas aguarda a atualização do servidor. Nenhuma conversa foi apagada.');return this.request<{ok:boolean}>('/md/conversations',{ids},'DELETE'); }
+  async deleteConversations(ids:string[]) { if(!await this.feature('conversation_delete'))throw new Error('A exclusão de conversas aguarda a atualização do servidor. Nenhuma conversa foi apagada.');const result=await this.request<{ok:boolean}>('/md/conversations',{ids},'DELETE');this.cacheGeneration++;this.startupReads.invalidate();this.snapshots.forget('/conversations?offset=0');for(const id of ids)this.snapshots.forget('/conversations/'+id);const current=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');if(current?.conversation&&ids.includes(current.conversation.id))this.snapshots.forget('/chat-sync/current');await this.snapshots.flush();return result; }
   newConversation(title = 'Conversa com a Sofia') { return this.request<{conversation: Conversation}>('/conversations', {title}); }
-  deleteMessage(id: string) { return this.request<{ok:boolean;id:string;conversation_id:string}>('/messages/' + encodeURIComponent(id), {}, 'DELETE'); }
-  clearChatHistory() { this.snapshots.forgetData();return this.request<{ok:boolean;conversations:number;messages:number}>('/chat-history', {}, 'DELETE'); }
+  async deleteMessage(id: string) {const result=await this.request<{ok:boolean;id:string;conversation_id:string}>('/messages/' + encodeURIComponent(id), {}, 'DELETE');this.cacheGeneration++;this.startupReads.invalidate();this.snapshots.forget('/conversations/'+result.conversation_id);const current=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');if(current?.conversation?.id===result.conversation_id&&current)this.snapshots.remember('/chat-sync/current',{...current,messages:current.messages.filter(m=>m.id!==id),deleted_ids:[...current.deleted_ids,id]});await this.snapshots.flush();return result;}
+  async clearChatHistory() {const result=await this.request<{ok:boolean;conversations:number;messages:number}>('/chat-history', {}, 'DELETE');this.cacheGeneration++;this.startupReads.invalidate();this.snapshots.forgetChat();await this.snapshots.flush();return result;}
   history(id: string, before?: number) { return this.request<MessagePage>(`/conversations/${encodeURIComponent(id)}${before ? '?before=' + before : ''}`); }
   async chat(data: object) { const result=await this.request<ChatResult>('/messages', data, 'POST', 180000);this.rememberChatResult(result,data);systemChanged(this);return result; }
   async audio(data: object) { const result=await this.request<ChatResult>('/messages/audio', data, 'POST', 180000);this.rememberChatResult(result,data);systemChanged(this);return result; }

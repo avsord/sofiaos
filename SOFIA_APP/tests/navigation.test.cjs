@@ -36,16 +36,16 @@ test('gestures use the native horizontal pager and do not steal vertical scrolls
   assert.ok(pager.includes('velocity !== undefined && Math.abs(velocity) < 0.01'));
   assert.ok(source.includes("enabled={!gestureLocked&&!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)&&!(tab==='apps'&&workspaceDepth)}"));
 });
-test('pager keeps six fixed slots while heavy screen trees mount progressively after the launch shell',()=>{
+test('pager keeps six fixed slots and mounts its screen trees behind data-ready launch handoff',()=>{
   assert.deepEqual(Array.from(TAB_ORDER),['home','chat','pages','agenda','apps','profile']);
   const body=source.slice(source.indexOf('<TabPager'),source.indexOf('</TabPager>'));
   const markers=['load={loadHome}','load={loadChat}','load={loadPages}','load={loadAgenda}','load={loadWorkspace}','load={loadProfile}'];
   let previous=-1;for(const marker of markers){const index=body.indexOf(marker);assert.ok(index>previous,marker);previous=index;}
   for(const tab of ['chat','pages','agenda','apps','profile'])assert.ok(body.includes("mountedTabs.has('"+tab+"')"));
   const startup=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
-  assert.ok(startup.includes("new Set<Tab>(['home'])"));
-  for(const tab of ['chat','agenda','pages','profile','apps'])assert.ok(startup.includes("add(current,['"+tab+"'])"),tab);
-  assert.ok(startup.includes("return MENU_TABS.includes(active)?add(mounted,[active]):mounted"));
+  assert.ok(startup.includes("enabled?MENU_TABS"));
+  assert.ok(!startup.includes('setTimeout'));
+  assert.ok(source.includes('useStartupMounts(!!auth&&!!bootstrap&&initialDataReady,tab)'));
   assert.ok(pager.includes('removeClippedSubviews={false}'));assert.ok(!source.includes('setBootstrap(null);setTab('));
 });
 test('screen instances stay cached after lazy loading, preserving drafts and scroll positions',()=>{
@@ -69,7 +69,8 @@ test('secure session opens a lightweight Home before cache decryption or live bo
 test('automatic update checks and notifications wait until after the first native paint',()=>{
   assert.ok(source.includes("if(!servicesReady)return;"));
   assert.ok(source.includes("enabled={!!auth&&!!bootstrap&&servicesReady}"));
-  assert.ok(source.includes("if(servicesReady)void api.preload(()=>preloadAgenda(api))"));
+  assert.ok(source.includes('prepareInitialData(api,()=>preloadAgenda(api))'));
+  assert.ok(source.includes('useAfterFirstPaint(!!auth&&!!bootstrap&&initialDataReady)'));
 });
 test('notification overlay cannot capture touches or accessibility focus while hidden',()=>{
   assert.ok(source.includes("pointerEvents={tab==='notifications'?'auto':'none'}"));
