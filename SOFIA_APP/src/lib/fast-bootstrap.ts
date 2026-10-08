@@ -3,7 +3,7 @@ import type {Auth,Bootstrap} from './types';
 const fallback=(auth:Auth):Bootstrap=>({
  version:'startup',profile:auth.profile,expires_at:auth.expires_at,
  ai:{ready:true,reason:null},
- limits:{audio_bytes:10*1024*1024,audio_seconds:600,text_chars:20000},
+ limits:{audio_bytes:64*1024*1024,audio_seconds:6*60*60,text_chars:1000000},
  capabilities:{text:true,voice_notes:true,notifications_push:false,multi_user:false,e2ee:false,workspace:true}
 });
 export function fastBootstrap(auth:Auth):Bootstrap{
