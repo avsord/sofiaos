@@ -79,3 +79,6 @@ Há fallback nativo de 5 segundos apenas para não esconder indefinidamente uma 
 ## Gate de backend da entrega
 
 A publicação Android desta versão deve validar o backend já implantado no Railway antes de liberar o APK. Mudanças apenas no aplicativo não podem mascarar uma API móvel antiga: texto sem teto explícito de caracteres, áudio sem teto explícito de duração, sessão persistente, prioridades da Agenda e contexto de tarefas precisam estar ativos no servidor utilizado pelo APK.
+
+
+O endpoint público de saúde do servidor expõe explicitamente os capabilities usados pelo gate Android (`task_description_format`, `selected_task_context`, `agenda_priority`, `persistent_sessions`, `unrestricted_chat_text` e `unrestricted_audio_duration`), evitando liberar um APK contra backend incompatível.
