@@ -3,6 +3,10 @@ export type SnapshotStorage={read:(scope:string)=>Promise<string|null>;write:(sc
 type Entry={at:number;value:unknown};
 const MAX_AGE=14*86400000,MAX_BYTES=4*1024*1024;
 export const chatRead=(path:string)=>path==='/chat-sync/current'||path==='/conversations?offset=0'||/^\/conversations\/[\w-]+$/.test(path);
+// Keep the next launch independent of recently opened history/detail pages.
+export const startupPriority=(path:string)=>path==='/chat-sync/current'?0:
+ ['/tasks','/home','/workspace/catalog','/md/dashboard','/agenda'].includes(path)?1:
+ /^\/agenda\?month=\d{4}-\d{2}$/.test(path)?2:3;
 const fresh=(path:string,at:number,now:number)=>at<=now+60000&&(chatRead(path)||now-at<MAX_AGE);
 export function cacheableRead(path:string){
  if(chatRead(path))return true;
@@ -28,20 +32,53 @@ export class StartupSnapshot {
    if(path==='/conversations?offset=0'&&Array.isArray(prior.items)&&prior.items.length&&Array.isArray(latest.items)&&!latest.items.length)return;
   }
   try{const text=JSON.stringify(value);if(text.length>1024*1024)return;const entry:Entry={at:this.now(),value:JSON.parse(text)};this.entries.set(path,entry);this.encoded.set(entry,'{"at":'+JSON.stringify(entry.at)+',"value":'+text+'}');this.schedule();}catch{}}
+ /** Reconcile only a deletion already acknowledged by the server. A failed
+  * request must never erase unrelated launch data or retained chat history. */
+ deleteRecord(domain:'task'|'entity',id:string){
+  if(this.closed||!id)return;
+  this.revision++;
+  for(const [path,entry] of this.entries){
+   if(chatRead(path))continue;
+   const value=entry.value as Record<string,unknown>|null;
+   if(!value||typeof value!=='object')continue;
+   let next=value;
+   const prune=(field:string)=>{
+    const rows=value[field];if(!Array.isArray(rows)||!rows.some(row=>row?.id===id))return;
+    next={...next,[field]:rows.filter(row=>row?.id!==id)};
+   };
+   if(domain==='task'){
+    if(path==='/tasks')prune('items');
+    if(path==='/home'){prune('tasks');prune('today_tasks');}
+   }else{
+    if(path==='/agenda'||path.startsWith('/agenda?month='))prune('items');
+    if(path.startsWith('/workspace/entities?')){
+     const rows=value.items;
+     // A page deletion can change descendant hierarchy. Invalidate only that
+     // listing rather than inventing a cascade or discarding Agenda and Tasks.
+     if(Array.isArray(rows)&&rows.some(row=>row?.id===id&&row.kind==='user_page')){this.entries.delete(path);continue;}
+     prune('items');
+    }
+   }
+   // Keep the original read timestamp: this is a local reconciliation, not a
+   // claim that all remaining rows were freshly fetched from the server.
+   if(next!==value)this.entries.set(path,{at:entry.at,value:next});
+  }
+  this.schedule();
+ }
  forgetData(){if(this.closed)return;this.revision++;for(const key of this.entries.keys())if(key!=='/bootstrap'&&!chatRead(key))this.entries.delete(key);this.schedule();}
  forgetChat(){if(this.closed)return;this.revision++;for(const key of this.entries.keys())if(chatRead(key))this.entries.delete(key);this.schedule();}
  forget(path:string){if(this.closed)return;this.revision++;this.entries.delete(path);this.schedule();}
  private schedule(){if(this.timer)clearTimeout(this.timer);this.timer=setTimeout(()=>{this.timer=undefined;void this.flush();},450);}
  async flush(){
   if(this.closed)return;
-  const entries=[...this.entries].sort((a,b)=>Number(b[0]==='/chat-sync/current')-Number(a[0]==='/chat-sync/current')||b[1].at-a[1].at).slice(0,32);
+  const entries=[...this.entries].sort((a,b)=>startupPriority(a[0])-startupPriority(b[0])||b[1].at-a[1].at).slice(0,32);
   const prefix='{"schema":1,"entries":[',suffix=']}',parts:string[]=[];
   let size=prefix.length+suffix.length;
   for(const [path,entry] of entries){
    let encoded=this.exposed.has(entry)?undefined:this.encoded.get(entry);
    if(encoded===undefined){encoded=JSON.stringify(entry);if(!this.exposed.has(entry))this.encoded.set(entry,encoded);}
    const part='['+JSON.stringify(path)+','+encoded+']',extra=part.length+(parts.length?1:0);
-   // Same priority, 32-entry limit and character budget as schema 1. Do not
+   // Same schema, 32-entry limit and character budget; launch reads are pinned ahead of secondary entries. Do not
    // repeatedly serialize all the old records while trimming the tail.
    if(parts.length&&size+extra>MAX_BYTES)break;
    parts.push(part);size+=extra;

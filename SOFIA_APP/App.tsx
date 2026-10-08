@@ -3,6 +3,7 @@ import {prepareLocalLaunch} from './src/lib/local-launch';
 import type {LocalLaunch} from './src/lib/local-launch';
 import {prepareInitialData} from './src/lib/startup-preparation';
 import {useAfterFirstPaint} from './src/lib/use-after-first-paint';
+import {useLaunchVisible} from './src/lib/use-launch-visible';
 import {preloadAgenda} from './src/lib/use-agenda-month';
 import React,{Component,ErrorInfo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {View,Text,StatusBar,ActivityIndicator,AccessibilityInfo,useColorScheme,AppState,Alert,Keyboard,BackHandler,Linking,StyleSheet} from 'react-native';
@@ -49,7 +50,9 @@ function Shell({startup}:{startup:LocalLaunch}){
  const api=useMemo(()=>new SofiaApi(auth?.token||'',expired,auth?.profile?.email||'anonymous',auth?.token===startup.auth?.token?startup.snapshot||undefined:undefined).deferNetworkUntilPaint(),[auth?.token,auth?.profile?.email,expired]);
  const [prepared,setPrepared]=useState<SofiaApi|null>(()=>startup.auth&&startup.snapshot?api:null),[preparationError,setPreparationError]=useState(''),[prepareAttempt,setPrepareAttempt]=useState(0);
  const initialDataReady=prepared===api;
- const painted=useAfterFirstPaint(ready),servicesReady=painted&&!!auth&&!!bootstrap&&initialDataReady,mountedTabs=useStartupMounts(servicesReady,tab);
+ // Layout releases essential network reads; only the completed visual handoff
+ // releases hidden screens, notification inventory and optional prefetch.
+ const painted=useAfterFirstPaint(ready),visible=useLaunchVisible(ready),servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady,mountedTabs=useStartupMounts(servicesReady,tab);
  useEffect(()=>{if(!auth||initialDataReady)return;let live=true;setPreparationError('');void prepareInitialData(api,()=>preloadAgenda(api)).then(()=>{if(live){setPrepared(api);console.info('SOFIA_STARTUP_CACHE_READY');}}).catch(e=>{if(live)setPreparationError(errorText(e));});return()=>{live=false;};},[api,prepareAttempt]);
  useEffect(()=>{if(painted)api.releaseNetwork();},[painted,api]);
  const launchReady=ready&&(!auth||(!!bootstrap&&servicesReady));
@@ -127,7 +130,7 @@ function Shell({startup}:{startup:LocalLaunch}){
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?1:0,backgroundColor:c.bg}]} pointerEvents={tab==='notifications'?'auto':'none'} accessibilityElementsHidden={tab!=='notifications'} importantForAccessibility={tab==='notifications'?'auto':'no-hide-descendants'}>{tab==='notifications'?<DeferredScreen load={loadNotifications} screenProps={{api,onBack:notificationBack}}/>:null}</View>
  </View>
  {!keyboard?<View nativeID="sofia-menu-bar" style={{flexDirection:'row',backgroundColor:c.surface,borderTopWidth:1,borderColor:c.line,paddingHorizontal:8,paddingTop:7,paddingBottom:4}}>{tabs.map(item=><MenuTab locked={locked} motion={menuMotion} key={item.id} item={item} selected={tab===item.id} onSelect={navigate}/>)}</View>:null}</>}
- {painted?<DeferredScreen load={loadBackgroundServices} screenProps={{api,scope:auth?.profile.email||'',enabled:!auth?false:servicesReady?true:null,onCapsules:openCapsules,onAgenda:openAgenda}}/>:null}</View></SafeAreaView></NotificationProvider></ThemeContext.Provider>;
+ {visible?<DeferredScreen load={loadBackgroundServices} screenProps={{api,scope:auth?.profile.email||'',enabled:!auth?false:servicesReady?true:null,onCapsules:openCapsules,onAgenda:openAgenda}}/>:null}</View></SafeAreaView></NotificationProvider></ThemeContext.Provider>;
 }
 function LocalLaunchGate(){
  const [startup,setStartup]=useState<LocalLaunch|null>(null),[error,setError]=useState(''),[attempt,setAttempt]=useState(0);

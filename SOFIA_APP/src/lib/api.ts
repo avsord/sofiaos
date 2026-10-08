@@ -78,7 +78,17 @@ export class SofiaApi {
   constructor(private token = '', private onExpired: () => void = () => {},scope='anonymous',restored?:StartupSnapshot) {this.md=new LegacyMdAdapter(this.request.bind(this),AsyncStorage,scope);this.snapshots=restored||startupSnapshotFor(scope);if(restored){for(const [key,value] of restored.all())this.startupReads.seed(key,value);this.hydration=Promise.resolve();}}
   get mdLocalOnly(){return this.md.localOnly;}
   private async request<T>(path: string, body?: unknown, method = body === undefined ? 'GET' : 'POST', timeout = 20000): Promise<T> {
-    if(method!=='GET'){if(!path.startsWith('/chat-sync/current')&&!path.startsWith('/chat-sync/select')){this.cacheGeneration++;this.startupReads.invalidate();if(method==='DELETE'||path==='/chat-sync/delete'||path==='/chat-history')this.snapshots.forgetData();}return this.fetchRequest<T>(path,body,method,timeout);}
+    if(method!=='GET'){
+      if(!path.startsWith('/chat-sync/current')&&!path.startsWith('/chat-sync/select')){this.cacheGeneration++;this.startupReads.invalidate();}
+      const result=await this.fetchRequest<T>(path,body,method,timeout);
+      if(method==='DELETE'){
+        // Fence reads begun during the write too. Failed deletes never get here.
+        this.cacheGeneration++;this.startupReads.invalidate();
+        const task=/^\/tasks\/([^/]+)$/.exec(path),entity=/^\/workspace\/entities\/([^/]+)$/.exec(path);
+        if(task||entity){this.snapshots.deleteRecord(task?'task':'entity',decodeURIComponent((task||entity)![1]));await this.snapshots.flush();}
+      }
+      return result;
+    }
     const read=()=>this.fetchRequest<T>(path,body,method,timeout);
     return this.warming&&path!=='/bootstrap' ? this.startupReads.prime(path,read) : this.startupReads.read(path,read);
   }
