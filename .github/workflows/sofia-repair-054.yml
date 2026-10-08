@@ -30,7 +30,7 @@ jobs:
         shell: bash
         run: |
           python3 - <<'PY'
-          import hashlib,json,shutil
+          import hashlib,json
           from pathlib import Path
           root=Path('source').resolve()
           digest=lambda text:hashlib.sha256(text.encode()).hexdigest()
@@ -44,7 +44,10 @@ jobs:
             assert digest(text)==item['after'], 'Result mismatch: '+item['path']
             path.parent.mkdir(parents=True,exist_ok=True)
             path.write_text(text)
-          shutil.copyfile('repair/tools/repair054.test.cjs',root/'SOFIA_APP/tests/profile-history-startup-054.test.cjs')
+          tests=Path('repair/tools/repair054.test.cjs').read_text()
+          assert tests.count('{default:storage}')==1
+          tests=tests.replace('{default:storage}','{__esModule:true,default:storage}')
+          (root/'SOFIA_APP/tests/profile-history-startup-054.test.cjs').write_text(tests)
           PY
           git -C source diff --check
           test -z "$(git -C source diff --name-only -- src tools package.json package-lock.json)"
