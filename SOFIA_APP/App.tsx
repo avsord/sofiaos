@@ -24,6 +24,7 @@ import {useStartupMounts} from './src/lib/startup-mounts';
 import {DeferredScreen,loadAgenda,loadChat,loadHome,loadNotifications,loadPages,loadProfile,loadWorkspace} from './src/lib/screen-loader';
 import {Login} from './src/screens/Login';
 import {APP_VERSION,checkForUpdate} from './src/lib/update';
+import {finishLaunchHandoff} from './src/lib/launch-handoff';
 
 const tabs:{id:Tab;label:string;icon:IconName}[]=[{id:'home',label:'Início',icon:'home'},{id:'chat',label:'Conversa',icon:'chat'},{id:'pages',label:'Páginas',icon:'book'},{id:'agenda',label:'Agenda',icon:'calendar'},{id:'apps',label:'Apps',icon:'grid'},{id:'profile',label:'Perfil',icon:'user'}];
 class AppBoundary extends Component<{children:React.ReactNode},{failed:boolean}>{
@@ -45,6 +46,8 @@ function Shell(){
  const expired=useCallback(()=>{tabHistory.current=[];setAuth(null);setBootstrap(null);setLocked(false);void forgetAuth().catch(()=>{});},[]);
  const api=useMemo(()=>new SofiaApi(auth?.token||'',expired,auth?.profile?.email||'anonymous'),[auth?.token,auth?.profile?.email,expired]);
  const servicesReady=useAfterFirstPaint(!!auth&&!!bootstrap),mountedTabs=useStartupMounts(!!auth&&!!bootstrap,tab);
+ const launchReady=ready&&(!auth||(!!bootstrap&&servicesReady));
+ useEffect(()=>{if(!launchReady)return;return finishLaunchHandoff();},[launchReady,c.bg]);
  useEffect(()=>{if(!auth)return;let live=true;void api.hydrate().then(()=>{if(!live)return;const saved=api.cached<Bootstrap>('/bootstrap');if(saved&&saved.profile?.email?.toLowerCase()===auth.profile.email.toLowerCase()){setBootstrap(saved);console.info('SOFIA_STARTUP_CACHE_READY');}});return()=>{live=false;};},[api,auth?.token]);
  useEffect(()=>{if(servicesReady)void api.preload(()=>preloadAgenda(api));},[api,servicesReady]);
  const checkingUpdate=useRef(false),lastUpdateCheck=useRef(0),lastUpdatePrompt=useRef('');
