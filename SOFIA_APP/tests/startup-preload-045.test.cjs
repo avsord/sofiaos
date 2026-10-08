@@ -1,7 +1,8 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
-const exports_={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(require.resolve('../src/lib/startup-preload.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exports_,Date,Map,Promise});
-const {StartupReads,preloadStartup}=exports_;
+function compile(file){const out={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(require.resolve(file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:out,Date,Map,Promise});return out;}
+const {StartupReads,preloadStartup}=compile('../src/lib/startup-preload.ts');
+const {fastBootstrap,authWithBootstrap}=compile('../src/lib/fast-bootstrap.ts');
 test('startup read is shared, consumed once and invalidated on writes',async()=>{
  const cache=new StartupReads();let calls=0;const get=async()=>++calls;
  await cache.prime('tasks',get);assert.equal(await cache.read('tasks',get),1);assert.equal(calls,1);
@@ -25,4 +26,11 @@ test('cold start is not followed by an unconditional second fetch of the same st
  assert.ok(api.includes("const refresh=paths.filter(path=>this.snapshots.peek(path)!==undefined)"));
  assert.ok(api.includes("if(refresh.length)systemChanged(this)"));
  assert.ok(!api.includes("Array.from({length:3}"));
+});
+test('secure session yields an immediate conservative bootstrap before server or encrypted cache',()=>{
+ const auth={token:'a'.repeat(43),token_type:'Bearer',expires_at:'2030-01-01T00:00:00Z',profile:{name:'Pedro Silva',email:'owner@test.invalid',role:'owner'}};
+ const first=fastBootstrap(auth);assert.equal(first.profile.name,'Pedro Silva');assert.equal(first.capabilities.text,true);assert.equal(first.capabilities.workspace,true);assert.equal(first.limits.audio_bytes,10*1024*1024);
+ const live={...first,version:'server-200',limits:{audio_bytes:7,audio_seconds:8,text_chars:9}};
+ const stored=authWithBootstrap(auth,live);assert.equal(stored.token,auth.token);assert.equal(fastBootstrap(stored).version,'server-200');assert.deepEqual(fastBootstrap(stored).limits,live.limits);
+ const wrong={...stored,startup:{...live,profile:{...live.profile,email:'other@test.invalid'}}};assert.equal(fastBootstrap(wrong).version,'startup');
 });
