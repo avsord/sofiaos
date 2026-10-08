@@ -1,0 +1,97 @@
+name: Sofia 057 local-first startup preflight
+on:
+  push:
+    branches: [repair/sofia-local-launch-057]
+    paths: ['.github/repairs/057*', '.github/workflows/sofia-local-launch-057-preflight.yml']
+permissions:
+  contents: write
+concurrency:
+  group: sofia-local-launch-057-preflight
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+      EXPO_PUBLIC_API_URL: https://sofiaos.up.railway.app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            SOFIA_APP/package-lock.json
+      - name: Verify and apply the exact account-preserving startup change
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/repair/sofia-local-launch-057
+          mkdir -p /tmp/sofia-057-results
+          python3 - <<'PY'
+          import pathlib,base64,gzip,hashlib,json,subprocess
+          def blob(text):
+            b=text.encode(); return hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
+          raw=gzip.decompress(base64.b64decode(pathlib.Path('.github/repairs/057-local-launch.b64').read_text(),validate=True))
+          assert hashlib.sha256(raw).hexdigest()=='023685daac826d134dc06e1a29e829bdb82b0d3195a273420bda2a26eb6a3a1f', 'Source transport checksum mismatch'
+          rows=json.loads(raw)
+          for row in rows:
+            p=pathlib.Path(row['path'])
+            assert p.as_posix().startswith('SOFIA_APP/') and '..' not in p.parts
+            before=p.read_text() if p.exists() else ''
+            assert (blob(before) if p.exists() else None)==row['base'], 'Baseline changed: '+str(p)
+            after=before
+            for start,end,text in reversed(row['edits']):
+              assert 0<=start<=end<=len(before)
+              after=after[:start]+text+after[end:]
+            assert blob(after)==row['sha'], 'Source checksum mismatch: '+str(p)
+            p.parent.mkdir(parents=True,exist_ok=True);p.write_text(after)
+          subprocess.run(['git','add','--',*[r['path'] for r in rows]],check=True)
+          pathlib.Path('/tmp/sofia-057-results/validated-files.json').write_text(json.dumps([{'path':r['path'],'mode':'100644','type':'blob','sha':r['sha']} for r in rows],indent=2)+'\n')
+          print('Applied',len(rows),'verified app-only files. Backend and user storage unchanged.')
+          PY
+          git diff --cached --check
+      - name: Install the locked SDK and validate all application behavior
+        working-directory: SOFIA_APP
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run check | tee /tmp/sofia-057-results/typecheck.txt
+          npm test | tee /tmp/sofia-057-results/app-tests.txt
+      - name: Validate isolated backend and every native delivery contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm test | tee /tmp/sofia-057-results/backend-tests.txt
+          python3 SOFIA_APP/tools/native-delivery-test.py | tee /tmp/sofia-057-results/native-contracts.txt
+          node --test SOFIA_APP/tools/delivery.test.cjs
+      - name: Save validated source on work branch only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin "$GITHUB_REF" | cut -f1)" = "$GITHUB_SHA"
+          python3 - <<'PY'
+          import json,pathlib,os
+          result={'validated':True,'base':'cc667e6a2fbdb475fc0b62bc555ea36a404f4d93','run_id':os.environ['GITHUB_RUN_ID'],'files':json.loads(pathlib.Path('/tmp/sofia-057-results/validated-files.json').read_text()),'native_emulator_verified':False}
+          pathlib.Path('.github/repairs/057-validated.json').write_text(json.dumps(result,indent=2)+'\n')
+          PY
+          git add -- .github/repairs/057-validated.json
+          git config user.name 'Sofia repair validation'
+          git config user.email 'sofia-build@users.noreply.github.com'
+          git commit -m 'fix: validated single-splash local-first startup and native first-frame network fence'
+          git push origin HEAD:"$GITHUB_REF"
+          git rev-parse HEAD > /tmp/sofia-057-results/validated-commit.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sofia-057-startup-preflight-${{ github.run_id }}
+          path: /tmp/sofia-057-results
+          retention-days: 14
