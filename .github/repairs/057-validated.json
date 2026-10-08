@@ -1,0 +1,122 @@
+{
+  "validated": true,
+  "base": "cc667e6a2fbdb475fc0b62bc555ea36a404f4d93",
+  "run_id": "37788976608",
+  "files": [
+    {
+      "path": "SOFIA_APP/App.tsx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0f071f5c566fb32dac185809920e8346d9b45326"
+    },
+    {
+      "path": "SOFIA_APP/package.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c55b27b7c12dd31723427c13ad1138a36e5f7079"
+    },
+    {
+      "path": "SOFIA_APP/plugins/native/SofiaLaunchOverlay.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "75f90cd04ef1956f6dce19bfa28c678aa0e256c2"
+    },
+    {
+      "path": "SOFIA_APP/plugins/with-sofia-launch.cjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "86043072a5adb74b068643c4de94b8a9afebfaa2"
+    },
+    {
+      "path": "SOFIA_APP/src/components/BackgroundServices.tsx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dde8e36e8f3aaff8fb7f7f8205930fc941f295d5"
+    },
+    {
+      "path": "SOFIA_APP/src/lib/api.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d07c8953f64b72ada44e8d991fabbf8a55306aed"
+    },
+    {
+      "path": "SOFIA_APP/src/lib/local-launch.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6d7a7b641bc8c3e7953a203e3d4fc45c3073464f"
+    },
+    {
+      "path": "SOFIA_APP/src/lib/screen-loader.tsx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "98b1ed508d59b598dc31d85f19d79f2900ac22c5"
+    },
+    {
+      "path": "SOFIA_APP/src/lib/startup-preparation.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4bf9de8b373be2e2eecc53d9754fcb7bbb1d757d"
+    },
+    {
+      "path": "SOFIA_APP/src/lib/use-after-first-paint.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5571276315366055cdaf0429f4fed907a2fa7765"
+    },
+    {
+      "path": "SOFIA_APP/src/lib/use-bell-inbox.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "574b35172c110b1dc0ace884a1ed80cf0058b7d6"
+    },
+    {
+      "path": "SOFIA_APP/src/screens/Home.tsx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "972c31b1e9e54b76dd6bd1ef84b73f91aa3aa64f"
+    },
+    {
+      "path": "SOFIA_APP/src/screens/Profile.tsx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7665e2bef53488c94ba6b2d8f2564c5007fddaeb"
+    },
+    {
+      "path": "SOFIA_APP/tests/home-profile-areas-history-055.test.cjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8cf346b8c116a2aa0436c7a88479cf18349bec25"
+    },
+    {
+      "path": "SOFIA_APP/tests/local-launch-057.test.cjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9435230afea3cfaead2ffb3b4fd2d8ca1cb726bb"
+    },
+    {
+      "path": "SOFIA_APP/tests/navigation.test.cjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ac4df4a376dc254c9e8dc8191b49c64a32bf31ae"
+    },
+    {
+      "path": "SOFIA_APP/tests/profile-history-startup-054.test.cjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a2541b0dbb1f4b487df0689618eb00efa26a1332"
+    },
+    {
+      "path": "SOFIA_APP/tests/voice-profile-notifications-051.test.cjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "74bc8c4a921b85b4a2ea055456b5a12952caafa3"
+    },
+    {
+      "path": "SOFIA_APP/tools/native-performance-smoke.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ce1647accc3d97d6ff01761c4c23c41a74dfd261"
+    }
+  ],
+  "native_emulator_verified": false
+}

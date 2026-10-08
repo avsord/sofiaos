@@ -27,7 +27,7 @@ test('055 Home profile picture and shared-area task filter are connected',()=>{
  assert.ok(src.includes('ProfileAvatar scope={bootstrap.profile.email}'));
  assert.ok(src.includes('Filtrar áreas das tarefas do Início'));
  assert.ok(src.includes('(!areaFilter||'));
- assert.ok(src.includes('HomeCommitmentEditor api={api}'));
+ assert.ok(src.includes('load={loadHomeCommitmentEditor}'));assert.ok(read('src/lib/screen-loader.tsx').includes("require('../components/HomeCommitmentEditor').HomeCommitmentEditor"));
  assert.ok(src.includes('onCreate={day=>void createHomeCommitment(day)}'));
 });
 test('055 profile editor propagates avatar edits to Home',()=>{

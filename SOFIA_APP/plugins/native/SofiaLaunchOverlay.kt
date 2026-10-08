@@ -1,107 +1,141 @@
 package com.avsord.sofiaapp
 
 import android.app.Activity
-import android.graphics.Color
-import android.view.Gravity
-import android.view.ViewGroup
-import android.view.View
-import android.view.ViewTreeObserver
+import android.os.Process
 import android.os.SystemClock
 import android.util.Log
-import android.widget.FrameLayout
-import android.widget.ImageView
+import android.view.View
+import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import java.lang.ref.WeakReference
+import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 
-/** Cold-start handoff owned by Android.
- * It covers the gap between the OS splash and the first fully-themed React frame,
- * so the user never sees an intermediate light/dark shell or an empty window.
- */
+/** Historical name retained for binary compatibility. This is now an observer,
+ * NOT an overlay. Android owns the only splash; no second logo, timer or touch
+ * blocker is ever installed on top of the usable application. */
 object SofiaLaunchOverlay {
-  private var overlay: WeakReference<FrameLayout>? = null
+  private var host: WeakReference<Activity>? = null
   private var observer: ViewTreeObserver? = null
   private var drawing: ViewTreeObserver.OnPreDrawListener? = null
-  private var installedAt = 0L
+  private var activityStartedAt = 0L
+  private var homeSeen = false
+  private var dataSeen = false
+  private val waiting = mutableListOf<Promise>()
+  private const val STORE = "sofia.launch.timings.v1"
 
-  private fun ready(view: View, cover: View): Boolean {
-    if (view === cover || view.visibility != View.VISIBLE || view.alpha <= 0f) return false
+  fun start(activity: Activity) {
+    detach()
+    waiting.toList().forEach { it.resolve(false) }; waiting.clear()
+    host = WeakReference(activity)
+    activityStartedAt = SystemClock.uptimeMillis()
+    homeSeen = false
+    dataSeen = false
+  }
+
+  private fun has(view: View, name: String): Boolean {
+    if (view.visibility != View.VISIBLE || view.alpha <= 0f) return false
     val tag = view.getTag(com.facebook.react.R.id.view_tag_native_id) as? String
-    if ((tag == "sofia-home-scroll" || tag == "sofia-login-ready" || tag == "sofia-launch-error") && view.width > 0 && view.height > 0) return true
-    if (view is ViewGroup) for (i in 0 until view.childCount) if (ready(view.getChildAt(i), cover)) return true
+    if (tag == name && view.width > 0 && view.height > 0) return true
+    if (view is ViewGroup) for (i in 0 until view.childCount) {
+      if (has(view.getChildAt(i), name)) return true
+    }
     return false
   }
 
   fun install(activity: Activity) {
-    val root = activity.window.decorView as? ViewGroup ?: return
-    remove(overlay?.get())
-    installedAt = SystemClock.elapsedRealtime()
-    val layer = FrameLayout(activity).apply {
-      setBackgroundColor(Color.parseColor("#7258E8"))
-      isClickable = true
-      isFocusable = true
-    }
-    val icon = ImageView(activity).apply {
-      setImageResource(R.drawable.sofia_logo_foreground)
-      scaleType = ImageView.ScaleType.CENTER_INSIDE
-      contentDescription = null
-    }
-    val size = (104 * activity.resources.displayMetrics.density).toInt()
-    layer.addView(icon, FrameLayout.LayoutParams(size, size, Gravity.CENTER))
-    root.addView(layer, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-    root.bringChildToFront(layer)
-    overlay = WeakReference(layer)
-    // Native layout is authoritative, including Activity recreation with an existing JS runtime.
-    // No bridge callback, offscreen tab mount or network response is required to reveal Home.
+    if (host?.get() !== activity) start(activity)
+    val root = activity.window.decorView
+    // Clear previous attempt's measurements; no personal information is stored.
+    activity.getSharedPreferences(STORE, Activity.MODE_PRIVATE).edit().clear()
+      .putLong("process_started_uptime_ms", Process.getStartUptimeMillis())
+      .putLong("activity_started_uptime_ms", activityStartedAt).apply()
     val listener = ViewTreeObserver.OnPreDrawListener {
-      if (ready(root, layer)) remove(layer)
+      inspect(activity)
       true
     }
     observer = root.viewTreeObserver
     drawing = listener
     observer?.addOnPreDrawListener(listener)
-    // Emergency escape only. A normal launch must be recorded as native-ready, never timeout.
-    layer.postDelayed({
-      if (overlay?.get() === layer) {
-        Log.w("SofiaLaunch", "SOFIA_LAUNCH_TIMEOUT")
-        remove(layer)
+    // Stop diagnostics if no usable frame arrived. This never hides/reveals UI
+    // or reports a successful launch: error and incomplete startup stay visible.
+    root.postDelayed({
+      if (host?.get() === activity && !dataSeen) {
+        Log.w("SofiaLaunch", "SOFIA_LAUNCH_INCOMPLETE")
+        detach()
       }
-    }, 5000)
+    }, 15000)
   }
 
-  private fun remove(view: FrameLayout?) {
-    val current = view ?: overlay?.get() ?: return
-    if (overlay?.get() !== current) return
+  private fun record(activity: Activity, stage: String) {
+    val time = SystemClock.uptimeMillis()
+    val processMs = time - Process.getStartUptimeMillis()
+    val activityMs = time - activityStartedAt
+    Log.i("SofiaLaunch", "SOFIA_LAUNCH_${stage}_PROCESS_MS=$processMs ACTIVITY_MS=$activityMs")
+    activity.getSharedPreferences(STORE, Activity.MODE_PRIVATE).edit()
+      .putLong(stage.lowercase() + "_process_ms", processMs)
+      .putLong(stage.lowercase() + "_activity_ms", activityMs)
+      .putLong("measured_at_ms", System.currentTimeMillis()).apply()
+  }
+
+  private fun inspect(activity: Activity) {
+    if (host?.get() !== activity || activity.isFinishing) return
+    val root = activity.window.decorView
+    val login = has(root, "sofia-login-ready")
+    val home = has(root, "sofia-home-scroll") && has(root, "sofia-menu-bar")
+    if (!homeSeen && (home || login)) {
+      homeSeen = true
+      record(activity, "UI")
+      val callbacks = waiting.toList(); waiting.clear()
+      root.post { callbacks.forEach { it.resolve(true) } }
+    }
+    if (!dataSeen && (login || (home && has(root, "sofia-home-data-ready")))) {
+      dataSeen = true
+      record(activity, "DATA")
+      root.post { if (host?.get() === activity && !activity.isFinishing) activity.reportFullyDrawn() }
+      detach()
+    }
+  }
+
+  private fun detach() {
     drawing?.let { listener -> if (observer?.isAlive == true) observer?.removeOnPreDrawListener(listener) }
     drawing = null
     observer = null
-    (current.parent as? ViewGroup)?.removeView(current)
-    overlay?.clear()
-    Log.i("SofiaLaunch", "SOFIA_LAUNCH_REVEALED_MS=" + (SystemClock.elapsedRealtime() - installedAt))
+  }
+
+  fun whenInteractive(promise: Promise) {
+    val activity = host?.get()
+    if (activity == null) { promise.resolve(false); return }
+    activity.runOnUiThread {
+      if (homeSeen) promise.resolve(true)
+      else if (waiting.size < 32) waiting.add(promise)
+      else promise.reject("LAUNCH_WAITERS", "Too many startup subscribers")
+    }
   }
 
   fun hide(activity: Activity?) {
-    val current = overlay?.get() ?: return
-    val host = activity ?: (current.context as? Activity)
-    if (host != null) host.runOnUiThread {
-      val root = host.window.decorView
-      if (ready(root, current)) remove(current)
-    }
+    // Compatibility with prior JS callers: no overlay exists to hide.
+    val current = activity ?: host?.get() ?: return
+    current.runOnUiThread { inspect(current) }
   }
 }
 
 class SofiaLaunchModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
   override fun getName() = "SofiaLaunch"
-
-  @ReactMethod
-  fun hide(promise: Promise) {
+  @ReactMethod fun hide(promise: Promise) {
+    try { SofiaLaunchOverlay.hide(null); promise.resolve(true) }
+    catch (e: Exception) { promise.reject("LAUNCH_HANDOFF", e) }
+  }
+  @ReactMethod fun whenInteractive(promise: Promise) { SofiaLaunchOverlay.whenInteractive(promise) }
+  @ReactMethod fun timings(promise: Promise) {
     try {
-      SofiaLaunchOverlay.hide(null)
-      promise.resolve(true)
-    } catch (e: Exception) {
-      promise.reject("LAUNCH_HANDOFF", e)
-    }
+      val values = context.getSharedPreferences("sofia.launch.timings.v1", Activity.MODE_PRIVATE).all
+      val result = Arguments.createMap()
+      for ((key, value) in values) if (value is Long) result.putDouble(key, value.toDouble())
+      promise.resolve(result)
+    } catch (e: Exception) { promise.reject("LAUNCH_METRICS", e) }
   }
 }

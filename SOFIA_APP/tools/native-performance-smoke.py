@@ -115,16 +115,19 @@ assert 'TOUCH_DOWN index=' in menu_logs, 'Native menu touch-down path was not ex
 tap('Conversa');wait('FIM DA RESPOSTA QA');tap('Início');tap('Conversa');wait('FIM DA RESPOSTA QA')
 screenshot('chat-tail-on-entry');tap('Início');wait('Olá, Teste.');time.sleep(1)
 # Warm process restart must render from the encrypted account snapshot.
-adb('shell','am','force-stop','com.avsord.sofiaapp');adb('shell','am','start','-W','-n','com.avsord.sofiaapp/.MainActivity');wait('Olá, Teste.')
+adb('shell','am','force-stop','com.avsord.sofiaapp');cold_start_output=adb('shell','am','start','-W','-n','com.avsord.sofiaapp/.MainActivity').decode(errors='replace');wait('Olá, Teste.')
 cache_logs=adb('logcat','-d','-s','ReactNativeJS:I').decode(errors='replace');assert 'SOFIA_STARTUP_CACHE_READY' in cache_logs,'Encrypted startup snapshot did not restore'
 screenshot('warm-start-from-encrypted-cache');print('PASS 048 native menu dispatch, chat tail and encrypted warm startup',flush=True)
-# 056: actual native reveal evidence; a timeout fallback is a regression, not a successful launch.
+# 057: measure the entire cold process, not just a logo overlay installed late.
 launch_logs=adb('logcat','-d','-s','SofiaLaunch:I').decode(errors='replace')
-assert 'SOFIA_LAUNCH_TIMEOUT' not in launch_logs,'Logo remained until the emergency timeout'
-launch_ms=[int(x) for x in re.findall(r'SOFIA_LAUNCH_REVEALED_MS=(\d+)',launch_logs)]
-assert launch_ms,'Native first-frame reveal was not observed'
-(out/'startup-timing-056.json').write_text(json.dumps({'scope':'native-overlay-install-to-visible-local-screen','samples_ms':launch_ms,'target_ms':1000,'target_met':max(launch_ms)<=1000},indent=2))
-print('056 measured native reveal milliseconds: '+str(launch_ms),flush=True)
+assert 'SOFIA_LAUNCH_TIMEOUT' not in launch_logs,'Unexpected legacy logo timer'
+ui_ms=[int(x) for x in re.findall(r'SOFIA_LAUNCH_UI_PROCESS_MS=(\d+)',launch_logs)]
+data_ms=[int(x) for x in re.findall(r'SOFIA_LAUNCH_DATA_PROCESS_MS=(\d+)',launch_logs)]
+assert ui_ms and data_ms,'Missing native UI and actual local-data readiness measurements'
+assert max(ui_ms)<5000,'Process-to-usable-screen is still five seconds or worse'
+assert max(data_ms)<5000,'Initial Home data was not ready within five seconds'
+(out/'startup-timing-057.json').write_text(json.dumps({'scope':'process-start-to-usable-home-and-local-data','ui_samples_ms':ui_ms,'data_samples_ms':data_ms,'target_ms':1000,'target_met':max(data_ms)<=1000,'synthetic_transport':True,'activity_manager_report':cold_start_output},indent=2))
+print('057 full-process UI/data readiness ms: '+str(ui_ms)+' / '+str(data_ms),flush=True)
 # Actual production screens with synthetic transport: new layout/filter/note flows.
 tap('Perfil');tap('Configurações do aplicativo');tap('Horário');wait('Claro a partir de');wait('Escuro a partir de');screenshot('schedule-settings')
 tap('Início');tap('Apps');tap('Biblioteca');tap('Criar registro')

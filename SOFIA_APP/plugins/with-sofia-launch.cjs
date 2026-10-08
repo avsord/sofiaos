@@ -9,7 +9,7 @@ module.exports=config=>{
       const candidates=['super.onCreate(null)','super.onCreate(savedInstanceState)'];
       const marker=candidates.find(value=>c.modResults.contents.includes(value));
       if(!marker)throw Error('MainActivity onCreate insertion point changed');
-      c.modResults.contents=c.modResults.contents.replace(marker,marker+'\n    SofiaLaunchOverlay.install(this)');
+      c.modResults.contents=c.modResults.contents.replace(marker,'SofiaLaunchOverlay.start(this)\n    '+marker+'\n    SofiaLaunchOverlay.install(this)');
     }
     return c;
   });

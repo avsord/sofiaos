@@ -45,7 +45,7 @@ test('pager keeps six fixed slots, prioritizes Home and warms hidden screens wit
   const startup=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
   assert.ok(startup.includes("enabled?warmed:[]"));assert.ok(startup.includes("requestIdleCallback(run)"));assert.ok(startup.includes("MENU_TABS.includes(active)?[active]:[]"));
   assert.ok(!startup.includes('setTimeout'));
-  assert.ok(source.includes('useStartupMounts(!!auth&&!!bootstrap&&initialDataReady,tab)'));
+  assert.ok(source.includes('useStartupMounts(servicesReady,tab)'));
   assert.ok(pager.includes('removeClippedSubviews={false}'));assert.ok(!source.includes('setBootstrap(null);setTab('));
 });
 test('screen instances stay cached after lazy loading, preserving drafts and scroll positions',()=>{
@@ -56,12 +56,12 @@ test('screen instances stay cached after lazy loading, preserving drafts and scr
   for(const name of ['navigate','goBack','changePrefs','logout','profile','manualUpdate','clearChat','notificationBack'])assert.ok(source.includes('const '+name+'=useCallback('),name);
   assert.ok(source.includes("key={'chat-'+chatEpoch}"));assert.ok(!source.includes('key={tab}'));
 });
-test('secure session opens a lightweight Home before cache decryption or live bootstrap',()=>{
+test('secure session and decrypted records mount Home before optional services or live bootstrap',()=>{
   const fast=fs.readFileSync(path.join(root,'src/lib/fast-bootstrap.ts'),'utf8');
   const shell=fs.readFileSync(path.join(root,'src/components/StartupHome.tsx'),'utf8');
-  assert.ok(source.includes('setBootstrap(a?fastBootstrap(a):null)'));
+  assert.ok(source.includes('startup.auth?fastBootstrap(startup.auth):null)'));
   assert.ok(source.includes("!ready?<StartupHome/>"));
-  assert.ok(source.includes("servicesReady?<DeferredScreen load={loadHome}"));
+  assert.ok(source.includes("initialDataReady?<DeferredScreen load={loadHome}"));
   assert.ok(source.includes('authWithBootstrap(auth,b)'));
   assert.ok(fast.includes('startup?:')||fs.readFileSync(path.join(root,'src/lib/types.ts'),'utf8').includes('startup?: Bootstrap'));
   assert.ok(shell.includes('contains no data fetches')||shell.includes('no data fetches'));
@@ -70,7 +70,7 @@ test('automatic update checks and notifications wait until after the first nativ
   assert.ok(source.includes("if(!servicesReady)return;"));
   assert.ok(source.includes("enabled={!!auth&&!!bootstrap&&servicesReady}"));
   assert.ok(source.includes('prepareInitialData(api,()=>preloadAgenda(api))'));
-  assert.ok(source.includes('useAfterFirstPaint(!!auth&&!!bootstrap&&initialDataReady)'));
+  assert.ok(source.includes('painted=useAfterFirstPaint(ready)')&&source.includes('servicesReady=painted&&!!auth&&!!bootstrap&&initialDataReady'));
 });
 test('notification overlay cannot capture touches or accessibility focus while hidden',()=>{
   assert.ok(source.includes("pointerEvents={tab==='notifications'?'auto':'none'}"));

@@ -9,6 +9,8 @@ function once(name:string,load:()=>Screen):Screen{
 /** Literal requires stay inside loaders so Metro/Hermes does not execute the
  * heavy screen module before that screen is warmed or selected.
  */
+export const loadHomeCommitmentEditor=()=>once('home-commitment-editor',()=>require('../components/HomeCommitmentEditor').HomeCommitmentEditor);
+export const loadHomeTaskDetails=()=>once('home-task-details',()=>require('../components/HomeTaskDetails').HomeTaskDetails);
 export const loadHome=()=>once('home',()=>require('../screens/Home').Home);
 export const loadChat=()=>once('chat',()=>require('../screens/Chat').Chat);
 export const loadPages=()=>once('pages',()=>require('../screens/Pages').Pages);

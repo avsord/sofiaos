@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useReducer} from 'react';
 import {AppState} from 'react-native';
-import * as Notifications from 'expo-notifications';
+import type * as Notifications from 'expo-notifications';
 import type {SofiaApi} from './api';
 import type {Entity,Task} from './types';
 import {SITE} from './api';
@@ -10,7 +10,7 @@ import {BellInbox,dueNotices,presentedNotice} from './bell-inbox';
 import {encryptedStorage} from './encrypted-storage';
 export function useBellInbox(api:SofiaApi,scope:string,enabled:boolean){
  const inbox=useMemo(()=>new BellInbox(encryptedStorage,SITE+'|'+scope.toLowerCase()+'|bell-v1'),[api,scope]),[,render]=useReducer(x=>x+1,0);
- useEffect(()=>{if(!enabled||!scope)return;let stopped=false,routines:Entity[]=[],tasks:Task[]=[],loading=false,pending=false;const capsules=capsuleStore(api);
+ useEffect(()=>{if(!enabled||!scope)return;const Notifications:typeof import('expo-notifications')=require('expo-notifications');let stopped=false,routines:Entity[]=[],tasks:Task[]=[],loading=false,pending=false;const capsules=capsuleStore(api);
   const notify=()=>render();inbox.listeners.add(notify);
   const derive=()=>{if(!stopped&&AppState.currentState==='active')inbox.ingest(dueNotices(capsules.snapshot.plans,capsules.snapshot.history,routines,tasks));};
   const refresh=async()=>{if(stopped)return;if(loading){pending=true;return;}loading=true;try{const [r,t]=await Promise.all([(async()=>{const rows:Entity[]=[];for(let offset=0;offset<10000;offset+=100){const page=await api.entities('routine','',offset);rows.push(...page.items);if(page.items.length<100)return rows;}return rows;})(),api.tasks()]);if(!stopped){routines=r;tasks=t.items;derive();}}catch{}finally{loading=false;if(pending&&!stopped){pending=false;void refresh();}}};
