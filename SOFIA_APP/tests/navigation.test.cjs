@@ -103,7 +103,7 @@ test('Pages opens a preloaded entity synchronously without a network wait',()=>{
 test('an open page disables the outer pager and uses Android Back without a custom page swipe',()=>{
  assert.ok(source.includes("[pagesDepth,setPagesDepth]=useState(false)"));
  assert.ok(source.includes("tab==='pages'&&pagesDepth"));
- assert.ok(source.includes('onDepthChange={setPagesDepth}'));
+ assert.ok(source.includes('onDepthChange:setPagesDepth'));
  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');
  assert.ok(!pages.includes('PanResponder.create'));assert.ok(pages.includes("BackHandler.addEventListener('hardwareBackPress'"));
  assert.ok(!pages.includes('translateX:backX'));
