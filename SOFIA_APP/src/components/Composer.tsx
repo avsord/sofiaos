@@ -14,7 +14,7 @@ import {VoiceDraft} from '../lib/types';
 import {IconButton} from './UI';
 import {VoicePlayer} from './VoicePlayer';
 export function deleteVoice(uri:string){try{const file=new File(uri);if(file.exists)file.delete();}catch{}}
-export function Composer({disabled,enterToSend,autoSendVoice,onText,onVoice,onAttachments,onActivity,onDraft}:{disabled:boolean;enterToSend:boolean;autoSendVoice:boolean;onText:(text:string)=>void;onAttachments:(files:AttachmentDraft[],text:string)=>void;onVoice:(draft:VoiceDraft)=>void;onActivity:(active:boolean)=>void;onDraft:(active:boolean)=>void}){
+export function Composer({disabled,enterToSend,autoSendVoice,maxChars:_maxChars,onText,onVoice,onAttachments,onActivity,onDraft}:{disabled:boolean;enterToSend:boolean;autoSendVoice:boolean;maxChars?:number;onText:(text:string)=>void;onAttachments:(files:AttachmentDraft[],text:string)=>void;onVoice:(draft:VoiceDraft)=>void;onActivity:(active:boolean)=>void;onDraft:(active:boolean)=>void}){
  const c=useTheme(),recorder=useAudioRecorder({...RecordingPresets.HIGH_QUALITY,numberOfChannels:1,bitRate:64000,isMeteringEnabled:true});
  const [files,setFiles]=useState<AttachmentDraft[]>([]),[attachments,setAttachments]=useState(false);
  const rs=useAudioRecorderState(recorder,120),[text,setText]=useState(''),[busy,setBusy]=useState(false),[recording,setRecording]=useState(false),[draft,setDraft]=useState<VoiceDraft|null>(null),[cancelReady,setCancelReady]=useState(false);
