@@ -10,3 +10,7 @@
 ### Critérios de aceitação
 
 Validar TypeScript, suíte Android/Node, upgrade sobre a instalação 0.3.66, assinatura idêntica e testes instrumentados do GitHub Actions. O ganho de tempo precisa ser medido em aparelho real com registros e cache de produção; esta mudança não representa abertura garantida em milissegundos.
+
+### Entrega para aprovação
+
+O APK 0.3.67 é gerado como artefato de teste no GitHub Actions (`[manual-apk]`), sem criar release pública. A publicação só poderá ocorrer após aprovação explícita do proprietário, registrada em um commit separado com `[approved-apk]`, e a execução dos testes completos.

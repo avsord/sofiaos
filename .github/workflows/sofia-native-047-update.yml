@@ -1,5 +1,5 @@
 # Build once; run every native check in parallel; publish only the identical verified APK.
-name: Sofia Android - entrega automatica
+name: Sofia Android - APK de teste e publicacao aprovada
 'on':
   workflow_dispatch: null
   push:
@@ -372,9 +372,11 @@ jobs:
         if-no-files-found: error
         retention-days: 30
   release:
-    name: Publish only after every acceptance gate
+    name: Publish only after owner approves the candidate APK
     needs: [build, native_tests]
-    if: needs.build.outputs.release == 'true' && !contains(github.event.head_commit.message, '[manual-apk]')
+    # No public release on normal pushes or pre-approval manual APKs.
+    # Owner approval is a separate [approved-apk] commit after testing.
+    if: needs.build.outputs.release == 'true' && contains(github.event.head_commit.message, '[approved-apk]') && !contains(github.event.head_commit.message, '[manual-apk]')
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     env:
