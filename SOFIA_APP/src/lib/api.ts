@@ -32,14 +32,22 @@ export function savePrefs(p: Prefs) { return AsyncStorage.setItem(PREFS_KEY, JSO
 export class ApiError extends Error {
   constructor(message: string, public code: string, public status: number, public data?: Record<string, unknown>) { super(message); this.name = 'ApiError'; }
 }
+export function startupSnapshotFor(scope:string){return new StartupSnapshot(encryptedStorage,SITE+'|'+scope.trim().toLowerCase()+'|startup-v1');}
 export class SofiaApi {
   private readonly md:LegacyMdAdapter;
   private readonly startupReads=new StartupReads();
   private warming=false;
+  private preloadFlight:Promise<void>|null=null;
   private readonly snapshots:StartupSnapshot;
   private hydration:Promise<void>|null=null;
   private chatOpening:Promise<ChatSnapshot>|null=null;
   private cacheGeneration=0;
+  private networkGate:Promise<void>=Promise.resolve();
+  private releaseGate:(()=>void)|null=null;
+  /** Cached reads stay available; live I/O cannot contend with first layout. */
+  deferNetworkUntilPaint(){if(!this.releaseGate)this.networkGate=new Promise<void>(resolve=>{this.releaseGate=resolve;});return this;}
+  releaseNetwork(){this.releaseGate?.();this.releaseGate=null;}
+
   private rememberChatResult(result:ChatResult,input:object){
     const id=result.conversation_id||(input as {conversation_id?:string}).conversation_id;if(!id)return;
     const current=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');
@@ -52,8 +60,12 @@ export class SofiaApi {
   cached<T>(path:string){return this.snapshots.peek<T>(path);}
   async discardCache(){this.cacheGeneration++;this.startupReads.invalidate();await this.snapshots.clear();}
   async liveBootstrap(){return this.fetchRequest<Bootstrap>('/bootstrap',undefined,'GET',20000);}
-  async preload(agenda:()=>Promise<unknown>){
-    if(this.warming)return;
+  preload(agenda:()=>Promise<unknown>){
+    if(!this.preloadFlight){const flight=this.runPreload(agenda);this.preloadFlight=flight;void flight.finally(()=>{if(this.preloadFlight===flight)this.preloadFlight=null;}).catch(()=>{});}
+    return this.preloadFlight;
+  }
+  private async runPreload(agenda:()=>Promise<unknown>){
+    await this.hydrate();
     // Only paths that already came from disk need an explicit live refresh.
     // On a cold cache preloadStartup fetches them once, so do not fetch twice.
     const paths=['/home','/tasks','/md/dashboard','/workspace/catalog',...['user_page','capsule','routine','monitor'].map(kind=>'/workspace/entities?limit=100&kind='+kind+'&q=&offset=0')];
@@ -62,7 +74,7 @@ export class SofiaApi {
     let index=0;await Promise.all(Array.from({length:2},async()=>{while(index<refresh.length){const path=refresh[index++];try{const value=await this.fetchRequest(path,undefined,'GET',20000);this.startupReads.seed(path,value);}catch{}}}));
     if(refresh.length)systemChanged(this);
   }
-  constructor(private token = '', private onExpired: () => void = () => {},scope='anonymous') {this.md=new LegacyMdAdapter(this.request.bind(this),AsyncStorage,scope);this.snapshots=new StartupSnapshot(encryptedStorage,SITE+'|'+scope.trim().toLowerCase()+'|startup-v1');}
+  constructor(private token = '', private onExpired: () => void = () => {},scope='anonymous',restored?:StartupSnapshot) {this.md=new LegacyMdAdapter(this.request.bind(this),AsyncStorage,scope);this.snapshots=restored||startupSnapshotFor(scope);if(restored){for(const [key,value] of restored.all())this.startupReads.seed(key,value);this.hydration=Promise.resolve();}}
   get mdLocalOnly(){return this.md.localOnly;}
   private async request<T>(path: string, body?: unknown, method = body === undefined ? 'GET' : 'POST', timeout = 20000): Promise<T> {
     if(method!=='GET'){if(!path.startsWith('/chat-sync/current')&&!path.startsWith('/chat-sync/select')){this.cacheGeneration++;this.startupReads.invalidate();if(method==='DELETE'||path==='/chat-sync/delete'||path==='/chat-history')this.snapshots.forgetData();}return this.fetchRequest<T>(path,body,method,timeout);}
@@ -70,6 +82,7 @@ export class SofiaApi {
     return this.warming&&path!=='/bootstrap' ? this.startupReads.prime(path,read) : this.startupReads.read(path,read);
   }
   private async fetchRequest<T>(path:string,body:unknown,method:string,timeout:number):Promise<T>{
+    await this.networkGate;
     const generation=this.cacheGeneration,controller = new AbortController(), timer = setTimeout(() => controller.abort(), timeout);
     try {
       const response = await fetch(SITE + '/api/mobile' + path, { method, signal: controller.signal,

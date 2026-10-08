@@ -1,8 +1,6 @@
 import type {SofiaApi} from './api';
-/** Only encrypted local disk hydration gates the initial usable frame.
- * Start full priority read-ahead immediately and let screens refresh in-place.
- * Network, Google Calendar and remote integrations must never block opening. */
-export async function prepareInitialData(api:Pick<SofiaApi,'hydrate'|'preload'>,agenda:()=>Promise<unknown>){
+/** Local data only. BackgroundServices owns the independent network lane after
+ * the real first Home frame. Offline snapshots must never wait for a server. */
+export async function prepareInitialData(api:Pick<SofiaApi,'hydrate'>,_agenda:()=>Promise<unknown>){
  await api.hydrate();
- void api.preload(agenda).catch(()=>{});
 }

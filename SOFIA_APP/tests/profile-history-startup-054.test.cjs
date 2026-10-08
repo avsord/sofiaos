@@ -39,7 +39,7 @@ const agenda=load('src/lib/agenda-cache.ts');
 test('054 initial agenda snapshot is already populated before its screen mounts',async()=>{let calls=0;const cache=agenda.createAgendaCache(async()=>{calls++;return{items:[]};},()=>10000);cache.seed('2026-10',{items:[{id:'existing'}]});assert.equal(cache.snapshot('2026-10').items[0].id,'existing');assert.equal(cache.snapshot('2026-10').loading,false);await cache.load('2026-10');assert.equal(calls,0);});
 test('054 invalidation refreshes the agenda without replacing saved events with loading',async()=>{let finish;const cache=agenda.createAgendaCache(()=>new Promise(r=>finish=r),()=>10000);cache.seed('2026-10',{items:[{id:'existing'}]});cache.invalidate();const flight=cache.load('2026-10');assert.equal(cache.snapshot('2026-10').loading,false);assert.equal(cache.snapshot('2026-10').items[0].id,'existing');finish({items:[{id:'new'}]});await flight;assert.equal(cache.snapshot('2026-10').items[0].id,'new');});
 const {prepareInitialData}=load('src/lib/startup-preparation.ts',{'./agenda-cache':agenda});
-test('054 startup waits only for encrypted disk hydration and starts network without blocking launch',async()=>{const events=[];let hydrate;const api={hydrate:()=>new Promise(r=>hydrate=r),preload:()=>{events.push('network-prefetch');return new Promise(()=>{});}};let ready=false;const p=prepareInitialData(api,async()=>{}).then(()=>ready=true);await tick();assert.equal(ready,false);assert.deepEqual(events,[]);hydrate();await p;assert.equal(ready,true);assert.deepEqual(events,['network-prefetch']);});
+test('057 disk hydration finishes before any optional prefetch is permitted',async()=>{const events=[];let hydrate;const api={hydrate:()=>new Promise(r=>hydrate=r),preload:()=>{events.push('network-prefetch');return new Promise(()=>{});}};let ready=false;const p=prepareInitialData(api,async()=>{}).then(()=>ready=true);await tick();assert.equal(ready,false);assert.deepEqual(events,[]);hydrate();await p;assert.equal(ready,true);assert.deepEqual(events,[]);});
 test('054 offline existing snapshots are usable without waiting for failed network',async()=>{const api={hydrate:async()=>{},cached:()=>({}),preload:()=>new Promise(()=>{}),home:()=>new Promise(()=>{}),tasks:()=>new Promise(()=>{}),ensureChat:()=>new Promise(()=>{})};await prepareInitialData(api,()=>new Promise(()=>{}));});
 test('054 offline launch stays responsive; Home exposes its own retry banner',async()=>{const offline=async()=>{throw Error('offline');};await prepareInitialData({hydrate:async()=>{},preload:offline},offline);});
 test('056 first Home frame does not wait for hidden screen trees; selected tabs are immediate',()=>{const {useStartupMounts}=load('src/lib/startup-mounts.ts',{'react':{useState:f=>[typeof f==='function'?f():f,()=>{}],useEffect:()=>{}}});assert.deepEqual(Array.from(useStartupMounts(true,'home')),['home']);assert.deepEqual(Array.from(useStartupMounts(true,'agenda')),['home','agenda']);assert.deepEqual(Array.from(useStartupMounts(false,'home')),['home']);});
@@ -85,6 +85,12 @@ test('056 repeated native Activity handoffs are not suppressed by a process-glob
 });
 test('056 native reveal observes real Home/login geometry, and Expo defers unused imports',()=>{
  const fs=require('node:fs'),path=require('node:path');const source=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
- const native=source('plugins/native/SofiaLaunchOverlay.kt');assert.ok(native.includes('OnPreDrawListener'));assert.ok(native.includes('sofia-home-scroll'));assert.ok(native.includes('view.alpha <= 0f'));assert.ok(native.includes('SOFIA_LAUNCH_REVEALED_MS='));
+ const native=source('plugins/native/SofiaLaunchOverlay.kt');assert.ok(native.includes('OnPreDrawListener'));assert.ok(native.includes('sofia-home-scroll'));assert.ok(native.includes('view.alpha <= 0f'));assert.ok(native.includes('Process.getStartUptimeMillis()'));assert.ok(native.includes('SOFIA_LAUNCH_${stage}_PROCESS_MS='));assert.ok(!native.includes('root.addView'));
  assert.ok(source('metro.config.js').includes('inlineRequires:true'));
+});
+test('057 first-frame network fence never blocks the local snapshot but holds live I/O',async()=>{
+ const f=apiFixture();f.api.deferNetworkUntilPaint();const live=f.api.liveBootstrap();
+ await tick();assert.equal(f.calls.length,0);
+ f.api.releaseNetwork();await live;assert.equal(f.calls.length,1);
+ await f.api.discardCache();
 });

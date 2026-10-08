@@ -1,12 +1,12 @@
+import {prepareLocalLaunch} from './src/lib/local-launch';
+import type {LocalLaunch} from './src/lib/local-launch';
 import {prepareInitialData} from './src/lib/startup-preparation';
 import {useAfterFirstPaint} from './src/lib/use-after-first-paint';
 import {preloadAgenda} from './src/lib/use-agenda-month';
-import {useCapsuleNotifications} from './src/lib/capsule-notifications';
-import {useAgendaNotifications} from './src/lib/agenda-notifications';
 import React,{Component,ErrorInfo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {View,Text,StatusBar,ActivityIndicator,AccessibilityInfo,useColorScheme,AppState,Alert,Keyboard,BackHandler,Linking,StyleSheet} from 'react-native';
 import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
-import {SofiaApi,readAuth,saveAuth,forgetAuth,readPrefs,savePrefs} from './src/lib/api';
+import {SofiaApi,readAuth,saveAuth,forgetAuth,readPrefs,savePrefs,startupSnapshotFor} from './src/lib/api';
 import type {Auth,Bootstrap,Prefs,Tab,Task,Profile as UserProfile} from './src/lib/types';
 import {fastBootstrap,authWithBootstrap} from './src/lib/fast-bootstrap';
 import {themeAppearance} from './src/lib/theme-schedule';
@@ -22,7 +22,7 @@ import {NotificationProvider} from './src/components/NotificationCenter';
 import {createMenuMotion} from './src/lib/menu-motion';
 import type {TabPagerHandle} from './src/components/TabPager';
 import {useStartupMounts} from './src/lib/startup-mounts';
-import {DeferredScreen,loadAgenda,loadChat,loadHome,loadNotifications,loadPages,loadProfile,loadWorkspace} from './src/lib/screen-loader';
+import {DeferredScreen,loadAgenda,loadChat,loadHome,loadNotifications,loadPages,loadProfile,loadWorkspace,loadBackgroundServices} from './src/lib/screen-loader';
 import {Login} from './src/screens/Login';
 import {APP_VERSION,checkForUpdate} from './src/lib/update';
 import {finishLaunchHandoff} from './src/lib/launch-handoff';
@@ -31,10 +31,10 @@ const tabs:{id:Tab;label:string;icon:IconName}[]=[{id:'home',label:'Início',ico
 class AppBoundary extends Component<{children:React.ReactNode},{failed:boolean}>{
  state={failed:false};static getDerivedStateFromError(){return {failed:true};}
  componentDidCatch(_e:Error,_info:ErrorInfo){/* No personal data in logs. */}
- render(){return this.state.failed?<View style={{flex:1,backgroundColor:'#F7F6FA',padding:30,justifyContent:'center'}}><Text style={{fontSize:25,fontWeight:'700',color:'#272334'}}>Vamos reabrir a Sofia.</Text><Text style={{marginTop:16,lineHeight:23,color:'#7F7A8D'}}>O aplicativo encontrou um problema. Feche e abra novamente. Mensagens ainda não enviadas podem precisar ser refeitas.</Text></View>:this.props.children;}
+ render(){return this.state.failed?<View nativeID="sofia-launch-error" style={{flex:1,backgroundColor:'#F7F6FA',padding:30,justifyContent:'center'}}><Text style={{fontSize:25,fontWeight:'700',color:'#272334'}}>Vamos reabrir a Sofia.</Text><Text style={{marginTop:16,lineHeight:23,color:'#7F7A8D'}}>O aplicativo encontrou um problema. Feche e abra novamente. Mensagens ainda não enviadas podem precisar ser refeitas.</Text></View>:this.props.children;}
 }
-function Shell(){
- const system=useColorScheme(),[ready,setReady]=useState(false),[auth,setAuth]=useState<Auth|null>(null),[bootstrap,setBootstrap]=useState<Bootstrap|null>(null),[prefs,setPrefs]=useState<Prefs>({appearance:'schedule',enterToSend:false,autoSendVoice:true,lightAt:'05:00',darkAt:'19:00'}),[error,setError]=useState(''),[tab,setTab]=useState<Tab>('home'),[locked,setLocked]=useState(false),[booting,setBooting]=useState(false),[keyboard,setKeyboard]=useState(false),[workspaceDepth,setWorkspaceDepth]=useState(false),[workspaceReset,setWorkspaceReset]=useState(0),[capsulesTarget,setCapsulesTarget]=useState(0),[gestureLocked,setGestureLocked]=useState(false),[pagesDepth,setPagesDepth]=useState(false),[chatEpoch,setChatEpoch]=useState(0);
+function Shell({startup}:{startup:LocalLaunch}){
+ const system=useColorScheme(),[ready]=useState(true),[auth,setAuth]=useState<Auth|null>(startup.auth),[bootstrap,setBootstrap]=useState<Bootstrap|null>(()=>startup.auth?fastBootstrap(startup.auth):null),[prefs,setPrefs]=useState<Prefs>(startup.prefs||{appearance:'schedule',enterToSend:false,autoSendVoice:true,lightAt:'05:00',darkAt:'19:00'}),[error,setError]=useState(''),[tab,setTab]=useState<Tab>('home'),[locked,setLocked]=useState(false),[booting,setBooting]=useState(false),[keyboard,setKeyboard]=useState(false),[workspaceDepth,setWorkspaceDepth]=useState(false),[workspaceReset,setWorkspaceReset]=useState(0),[capsulesTarget,setCapsulesTarget]=useState(0),[gestureLocked,setGestureLocked]=useState(false),[pagesDepth,setPagesDepth]=useState(false),[chatEpoch,setChatEpoch]=useState(0);
  const [agendaTarget,setAgendaTarget]=useState<{date:string;id?:string;create?:boolean;nonce:number}>({date:'',nonce:0});
  const tabHistory=useRef<Tab[]>([]),pager=useRef<TabPagerHandle>(null),navigation=useRef({tab,locked});
  navigation.current={tab,locked};
@@ -45,11 +45,12 @@ function Shell(){
  useEffect(()=>{const update=()=>setThemeClock(previous=>{const now=new Date();return now.getHours()!==previous.getHours()||now.getMinutes()!==previous.getMinutes()?now:previous;}),timer=setInterval(update,1000),sub=AppState.addEventListener('change',state=>{if(state==='active')update();});return()=>{clearInterval(timer);sub.remove();};},[]);
  const c=themeAppearance(prefs,system,themeClock)==='dark'?dark:light;
  const expired=useCallback(()=>{tabHistory.current=[];setAuth(null);setBootstrap(null);setLocked(false);void forgetAuth().catch(()=>{});},[]);
- const api=useMemo(()=>new SofiaApi(auth?.token||'',expired,auth?.profile?.email||'anonymous'),[auth?.token,auth?.profile?.email,expired]);
- const [prepared,setPrepared]=useState<SofiaApi|null>(null),[preparationError,setPreparationError]=useState(''),[prepareAttempt,setPrepareAttempt]=useState(0);
+ const api=useMemo(()=>new SofiaApi(auth?.token||'',expired,auth?.profile?.email||'anonymous',auth?.token===startup.auth?.token?startup.snapshot||undefined:undefined).deferNetworkUntilPaint(),[auth?.token,auth?.profile?.email,expired]);
+ const [prepared,setPrepared]=useState<SofiaApi|null>(()=>startup.auth&&startup.snapshot?api:null),[preparationError,setPreparationError]=useState(''),[prepareAttempt,setPrepareAttempt]=useState(0);
  const initialDataReady=prepared===api;
- const servicesReady=useAfterFirstPaint(!!auth&&!!bootstrap&&initialDataReady),mountedTabs=useStartupMounts(!!auth&&!!bootstrap&&initialDataReady,tab);
- useEffect(()=>{if(!auth)return;let live=true;setPreparationError('');void prepareInitialData(api,()=>preloadAgenda(api)).then(()=>{if(live){setPrepared(api);console.info('SOFIA_STARTUP_CACHE_READY');}}).catch(e=>{if(live)setPreparationError(errorText(e));});return()=>{live=false;};},[api,prepareAttempt]);
+ const painted=useAfterFirstPaint(ready),servicesReady=painted&&!!auth&&!!bootstrap&&initialDataReady,mountedTabs=useStartupMounts(servicesReady,tab);
+ useEffect(()=>{if(!auth||initialDataReady)return;let live=true;setPreparationError('');void prepareInitialData(api,()=>preloadAgenda(api)).then(()=>{if(live){setPrepared(api);console.info('SOFIA_STARTUP_CACHE_READY');}}).catch(e=>{if(live)setPreparationError(errorText(e));});return()=>{live=false;};},[api,prepareAttempt]);
+ useEffect(()=>{if(painted)api.releaseNetwork();},[painted,api]);
  const launchReady=ready&&(!auth||(!!bootstrap&&servicesReady));
  useEffect(()=>{if(!launchReady)return;return finishLaunchHandoff();},[launchReady,c.bg]);
  const checkingUpdate=useRef(false),lastUpdateCheck=useRef(0),lastUpdatePrompt=useRef('');
@@ -67,7 +68,7 @@ function Shell(){
   finally{checkingUpdate.current=false;}
  },[]);
  useEffect(()=>{const a=Keyboard.addListener('keyboardDidShow',()=>setKeyboard(true)),b=Keyboard.addListener('keyboardDidHide',()=>setKeyboard(false));return()=>{a.remove();b.remove();};},[]);
- useEffect(()=>{let active=true;Promise.all([readAuth(),readPrefs()]).then(([a,p])=>{if(active){setAuth(a);setBootstrap(a?fastBootstrap(a):null);setPrefs(p);}}).catch(e=>{if(active)setError(errorText(e));}).finally(()=>{if(active)setReady(true);});return()=>{active=false;};},[]);
+
  useEffect(()=>{
   if(!servicesReady)return;
   void checkUpdate(false);
@@ -93,8 +94,7 @@ function Shell(){
  const discussTask=useCallback((task:Task)=>{setTaskContext(task);navigate('chat');},[navigate]);
  const openAgenda=useCallback((date:string,id?:string,create=false)=>{setAgendaTarget({date,id,create,nonce:Date.now()});navigate('agenda');},[navigate]);
  const openCapsules=useCallback(()=>{navigate('apps');setCapsulesTarget(v=>v+1);},[navigate]);
- useCapsuleNotifications(api,auth?.profile.email||'',!auth&&ready?false:servicesReady?true:null,openCapsules);
- useAgendaNotifications(api,auth?.profile.email||'',!auth&&ready?false:servicesReady?true:null,openAgenda);
+
  const goBack=useCallback(()=>{
   const current=navigation.current;
   if(current.locked){Alert.alert('Sua conversa','Pare a gravação ou aguarde a resposta.');return true;}
@@ -115,7 +115,7 @@ function Shell(){
  {!ready?<StartupHome/>:!auth?<Login onLogin={login}/>:!bootstrap?<View style={{flex:1,justifyContent:'center',padding:24,gap:14}}>{booting?<ActivityIndicator color={c.accent}/>:null}<Text style={{fontSize:23,fontWeight:'600',color:c.text}}>Abrindo sua Sofia…</Text>{error?<ErrorBanner text={error}/>:null}<Button title="Tentar novamente" onPress={()=>void boot()} loading={booting}/><Button title="Voltar para o login" secondary onPress={()=>void logout()}/></View>:!initialDataReady?<View style={{flex:1}}><StartupHome profile={bootstrap.profile}/>{preparationError?<View style={{padding:24,gap:12}}><ErrorBanner text={preparationError}/><Button title="Tentar novamente" onPress={()=>setPrepareAttempt(n=>n+1)}/></View>:null}</View>:<><View style={{flex:1}}>
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?0:1}]} pointerEvents={tab==='notifications'?'none':'auto'} accessibilityElementsHidden={tab==='notifications'} importantForAccessibility={tab==='notifications'?'no-hide-descendants':'auto'}>
   <TabPager motion={menuMotion} ref={pager} activeTab={tab} enabled={!gestureLocked&&!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)&&!(tab==='apps'&&workspaceDepth)} onSelect={navigate}>
-   {servicesReady?<DeferredScreen load={loadHome} screenProps={{onDiscussTask:discussTask,onOpenCapsules:openCapsules,onGestureLock:setGestureLocked,api,bootstrap,navigate,onOpenAgenda:openAgenda,active:screenTab==='home'}}/>:<StartupHome profile={bootstrap.profile}/>} 
+   {initialDataReady?<DeferredScreen load={loadHome} screenProps={{onDiscussTask:discussTask,onOpenCapsules:openCapsules,onGestureLock:setGestureLocked,api,bootstrap,navigate,onOpenAgenda:openAgenda,active:screenTab==='home'}}/>:<StartupHome profile={bootstrap.profile}/>}
    {mountedTabs.has('chat')?<DeferredScreen key={'chat-'+chatEpoch} load={loadChat} screenProps={{taskContext,onClearTaskContext:clearTaskContext,api,bootstrap,enterToSend:prefs.enterToSend,autoSendVoice:prefs.autoSendVoice,onLock:setLocked,active:screenTab==='chat',onRefreshBootstrap:boot}}/>:<View style={{flex:1}}/>}
    {mountedTabs.has('pages')?<DeferredScreen key={bootstrap.profile.email} load={loadPages} screenProps={{api,active:screenTab==='pages',storageScope:bootstrap.profile.email,onDepthChange:setPagesDepth}}/>:<View style={{flex:1}}/>}
    {mountedTabs.has('agenda')?<DeferredScreen load={loadAgenda} screenProps={{onGestureLock:setGestureLocked,api,target:agendaTarget,active:screenTab==='agenda'}}/>:<View style={{flex:1}}/>}
@@ -126,6 +126,13 @@ function Shell(){
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?1:0,backgroundColor:c.bg}]} pointerEvents={tab==='notifications'?'auto':'none'} accessibilityElementsHidden={tab!=='notifications'} importantForAccessibility={tab==='notifications'?'auto':'no-hide-descendants'}>{tab==='notifications'?<DeferredScreen load={loadNotifications} screenProps={{api,onBack:notificationBack}}/>:null}</View>
  </View>
  {!keyboard?<View nativeID="sofia-menu-bar" style={{flexDirection:'row',backgroundColor:c.surface,borderTopWidth:1,borderColor:c.line,paddingHorizontal:8,paddingTop:7,paddingBottom:4}}>{tabs.map(item=><MenuTab locked={locked} motion={menuMotion} key={item.id} item={item} selected={tab===item.id} onSelect={navigate}/>)}</View>:null}</>}
- </View></SafeAreaView></NotificationProvider></ThemeContext.Provider>;
+ {painted?<DeferredScreen load={loadBackgroundServices} screenProps={{api,scope:auth?.profile.email||'',enabled:!auth?false:servicesReady?true:null,onCapsules:openCapsules,onAgenda:openAgenda}}/>:null}</View></SafeAreaView></NotificationProvider></ThemeContext.Provider>;
 }
-export default function App(){return <AppBoundary><SafeAreaProvider><Shell/></SafeAreaProvider></AppBoundary>;}
+function LocalLaunchGate(){
+ const [startup,setStartup]=useState<LocalLaunch|null>(null),[error,setError]=useState(''),[attempt,setAttempt]=useState(0);
+ useEffect(()=>{let live=true;setError('');void prepareLocalLaunch(readAuth,readPrefs,startupSnapshotFor).then(value=>{if(live)setStartup(value);}).catch(e=>{if(live)setError(errorText(e));});return()=>{live=false;};},[attempt]);
+ // Do not display a wrongly-themed/empty dashboard before local reads resolve.
+ if(!startup)return error?<View nativeID="sofia-launch-error" style={{flex:1,padding:24,justifyContent:'center',backgroundColor:'#F7F6FA'}}><ErrorBanner text={error}/><Button title="Tentar novamente" onPress={()=>setAttempt(n=>n+1)}/></View>:null;
+ return <Shell startup={startup}/>;
+}
+export default function App(){return <AppBoundary><SafeAreaProvider><LocalLaunchGate/></SafeAreaProvider></AppBoundary>;}
