@@ -5,8 +5,8 @@ const { AppError, validId, cleanText, cleanMessage } = require('../core/util');
 const { VERSION } = require('../config/sofia');
 const { makeApi45 } = require('../core/api45');
 const OWNER = 'owner-local';
-// Product UI has no text-character or audio-duration ceiling. A single HTTP
-// request still has a byte budget so one upload cannot exhaust server memory.
+// Product UI has no text-character or audio-duration ceiling. The transport
+// keeps only byte-level safety budgets so one request cannot exhaust server memory.
 const MAX_AUDIO = 64 * 1024 * 1024, MAX_MESSAGE_BODY = 8 * 1024 * 1024;
 const fail = (code, message, status = 400) => { throw new AppError(code, message, status); };
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
