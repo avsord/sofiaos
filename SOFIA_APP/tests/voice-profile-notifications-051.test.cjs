@@ -34,11 +34,11 @@ test('task editor exposes an explicit destructive action in its header and body'
  const workspace=file('src/screens/Workspace.tsx');
  assert.ok(workspace.includes('function removeTask()'));assert.ok(workspace.includes('name="trash" label="Excluir tarefa"'));assert.ok(workspace.includes('<Button title="Excluir tarefa" secondary disabled={saving} onPress={removeTask}/>'));
 });
-test('cold start stays on one native brand surface until the final themed Home is ready',()=>{
+test('cold start uses only the OS splash and has no second blocking brand overlay',()=>{
  const app=file('App.tsx'),plugin=file('plugins/with-sofia-launch.cjs'),native=file('plugins/native/SofiaLaunchOverlay.kt'),config=JSON.parse(file('app.json')).expo;
  assert.ok(app.includes("launchReady=ready&&(!auth||(!!bootstrap&&servicesReady))"));assert.ok(app.includes('finishLaunchHandoff()'));
  assert.ok(plugin.includes('SofiaLaunchOverlay.install(this)'));assert.ok(plugin.includes("super.onCreate(null)"));
- assert.ok(native.includes('setBackgroundColor(Color.parseColor("#7258E8"))'));assert.ok(native.includes('postDelayed({ remove(layer) }, 5000)'));
+ assert.ok(!native.includes('postDelayed'));assert.ok(!native.includes('root.addView'));assert.ok(!native.includes('isClickable = true'));assert.ok(native.includes('first-ui-commit-ms='));
  assert.equal(config.backgroundColor,'#7258E8');assert.ok(config.plugins.includes('./plugins/with-sofia-launch.cjs'));
 });
 test('instant fallback bootstrap uses the same expanded transport ceiling as the mobile server',()=>{

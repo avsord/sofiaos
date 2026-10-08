@@ -1,4 +1,5 @@
 import {StartupSnapshot} from './startup-snapshot';
+import {openExistingChat} from './chat-opening';
 import {encryptedStorage} from './encrypted-storage';
 export type CalendarState={configured:boolean;connected:boolean;syncing?:boolean;last_sync?:string;error?:string;calendar_name?:string;calendar_id?:string;warnings?:string[];conflicts?:{id:string;reason:string}[];calendars?:{id:string;summary:string;accessRole:string}[]};
 import {StartupReads,preloadStartup} from './startup-preload';
@@ -40,9 +41,10 @@ export class SofiaApi {
   private hydration:Promise<void>|null=null;
   private chatOpening:Promise<ChatSnapshot>|null=null;
   private cacheGeneration=0;
-  private rememberChatResult(result:ChatResult,input:object){const before=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');const id=(input as {conversation_id?:string}).conversation_id;if(before?.conversation?.id===id&&before)this.snapshots.remember('/chat-sync/current',{...before,messages:mergeMessages(before.messages,result.messages).slice(-100)});}
+  private async rememberChatResult(result:ChatResult,input:object){const before=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');const id=result.conversation_id||(input as {conversation_id?:string}).conversation_id;if(before?.conversation?.id===id&&before){const saved={...before,messages:mergeMessages(before.messages,result.messages).slice(-100)};this.snapshots.remember('/chat-sync/current',saved);this.snapshots.remember('/conversations/'+id,saved);}await this.snapshots.flush();}
   async hydrate(){if(!this.hydration)this.hydration=this.snapshots.hydrate().then(()=>{for(const [key,value] of this.snapshots.all())this.startupReads.seed(key,value);});return this.hydration;}
   cached<T>(path:string){return this.snapshots.peek<T>(path);}
+  flushCache(){return this.snapshots.flush();}
   async discardCache(){this.cacheGeneration++;this.startupReads.invalidate();await this.snapshots.clear();}
   async liveBootstrap(){return this.fetchRequest<Bootstrap>('/bootstrap',undefined,'GET',20000);}
   async preload(agenda:()=>Promise<unknown>){
@@ -72,8 +74,9 @@ export class SofiaApi {
       try { data = await response.json(); } catch { throw new ApiError('O servidor não retornou dados válidos. A API móvel da Sofia precisa estar publicada.', 'INVALID_RESPONSE', response.status); }
       if (!response.ok && path === '/auth/login' && (response.status === 404 || response.status === 405 || data.code === 'AUTH_REQUIRED')) throw new ApiError('O servidor ainda precisa receber a API móvel da Sofia. Não é um erro da sua senha.', 'MOBILE_API_NOT_PUBLISHED', response.status);
       if (!response.ok) { if (response.status === 401 && path !== '/auth/login') {void this.discardCache();this.onExpired();} throw new ApiError(data.error || 'Não foi possível concluir.', data.code || 'HTTP_ERROR', response.status, data); }
+      if(generation===this.cacheGeneration&&path.startsWith('/chat-sync')&&Array.isArray(data.deleted_conversation_ids)&&data.deleted_conversation_ids.length){const removed=new Set<string>(data.deleted_conversation_ids);for(const id of removed)this.snapshots.forget('/conversations/'+id);const current=this.cached<ChatSnapshot>('/chat-sync/current');if(current?.conversation&&removed.has(current.conversation.id))this.snapshots.forget('/chat-sync/current');const index=this.cached<{items:Conversation[];has_more:boolean}>('/conversations?offset=0');if(index){this.snapshots.forget('/conversations?offset=0');this.snapshots.remember('/conversations?offset=0',{...index,items:index.items.filter(c=>!removed.has(c.id))});}}
       if(method==='GET'&&generation===this.cacheGeneration)this.snapshots.remember(path,data);
-      if(generation===this.cacheGeneration&&path.startsWith('/chat-sync')&&data.conversation&&Array.isArray(data.messages)){this.snapshots.remember('/chat-sync/current',{...data,messages:data.messages.slice(-100)});this.snapshots.remember('/conversations/'+data.conversation.id,{...data,messages:data.messages.slice(-100)});}
+      if(generation===this.cacheGeneration&&path.startsWith('/chat-sync')&&data.conversation&&Array.isArray(data.messages)){const saved={...data,messages:data.messages.slice(-100)};if(!path.includes('?conversation_id='))this.snapshots.remember('/chat-sync/current',saved);this.snapshots.remember('/conversations/'+data.conversation.id,saved);}
       return data as T;
     } catch (error) {
       if (error instanceof ApiError) throw error;
@@ -87,7 +90,7 @@ export class SofiaApi {
   logoutAll() { return this.request<{ok: boolean}>('/auth/logout-all', {}); }
   changePassword(currentPassword: string,newPassword: string,confirmPassword: string) { return this.request<{ok: boolean}>('/auth/change-password', {currentPassword,newPassword,confirmPassword}); }
   syncChat(id?:string) { return this.request<ChatSnapshot>('/chat-sync'+(id?'?conversation_id='+encodeURIComponent(id):'')); }
-  ensureChat() { if(!this.chatOpening){const opening=this.request<ChatSnapshot>('/chat-sync/current',{});this.chatOpening=opening;void opening.finally(()=>{if(this.chatOpening===opening)this.chatOpening=null;}).catch(()=>{});}return this.chatOpening; }
+  ensureChat() { if(!this.chatOpening){const opening=openExistingChat({current:()=>this.fetchRequest<ChatSnapshot>('/chat-sync',undefined,'GET',20000),index:offset=>this.conversations(offset),history:id=>this.syncChat(id),select:(id,revision)=>this.request<ChatSnapshot>('/chat-sync/select',{conversation_id:id,expected_cursor_revision:revision})},this.cached<ChatSnapshot>('/chat-sync/current'));this.chatOpening=opening;void opening.finally(()=>{if(this.chatOpening===opening)this.chatOpening=null;}).catch(()=>{});}return this.chatOpening; }
   selectChat(id:string) { return this.request<ChatSnapshot>('/chat-sync/select',{conversation_id:id}); }
   async deleteChatMessages(id:string,ids:string[]) {const result=await this.request<{deleted_ids:string[];failed:{id:string;error:string}[]}>('/chat-sync/delete',{conversation_id:id,ids});this.cacheGeneration++;this.startupReads.invalidate();const before=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');if(before?.conversation?.id===id&&before){const removed=new Set(result.deleted_ids);this.snapshots.remember('/chat-sync/current',{...before,messages:before.messages.filter(m=>!removed.has(m.id)),deleted_ids:[...new Set([...before.deleted_ids,...result.deleted_ids])]});}this.snapshots.forget('/conversations/'+id);await this.snapshots.flush();return result;}
   conversations(offset = 0) { return this.request<{items: Conversation[]; has_more: boolean; next_offset: number}>('/conversations?offset=' + offset); }
@@ -96,12 +99,12 @@ export class SofiaApi {
   dashboardWidgets(){return this.request<{widgets:string[]}>('/md/dashboard');}
   async saveDashboardWidgets(widgets:string[]){if(!await this.feature('dashboard_widgets'))throw new Error('A sincronização dos widgets aguarda a atualização do servidor. A organização anterior foi mantida.');return this.request<{widgets:string[]}>('/md/dashboard',{widgets},'PATCH');}
   async deleteConversations(ids:string[]) { if(!await this.feature('conversation_delete'))throw new Error('A exclusão de conversas aguarda a atualização do servidor. Nenhuma conversa foi apagada.');const result=await this.request<{ok:boolean}>('/md/conversations',{ids},'DELETE');this.cacheGeneration++;this.startupReads.invalidate();this.snapshots.forget('/conversations?offset=0');for(const id of ids)this.snapshots.forget('/conversations/'+id);const current=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');if(current?.conversation&&ids.includes(current.conversation.id))this.snapshots.forget('/chat-sync/current');await this.snapshots.flush();return result; }
-  newConversation(title = 'Conversa com a Sofia') { return this.request<{conversation: Conversation}>('/conversations', {title}); }
+  async newConversation(title = 'Conversa com a Sofia') { const result=await this.request<{conversation: Conversation}>('/conversations', {title});const saved={conversation:result.conversation,messages:[],has_more:false,deleted_ids:[],current_id:result.conversation.id,cursor_revision:0};this.snapshots.remember('/chat-sync/current',saved);this.snapshots.remember('/conversations/'+result.conversation.id,saved);const index=this.cached<{items:Conversation[];has_more:boolean;next_offset?:number}>('/conversations?offset=0');this.snapshots.remember('/conversations?offset=0',{...index,items:[result.conversation,...(index?.items||[]).filter(c=>c.id!==result.conversation.id)],has_more:index?.has_more||false});await this.snapshots.flush();return result; }
   async deleteMessage(id: string) {const result=await this.request<{ok:boolean;id:string;conversation_id:string}>('/messages/' + encodeURIComponent(id), {}, 'DELETE');this.cacheGeneration++;this.startupReads.invalidate();this.snapshots.forget('/conversations/'+result.conversation_id);const current=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');if(current?.conversation?.id===result.conversation_id&&current)this.snapshots.remember('/chat-sync/current',{...current,messages:current.messages.filter(m=>m.id!==id),deleted_ids:[...current.deleted_ids,id]});await this.snapshots.flush();return result;}
   async clearChatHistory() {const result=await this.request<{ok:boolean;conversations:number;messages:number}>('/chat-history', {}, 'DELETE');this.cacheGeneration++;this.startupReads.invalidate();this.snapshots.forgetChat();await this.snapshots.flush();return result;}
   history(id: string, before?: number) { return this.request<MessagePage>(`/conversations/${encodeURIComponent(id)}${before ? '?before=' + before : ''}`); }
-  async chat(data: object) { const result=await this.request<ChatResult>('/messages', data, 'POST', 180000);this.rememberChatResult(result,data);systemChanged(this);return result; }
-  async audio(data: object) { const result=await this.request<ChatResult>('/messages/audio', data, 'POST', 180000);this.rememberChatResult(result,data);systemChanged(this);return result; }
+  async chat(data: object) { const result=await this.request<ChatResult>('/messages', data, 'POST', 180000);await this.rememberChatResult(result,data);systemChanged(this);return result; }
+  async audio(data: object) { const result=await this.request<ChatResult>('/messages/audio', data, 'POST', 180000);await this.rememberChatResult(result,data);systemChanged(this);return result; }
   home() { return this.request<HomeData>('/home'); }
   movePage(input:{id:string;revision:number;parentId:string;kind:string;anchorId:string}) { return this.md.move(input); }
   allNotifications(offset=0) { return this.md.notices(offset); }

@@ -29,7 +29,7 @@ export class StartupSnapshot {
  forgetData(){if(this.closed)return;this.revision++;for(const key of this.entries.keys())if(key!=='/bootstrap'&&!chatRead(key))this.entries.delete(key);this.schedule();}
  forgetChat(){if(this.closed)return;this.revision++;for(const key of this.entries.keys())if(chatRead(key))this.entries.delete(key);this.schedule();}
  forget(path:string){if(this.closed)return;this.revision++;this.entries.delete(path);this.schedule();}
- private schedule(){if(this.timer)clearTimeout(this.timer);this.timer=setTimeout(()=>{this.timer=undefined;void this.flush();},450);}
- async flush(){if(this.closed)return;const entries=[...this.entries].sort((a,b)=>Number(b[0]==='/chat-sync/current')-Number(a[0]==='/chat-sync/current')||b[1].at-a[1].at).slice(0,32);let text=JSON.stringify({schema:1,entries});while(text.length>MAX_BYTES&&entries.length>1){entries.pop();text=JSON.stringify({schema:1,entries});}try{await this.storage.write(this.scope,text);}catch{/* Confirmed server writes never depend on the optional cache. */}}
+ private schedule(){if(this.timer)return;this.timer=setTimeout(()=>{this.timer=undefined;void this.flush();},150);}
+ async flush(){if(this.closed)return;const entries=[...this.entries].sort((a,b)=>Number(b[0]==='/chat-sync/current')-Number(a[0]==='/chat-sync/current')||Number(b[0]==='/conversations?offset=0')-Number(a[0]==='/conversations?offset=0')||b[1].at-a[1].at).slice(0,32);let text=JSON.stringify({schema:1,entries});while(text.length>MAX_BYTES&&entries.length>1){entries.pop();text=JSON.stringify({schema:1,entries});}try{await this.storage.write(this.scope,text);}catch{/* Confirmed server writes never depend on the optional cache. */}}
  async clear(){this.closed=true;if(this.timer)clearTimeout(this.timer);this.entries.clear();try{await this.storage.remove(this.scope);}catch{}}
 }

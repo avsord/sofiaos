@@ -77,7 +77,7 @@ function Shell(){
  },[servicesReady,checkUpdate]);
  const boot=useCallback(async()=>{if(!auth)return;setBooting(true);try{const b=await api.liveBootstrap();setBootstrap(previous=>JSON.stringify(previous)===JSON.stringify(b)?previous:b);const next=authWithBootstrap(auth,b);setAuth(next);if(JSON.stringify(auth.startup)!==JSON.stringify(next.startup))void saveAuth(next).catch(()=>{});setError('');}catch(e){setError(errorText(e));}finally{setBooting(false);}},[api,auth]);
  useEffect(()=>{if(auth)void boot();},[api]);
- useEffect(()=>{if(!auth)return;const sub=AppState.addEventListener('change',state=>{if(state==='active'&&!locked)void boot();else if(state!=='active')void silenceVoices();});return()=>sub.remove();},[auth,locked,boot]);
+ useEffect(()=>{if(!auth)return;const sub=AppState.addEventListener('change',state=>{if(state==='active'&&!locked)void boot();else if(state!=='active'){void silenceVoices();void api.flushCache();}});return()=>sub.remove();},[auth,locked,boot]);
  // Issue the native, non-animated jump before React updates the selected menu.
  const switchTab=useCallback((next:Tab)=>{navigation.current.tab=next;pager.current?.goTo(next);setTab(next);},[]);
  const navigate=useCallback((next:Tab)=>{

@@ -40,7 +40,7 @@ function makeMobileApi(runtime, deps) {
   function profile() { const s = store.settings(); return { name: s.profileName || 'Proprietário', email: ownerAuth.registeredEmail(), role: 'owner' }; }
   function conversation(id) {
     const c = store.conversation(validId(id));
-    if (!['mobile', 'web', 'test'].includes(c.channel) || c.state !== 'active') fail('NOT_FOUND', 'Conversa não disponível neste canal.', 404);
+    if (!['mobile', 'web', 'test'].includes(c.channel) || !['active','paused'].includes(c.state)) fail('NOT_FOUND', 'Conversa não disponível neste canal.', 404);
     return c;
   }
   function messages(id, before = Number.MAX_SAFE_INTEGER) {
@@ -122,8 +122,8 @@ function makeMobileApi(runtime, deps) {
       capabilities: { text: true, voice_notes: true, notifications_push: false, multi_user: false, e2ee: false, workspace: true, protected_diary: true } });
     if (p === '/api/mobile/conversations' && m === 'GET') {
       const offset = Math.max(0, Math.min(100000, Number(url.searchParams.get('offset')) || 0));
-      const rows = store.db.prepare(`SELECT * FROM conversations WHERE owner=? AND state='active'
-        AND channel IN ('mobile','web','test') ORDER BY updated_at DESC,rowid DESC LIMIT 51 OFFSET ?`).all(OWNER, Math.trunc(offset));
+      const rows = store.db.prepare(`SELECT c.*, (SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.owner=c.owner AND m.status<>'deleted') AS message_count FROM conversations c WHERE c.owner=? AND c.state IN ('active','paused')
+        AND c.channel IN ('mobile','web','test') ORDER BY c.updated_at DESC,c.rowid DESC LIMIT 51 OFFSET ?`).all(OWNER, Math.trunc(offset));
       return send({ items: rows.slice(0, 50), has_more: rows.length > 50, next_offset: offset + 50 });
     }
     if (p === '/api/mobile/conversations' && m === 'POST') {

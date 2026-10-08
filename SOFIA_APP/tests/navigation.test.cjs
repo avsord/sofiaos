@@ -36,14 +36,14 @@ test('gestures use the native horizontal pager and do not steal vertical scrolls
   assert.ok(pager.includes('velocity !== undefined && Math.abs(velocity) < 0.01'));
   assert.ok(source.includes("enabled={!gestureLocked&&!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)&&!(tab==='apps'&&workspaceDepth)}"));
 });
-test('pager keeps six fixed slots and mounts its screen trees behind data-ready launch handoff',()=>{
+test('pager keeps six fixed slots while only hidden trees warm after Home paints',()=>{
   assert.deepEqual(Array.from(TAB_ORDER),['home','chat','pages','agenda','apps','profile']);
   const body=source.slice(source.indexOf('<TabPager'),source.indexOf('</TabPager>'));
   const markers=['load={loadHome}','load={loadChat}','load={loadPages}','load={loadAgenda}','load={loadWorkspace}','load={loadProfile}'];
   let previous=-1;for(const marker of markers){const index=body.indexOf(marker);assert.ok(index>previous,marker);previous=index;}
   for(const tab of ['chat','pages','agenda','apps','profile'])assert.ok(body.includes("mountedTabs.has('"+tab+"')"));
   const startup=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
-  assert.ok(startup.includes("enabled?MENU_TABS"));
+  assert.ok(startup.includes("enabled?warmed"));assert.ok(startup.includes("MENU_TABS.includes(active)"));
   assert.ok(!startup.includes('setTimeout'));
   assert.ok(source.includes('useStartupMounts(!!auth&&!!bootstrap&&initialDataReady,tab)'));
   assert.ok(pager.includes('removeClippedSubviews={false}'));assert.ok(!source.includes('setBootstrap(null);setTab('));

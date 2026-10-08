@@ -68,3 +68,22 @@ test('sync: a recoverable deletion failure is explicit rather than reported succ
  const f=await setup(t),c=f.store.createConversation('A','web'),a=f.add(c.id),sync=createChatSync(f.store),original=f.store.deleteMessage.bind(f.store);
  f.store.deleteMessage=id=>{if(id===a[1].id)throw Error('fixture failure');return original(id);};const r=sync.remove(c.id,a.map(m=>m.id));assert.equal(r.ok,false);assert.deepEqual(r.deleted_ids,[a[0].id]);assert.equal(r.failed[0].id,a[1].id);assert.ok(f.store.message(a[1].id));
 });
+
+test('056: paused personal history remains readable without changing pause state',async t=>{
+ const f=await setup(t),c=f.store.createConversation('Retained paused','mobile');f.add(c.id);
+ f.store.db.prepare("UPDATE conversations SET state='paused' WHERE id=?").run(c.id);
+ const read=await f.mobile('?conversation_id='+c.id);assert.equal(read.status,200);assert.equal(read.body.messages.length,2);assert.equal(f.store.conversation(c.id).state,'paused');
+ const token=new MobileSessions(f.store,new OwnerAuth(f.config,f.store),f.config).issue('history').token;
+ const response=await fetch(f.base+'/api/mobile/conversations',{headers:{Authorization:'Bearer '+token}}),index=await response.json();
+ assert.ok(index.items.some(item=>item.id===c.id&&item.message_count===2));assert.equal(f.store.conversation(c.id).state,'paused');
+});
+test('056: recovery selection rejects a changed cursor without overwriting it',async t=>{
+ const f=await setup(t),a=f.store.createConversation('A','web'),b=f.store.createConversation('B','mobile');
+ await f.web('/select',{conversation_id:a.id});const old=(await f.mobile('')).body.cursor_revision;
+ await f.web('/select',{conversation_id:b.id});const rejected=await f.mobile('/select',{conversation_id:a.id,expected_cursor_revision:old});
+ assert.equal(rejected.status,409);assert.equal((await f.web()).body.conversation.id,b.id);
+});
+test('056: explicit deletion IDs reach the other client for safe local cache removal',async t=>{
+ const f=await setup(t),c=f.store.createConversation('Remove by request','mobile');f.add(c.id);f.store.clearChatHistory();
+ const state=(await f.mobile('')).body;assert.ok(state.deleted_conversation_ids.includes(c.id));assert.equal(state.conversation,null);
+});

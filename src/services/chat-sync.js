@@ -25,9 +25,9 @@ function recoverShutdownConversations(store,beforeRecovery){
 }
 function createChatSync(store){
  store.db.exec(`CREATE TABLE IF NOT EXISTS owner_chat_cursor(owner TEXT PRIMARY KEY,conversation_id TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 1) STRICT;`);
- function eligible(id){const c=store.conversation(validId(id));if(c.owner!==OWNER||c.state!=='active'||!['web','mobile'].includes(c.channel))throw new AppError('NOT_FOUND','Conversa pessoal não encontrada.',404);return c;}
+ function eligible(id){const c=store.conversation(validId(id));if(c.owner!==OWNER||!['active','paused'].includes(c.state)||!['web','mobile'].includes(c.channel))throw new AppError('NOT_FOUND','Conversa pessoal não encontrada.',404);return c;}
  function cursor(){return store.db.prepare('SELECT * FROM owner_chat_cursor WHERE owner=?').get(OWNER);}
- function select(id){const c=eligible(id),old=cursor();if(old?.conversation_id!==c.id)store.db.prepare('INSERT INTO owner_chat_cursor(owner,conversation_id,revision) VALUES(?,?,1) ON CONFLICT(owner) DO UPDATE SET conversation_id=excluded.conversation_id,revision=owner_chat_cursor.revision+1').run(OWNER,c.id);return c;}
+ function select(id,expectedRevision){const c=eligible(id),old=cursor();if(expectedRevision!==undefined&&(!Number.isInteger(expectedRevision)||(old?.revision||0)!==expectedRevision))throw new AppError('CURSOR_CHANGED','A conversa foi alterada em outro dispositivo. Atualize antes de continuar.',409);if(old?.conversation_id!==c.id)store.db.prepare('INSERT INTO owner_chat_cursor(owner,conversation_id,revision) VALUES(?,?,1) ON CONFLICT(owner) DO UPDATE SET conversation_id=excluded.conversation_id,revision=owner_chat_cursor.revision+1').run(OWNER,c.id);return c;}
  function current(create=false){const old=cursor();if(old){try{return eligible(old.conversation_id);}catch(e){if(e.code!=='NOT_FOUND')throw e;}}
   const latest=store.db.prepare("SELECT id FROM conversations WHERE owner=? AND state='active' AND channel IN ('web','mobile') ORDER BY updated_at DESC,rowid DESC LIMIT 1").get(OWNER);
   if(latest)return select(latest.id);if(!create)return null;
@@ -36,11 +36,12 @@ function createChatSync(store){
  function decorate(rows,client){const voices=store.voiceForMessages(rows);return rows.map(m=>{const v=voices.get(m.id);return {...m,voice:v?{mime:v.mime,duration_ms:v.duration_ms,audio_url:(client==='mobile'?'/api/mobile/messages/':'/api/messages/')+m.id+'/audio'}:null};});}
  function snapshot({id=null,client='web',decorateRows=null}={}){
   const conversation=id?eligible(id):current(false),selection=cursor();
-  if(!conversation)return {conversation:null,messages:[],has_more:false,deleted_ids:[],current_id:null,cursor_revision:selection?.revision||0};
+  const deleted_conversation_ids=store.db.prepare("SELECT id FROM conversations WHERE owner=? AND state='deleted' AND channel IN ('web','mobile')").all(OWNER).map(row=>row.id);
+  if(!conversation)return {conversation:null,messages:[],has_more:false,deleted_ids:[],deleted_conversation_ids,current_id:null,cursor_revision:selection?.revision||0};
   const rows=store.messages(conversation.id,101),messages=rows.slice(-100);
   // Tombstones cover older loaded pages too, not only the latest 100 messages.
   const deleted_ids=store.db.prepare("SELECT id FROM messages WHERE owner=? AND conversation_id=? AND status='deleted'").all(OWNER,conversation.id).map(m=>m.id);
-  return {conversation,messages:decorateRows?decorateRows(messages):decorate(messages,client),has_more:rows.length>100,deleted_ids,current_id:selection?.conversation_id||conversation.id,cursor_revision:selection?.revision||0};
+  return {conversation,messages:decorateRows?decorateRows(messages):decorate(messages,client),has_more:rows.length>100,deleted_ids,deleted_conversation_ids,current_id:selection?.conversation_id||conversation.id,cursor_revision:selection?.revision||0};
  }
  function remove(id,ids){const c=eligible(id);if(!Array.isArray(ids)||!ids.length||ids.length>100)throw new AppError('BAD_SELECTION','Selecione de 1 a 100 mensagens.');
   const unique=[...new Set(ids.map(validId))];
@@ -58,7 +59,7 @@ function makeChatSyncApi(store,{bodyJson,json,client='web',decorateRows=null}){
   const send=value=>{json(res,200,value);return true;};
   if(p===prefix&&m==='GET')return send(sync.snapshot({id:url.searchParams.get('conversation_id')||null,client,decorateRows}));
   if(p===prefix+'/current'&&m==='POST'){await bodyJson(req,1024);sync.current(true);return send(sync.snapshot({client,decorateRows}));}
-  if(p===prefix+'/select'&&m==='POST'){const b=await bodyJson(req,1024);sync.select(b.conversation_id);return send(sync.snapshot({client,decorateRows}));}
+  if(p===prefix+'/select'&&m==='POST'){const b=await bodyJson(req,1024);sync.select(b.conversation_id,b.expected_cursor_revision);return send(sync.snapshot({client,decorateRows}));}
   if(p===prefix+'/delete'&&m==='POST'){const b=await bodyJson(req,16384);return send(sync.remove(b.conversation_id,b.ids));}
   return false;
  };

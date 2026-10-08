@@ -54,7 +54,7 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
   previousMessages.current=messages;
  },[messages]);
  const [loading,setLoading]=useState(!cached),[sending,setSending]=useState(false),[refreshing,setRefreshing]=useState(false),[dirty,setDirty]=useState(false),[recordingLock,setRecordingLock]=useState(false),[error,setError]=useState('');
- const [history,setHistory]=useState(false),[items,setItems]=useState<Conversation[]>([]),[historyMore,setHistoryMore]=useState(false),[query,setQuery]=useState('');
+ const [history,setHistory]=useState(false),[items,setItems]=useState<Conversation[]>(()=>api.cached<{items:Conversation[]}>('/conversations?offset=0')?.items||[]),[historyMore,setHistoryMore]=useState(false),[query,setQuery]=useState('');
  const [selectedConversations,setSelectedConversations]=useState(new Set<string>());
  const [selectedIds,setSelectedIds]=useState(new Set<string>()),[deleting,setDeleting]=useState(false);
  const syncEpoch=useRef(0),syncBusy=useRef(false),latest=useRef({dirty,history,recordingLock,selectedIds,deleting});latest.current={dirty,history,recordingLock,selectedIds,deleting};
@@ -70,8 +70,8 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
   try{const page=publish&&['web','mobile'].includes(item.channel)?await api.selectChat(item.id):await api.history(item.id);if(!mounted.current||epoch!==syncEpoch.current||currentId.current!==item.id)return;setConversation(item);setMessages(previous=>previous.length&&conversation?.id===item.id?reconcileMessages(previous,page):page.messages);setHasMore(page.has_more);}catch(e){if(mounted.current&&epoch===syncEpoch.current){const saved=api.cached<{messages:Message[];has_more:boolean}>('/conversations/'+item.id);if(saved){setConversation(item);setMessages(saved.messages);setHasMore(saved.has_more);}setError(errorText(e));}}finally{if(mounted.current&&epoch===syncEpoch.current)setLoading(false);}
  }
  async function initialize(){
-  const epoch=++syncEpoch.current;setLoading(!api.cached<ChatSnapshot>('/chat-sync/current'));setError('');try{await api.hydrate();const page=await api.ensureChat();if(!mounted.current||epoch!==syncEpoch.current)return;if(!page.conversation){if(cached?.conversation&&cached.messages.length){setConversation(cached.conversation);setMessages(cached.messages);setHasMore(cached.has_more);setError('A conversa salva permanece disponível. Atualize a conexão para sincronizar.');}return;}
-   followChat();const before=currentId.current;currentId.current=page.conversation.id;setConversation(page.conversation);setMessages(previous=>before===page.conversation!.id?reconcileMessages(previous,page):page.messages);setHasMore(page.has_more);setSelectedIds(new Set());
+  const epoch=++syncEpoch.current;setLoading(!api.cached<ChatSnapshot>('/chat-sync/current'));setError('');try{await api.hydrate();const page=await api.ensureChat();if(!mounted.current||epoch!==syncEpoch.current)return;if(!page.conversation){setConversation(null);currentId.current='';setMessages([]);setHasMore(false);return;}
+   followChat();const before=currentId.current;currentId.current=page.conversation.id;setConversation(page.conversation);setMessages(previous=>before===page.conversation!.id?reconcileMessages(previous,page):page.messages);setHasMore(page.has_more);setSelectedIds(new Set());if(page.recovery_pending)setError('Mostrando a conversa salva neste aparelho. O servidor ainda não confirmou este histórico.');
   }catch(e){if(mounted.current)setError(errorText(e));}finally{if(mounted.current&&epoch===syncEpoch.current)setLoading(false);}
  }
  useEffect(()=>{void initialize();},[api]);

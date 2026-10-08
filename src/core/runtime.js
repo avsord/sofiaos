@@ -22,6 +22,7 @@ function createRuntime(config,options={}){
  if(config.privateApiKey||(config.apiKey&&current.legacyRoute==='private')){const updates={};if(!current.routingEnabled)updates.routingEnabled=true;if(!current.privateConfirmed)updates.privateConfirmed=true;if(Object.keys(updates).length){store.updateSettings(updates);current=store.settings();}}
  const vault=new VaultService(store,{secureDir:options.secureDir});const routing=new RoutingService(store,config,options.providerFactory||(options.provider?()=>options.provider:undefined));
  const backups=new BackupService(store,config.backupDir,new KeyStore(options.secureDir));backups.vault=vault;
+ if(process.env.SOFIA_PERSISTENT_DIR){const verified=require('../services/history-safety').verifyHistoryBackup(store,backups);console.info('[Sofia] History 056 backup verified; retained records: '+JSON.stringify(verified.states));}
  // Repair legacy shutdown pauses only after retaining a fresh encrypted backup.
  // Failure leaves all records in place and does not prevent the app from opening.
  try{const recovered=require('../services/chat-sync').recoverShutdownConversations(store,()=>backups.create('before-history-recovery'));if(recovered.conversations)console.info('[Sofia] History visibility recovered: '+recovered.conversations+' personal conversations, '+recovered.messages+' existing messages. Message rows unchanged.');}
