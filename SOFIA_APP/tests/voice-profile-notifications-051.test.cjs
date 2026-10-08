@@ -45,3 +45,10 @@ test('instant fallback bootstrap uses the same expanded transport ceiling as the
  const fast=file('src/lib/fast-bootstrap.ts');
  assert.ok(fast.includes('audio_bytes:64*1024*1024'));assert.ok(fast.includes('audio_seconds:0'));assert.ok(fast.includes('text_chars:0'));
 });
+
+test('root regression suite accepts 200k chat text instead of restoring the old 12k ceiling',()=>{
+ const memory=file('../tests/memory.test.cjs');
+ assert.ok(memory.includes("message='x'.repeat(200000)"));
+ assert.ok(memory.includes("mensagem longa é preservada sem teto curto"));
+ assert.ok(!memory.includes("Mensagens vazias e grandes são recusadas"));
+});
