@@ -12,7 +12,7 @@ const {migrate85}=require('./migration85');
 const {migrate119}=require('./migration119');
 const TABLES_PRE82=[...BASE_TABLES,...EXTRA_TABLES,...EXTRA_TABLES_46,...EXTRA_TABLES_49,'voice_messages'];
 const TABLES=[...TABLES_PRE82,...EXTRA_TABLES_82];
-const { AppError, now, id, cleanText, rejectSecrets, searchTerms, normalize } = require('../core/util');
+const { AppError, now, id, cleanText, cleanMessage, rejectSecrets, searchTerms, normalize } = require('../core/util');
 const OWNER = 'owner-local';
 const DEFAULTS = { privacyMode: 'auto', dailyCallLimit: 50, maxOutputTokens: 1200, routingEnabled: false, privateConfirmed: false, sharedConfirmed: false, sharedBillingAcknowledged: false, legacyRoute: 'none', privateDailyUSD: 0, privateMonthlyUSD: 0, sharedDailyUSD: 0, sharedMonthlyUSD: 0, privateInputPerMillion: 0, privateOutputPerMillion: 0, sharedInputPerMillion: 0, sharedOutputPerMillion: 0, privateModel: '', sharedModel: 'gpt-5.6-terra', sharedDailyTokenCap: 250000, sharedIncentiveDailyTokens: 2500000, sharedUsageAlertPercent: 90, privateUsageAlertPercent: 90, privateUsageTotalUSD: 5, privateUsageTotalUserSet: false, timezone: 'America/Sao_Paulo', developerModeAllowed: true, uiMode: 'user', homeWidgets: ['priorities','tasks','commitments','notifications','study'], userNavWidgets: ['lists','library'], listViews: ['market','pharmacy','purchase','blackfriday','monitor'], libraryViews: ['recipe','recipe_session','music','film','video','reading','source','asset','file'], profileName: 'Pedro Silva', profileEmail: 'sofiaos.core@gmail.com' };
 class Store {
@@ -234,7 +234,7 @@ class Store {
     if(!Buffer.isBuffer(bytes))bytes=Buffer.from(bytes||[]);
     if(!bytes.length||bytes.length>25*1024*1024)throw new AppError('VOICE_SIZE','Áudio inválido ou acima de 25 MB.',413);
     const safeMime=String(mime||'audio/webm').slice(0,120);
-    const safeTranscript=cleanText(transcript,'Transcrição',12000,true);
+    const safeTranscript=cleanMessage(transcript,'Transcrição',true);
     const dur=Number.isSafeInteger(duration_ms)&&duration_ms>=0?duration_ms:0;
     this.db.prepare(`INSERT INTO voice_messages(message_id,mime,duration_ms,transcript,languages_json,blob,created_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(message_id) DO UPDATE SET mime=excluded.mime,duration_ms=excluded.duration_ms,transcript=excluded.transcript,languages_json=excluded.languages_json,blob=excluded.blob`).run(messageId,safeMime,dur,safeTranscript,JSON.stringify(Array.isArray(languages)?languages:[]),bytes,now());
     this.audit('voice.saved',messageId);
