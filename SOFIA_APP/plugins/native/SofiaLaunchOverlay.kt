@@ -349,6 +349,10 @@ private class SofiaEarlySplashSurface(
     // CircularRRectOp and FillRectOp. Prime their real clipped draws, not
     // just their unmasked shapes, in the identical purple background color.
     // Spread work over early frames so React can mount between each draw.
+    canvas.save()
+    // Keep the invisible warm samples inside the app area: system bars can
+    // occlude top-edge circles and collapse rounded samples into rectangles.
+    canvas.translate(0f, canvas.clipBounds.top + 96f * resources.displayMetrics.density)
     warmPaint.style = Paint.Style.FILL
     warmPaint.alpha = 255
     when (step) {
@@ -389,6 +393,7 @@ private class SofiaEarlySplashSurface(
         canvas.drawRect(24.25f, 82.25f, 40.75f, 96.75f, warmPaint)
       }
     }
+    canvas.restore()
   }
 
 }

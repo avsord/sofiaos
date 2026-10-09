@@ -82,7 +82,7 @@ test('060 unmount or launch failure cannot release stale optional services',asyn
 test('060 old platforms without the visibility bridge keep a cancellable fallback',async()=>{
  const f=visibilityFixture(false);assert.deepEqual(f.states,[false]);f.frames.shift()();f.frames.shift()();assert.deepEqual(f.states,[false,true]);f.dispose();
 });
-test('099 early visible snapshot preserves system pixels through scale and fade',()=>{
+test('100 early visible snapshot preserves system pixels through scale and fade',()=>{
  const native=file('plugins/native/SofiaLaunchOverlay.kt');
  const exit=native.slice(native.indexOf('exitSystemSplash = { success ->'),native.indexOf('when (transition.splashReady())'));
  assert.ok(!native.includes('SofiaLaunchFadeLayer'));
@@ -112,6 +112,7 @@ test('099 early visible snapshot preserves system pixels through scale and fade'
  assert.ok(native.includes('canvas.clipPath(clip)'));
  assert.ok(native.includes('Path.Direction.CW'));
  assert.ok(native.includes('when (step)'));
+ assert.ok(native.includes('canvas.translate(0f, canvas.clipBounds.top + 96f * resources.displayMetrics.density)'));
  assert.ok(native.includes('queueHomePrograms(canvas, homeProgramStep++)'));
  assert.ok(!native.includes('View.INVISIBLE'));
  assert.ok(native.includes('Bitmap.createBitmap(icon.width, icon.height, Bitmap.Config.ARGB_8888)'));

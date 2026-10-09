@@ -150,7 +150,7 @@ test('086 startup S uses the reference vector and one finite scale and defers op
 
 
 
-test('099 early Canvas retains its mark during the single alpha fade',()=>{
+test('100 early Canvas retains its mark during the single alpha fade',()=>{
  const overlay=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const loader=fs.readFileSync(path.join(root,'src/lib/screen-loader.tsx'),'utf8');
@@ -209,7 +209,7 @@ test('075 launch does not block on optional photo decode or full archive rollove
  assert.ok(snapshot.includes('await this.hydrate();void this.flushLaunch()'),'No-cache sessions can still recover the entire archive');
 });
 
-test('099 early prepared surface leaves within the unchanged startup timing gates',()=>{
+test('100 early prepared surface leaves within the unchanged startup timing gates',()=>{
  const native=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const smoke=fs.readFileSync(path.join(root,'tools/manual-apk-smoke.py'),'utf8');
