@@ -75,7 +75,7 @@ test('automatic update checks and notifications wait until the completed visual 
   assert.ok(source.includes("if(!servicesReady)return;"));
   assert.ok(source.includes("enabled={!!auth&&!!bootstrap&&servicesReady}"));
   assert.ok(source.includes('prepareInitialData(api,()=>preloadAgenda(api))'));
-  assert.ok(source.includes('painted=useAfterFirstPaint(ready)')&&source.includes('servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady')&&source.includes('visible=useLaunchVisible(ready)')&&source.includes('if(painted&&(!cachedOpening||visible))api.releaseNetwork()')&&source.includes("const cachedOpening=!!(api.cached('/home')||api.cached('/tasks'))"));
+  assert.ok(source.includes('painted=useAfterFirstPaint(ready&&!cachedOpening)')&&source.includes('servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady')&&source.includes('visible=useLaunchVisible(ready)')&&source.includes('if(cachedOpening?visible:painted)api.releaseNetwork()')&&source.includes("const cachedOpening=!!(api.cached('/home')||api.cached('/tasks'))"));
 });
 test('notification overlay cannot capture touches or accessibility focus while hidden',()=>{
   assert.ok(source.includes("pointerEvents={tab==='notifications'?'auto':'none'}"));
@@ -107,8 +107,8 @@ test('notifications are outside the swipe sequence without losing the underlying
 test('Android identity, discovery prefix and version stay compatible',()=>{
   const config=JSON.parse(fs.readFileSync(path.join(root,'app.json'))).expo,pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json')));
   const update=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');
-  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,92);
-  assert.equal(config.version,'0.3.87');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
+  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,93);
+  assert.equal(config.version,'0.3.88');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
 });
 test('Pages opens a preloaded entity synchronously without a network wait',()=>{
  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');

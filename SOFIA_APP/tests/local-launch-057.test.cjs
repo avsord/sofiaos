@@ -50,3 +50,13 @@ test('064 entrypoint warms native storage and starts local preparation before re
  const events=[],Component=()=>{};load('index.ts',{'expo':{registerRootComponent:c=>{assert.equal(c,Component);events.push('register');}},'./src/lib/startup-read-ahead':{AUTH_STORAGE_KEY:'auth',PREFS_STORAGE_KEY:'prefs',primeStartupReads:()=>events.push('session')},'react-native':{NativeModules:{SofiaSnapshot:{prepareLaunch:()=>events.push('key')}}},'./App':{default:Component,prepareStartup:()=>events.push('local')}});
  assert.deepEqual(events,['session','key','local','register']);
 });
+
+test('088 cached opening disables the intermediate paint subscription and foreground boot waits for visibility',()=>{
+ let effect,calls=0;const frames=[],states=[];
+ const {useAfterFirstPaint}=load('src/lib/use-after-first-paint.ts',{'react':{useState:v=>[v,x=>states.push(x)],useEffect:f=>effect=f},'react-native':{NativeModules:{SofiaLaunch:{whenInteractive:()=>{calls++;return Promise.resolve(true);}}}}},{requestAnimationFrame:f=>{frames.push(f);return 1;},cancelAnimationFrame(){}});
+ assert.equal(useAfterFirstPaint(false),false);effect();assert.equal(calls,0);assert.equal(frames.length,0);assert.deepEqual(states,[false]);
+ const app=fs.readFileSync(path.join(__dirname,'..','App.tsx'),'utf8');
+ assert.ok(app.includes('painted=useAfterFirstPaint(ready&&!cachedOpening)'));
+ assert.ok(app.includes('if(cachedOpening?visible:painted)api.releaseNetwork()'));
+ assert.ok(app.includes("if(state==='active'&&!locked&&visible)void boot()"));
+});

@@ -53,15 +53,17 @@ function Shell({startup}:{startup:LocalLaunch}){
  const initialDataReady=prepared===api;
  // Layout releases essential network reads; only the completed visual handoff
  // releases hidden screens, notification inventory and optional prefetch.
- const painted=useAfterFirstPaint(ready),visible=useLaunchVisible(ready),servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady,mountedTabs=useStartupMounts(visible&&!!auth,tab);
+ // A cached Home needs only the final visibility fence. A second first-paint
+ // state update rerenders the entire Shell during the native alpha animation.
+ const cachedOpening=!!(api.cached('/home')||api.cached('/tasks'));
+ const painted=useAfterFirstPaint(ready&&!cachedOpening),visible=useLaunchVisible(ready),servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady,mountedTabs=useStartupMounts(visible&&!!auth,tab);
  useEffect(()=>{if(!auth||initialDataReady)return;let live=true;setPreparationError('');void prepareInitialData(api,()=>preloadAgenda(api)).then(()=>{if(live){setPrepared(api);console.info('SOFIA_STARTUP_CACHE_READY');}}).catch(e=>{if(live)setPreparationError(errorText(e));});return()=>{live=false;};},[api,prepareAttempt]);
  // Do not start network completion renders over the native splash fade
  // when there is already a cached Home to present. In 0.3.76, React work
  // starved the UI-thread ValueAnimator for 600-770ms despite its 95ms
  // duration. With no cached Home, essential requests retain first-paint
  // permission so login and a first run cannot get stuck.
- const cachedOpening=!!(api.cached('/home')||api.cached('/tasks'));
- useEffect(()=>{if(painted&&(!cachedOpening||visible))api.releaseNetwork();},[painted,visible,cachedOpening,api]);
+ useEffect(()=>{if(cachedOpening?visible:painted)api.releaseNetwork();},[painted,visible,cachedOpening,api]);
  // All six tab trees are initialized behind the real Android splash.
  // Do not schedule post-launch Metro requires that race the first menu press.
  const launchReady=ready&&(!auth||(!!bootstrap&&servicesReady));
@@ -92,7 +94,7 @@ function Shell({startup}:{startup:LocalLaunch}){
  const boot=useCallback(async()=>{if(!auth)return;setBooting(true);try{const b=await api.liveBootstrap();setBootstrap(previous=>JSON.stringify(previous)===JSON.stringify(b)?previous:b);const next=authWithBootstrap(auth,b);setAuth(next);if(JSON.stringify(auth.startup)!==JSON.stringify(next.startup))void saveAuth(next).catch(()=>{});setError('');}catch(e){setError(errorText(e));}finally{setBooting(false);}},[api,auth]);
  useEffect(()=>{if(auth&&visible)void boot();},[api,visible]);
  useEffect(()=>{if(!auth)return;const sub=AppState.addEventListener('change',state=>{if(state!=='active')void api.persistLaunch().catch(()=>{});});return()=>sub.remove();},[api,auth]);
- useEffect(()=>{if(!auth)return;const sub=AppState.addEventListener('change',state=>{if(state==='active'&&!locked)void boot();else if(state!=='active')void silenceVoices();});return()=>sub.remove();},[auth,locked,boot]);
+ useEffect(()=>{if(!auth)return;const sub=AppState.addEventListener('change',state=>{if(state==='active'&&!locked&&visible)void boot();else if(state!=='active')void silenceVoices();});return()=>sub.remove();},[auth,locked,visible,boot]);
  // Issue the native, non-animated jump before React updates the selected menu.
  const switchTab=useCallback((next:Tab)=>{navigation.current.tab=next;pager.current?.goTo(next);setTab(next);},[]);
  const navigate=useCallback((next:Tab)=>{

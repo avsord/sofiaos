@@ -1,3 +1,9 @@
+## 0.3.88 — impedir renders intermediários durante a saída
+
+Base d607bcca1a98aea24b5982ae742c2b295caf3213 (0.3.87/code92), alteração concorrente que preserva uma entrada orgânica finita0.88→1 e usa o relógio original do Android. Mantém integralmente esse delta. O S final é maior que083, sem pulso repetido nem reinício na superfície de saída.
+
+A086/run37931290792 reprovou novamente: fade mediano574ms e DATA1296ms vs850ms. A hipótese de relayout não resolveu o atraso. Código da Shell ainda habilitava useAfterFirstPaint no caminho com cache, disparando setState(painted) e render completo durante o fade, além de boot/setBooting pelo evento AppState antes de visible. Delta088 desabilita o sinal intermediário nesse caminho e guarda boot por visible. Sem cache, whenInteractive continua liberando leituras essenciais. Sem mudança de dados/auth/backend. Teste de hook desabilitado verifica que não há inscrição nativa ou frame agendado; gates nativos intactos. TypeScript/suites locais executados; APK/smoke/gravação pendentes. Promoção sobre head atual, sem sobrescrever a alteração concorrente087.
+
 ## 0.3.87 — escala orgânica sem reinício e proporção do anexo
 
 Base atual725ff51dc2d974fb315619dbfc86e9976ecd25c3 (0.3.86/code91); integra ViewOverlay sem relayout concorrente. Pedido ativo desta conversa exige escala orgânica e fade, além de remover o encolhimento brusco. A0.3.85 concorrente resolveu o reinício removendo movimento; este delta preserva a superfície única, fade95/limpeza180 e troca sem loop independente, usando uma entrada finita0.88→1 em800ms. A superfície de saída segue `SplashScreenView.iconAnimationStart`, curva accelerate/decelerate e bounds1.5× do foreground Android. Sem aguardar fim do movimento para liberar Home. S32dp/círculo67.2dp correspondem ao anexo; são maiores que os20–22px reais do vídeo083. Não adota48dp da085, pois diverge desta referência.
