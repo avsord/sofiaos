@@ -86,7 +86,7 @@ test('086 finite system S does not extend the native Home handoff or restart an 
  assert.ok(logo.includes('android:windowSplashScreenAnimationDuration')); 
  assert.ok(logo.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_animated</item>'));
  const launch=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
- assert.ok(launch.includes('splash.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(launch.includes('surface.animate().alpha(0f).setDuration(95L)'));
  assert.ok(!launch.includes('Animatable'));
 });
 test('068 photo preloads without blocking Home; menu prewarm yields to navigation',()=>{
@@ -150,13 +150,13 @@ test('086 startup S uses the reference vector and one finite scale and defers op
 
 
 
-test('091 original OS splash retains its mark during the single alpha fade',()=>{
+test('093 prebuilt cover retains its mark during the single alpha fade',()=>{
  const overlay=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const loader=fs.readFileSync(path.join(root,'src/lib/screen-loader.tsx'),'utf8');
- assert.ok(!overlay.includes('SofiaUnifiedSplashSurface'));
- assert.ok(overlay.includes('iconTransaction?.setAlpha(iconSurface.surfaceControl, splash.alpha)?.apply()'));
- assert.ok(overlay.includes('splash.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(overlay.includes('buildLayer()'));
+ assert.ok(overlay.includes('surface?.continueSystemMotion()'));
+ assert.ok(overlay.includes('surface.animate().alpha(0f).setDuration(95L)'));
  assert.ok(!app.includes('<LaunchSAnimation'));
  assert.ok(loader.includes('export const DeferredScreen=React.memo('));
  assert.ok(loader.includes('keys.every(key=>Object.is(left[key],right[key]))'));
@@ -192,7 +192,7 @@ test('078 no second OS S persists underneath the single composited image',()=>{
  assert.ok(theme.includes('<item name="android:windowBackground">@color/sofiaLaunchBackground</item>'));
  assert.ok(!theme.includes('<item name="android:windowBackground">@drawable/splashscreen_logo</item>'));
  assert.ok(theme.includes('<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_animated</item>'));
- assert.ok(!native.includes('SofiaUnifiedSplashSurface'));
+ assert.ok(native.includes('buildLayer()'));
  assert.ok(native.includes('splash.remove()'));
  assert.ok(!native.includes('icon.postDelayed('));
  assert.ok(native.includes('SOFIA_LAUNCH_SYSTEM_CALLBACK_PROCESS_MS='));
@@ -208,18 +208,19 @@ test('075 launch does not block on optional photo decode or full archive rollove
  assert.ok(snapshot.includes('await this.hydrate();void this.flushLaunch()'),'No-cache sessions can still recover the entire archive');
 });
 
-test('091 original OS splash leaves within the unchanged startup timing gates',()=>{
+test('093 prebuilt cover leaves within the unchanged startup timing gates',()=>{
  const native=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const smoke=fs.readFileSync(path.join(root,'tools/manual-apk-smoke.py'),'utf8');
  const exit=native.slice(native.indexOf('exitSystemSplash = { success ->'),native.indexOf('when (transition.splashReady())'));
  assert.ok(exit.includes('splash.remove()'));
- assert.ok(exit.includes('splash.animate().alpha(0f).setDuration(95L)'));
- assert.ok(exit.includes('splash.postDelayed({ complete() }, 180L)'));
+ assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(exit.includes('surface.postDelayed({ complete() }, 180L)'));
  assert.ok(exit.includes('record(activity, "FADE_DONE")'));
- assert.ok(exit.includes('iconTransaction?.setAlpha(iconSurface.surfaceControl, splash.alpha)?.apply()'));
+ assert.ok(exit.includes('surface?.continueSystemMotion()'));
  assert.ok(!exit.includes('icon?.animate()?.alpha(0f)'));
  assert.ok(!exit.includes('decor.overlay.add('));
+ assert.ok(!native.includes('SurfaceControl.Transaction'));
  assert.ok(app.includes("const cachedOpening=!!(api.cached('/home')||api.cached('/tasks'))"));
  assert.ok(smoke.includes("result['fade_to_done_median_ms']<=250"));
  assert.ok(smoke.includes("result['ready_to_splash_remove_median_ms']<=150"));
