@@ -135,7 +135,7 @@ test('069 startup restores photo and cached Home together; menus mount only when
 test('070 startup S moves as an actual vector group, never just an opacity fade',()=>{
  const code=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
  assert.ok(code.includes('android:name="sofiaLetterMotion"'));
- assert.ok(code.includes('android:pivotX="144" android:pivotY="144"'));
+ assert.ok(code.includes('android:pivotX="96" android:pivotY="96"'));
  assert.ok(!code.includes('sofia_letter_reveal'));
  assert.ok(code.includes('@animator/sofia_letter_motion'));
  const bg=fs.readFileSync(path.join(root,'src/components/BackgroundServices.tsx'),'utf8');
@@ -157,7 +157,7 @@ test('078 unified image takes over native splash without a second icon layer',()
  assert.ok(overlay.includes('class SofiaUnifiedSplashSurface(activity: Activity) : View(activity)'));
  assert.ok(overlay.includes('canvas.drawColor(background)'));
  assert.ok(overlay.includes('logo?.draw(canvas)'));
- assert.ok(overlay.includes('surface.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(overlay.includes('surface.animate().alpha(0f).setDuration(160L)'));
  assert.ok(!overlay.includes('ValueAnimator.ofFloat('));
  assert.ok(!app.includes('<LaunchSAnimation'));
  assert.ok(loader.includes('export const DeferredScreen=React.memo('));
@@ -219,8 +219,8 @@ test('079 Android removes system icon before continuous one-layer fade',()=>{
  assert.ok(callback.indexOf('splash.remove()')>=0);
  assert.ok(callback.indexOf('splash.remove()')<callback.indexOf('record(activity, "FADE_START")'));
  assert.ok(exit.includes('view.matchSystemIcon(splash.iconView)'));
- assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
- assert.ok(exit.includes('surface.postDelayed({ complete() }, 180L)'));
+ assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(160L)'));
+ assert.ok(exit.includes('surface.postDelayed({ complete() }, 225L)'));
  assert.ok(exit.includes('record(activity, "FADE_DONE")'));
  assert.ok(!exit.includes('icon?.animate()?.alpha(0f)'));
  assert.ok(!exit.includes('ValueAnimator.ofFloat('));

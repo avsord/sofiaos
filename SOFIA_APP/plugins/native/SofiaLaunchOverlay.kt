@@ -67,7 +67,7 @@ private class SofiaUnifiedSplashSurface(activity: Activity) : View(activity) {
   }
   override fun onDraw(canvas: Canvas) {
     canvas.drawColor(background)
-    val size = (432f * resources.displayMetrics.density + 0.5f).toInt()
+    val size = (288f * resources.displayMetrics.density + 0.5f).toInt()
     val left = (width - size) / 2
     val top = (height - size) / 2
     // OEM splash icon dimensions can be 288dp rather than our old 192dp.
@@ -162,10 +162,10 @@ object SofiaLaunchOverlay {
                 // Preserve size and breathing phase while both S and background
                 // fade as a single compositor layer over the prepared Home.
                 record(activity, "FADE_START")
-                surface.animate().alpha(0f).setDuration(95L)
+                surface.animate().alpha(0f).setDuration(160L)
                   .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
                   .withEndAction { complete() }.start()
-                surface.postDelayed({ complete() }, 180L)
+                surface.postDelayed({ complete() }, 225L)
               }
             }
             Unit
@@ -268,7 +268,7 @@ object SofiaLaunchOverlay {
     // extra postOnAnimation fence added 400–650 ms on loaded Android emulators:
     // Home was ready, but Android did not start the fade until another frame.
     // Begin the synchronized splash exit in this SAME ready callback. The
-    // underlying prepared Home draws during the 95-ms fade.
+    // underlying prepared Home draws during the 160-ms fade.
     when (transition.contentReady()) {
       SofiaLaunchTransition.Exit.SYSTEM_SPLASH -> exitSystemSplash?.invoke(success)
       SofiaLaunchTransition.Exit.CONTENT -> {

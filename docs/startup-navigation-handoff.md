@@ -1,3 +1,9 @@
+## 0.3.84 — proporção do anexo e fade mais perceptível
+
+Base 2e7d5c5e31374cb87ddade2e6826bb90b7e2e327, runtime a0ec56250181a0c755e09a97267e0dff4659d84e (0.3.83). Run 37926742074 passou instalação por cima, Home offline autenticada sintética, conversa e paginação; DATA mediana 1007ms contra955ms, fade118ms. Não representa teste físico.
+
+Delta preserva essa estratégia nativa. A medida de 32dp anteriormente registrada foi inferida do viewport; o vídeo real320×640 mostra S de20–22px na0.3.83. O viewport192 corrige o S para32dp e círculo67dp sobre a região interna288dp da iconView192dp. Mesmos limites compensados na transferência, fallback legado288dp. Fade160ms e limpeza225ms; mantém gate250ms e comparação de abertura sem relaxamento. Sem mudanças de dados, rede ou navegação. Build/nativo/visual0.3.84 pendentes.
+
 ## Entrega validada 09/10/2026 — 0.3.83/code88
 
 Execução 37926742074, fonte a0ec56250181a0c755e09a97267e0dff4659d84e. Build, testes de app/backend e smoke nativo passaram. APK 51.620.433 bytes, SHA256 997a2b0eca88aeb537ca0f8835fb295246bf65e6b83b1612e41fb20fb4bf443b; certificado existente fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c. Cinco partidas frias offline com dados sintéticos: DATA mediana 1007ms, baseline0.3.65 955ms; fade mediano118ms, início após prontidão3ms. Instalação por cima, Home autenticada sintética, primeiro toque, conversa e paginação salvos passaram. Gravação de migração inspecionada: fundo roxo, S branco32dp e círculo67dp; saída conjunta. Não é prova de velocidade ou dados reais no aparelho do proprietário. Entrega manual; sem publicação no atualizador. O usuário recebe o arquivo exato Sofia-OS-0.3.83.apk.
@@ -135,3 +141,4 @@ Source inspection confirmed the configured 120 ms fade and the 0.3.60 cache/init
 The fade-specific unit test checks source strings and bridge mocks, not this native callback ordering or a visible transition. Home's native ready marker still requires tasksReady and calendar.loadedAt; missing local records can therefore leave network completion in the launch path. The exact contribution to the user's delay remains unmeasured. Do not report a source edit or passed mock as a demonstrated visual fix.
 
 The [official OpenAI status page](https://status.openai.com/) reported operational when checked. The [Codex/Work degradation on October 7](https://status.openai.com/incidents/01M4BP5JE7DKJSP3VG2S2DCWF2) was marked resolved. There is no established causal link between that incident and this APK's missing fade or GitHub build/test duration.
+
