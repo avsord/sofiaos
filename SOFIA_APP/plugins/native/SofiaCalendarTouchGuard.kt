@@ -149,12 +149,23 @@ internal class SofiaCalendarTouchGuard {
 
   private fun immediateMenu(root: View, event: MotionEvent): Boolean {
     val tab = menuAt(root, event.rawX.toInt(), event.rawY.toInt()) ?: return false
-    val index = (tab.getTag(com.facebook.react.R.id.view_tag_native_id) as? String)
-      ?.removePrefix("sofia-menu-")?.toIntOrNull()
-    // Do not scroll or write Animated properties before onPressIn runs.
-    // The previous native shortcut displayed a different page while React still
-    // owned the old activeTab, pointerEvents and accessibility selection.
-    if (index != null && index in 0..5) android.util.Log.i("SofiaMenu", "TOUCH_DOWN index=$index observerOnly=true")
+    val tag = tab.getTag(com.facebook.react.R.id.view_tag_native_id) as? String
+    val index = tag?.removePrefix("sofia-menu-")?.toIntOrNull()
+    // This is an observer for locked controls; React retains the recording
+    // guard. The native first hop is only for an enabled pager and real tab.
+    if (index != null && index in 0..5 && tag != "sofia-menu-blocked") {
+      val pager = taggedVisible(root, "sofia-tab-pager") as? ReactHorizontalScrollView
+      if (pager != null && pager.scrollEnabled && pager.width > 0) {
+        val target = index * pager.width
+        if (pager.scrollX != target) {
+          // The UI thread moves the viewport on DOWN; React onPressIn updates
+          // activeTab, accessibility, history and content on the same choice.
+          // No animation, JS bridge wait, timer, or loss of stored screen state.
+          pager.scrollTo(target, 0)
+        }
+        android.util.Log.i("SofiaMenu", "TOUCH_DOWN index=$index nativeFirst=true")
+      }
+    }
     return true // Locked buttons still reach React's existing recording guard.
   }
 

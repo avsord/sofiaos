@@ -25,11 +25,15 @@ test('058 touch completion never replays an older selection after a new press',(
  const calls=[],a=createImmediateMenuPress(()=>calls.push('agenda')),b=createImmediateMenuPress(()=>calls.push('apps'));
  for(let i=0;i<100;i++){a.pressIn();b.pressIn();a.press();b.press();assert.deepEqual(calls.slice(-2),['agenda','apps']);}
 });
-test('058 native input observer cannot alter pager position, alpha, scale or selection',()=>{
+test('071 native input moves the selected pager immediately while React owns history',()=>{
  const text=fs.readFileSync(path.join(__dirname,'../plugins/native/SofiaCalendarTouchGuard.kt'),'utf8');
  const method=text.slice(text.indexOf('private fun immediateMenu('),text.indexOf('private fun menuAt('));
- for(const forbidden of ['.scrollTo(','.alpha =','.scaleX =','.scaleY ='])assert.ok(!method.includes(forbidden),forbidden);
- assert.ok(method.includes('observerOnly=true'));
+ assert.ok(method.includes('pager.scrollTo(target, 0)'));
+ assert.ok(method.includes('pager.scrollEnabled && pager.width > 0'));
+ assert.ok(method.includes('tag != "sofia-menu-blocked"'));
+ for(const forbidden of ['.alpha =','.scaleX =','.scaleY ='])assert.ok(!method.includes(forbidden),forbidden);
+ const app=fs.readFileSync(path.join(__dirname,'../App.tsx'),'utf8');
+ assert.ok(app.includes('pager.current?.goTo(next);setTab(next)'));
 });
 test('058 original Android splash waits for local data without blocking Android 12 layout',()=>{
  const text=fs.readFileSync(path.join(__dirname,'../plugins/native/SofiaLaunchOverlay.kt'),'utf8');
