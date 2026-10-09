@@ -181,6 +181,84 @@ const CATALOG={
     "defaultPrivacy": "shared"
   },
 
+  "capsule": {
+    "label": "Cápsula",
+    "group": "health",
+    "states": [
+      "active",
+      "paused",
+      "archived"
+    ],
+    "fields": [
+      {
+        "key": "capsule_type",
+        "label": "Tipo",
+        "type": "select",
+        "options": [
+          "medicine",
+          "herbal",
+          "supplement"
+        ]
+      },
+      {
+        "key": "dose_text",
+        "label": "Dose",
+        "type": "text"
+      },
+      {
+        "key": "times_json",
+        "label": "Horários",
+        "type": "text",
+        "max": 1000
+      },
+      {
+        "key": "start_date",
+        "label": "Primeiro dia",
+        "type": "date"
+      },
+      {
+        "key": "end_date",
+        "label": "Último dia",
+        "type": "date"
+      },
+      {
+        "key": "repeat_type",
+        "label": "Repetição",
+        "type": "select",
+        "options": [
+          "daily",
+          "weekdays",
+          "interval",
+          "monthly",
+          "yearly",
+          "once"
+        ]
+      },
+      {
+        "key": "weekdays_json",
+        "label": "Dias da semana",
+        "type": "text",
+        "max": 200
+      },
+      {
+        "key": "interval_days",
+        "label": "Intervalo em dias",
+        "type": "number"
+      },
+      {
+        "key": "remind_minutes",
+        "label": "Antecedência",
+        "type": "number"
+      },
+      {
+        "key": "notifications",
+        "label": "Notificações",
+        "type": "checkbox"
+      }
+    ],
+    "description": "Rotina privada de doses e lembretes da área Cápsulas.",
+    "private": true
+  },
   "routine": {
     "label": "Rotina",
     "group": "flow",
