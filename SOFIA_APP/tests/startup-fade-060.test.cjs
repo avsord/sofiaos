@@ -90,9 +90,11 @@ test('091 original splash fades without a second mark or a transfer frame',()=>{
  assert.ok(!exit.includes('postOnAnimation'));
  assert.ok(!exit.includes('registerFrameCommitCallback'));
  assert.ok(exit.includes('splash.animate().alpha(0f).setDuration(95L)'));
- assert.ok(exit.includes('if (icon is android.view.SurfaceView) icon.alpha = splash.alpha'));
+ assert.ok(exit.includes('iconTransaction?.setAlpha(iconSurface.surfaceControl, splash.alpha)?.apply()'));
  assert.ok(!exit.includes('splash.iconView?.alpha = 1f'));
  assert.ok(!exit.includes('ValueAnimator.ofFloat('));
+ assert.ok(exit.includes('iconTransaction?.close()'));
+ assert.ok(!exit.includes('icon.alpha = splash.alpha')); 
  assert.ok(exit.includes('splash.postDelayed({ complete() }, 180L)'));
  assert.ok(exit.indexOf('splash.remove()')<exit.indexOf('record(activity, "FADE_DONE")'));
  const complete=exit.slice(exit.indexOf('val complete ='),exit.indexOf('removeSystemSplash = { finished'));

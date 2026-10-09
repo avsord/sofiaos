@@ -68,13 +68,15 @@ object SofiaLaunchOverlay {
               // copy, new cover, geometry transfer or first-frame gap.
               splash.animate().cancel()
               splash.iconView?.animate()?.cancel()
+              val iconSurface = splash.iconView as? android.view.SurfaceView
+              val iconTransaction = if (iconSurface != null) android.view.SurfaceControl.Transaction() else null
               var finished = false
               val complete = {
                 if (!finished) {
                   finished = true
                   splash.animate().cancel()
-                  val icon = splash.iconView
-                  if (icon is android.view.SurfaceView) icon.alpha = 0f
+                  if (iconSurface != null) iconTransaction?.setAlpha(iconSurface.surfaceControl, 0f)?.apply()
+                  iconTransaction?.close()
                   splash.alpha = 0f
                   splash.remove()
                   record(activity, "SPLASH_REMOVED")
@@ -85,17 +87,17 @@ object SofiaLaunchOverlay {
                 }
                 Unit
               }
-              removeSystemSplash = { finished = true; splash.animate().cancel(); splash.remove() }
+              removeSystemSplash = { finished = true; splash.animate().cancel(); iconTransaction?.close(); splash.remove() }
               record(activity, "FADE_START")
               splash.animate().alpha(0f).setDuration(95L)
                 .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
                 .setUpdateListener {
-                  // ViewPropertyAnimator updates the parent's RenderNode
-                  // directly. A SurfaceView icon is a separate compositor
-                  // surface: give it exactly the parent's current opacity.
-                  // ImageView icons already inherit it and need no change.
-                  val icon = splash.iconView
-                  if (icon is android.view.SurfaceView) icon.alpha = splash.alpha
+                  // Update the compositor directly: SurfaceView.setAlpha also
+                  // invalidates the entire window hierarchy during startup.
+                  // The background RenderNode and icon use one absolute alpha;
+                  // normal ImageView icons already inherit the background's.
+                  if (iconSurface != null)
+                    iconTransaction?.setAlpha(iconSurface.surfaceControl, splash.alpha)?.apply()
                 }
                 .withEndAction { complete() }.start()
               splash.postDelayed({ complete() }, 180L)

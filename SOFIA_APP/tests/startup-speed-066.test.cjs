@@ -155,7 +155,7 @@ test('091 original OS splash retains its mark during the single alpha fade',()=>
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const loader=fs.readFileSync(path.join(root,'src/lib/screen-loader.tsx'),'utf8');
  assert.ok(!overlay.includes('SofiaUnifiedSplashSurface'));
- assert.ok(overlay.includes('if (icon is android.view.SurfaceView) icon.alpha = splash.alpha'));
+ assert.ok(overlay.includes('iconTransaction?.setAlpha(iconSurface.surfaceControl, splash.alpha)?.apply()'));
  assert.ok(overlay.includes('splash.animate().alpha(0f).setDuration(95L)'));
  assert.ok(!app.includes('<LaunchSAnimation'));
  assert.ok(loader.includes('export const DeferredScreen=React.memo('));
@@ -217,7 +217,7 @@ test('091 original OS splash leaves within the unchanged startup timing gates',(
  assert.ok(exit.includes('splash.animate().alpha(0f).setDuration(95L)'));
  assert.ok(exit.includes('splash.postDelayed({ complete() }, 180L)'));
  assert.ok(exit.includes('record(activity, "FADE_DONE")'));
- assert.ok(exit.includes('if (icon is android.view.SurfaceView) icon.alpha = splash.alpha'));
+ assert.ok(exit.includes('iconTransaction?.setAlpha(iconSurface.surfaceControl, splash.alpha)?.apply()'));
  assert.ok(!exit.includes('icon?.animate()?.alpha(0f)'));
  assert.ok(!exit.includes('decor.overlay.add('));
  assert.ok(app.includes("const cachedOpening=!!(api.cached('/home')||api.cached('/tasks'))"));

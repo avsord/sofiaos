@@ -1,3 +1,7 @@
+## 0.3.92 — opacidade do ícone no compositor
+
+091/run37972406277 compilou, mas fade mediano≈520ms e remoção≈520ms reprovaram. Mantém desenho50% maior e splash original sem transferência. Troca somente SurfaceView.setAlpha no update listener por SurfaceControl.Transaction.setAlpha, API pública29+, ramoAndroid31+. Evita invalidação/layout da hierarquia do ícone e usa o valor absoluto do RenderNode do fundo. Transaction única, fechada em conclusão/cancelamento. Sem restauraçãoalpha1, acúmulo, cópia do S ou frame novo. Todos os limites numéricos e a ordem real dos eventos preservados. Fonte091 atual como base; teste de contrato local passou. APK/assinatura/smoke/visual92 pendentes. Hipótese de custo da setter precisa de evidência nativa.
+
 ## 0.3.91 — fade na própria splash, sem troca do S
 
 090/run37970590920 reprovou: início124ms, fade384ms, DATA1042ms vs658ms; cobertura/frame extra atrasou saída. Delta elimina completamente a nova cobertura e transferência: ViewPropertyAnimator anima o RenderNode da SplashScreenView já visível,95ms. setUpdateListener sincroniza SurfaceView do ícone com splash.alpha absoluta; ImageView herda naturalmente. AOSP SplashScreenView.setAlpha multiplicaria a alpha do SurfaceView; usar o animador de View com atualização explícita evita acumulação e restauração1 que poderia piscar. S48dp/anel100.8dp e entrada finita permanecem no drawable OS original.
