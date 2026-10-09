@@ -75,7 +75,7 @@ test('automatic update checks and notifications wait until the completed visual 
   assert.ok(source.includes("if(!servicesReady)return;"));
   assert.ok(source.includes("enabled={!!auth&&!!bootstrap&&servicesReady}"));
   assert.ok(source.includes('prepareInitialData(api,()=>preloadAgenda(api))'));
-  assert.ok(source.includes('painted=useAfterFirstPaint(ready)')&&source.includes('servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady')&&source.includes('visible=useLaunchVisible(ready)')&&source.includes('if(painted)api.releaseNetwork()'));
+  assert.ok(source.includes('painted=useAfterFirstPaint(ready)')&&source.includes('servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady')&&source.includes('visible=useLaunchVisible(ready)')&&source.includes('if(painted&&(!cachedOpening||visible))api.releaseNetwork()')&&source.includes("const cachedOpening=!!(api.cached('/home')||api.cached('/tasks'))"));
 });
 test('notification overlay cannot capture touches or accessibility focus while hidden',()=>{
   assert.ok(source.includes("pointerEvents={tab==='notifications'?'auto':'none'}"));
