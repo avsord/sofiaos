@@ -26,6 +26,17 @@ function makeMobileApi(runtime, deps) {
   const extra = makeApi45(runtime, { bodyJson, json });
   const chatSync = require('../services/chat-sync').makeChatSyncApi(store, { bodyJson, json, client: 'mobile' });
   const inAudio = new Set(), rateBuckets = new Map();
+
+  // Shared SQLite storage for mobile capsule marks. No per-device dose history.
+  store.db.exec('CREATE TABLE IF NOT EXISTS mobile_capsule_doses (owner TEXT NOT NULL,capsule_id TEXT NOT NULL,day TEXT NOT NULL,time TEXT NOT NULL,taken_at TEXT NOT NULL,title TEXT NOT NULL,dose_text TEXT NOT NULL,PRIMARY KEY(owner,capsule_id,day,time)) STRICT;');
+  const capsuleDayOK=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v+'T12:00:00Z'))&&new Date(v+'T12:00:00Z').toISOString().slice(0,10)===v;
+  const capsuleTimeOK=v=>typeof v==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+  const capsuleItem=r=>({id:r.capsule_id+':'+r.day+':'+r.time,kind:'capsule_dose',title:r.title,privacy:'private',state:'done',data:{capsule_id:r.capsule_id,day:r.day,time:r.time,taken_at:r.taken_at,dose_text:r.dose_text}});
+  const capsuleGet=store.db.prepare('SELECT * FROM mobile_capsule_doses WHERE owner=? AND capsule_id=? AND day=? AND time=?');
+  const capsuleList=store.db.prepare('SELECT * FROM mobile_capsule_doses WHERE owner=? AND day>=? AND day<=? ORDER BY day DESC,time DESC LIMIT 5000');
+  const capsuleInsert=store.db.prepare('INSERT INTO mobile_capsule_doses (owner,capsule_id,day,time,taken_at,title,dose_text) VALUES (?,?,?,?,?,?,?) ON CONFLICT(owner,capsule_id,day,time) DO NOTHING');
+  const capsuleDelete=store.db.prepare('DELETE FROM mobile_capsule_doses WHERE owner=? AND capsule_id=? AND day=? AND time=?');
+
   store.db.exec(`CREATE TABLE IF NOT EXISTS mobile_voice_receipts (
     client_id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, audio_hash TEXT NOT NULL,
     transcript TEXT NOT NULL, created_ms INTEGER NOT NULL
@@ -102,6 +113,30 @@ function makeMobileApi(runtime, deps) {
       if (next.length < 12 || next.length > 200) fail('PASSWORD_WEAK', 'Use de 12 a 200 caracteres.');
       if (next !== confirmation) fail('PASSWORD_MISMATCH', 'As duas senhas precisam ser iguais.');
       ownerAuth.setPassword(next); mobileSessions.revokeAll(); deps.revokeWebSessions?.(); return send({ ok: true });
+    }
+
+    if (p === '/api/mobile/md/capsules/doses') {
+      if (m === 'GET') {
+        const from=url.searchParams.get('from'),to=url.searchParams.get('to');
+        if (!capsuleDayOK(from)||!capsuleDayOK(to)||from>to||Date.parse(to)-Date.parse(from)>61*86400000)
+          fail('CAPSULE_RANGE','Período de Cápsulas inválido.');
+        return send({items:capsuleList.all(OWNER,from,to).map(capsuleItem)});
+      }
+      if (m === 'POST') {
+        rate(session,'capsule-dose-write',40);
+        const b=await bodyJson(req,2048),capsuleId=validId(b.capsule_id);
+        if (!capsuleDayOK(b.day)||!capsuleTimeOK(b.time)||typeof b.taken!=='boolean')
+          fail('CAPSULE_DOSE_INVALID','Informe data, horário e marcação da dose.');
+        const plan=workspace.get(capsuleId);
+        if (plan.kind!=='capsule') fail('CAPSULE_NOT_FOUND','Cápsula não encontrada.',404);
+        if (b.taken) {
+          capsuleInsert.run(OWNER,capsuleId,b.day,b.time,new Date().toISOString(),plan.title,String(plan.data?.dose_text||'').slice(0,1000));
+          return send({ok:true,item:capsuleItem(capsuleGet.get(OWNER,capsuleId,b.day,b.time))});
+        }
+        capsuleDelete.run(OWNER,capsuleId,b.day,b.time);
+        return send({ok:true,item:null});
+      }
+      fail('NOT_FOUND','Operação de Cápsulas não disponível.',404);
     }
     // Reuse web workspace operations only AFTER bearer auth. Never bridge admin/credentials/restore endpoints.
     if (p.startsWith('/api/mobile/workspace/')) {
