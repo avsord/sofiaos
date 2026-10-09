@@ -5,9 +5,6 @@ import android.os.Build
 import android.os.Process
 import android.os.SystemClock
 import android.util.Log
-import android.graphics.Canvas
-import android.graphics.Rect
-import android.graphics.drawable.Drawable
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -24,57 +21,6 @@ import com.facebook.react.bridge.ReactMethod
 
 /** Retain Android's original splash until the saved Home is ready. Remove it
  * through one animated native surface; optional work waits for visual completion. */
-/** One atomic canvas surface: the background and mark are painted in the
- * SAME native View so neither can remain above Home after the other fades.
- * Unlike fading SplashScreenView/icon separately, this has one compositor
- * layer on Android 12-15 and can be disposed immediately. */
-private class SofiaUnifiedSplashSurface(activity: Activity) : View(activity) {
-  private val logo = activity.getDrawable(R.drawable.sofia_launch_mark)?.mutate()
-  private val background = activity.getColor(R.color.sofiaLaunchBackground)
-  private var markBounds: Rect? = null
-  private var motionStart = 0L
-  fun matchSystemMotion(start: Long) { motionStart = start }
-  fun matchSystemIcon(icon: View?) {
-    if (icon == null || icon.width <= 0 || icon.height <= 0) return
-    val iconPosition = IntArray(2)
-    val rootPosition = IntArray(2)
-    icon.getLocationOnScreen(iconPosition)
-    getLocationOnScreen(rootPosition)
-    val x = iconPosition[0] - rootPosition[0]
-    val y = iconPosition[1] - rootPosition[1]
-    // AOSP's adaptive foreground expands the inner vector by 1.5.
-    val padX = icon.width / 4
-    val padY = icon.height / 4
-    markBounds = Rect(x - padX, y - padY, x + icon.width + padX, y + icon.height + padY)
-  }
-  init {
-    setWillNotDraw(false)
-    logo?.callback = this
-    isClickable = false; isFocusable = false
-    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-  }
-  override fun verifyDrawable(who: Drawable): Boolean = who === logo || super.verifyDrawable(who)
-  override fun onDraw(canvas: Canvas) {
-    canvas.drawColor(background)
-    val size = (288f * resources.displayMetrics.density + 0.5f).toInt()
-    val left = (width - size) / 2
-    val top = (height - size) / 2
-    // OEM splash icon dimensions can be 288dp rather than our old 192dp.
-    // Reuse its real bounds so transfer never shrinks or recenters the mark.
-    val bounds = markBounds ?: Rect(left, top, left + size, top + size)
-    // Continue the OS clock instead of restarting scale during handoff.
-    val now = System.currentTimeMillis()
-    val scale = SofiaLaunchMotion.scaleAt(motionStart, now)
-    canvas.save()
-    canvas.scale(scale, scale, bounds.exactCenterX(), bounds.exactCenterY())
-    logo?.setBounds(bounds)
-    logo?.draw(canvas)
-    canvas.restore()
-    if (motionStart > 0L && now - motionStart < SofiaLaunchMotion.DURATION_MS)
-      postInvalidateOnAnimation()
-  }
-}
-
 object SofiaLaunchOverlay {
   private var host: WeakReference<Activity>? = null
   private var observer: ViewTreeObserver? = null
@@ -118,71 +64,41 @@ object SofiaLaunchOverlay {
           exitSystemSplash = { success ->
             if (!exitStarted && host?.get() === activity) {
               exitStarted = true
-              val decor = activity.window.decorView as? ViewGroup
-              val surface = if (decor != null && decor.width > 0 && decor.height > 0)
-                SofiaUnifiedSplashSurface(activity).also { view ->
-                  // Add a drawing layer without relayout of the prepared Home.
-                  decor.overlay.add(view)
-                  view.measure(
-                    View.MeasureSpec.makeMeasureSpec(decor.width, View.MeasureSpec.EXACTLY),
-                    View.MeasureSpec.makeMeasureSpec(decor.height, View.MeasureSpec.EXACTLY))
-                  view.layout(0, 0, decor.width, decor.height)
-                  view.matchSystemIcon(splash.iconView)
-                  view.matchSystemMotion(splash.iconAnimationStart?.toEpochMilli() ?: 0L)
-                }
-              else null
-              // Do not drop the OS layer until our identical replacement has
-              // been rendered. Removing it during pre-draw can expose Home for
-              // one frame before the cover exists: the end-of-launch flicker.
-              var transferred = false
-              val handoff = Runnable {
-                if (!transferred && host?.get() === activity) {
-                  transferred = true
-                  // The OS icon cannot remain as a separately composited layer.
-                  splash.iconView?.animate()?.cancel()
+              // Fade the ORIGINAL already rendered splash. There is no icon
+              // copy, new cover, geometry transfer or first-frame gap.
+              splash.animate().cancel()
+              splash.iconView?.animate()?.cancel()
+              var finished = false
+              val complete = {
+                if (!finished) {
+                  finished = true
                   splash.animate().cancel()
+                  val icon = splash.iconView
+                  if (icon is android.view.SurfaceView) icon.alpha = 0f
+                  splash.alpha = 0f
                   splash.remove()
                   record(activity, "SPLASH_REMOVED")
+                  record(activity, "FADE_DONE")
                   exitSystemSplash = null
                   removeSystemSplash = null
-                  if (surface == null) {
-                    removeSystemSplash = null
-                    completeReveal(activity, success)
-                  } else {
-                    var finished = false
-                    val complete = {
-                      if (!finished) {
-                        finished = true
-                        surface.animate().cancel()
-                        surface.alpha = 0f
-                        decor?.overlay?.remove(surface)
-                        removeSystemSplash = null
-                        record(activity, "FADE_DONE")
-                        completeReveal(activity, success)
-                      }
-                      Unit
-                    }
-                    // Preserve the stable mark size while both S and background
-                    // fade as a single compositor layer over the prepared Home.
-                    record(activity, "FADE_START")
-                    surface.animate().alpha(0f).setDuration(95L)
-                      .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
-                      .withEndAction { complete() }.start()
-                    surface.postDelayed({ complete() }, 180L)
-                  }
+                  completeReveal(activity, success)
                 }
+                Unit
               }
-              if (surface == null) handoff.run()
-              else {
-                if (surface.isHardwareAccelerated) {
-                  decor!!.viewTreeObserver.registerFrameCommitCallback {
-                    activity.runOnUiThread(handoff)
-                  }
-                } else surface.postOnAnimation { handoff.run() }
-                surface.invalidate()
-                // OEM fallback; both paths enter the same once-only handoff.
-                surface.postDelayed(handoff, 100L)
-              }
+              removeSystemSplash = { finished = true; splash.animate().cancel(); splash.remove() }
+              record(activity, "FADE_START")
+              splash.animate().alpha(0f).setDuration(95L)
+                .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
+                .setUpdateListener {
+                  // ViewPropertyAnimator updates the parent's RenderNode
+                  // directly. A SurfaceView icon is a separate compositor
+                  // surface: give it exactly the parent's current opacity.
+                  // ImageView icons already inherit it and need no change.
+                  val icon = splash.iconView
+                  if (icon is android.view.SurfaceView) icon.alpha = splash.alpha
+                }
+                .withEndAction { complete() }.start()
+              splash.postDelayed({ complete() }, 180L)
             }
             Unit
           }

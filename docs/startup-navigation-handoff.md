@@ -1,3 +1,9 @@
+## 0.3.91 — fade na própria splash, sem troca do S
+
+090/run37970590920 reprovou: início124ms, fade384ms, DATA1042ms vs658ms; cobertura/frame extra atrasou saída. Delta elimina completamente a nova cobertura e transferência: ViewPropertyAnimator anima o RenderNode da SplashScreenView já visível,95ms. setUpdateListener sincroniza SurfaceView do ícone com splash.alpha absoluta; ImageView herda naturalmente. AOSP SplashScreenView.setAlpha multiplicaria a alpha do SurfaceView; usar o animador de View com atualização explícita evita acumulação e restauração1 que poderia piscar. S48dp/anel100.8dp e entrada finita permanecem no drawable OS original.
+
+Smoke muda só ordem legítima dos eventos: remoção ocorre após fade, antes de DATA. Todos os limites numéricos continuam150/150/250ms ebaseline+200; não registra remoção fictícia nem relaxa desempenho. Regressões exigem um único S, nenhuma cópia/fence, alpha absoluta e dados liberados somente após conclusão. Rota manual; sem backend/dados. Fonte090 exata como base, build/testes/assinatura/migração/visual91 pendentes.
+
 ## 0.3.90 — observar frame da janela real e manter fade validado
 
 089/run37942044183 compilou, mas reprovou fade mediano591ms, início≈104–123ms, indicando fallback100ms. Causa candidata: observador da ViewOverlay não participa da árvore real submetida. Registrar no decor.viewTreeObserver e retornar95ms/180ms do runtime088 aprovado; manter cobertura renderizada antes da remoção OS, S48dp e anel100.8dp. Sem relaxar gates. Feedback de status do usuário15:01BRT; retoma a execução exata, sem entregar089 reprovado. Ajuste/contrato focado nesta retomada; CI/visual pendentes.
