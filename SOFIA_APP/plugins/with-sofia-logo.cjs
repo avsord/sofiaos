@@ -15,11 +15,11 @@ module.exports=config=>withDangerousMod(config,['android',async c=>{
  write('values/sofia-launch-colors.xml','<resources><color name="sofiaLaunchBackground">#7258E8</color></resources>');
  write('values-night/sofia-launch-colors.xml','<resources><color name="sofiaLaunchBackground">#7258E8</color></resources>');
  for(const folder of fs.readdirSync(res).filter(x=>x.startsWith('drawable-'))){const p=path.join(res,folder,'splashscreen_logo.png');if(fs.existsSync(p))fs.unlinkSync(p);}
- // A single finite entrance ends at exactly 1. The native fade follows the
- // OS animation clock; it never starts a second independent animator.
- for(const obsolete of ['animator/sofia_letter_breath.xml','drawable/sofia_launch_mark_breathing.xml']) fs.rmSync(path.join(res,obsolete),{force:true});
- write('animator/sofia_letter_motion.xml','<set xmlns:android="http://schemas.android.com/apk/res/android" android:ordering="together"><objectAnimator android:propertyName="scaleX" android:valueFrom="0.88" android:valueTo="1" android:valueType="floatType" android:duration="800" android:interpolator="@android:interpolator/accelerate_decelerate"/><objectAnimator android:propertyName="scaleY" android:valueFrom="0.88" android:valueTo="1" android:valueType="floatType" android:duration="800" android:interpolator="@android:interpolator/accelerate_decelerate"/></set>');
- write('drawable-v31/sofia_launch_mark_animated.xml','<animated-vector xmlns:android="http://schemas.android.com/apk/res/android" android:drawable="@drawable/sofia_launch_mark"><target android:name="sofiaLetterMotion" android:animation="@animator/sofia_letter_motion"/></animated-vector>');
+ // Keep Android's original ImageView by supplying a static vector.
+ // Bake in the initial scale; the native transform grows it without a jump.
+ for(const obsolete of ['animator/sofia_letter_breath.xml','drawable/sofia_launch_mark_breathing.xml','animator/sofia_letter_motion.xml','drawable-v31/sofia_launch_mark_animated.xml']) fs.rmSync(path.join(res,obsolete),{force:true});
+ const mark=fs.readFileSync(path.join(res,'drawable/sofia_launch_mark.xml'),'utf8');
+ write('drawable-v31/sofia_launch_mark_entry.xml',mark.replace('android:name="sofiaLetterMotion"','android:name="sofiaLetterMotion" android:scaleX="0.88" android:scaleY="0.88"'));
  write('drawable/splashscreen_logo.xml','<layer-list xmlns:android="http://schemas.android.com/apk/res/android"><item android:drawable="@color/sofiaLaunchBackground"/><item android:width="288dp" android:height="288dp" android:gravity="center" android:drawable="@drawable/sofia_launch_mark"/></layer-list>');
  // On Android 12+, the Activity window MUST have a plain-color background.
  // A second S in android:windowBackground stays underneath the OS splash and
@@ -27,7 +27,7 @@ module.exports=config=>withDangerousMod(config,['android',async c=>{
  // On Android 11 and earlier the legacy layer-list remains available only
  // as the original starting surface and is cleared on reveal.
  // The launch icon is a vector at every scale; the mark remains stable until the single native fade.
- write('values-v31/sofia-splash.xml','<resources><style name="Theme.App.SplashScreen" parent="AppTheme"><item name="android:windowBackground">@color/sofiaLaunchBackground</item><item name="android:windowSplashScreenBackground">@color/sofiaLaunchBackground</item><item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_animated</item><item name="android:windowSplashScreenAnimationDuration">800</item><item name="android:statusBarColor">@color/sofiaLaunchBackground</item><item name="android:navigationBarColor">@color/sofiaLaunchBackground</item></style></resources>');
+ write('values-v31/sofia-splash.xml','<resources><style name="Theme.App.SplashScreen" parent="AppTheme"><item name="android:windowBackground">@color/sofiaLaunchBackground</item><item name="android:windowSplashScreenBackground">@color/sofiaLaunchBackground</item><item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_entry</item><item name="android:windowSplashScreenAnimationDuration">800</item><item name="android:statusBarColor">@color/sofiaLaunchBackground</item><item name="android:navigationBarColor">@color/sofiaLaunchBackground</item></style></resources>');
  for(const name of ['ic_launcher.xml','ic_launcher_round.xml']){const p=path.join(res,'mipmap-anydpi-v26',name);if(fs.existsSync(p))fs.writeFileSync(p,fs.readFileSync(p,'utf8').replace('@mipmap/ic_launcher_foreground','@drawable/sofia_logo_foreground'));}
  // The generated legacy background must not treat the vector/layer-list as a bitmap.
  write('drawable/ic_launcher_background.xml','<layer-list xmlns:android="http://schemas.android.com/apk/res/android"><item android:drawable="@color/iconBackground"/></layer-list>');

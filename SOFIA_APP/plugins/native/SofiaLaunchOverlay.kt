@@ -12,8 +12,6 @@ import android.view.ViewTreeObserver
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.FrameLayout
-import android.widget.ImageView
 import java.lang.ref.WeakReference
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -21,64 +19,8 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 
-/** Prepare the fade layer while Android still owns the visible splash. Its
- * vector display list is built before Home is ready, not during the handoff. */
-private class SofiaLaunchFadeLayer(activity: Activity) : FrameLayout(activity) {
-  private val mark = ImageView(activity).apply {
-    setImageResource(R.drawable.sofia_launch_mark)
-    scaleType = ImageView.ScaleType.FIT_XY
-  }
-  private var motionStart = 0L
-  init {
-    setBackgroundColor(activity.getColor(R.color.sofiaLaunchBackground))
-    addView(mark)
-    alpha = 0f
-    setLayerType(View.LAYER_TYPE_HARDWARE, null)
-    isClickable = false; isFocusable = false
-    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
-  }
-  fun prepare(decor: ViewGroup, icon: View?, start: Long) {
-    motionStart = start
-    val size = (288f * resources.displayMetrics.density + 0.5f).toInt()
-    var left = (decor.width - size) / 2
-    var top = (decor.height - size) / 2
-    var width = size; var height = size
-    if (icon != null && icon.width > 0 && icon.height > 0) {
-      val position = IntArray(2); val rootPosition = IntArray(2)
-      icon.getLocationOnScreen(position); decor.getLocationOnScreen(rootPosition)
-      // Android's adaptive foreground expands the inner vector by 1.5.
-      val padX = icon.width / 4; val padY = icon.height / 4
-      left = position[0] - rootPosition[0] - padX
-      top = position[1] - rootPosition[1] - padY
-      width = icon.width + padX * 2; height = icon.height + padY * 2
-    }
-    mark.layoutParams = LayoutParams(width, height).apply { leftMargin = left; topMargin = top }
-    measure(View.MeasureSpec.makeMeasureSpec(decor.width, View.MeasureSpec.EXACTLY),
-      View.MeasureSpec.makeMeasureSpec(decor.height, View.MeasureSpec.EXACTLY))
-    layout(0, 0, decor.width, decor.height)
-    // Explicitly render the invisible cover now. It must not wait for the
-    // first fade frame to allocate or paint its hardware layer.
-    buildLayer()
-  }
-  fun continueSystemMotion() {
-    val now = System.currentTimeMillis()
-    val from = SofiaLaunchMotion.scaleAt(motionStart, now)
-    mark.scaleX = from; mark.scaleY = from
-    val remaining = SofiaLaunchMotion.DURATION_MS - (now - motionStart).coerceAtLeast(0L)
-    if (motionStart > 0L && remaining > 0L && from < 1f) {
-      // Resume the same finite curve and clock; never reset to 0.88 at exit.
-      mark.animate().scaleX(1f).scaleY(1f).setDuration(remaining)
-        .setInterpolator { fraction ->
-          (SofiaLaunchMotion.scaleAt(motionStart, now + (remaining * fraction).toLong()) - from) / (1f - from)
-        }.start()
-    }
-    alpha = 1f
-  }
-  fun dispose() { animate().cancel(); mark.animate().cancel(); alpha = 0f }
-}
-
-/** Retain the original splash until Home is ready, then fade one prepared
- * composite. Optional work waits for visual completion. */
+/** Retain Android's original splash until the saved Home is ready. Remove it
+ * through one animated native surface; optional work waits for visual completion. */
 object SofiaLaunchOverlay {
   private var host: WeakReference<Activity>? = null
   private var observer: ViewTreeObserver? = null
@@ -117,49 +59,40 @@ object SofiaLaunchOverlay {
         if (host?.get() !== activity) splash.remove()
         else {
           Log.i("SofiaLaunch", "SOFIA_LAUNCH_SYSTEM_CALLBACK_PROCESS_MS=${SystemClock.uptimeMillis() - Process.getStartUptimeMillis()}")
-          val decor = activity.window.decorView as? ViewGroup
-          val surface = if (decor != null && decor.width > 0 && decor.height > 0)
-            SofiaLaunchFadeLayer(activity).also { view ->
-              decor.overlay.add(view)
-              view.prepare(decor, splash.iconView, splash.iconAnimationStart?.toEpochMilli() ?: 0L)
-            } else null
+          val icon = splash.iconView
+          Log.i("SofiaLaunch", "SOFIA_LAUNCH_ICON_KIND=${icon?.javaClass?.simpleName}")
+          // The static vector already contains the initial 0.88 scale.
+          // Grow the SAME original ImageView, without replacing or shrinking it.
+          icon?.animate()?.scaleX(1f / 0.88f)?.scaleY(1f / 0.88f)
+            ?.setDuration(SofiaLaunchMotion.DURATION_MS)
+            ?.setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())?.start()
           var finished = false
-          removeSystemSplash = {
-            finished = true
-            surface?.dispose(); if (surface != null) decor?.overlay?.remove(surface)
-            splash.animate().cancel(); splash.remove()
-          }
-          // Keep the original animated Android splash until Home is prepared.
+          removeSystemSplash = { finished = true; icon?.animate()?.cancel(); splash.animate().cancel(); splash.remove() }
           exitSystemSplash = { success ->
             if (!exitStarted && host?.get() === activity) {
               exitStarted = true
-              // The cover already has a rendered hardware layer. Match the
-              // OS scale before exposing it, then remove the separate OS icon.
-              surface?.continueSystemMotion()
-              splash.iconView?.animate()?.cancel()
-              splash.animate().cancel()
-              splash.remove()
-              record(activity, "SPLASH_REMOVED")
-              exitSystemSplash = null
               val complete = {
                 if (!finished) {
                   finished = true
-                  surface?.dispose()
-                  if (surface != null) decor?.overlay?.remove(surface)
+                  splash.animate().cancel()
+                  icon?.animate()?.cancel()
+                  splash.alpha = 0f
+                  splash.remove()
+                  record(activity, "SPLASH_REMOVED")
                   record(activity, "FADE_DONE")
+                  exitSystemSplash = null
                   removeSystemSplash = null
                   completeReveal(activity, success)
                 }
                 Unit
               }
+              // ImageView and background share the parent alpha. No separate
+              // SurfaceView icon, new mark, or first-frame handoff is needed.
               record(activity, "FADE_START")
-              if (surface == null) complete()
-              else {
-                surface.animate().alpha(0f).setDuration(95L)
-                  .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
-                  .withEndAction { complete() }.start()
-                surface.postDelayed({ complete() }, 180L)
-              }
+              splash.animate().alpha(0f).setDuration(95L)
+                .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
+                .withEndAction { complete() }.start()
+              splash.postDelayed({ complete() }, 180L)
             }
             Unit
           }

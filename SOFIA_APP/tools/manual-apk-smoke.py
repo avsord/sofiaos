@@ -79,7 +79,7 @@ try:
  for run in result['candidate_runs']:
   events=run['stages_ms']
   assert 'FADE_START' in events, 'Native fade never started: '+str(events)
-  assert events['SPLASH_REMOVED']<=events['FADE_START'] and events['LOCAL_READY']<=events['FADE_START']<=events['FADE_DONE']<=events['DATA'],events
+  assert events['LOCAL_READY']<=events['FADE_START']<=events['SPLASH_REMOVED']<=events['FADE_DONE']<=events['DATA'],events
   spans.append({'ready_to_fade_ms':events['FADE_START']-events['LOCAL_READY'],
                 'ready_to_splash_remove_ms':events['SPLASH_REMOVED']-events['LOCAL_READY'],
                 'fade_to_done_ms':events['FADE_DONE']-events['FADE_START']})

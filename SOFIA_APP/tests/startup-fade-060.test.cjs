@@ -82,32 +82,34 @@ test('060 unmount or launch failure cannot release stale optional services',asyn
 test('060 old platforms without the visibility bridge keep a cancellable fallback',async()=>{
  const f=visibilityFixture(false);assert.deepEqual(f.states,[false]);f.frames.shift()();f.frames.shift()();assert.deepEqual(f.states,[false,true]);f.dispose();
 });
-test('093 prebuilt cover preserves the OS mark and uses one fade',()=>{
+test('094 same original ImageView scales and fades without icon handoff',()=>{
  const native=file('plugins/native/SofiaLaunchOverlay.kt');
- const prepare=native.slice(native.indexOf('val decor = activity.window.decorView'),native.indexOf('exitSystemSplash = { success ->'));
  const exit=native.slice(native.indexOf('exitSystemSplash = { success ->'),native.indexOf('when (transition.splashReady())'));
- assert.ok(prepare.includes('view.prepare(decor, splash.iconView, splash.iconAnimationStart?.toEpochMilli() ?: 0L)'));
- assert.ok(native.includes('buildLayer()'));
- assert.ok(native.includes('SofiaLaunchMotion.scaleAt(motionStart, now)'));
- assert.ok(!native.includes('postInvalidateOnAnimation'));
+ assert.ok(!native.includes('SofiaLaunchFadeLayer'));
+ assert.ok(!native.includes('decor.overlay.add('));
  assert.ok(!native.includes('SurfaceControl.Transaction'));
+ assert.ok(!native.includes('setUpdateListener'));
+ assert.ok(!native.includes('postInvalidateOnAnimation'));
+ assert.ok(native.includes('icon?.animate()?.scaleX(1f / 0.88f)?.scaleY(1f / 0.88f)'));
+ assert.ok(native.includes('setDuration(SofiaLaunchMotion.DURATION_MS)'));
  assert.ok(!exit.includes('postOnAnimation'));
  assert.ok(!exit.includes('registerFrameCommitCallback'));
- assert.ok(exit.indexOf('surface?.continueSystemMotion()')<exit.indexOf('splash.remove()'));
- assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
- assert.ok(exit.includes('surface.postDelayed({ complete() }, 180L)'));
- assert.ok(!exit.includes('setUpdateListener'));
- assert.ok(exit.indexOf('splash.remove()')<exit.indexOf('record(activity, "FADE_START")'));
+ assert.ok(exit.includes('splash.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(exit.includes('splash.postDelayed({ complete() }, 180L)'));
  const complete=exit.slice(exit.indexOf('val complete ='),exit.indexOf('record(activity, "FADE_START")'));
  assert.ok(complete.includes('if (!finished)'));
- assert.ok(complete.indexOf('finished = true')<complete.indexOf('surface?.dispose()'));
- assert.ok(complete.indexOf('surface?.dispose()')<complete.indexOf('decor?.overlay?.remove(surface)'));
+ assert.ok(complete.indexOf('finished = true')<complete.indexOf('splash.animate().cancel()'));
+ assert.ok(complete.indexOf('splash.alpha = 0f')<complete.indexOf('splash.remove()'));
+ assert.ok(complete.indexOf('splash.remove()')<complete.indexOf('record(activity, "FADE_DONE")'));
  const resources=file('plugins/with-sofia-logo.cjs');
  assert.ok(resources.includes('A33.6,33.6'));
  assert.ok(resources.includes('android:scaleX="0.020658489"'));
  assert.ok(resources.includes('android:strokeColor="#12FFFFFF"'));
+ assert.ok(resources.includes('android:scaleX="0.88" android:scaleY="0.88"'));
+ assert.ok(resources.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_entry</item>'));
+ assert.ok(!resources.includes('<animated-vector'));
  assert.ok(!resources.includes('repeatCount'));
  const smoke=file('tools/manual-apk-smoke.py');
- assert.ok(smoke.includes("events['SPLASH_REMOVED']<=events['FADE_START'] and events['LOCAL_READY']<=events['FADE_START']<=events['FADE_DONE']<=events['DATA']"));
+ assert.ok(smoke.includes("events['LOCAL_READY']<=events['FADE_START']<=events['SPLASH_REMOVED']<=events['FADE_DONE']<=events['DATA']"));
  for(const gate of ["ready_to_fade_median_ms']<=150","ready_to_splash_remove_median_ms']<=150","fade_to_done_median_ms']<=250","baseline_median_ms']+200"]) assert.ok(smoke.includes(gate));
 });

@@ -81,12 +81,12 @@ test('067 cached Home and Agenda remain primary; catalog, widgets and monitors s
 
 test('086 finite system S does not extend the native Home handoff or restart an animator',()=>{
  const logo=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
- assert.ok(logo.includes('<animated-vector'));
- assert.ok(logo.includes('<objectAnimator')); 
+ assert.ok(!logo.includes('<animated-vector'));
+ assert.ok(logo.includes('android:scaleX="0.88" android:scaleY="0.88"')); 
  assert.ok(logo.includes('android:windowSplashScreenAnimationDuration')); 
- assert.ok(logo.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_animated</item>'));
+ assert.ok(logo.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_entry</item>'));
  const launch=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
- assert.ok(launch.includes('surface.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(launch.includes('splash.animate().alpha(0f).setDuration(95L)'));
  assert.ok(!launch.includes('Animatable'));
 });
 test('068 photo preloads without blocking Home; menu prewarm yields to navigation',()=>{
@@ -135,9 +135,9 @@ test('086 startup S uses the reference vector and one finite scale and defers op
  assert.ok(code.includes('android:pivotX="96" android:pivotY="96"'));
  assert.ok(!code.includes('sofia_letter_reveal'));
  assert.ok(code.includes('android:scaleX="0.020658489"'));
- assert.ok(code.includes('<animated-vector'));
+ assert.ok(!code.includes('<animated-vector'));
  assert.ok(!code.includes('repeatCount'));
- assert.ok(code.includes('android:valueFrom="0.88" android:valueTo="1"')); 
+ assert.ok(code.includes('android:scaleX="0.88" android:scaleY="0.88"')); 
  const bg=fs.readFileSync(path.join(root,'src/components/BackgroundServices.tsx'),'utf8');
  assert.ok(bg.includes('if(!enabled||!preloadWhenIdle'));
  assert.ok(bg.includes('scheduleIdleTask('));
@@ -150,13 +150,13 @@ test('086 startup S uses the reference vector and one finite scale and defers op
 
 
 
-test('093 prebuilt cover retains its mark during the single alpha fade',()=>{
+test('094 original ImageView retains its mark during the single alpha fade',()=>{
  const overlay=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const loader=fs.readFileSync(path.join(root,'src/lib/screen-loader.tsx'),'utf8');
- assert.ok(overlay.includes('buildLayer()'));
- assert.ok(overlay.includes('surface?.continueSystemMotion()'));
- assert.ok(overlay.includes('surface.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(!overlay.includes('decor.overlay.add('));
+ assert.ok(overlay.includes('icon?.animate()?.scaleX(1f / 0.88f)'));
+ assert.ok(overlay.includes('splash.animate().alpha(0f).setDuration(95L)'));
  assert.ok(!app.includes('<LaunchSAnimation'));
  assert.ok(loader.includes('export const DeferredScreen=React.memo('));
  assert.ok(loader.includes('keys.every(key=>Object.is(left[key],right[key]))'));
@@ -170,7 +170,7 @@ test('078 Home is allowed to reveal without waiting for server or prefetch',()=>
  assert.ok(overlay.includes('splash.remove()'));
  assert.ok(overlay.includes('record(activity, "FADE_DONE")'));
  assert.ok(logo.includes('android:windowSplashScreenAnimationDuration')); 
- assert.ok(logo.includes('<objectAnimator')); 
+ assert.ok(logo.includes('android:scaleX="0.88" android:scaleY="0.88"')); 
 });
 test('074 hidden tabs mount one idle slice at a time after original splash exits',()=>{
  const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
@@ -191,8 +191,8 @@ test('078 no second OS S persists underneath the single composited image',()=>{
  const native=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  assert.ok(theme.includes('<item name="android:windowBackground">@color/sofiaLaunchBackground</item>'));
  assert.ok(!theme.includes('<item name="android:windowBackground">@drawable/splashscreen_logo</item>'));
- assert.ok(theme.includes('<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_animated</item>'));
- assert.ok(native.includes('buildLayer()'));
+ assert.ok(theme.includes('<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_entry</item>'));
+ assert.ok(!native.includes('decor.overlay.add('));
  assert.ok(native.includes('splash.remove()'));
  assert.ok(!native.includes('icon.postDelayed('));
  assert.ok(native.includes('SOFIA_LAUNCH_SYSTEM_CALLBACK_PROCESS_MS='));
@@ -208,16 +208,16 @@ test('075 launch does not block on optional photo decode or full archive rollove
  assert.ok(snapshot.includes('await this.hydrate();void this.flushLaunch()'),'No-cache sessions can still recover the entire archive');
 });
 
-test('093 prebuilt cover leaves within the unchanged startup timing gates',()=>{
+test('094 original ImageView leaves within the unchanged startup timing gates',()=>{
  const native=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const smoke=fs.readFileSync(path.join(root,'tools/manual-apk-smoke.py'),'utf8');
  const exit=native.slice(native.indexOf('exitSystemSplash = { success ->'),native.indexOf('when (transition.splashReady())'));
  assert.ok(exit.includes('splash.remove()'));
- assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
- assert.ok(exit.includes('surface.postDelayed({ complete() }, 180L)'));
+ assert.ok(exit.includes('splash.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(exit.includes('splash.postDelayed({ complete() }, 180L)'));
  assert.ok(exit.includes('record(activity, "FADE_DONE")'));
- assert.ok(exit.includes('surface?.continueSystemMotion()'));
+ assert.ok(!exit.includes('setUpdateListener'));
  assert.ok(!exit.includes('icon?.animate()?.alpha(0f)'));
  assert.ok(!exit.includes('decor.overlay.add('));
  assert.ok(!native.includes('SurfaceControl.Transaction'));
