@@ -4,6 +4,7 @@ import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.os.Build
@@ -114,10 +115,10 @@ object SofiaLaunchOverlay {
                 Unit
               }
               record(activity, "FADE_START")
-              surface.animate().alpha(0f).setDuration(95L)
+              surface.animate().alpha(0f).setDuration(140L)
                 .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
                 .withEndAction { complete() }.start()
-              surface.postDelayed({ complete() }, 180L)
+              surface.postDelayed({ complete() }, 210L)
             }
             Unit
           }
@@ -219,7 +220,7 @@ object SofiaLaunchOverlay {
     // extra postOnAnimation fence added 400–650 ms on loaded Android emulators:
     // Home was ready, but Android did not start the fade until another frame.
     // Begin the synchronized splash exit in this SAME ready callback. The
-    // underlying prepared Home draws during the 95-ms fade.
+    // underlying prepared Home draws during the 140-ms fade.
     when (transition.contentReady()) {
       SofiaLaunchTransition.Exit.SYSTEM_SPLASH -> exitSystemSplash?.invoke(success)
       SofiaLaunchTransition.Exit.CONTENT -> {
@@ -322,7 +323,7 @@ private class SofiaEarlySplashSurface(
     textSize = 18f * resources.displayMetrics.scaledDensity
     typeface = Typeface.DEFAULT
   }
-  private var homeProgramsQueued = false
+  private var homeProgramStep = 0
   init {
     // Enter Android's composed-alpha path on the early visible frame,
     // not for the first time when Home is ready. Over the matching original
@@ -333,10 +334,7 @@ private class SofiaEarlySplashSurface(
   val markCenterY = markTop + (pixels?.height ?: 0) / 2f
   override fun onDraw(canvas: Canvas) {
     canvas.drawColor(backgroundColor)
-    if (!homeProgramsQueued) {
-      homeProgramsQueued = true
-      queueHomePrograms(canvas)
-    }
+    if (homeProgramStep < 3) queueHomePrograms(canvas, homeProgramStep++)
     val now = SystemClock.uptimeMillis()
     val scale = SofiaLaunchMotion.scaleAt(startedAt, now) / 0.88f
     canvas.save()
@@ -346,26 +344,51 @@ private class SofiaEarlySplashSurface(
     if (now - startedAt < SofiaLaunchMotion.DURATION_MS && alpha > 0f)
       postInvalidateOnAnimation()
   }
-  private fun queueHomePrograms(canvas: Canvas) {
-    // Perfetto found CircleOp, CircularRRectOp, AtlasTextOp and FillRectOp
-    // compiling for 300 ms in the first Home draw. Record these primitives
-    // on the early splash frame, in its SAME background color: they change
-    // no visible pixels and do not gate or fabricate any readiness marker.
+  private fun queueHomePrograms(canvas: Canvas, step: Int) {
+    // Actual Home traces also contain clipping variants of CircleOp,
+    // CircularRRectOp and FillRectOp. Prime their real clipped draws, not
+    // just their unmasked shapes, in the identical purple background color.
+    // Spread work over early frames so React can mount between each draw.
     warmPaint.style = Paint.Style.FILL
     warmPaint.alpha = 255
-    canvas.drawCircle(12f, 12f, 8f, warmPaint)
-    val rounded = RectF(24f, 4f, 64f, 28f)
-    canvas.drawRoundRect(rounded, 8f, 8f, warmPaint)
-    canvas.drawText("Olá, Sofia. Agenda", 4f, 52f, warmPaint)
-    warmPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-    canvas.drawText("Conversa", 4f, 76f, warmPaint)
-    canvas.drawRect(2.25f, 82.25f, 18.75f, 96.75f, warmPaint)
-    warmPaint.alpha = 128
-    canvas.drawRect(24.25f, 82.25f, 40.75f, 96.75f, warmPaint)
-    warmPaint.style = Paint.Style.STROKE
-    warmPaint.strokeWidth = 1f
-    canvas.drawCircle(12f, 12f, 8f, warmPaint)
-    canvas.drawRoundRect(rounded, 8f, 8f, warmPaint)
+    when (step) {
+      0 -> {
+        canvas.drawCircle(12f, 12f, 8f, warmPaint)
+        warmPaint.style = Paint.Style.STROKE
+        warmPaint.strokeWidth = resources.displayMetrics.density
+        canvas.drawCircle(12f, 12f, 8f, warmPaint)
+        warmPaint.style = Paint.Style.FILL
+        val clip = Path().apply { addCircle(12f, 12f, 8f, Path.Direction.CW) }
+        canvas.save()
+        canvas.clipPath(clip)
+        canvas.drawRect(2.25f, 2.25f, 12.75f, 22.75f, warmPaint)
+        warmPaint.alpha = 128
+        canvas.drawRect(10.25f, 2.25f, 22.75f, 22.75f, warmPaint)
+        canvas.restore()
+      }
+      1 -> {
+        val rounded = RectF(24f, 4f, 64f, 28f)
+        canvas.drawRoundRect(rounded, 8f, 8f, warmPaint)
+        warmPaint.style = Paint.Style.STROKE
+        canvas.drawRoundRect(rounded, 8f, 8f, warmPaint)
+        warmPaint.style = Paint.Style.FILL
+        val clip = Path().apply { addRoundRect(rounded, 8f, 8f, Path.Direction.CW) }
+        canvas.save()
+        canvas.clipPath(clip)
+        canvas.drawRect(22.25f, 2.25f, 44.75f, 30.75f, warmPaint)
+        warmPaint.alpha = 128
+        canvas.drawRect(42.25f, 2.25f, 66.75f, 30.75f, warmPaint)
+        canvas.restore()
+      }
+      2 -> {
+        canvas.drawText("Olá, Sofia. Agenda", 4f, 52f, warmPaint)
+        warmPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("Conversa", 4f, 76f, warmPaint)
+        canvas.drawRect(2.25f, 82.25f, 18.75f, 96.75f, warmPaint)
+        warmPaint.alpha = 128
+        canvas.drawRect(24.25f, 82.25f, 40.75f, 96.75f, warmPaint)
+      }
+    }
   }
 
 }

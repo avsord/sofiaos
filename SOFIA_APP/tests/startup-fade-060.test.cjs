@@ -82,7 +82,7 @@ test('060 unmount or launch failure cannot release stale optional services',asyn
 test('060 old platforms without the visibility bridge keep a cancellable fallback',async()=>{
  const f=visibilityFixture(false);assert.deepEqual(f.states,[false]);f.frames.shift()();f.frames.shift()();assert.deepEqual(f.states,[false,true]);f.dispose();
 });
-test('098 early visible snapshot preserves system pixels through scale and fade',()=>{
+test('099 early visible snapshot preserves system pixels through scale and fade',()=>{
  const native=file('plugins/native/SofiaLaunchOverlay.kt');
  const exit=native.slice(native.indexOf('exitSystemSplash = { success ->'),native.indexOf('when (transition.splashReady())'));
  assert.ok(!native.includes('SofiaLaunchFadeLayer'));
@@ -97,8 +97,8 @@ test('098 early visible snapshot preserves system pixels through scale and fade'
  assert.ok(native.includes('private val startedAt = SystemClock.uptimeMillis()'));
  assert.ok(!exit.includes('postOnAnimation'));
  assert.ok(!exit.includes('registerFrameCommitCallback'));
- assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
- assert.ok(exit.includes('surface.postDelayed({ complete() }, 180L)'));
+ assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(140L)'));
+ assert.ok(exit.includes('surface.postDelayed({ complete() }, 210L)'));
  const complete=exit.slice(exit.indexOf('val complete ='),exit.indexOf('record(activity, "FADE_START")'));
  assert.ok(complete.includes('if (!finished)'));
  assert.ok(complete.indexOf('finished = true')<complete.indexOf('disposeSurface()'));
@@ -106,10 +106,13 @@ test('098 early visible snapshot preserves system pixels through scale and fade'
  assert.ok(complete.indexOf('disposeSurface()')<complete.indexOf('record(activity, "FADE_DONE")'));
  assert.ok(native.includes('icon.draw(Canvas(it))'));
  assert.ok(native.includes('alpha = 254f / 255f'));
- assert.ok(native.includes('if (!homeProgramsQueued)'));
+ assert.ok(native.includes('if (homeProgramStep < 3)'));
  assert.ok(native.includes('warmPaint.style = Paint.Style.FILL'));
  assert.ok(native.includes('color = backgroundColor'));
- assert.ok(native.includes('queueHomePrograms(canvas)'));
+ assert.ok(native.includes('canvas.clipPath(clip)'));
+ assert.ok(native.includes('Path.Direction.CW'));
+ assert.ok(native.includes('when (step)'));
+ assert.ok(native.includes('queueHomePrograms(canvas, homeProgramStep++)'));
  assert.ok(!native.includes('View.INVISIBLE'));
  assert.ok(native.includes('Bitmap.createBitmap(icon.width, icon.height, Bitmap.Config.ARGB_8888)'));
  assert.ok(!native.includes('.recycle()'));

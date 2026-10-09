@@ -86,7 +86,7 @@ test('086 finite system S does not extend the native Home handoff or restart an 
  assert.ok(logo.includes('android:windowSplashScreenAnimationDuration')); 
  assert.ok(logo.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_entry</item>'));
  const launch=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
- assert.ok(launch.includes('surface.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(launch.includes('surface.animate().alpha(0f).setDuration(140L)'));
  assert.ok(!launch.includes('Animatable'));
 });
 test('068 photo preloads without blocking Home; menu prewarm yields to navigation',()=>{
@@ -150,14 +150,14 @@ test('086 startup S uses the reference vector and one finite scale and defers op
 
 
 
-test('098 early Canvas retains its mark during the single alpha fade',()=>{
+test('099 early Canvas retains its mark during the single alpha fade',()=>{
  const overlay=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const loader=fs.readFileSync(path.join(root,'src/lib/screen-loader.tsx'),'utf8');
  assert.ok(overlay.indexOf('decor.overlay.add(surface)')<overlay.indexOf('exitSystemSplash = { success ->'));
  assert.ok(overlay.includes('SofiaLaunchMotion.scaleAt(startedAt, now) / 0.88f'));
  assert.ok(!overlay.includes('.scaleX('));
- assert.ok(overlay.includes('surface.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(overlay.includes('surface.animate().alpha(0f).setDuration(140L)'));
  assert.ok(!app.includes('<LaunchSAnimation'));
  assert.ok(loader.includes('export const DeferredScreen=React.memo('));
  assert.ok(loader.includes('keys.every(key=>Object.is(left[key],right[key]))'));
@@ -209,14 +209,14 @@ test('075 launch does not block on optional photo decode or full archive rollove
  assert.ok(snapshot.includes('await this.hydrate();void this.flushLaunch()'),'No-cache sessions can still recover the entire archive');
 });
 
-test('098 early prepared surface leaves within the unchanged startup timing gates',()=>{
+test('099 early prepared surface leaves within the unchanged startup timing gates',()=>{
  const native=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const smoke=fs.readFileSync(path.join(root,'tools/manual-apk-smoke.py'),'utf8');
  const exit=native.slice(native.indexOf('exitSystemSplash = { success ->'),native.indexOf('when (transition.splashReady())'));
  assert.ok(exit.includes('splash.remove()'));
- assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
- assert.ok(exit.includes('surface.postDelayed({ complete() }, 180L)'));
+ assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(140L)'));
+ assert.ok(exit.includes('surface.postDelayed({ complete() }, 210L)'));
  assert.ok(exit.includes('record(activity, "FADE_DONE")'));
  assert.ok(!exit.includes('setUpdateListener'));
  assert.ok(!exit.includes('icon?.animate()?.alpha(0f)'));
