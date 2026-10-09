@@ -42,7 +42,14 @@ const {prepareInitialData}=load('src/lib/startup-preparation.ts',{'./agenda-cach
 test('057 disk hydration finishes before any optional prefetch is permitted',async()=>{const events=[];let hydrate;const api={hydrate:()=>new Promise(r=>hydrate=r),preload:()=>{events.push('network-prefetch');return new Promise(()=>{});}};let ready=false;const p=prepareInitialData(api,async()=>{}).then(()=>ready=true);await tick();assert.equal(ready,false);assert.deepEqual(events,[]);hydrate();await p;assert.equal(ready,true);assert.deepEqual(events,[]);});
 test('054 offline existing snapshots are usable without waiting for failed network',async()=>{const api={hydrate:async()=>{},cached:()=>({}),preload:()=>new Promise(()=>{}),home:()=>new Promise(()=>{}),tasks:()=>new Promise(()=>{}),ensureChat:()=>new Promise(()=>{})};await prepareInitialData(api,()=>new Promise(()=>{}));});
 test('054 offline launch stays responsive; Home exposes its own retry banner',async()=>{const offline=async()=>{throw Error('offline');};await prepareInitialData({hydrate:async()=>{},preload:offline},offline);});
-test('056 first Home frame does not wait for hidden screen trees; selected tabs are immediate',()=>{const {useStartupMounts}=load('src/lib/startup-mounts.ts',{'react':{useState:f=>[typeof f==='function'?f():f,()=>{}],useEffect:()=>{}}});assert.deepEqual(Array.from(useStartupMounts(true,'home')),['home']);assert.deepEqual(Array.from(useStartupMounts(true,'agenda')),['home','agenda']);assert.deepEqual(Array.from(useStartupMounts(false,'home')),['home']);});
+test('073 all six panels are mounted before splash exits; menu taps do not lazy-mount',()=>{
+ const {useStartupMounts}=load('src/lib/startup-mounts.ts');
+ const tabs=['home','chat','agenda','pages','apps','profile'];
+ assert.deepEqual(Array.from(useStartupMounts(true,'home')),tabs);
+ assert.deepEqual(Array.from(useStartupMounts(true,'agenda')),tabs);
+ assert.deepEqual(Array.from(useStartupMounts(false,'home')),['home']);
+ assert.deepEqual(Array.from(useStartupMounts(false,'profile')),['home','profile']);
+});
 
 function routedApiFixture(handler){
  const d=disk(),calls=[];let expired=0;

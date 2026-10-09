@@ -74,7 +74,7 @@ function visibilityFixture(withNative=true){
 }
 test('060 optional services do not start at layout permission, only at completed visual handoff',async()=>{
  const f=visibilityFixture();assert.deepEqual(f.states,[false]);f.resolve(true);await tick();assert.deepEqual(f.states,[false,true]);f.dispose();
- const app=file('App.tsx');assert.ok(app.includes('servicesReady=visible&&'));assert.ok(app.includes('if(painted)api.releaseNetwork()'));assert.ok(app.includes('useStartupMounts(servicesReady,tab)'));assert.ok(app.includes('{visible?<DeferredScreen load={loadBackgroundServices}')); 
+ const app=file('App.tsx');assert.ok(app.includes('servicesReady=visible&&'));assert.ok(app.includes('if(painted)api.releaseNetwork()'));assert.ok(app.includes('useStartupMounts(initialDataReady,tab)'));assert.ok(app.includes('{visible?<DeferredScreen load={loadBackgroundServices}')); 
 });
 test('060 unmount or launch failure cannot release stale optional services',async()=>{
  for(const cancel of [true,false]){const f=visibilityFixture();if(cancel)f.dispose();f.resolve(!cancel?false:true);await tick();assert.deepEqual(f.states,[false]);}
@@ -82,11 +82,14 @@ test('060 unmount or launch failure cannot release stale optional services',asyn
 test('060 old platforms without the visibility bridge keep a cancellable fallback',async()=>{
  const f=visibilityFixture(false);assert.deepEqual(f.states,[false]);f.frames.shift()();f.frames.shift()();assert.deepEqual(f.states,[false,true]);f.dispose();
 });
-test('063 ready content exits directly while readiness still includes the next display frame',()=>{
+test('073 original S splash fades as a whole only when the Home is ready',()=>{
  const native=file('plugins/native/SofiaLaunchOverlay.kt');
  for(const token of ['fun whenRevealed','SOFIA_LAUNCH_${stage}_PROCESS_MS=','record(activity, "LOCAL_READY")','record(activity, "SPLASH_REMOVED")'])assert.ok(native.includes(token),token);
- assert.ok(native.includes('splash.remove(); removeSystemSplash = null'));
- for(const absent of ['root.addView','Thread.sleep','.translationY(','.animate()', 'content.alpha = 0f','EXIT_FADE_MS'])assert.ok(!native.includes(absent),absent);
+ assert.ok(native.includes('splash.animate().alpha(0f)'));
+ assert.ok(native.includes('setDuration(190L)'));
+ assert.ok(native.includes('withEndAction { finalizeSplash() }'));
+ assert.ok(native.includes('splash.postDelayed({ finalizeSplash() }, 300L)'));
+ for(const absent of ['root.addView','Thread.sleep','.translationY(', 'content.alpha = 0f'])assert.ok(!native.includes(absent),absent);
  const completion=native.slice(native.indexOf('private fun completeReveal'),native.indexOf('private fun reveal'));
  assert.ok(completion.indexOf('postOnAnimation')<completion.indexOf('visible = true'));
  assert.ok(completion.indexOf('visible = true')<completion.indexOf('record(activity, if (success) "DATA"'));
