@@ -1,3 +1,11 @@
+## Entrega manual validada — 0.3.87/code92, 09/10/2026
+
+Fonte d607bcca1a98aea24b5982ae742c2b295caf3213; execução37931493993. Build/assinatura/TypeScript/suites e smoke de produção passaram. APK51.619.377 bytes; SHA256598af617c5f8f7f4be7b07cd7e62da9b322ffc10f96592e6e002ec2710845bda; certificado existente fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c. Download manual Sofia-OS-0.3.87.apk disponibilizado, sem release do atualizador. Fonte e APK conferidos contra o artefato exato.
+
+Cinco partidas frias com dados sintéticos offline: DATA mediana937ms vsbaseline0.3.65 892ms; prontidão→fade5ms, fade→fim118ms. Instalação por cima, Home autenticada sintética, primeiro toque, conversa preservada e paginação automática passaram. Gravação de migração: S branco28→30→32px em320×640, centro fixo e sem encolhimento antes de Home; roxo e círculo discretos. A gravação variável tem média≈19.8fps e não resolve quadros intermediários do fade curto; duração e conclusão foram medidas pelos marcadores nativos. Não é prova de aparelho físico nem preservação de dados reais. A0.3.88 concorrente preserva o desenho/movimento e está em outra execução; a aprovação aqui refere-se somente ao APK087.
+
+Delta final iniciado12:30UTC, promoção12:39:39UTC; CI aguardou execução concorrente até≈12:46:45UTC e terminou≈12:57UTC. Tempos de investigação/edição e fila/CI separados, sem alegação percentual de melhora.
+
 ## 0.3.88 — impedir renders intermediários durante a saída
 
 Base d607bcca1a98aea24b5982ae742c2b295caf3213 (0.3.87/code92), alteração concorrente que preserva uma entrada orgânica finita0.88→1 e usa o relógio original do Android. Mantém integralmente esse delta. O S final é maior que083, sem pulso repetido nem reinício na superfície de saída.
