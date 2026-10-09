@@ -111,7 +111,7 @@ test('086 synchronized composited one-layer S + background fades after actual sy
  assert.ok(!resources.includes('#17151F'));
  assert.ok(resources.includes('A33.6,33.6'));
  assert.ok(resources.includes('android:scaleX="0.020658489"'));
- assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(150L)'));
+ assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
  assert.ok(!exit.includes('ValueAnimator.ofFloat('));
  assert.ok(exit.includes('decor.overlay.add(view)'));
  assert.ok(exit.includes('decor?.overlay?.remove(surface)'));
@@ -127,7 +127,7 @@ test('089 native cover commits before once-only OS handoff to prevent a blank fr
  const code=file('plugins/native/SofiaLaunchOverlay.kt');
  const exit=code.slice(code.indexOf('exitSystemSplash = { success ->'),code.indexOf('when (transition.splashReady())'));
  assert.ok(exit.indexOf('view.layout(')<exit.indexOf('val handoff = Runnable'));
- assert.ok(exit.includes('surface.viewTreeObserver.registerFrameCommitCallback'));
+ assert.ok(exit.includes('decor!!.viewTreeObserver.registerFrameCommitCallback'));
  assert.ok(exit.includes('activity.runOnUiThread(handoff)'));
  assert.ok(exit.includes('if (!transferred && host?.get() === activity)'));
  assert.ok(exit.indexOf('transferred = true')<exit.indexOf('splash.remove()'));

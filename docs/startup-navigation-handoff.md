@@ -1,3 +1,7 @@
+## 0.3.90 — observar frame da janela real e manter fade validado
+
+089/run37942044183 compilou, mas reprovou fade mediano591ms, início≈104–123ms, indicando fallback100ms. Causa candidata: observador da ViewOverlay não participa da árvore real submetida. Registrar no decor.viewTreeObserver e retornar95ms/180ms do runtime088 aprovado; manter cobertura renderizada antes da remoção OS, S48dp e anel100.8dp. Sem relaxar gates. Feedback de status do usuário15:01BRT; retoma a execução exata, sem entregar089 reprovado. Ajuste/contrato focado nesta retomada; CI/visual pendentes.
+
 ## 0.3.89 — aumentar S e impedir intervalo na troca nativa
 
 Pedido ativo: deixar S maior e corrigir flicker no final, entregar APK. Base d53f2c21bc0b29eaf1c899e0955cb75a881c8284, runtime088 (run37933059646 passou). A087 entregue passou gates, mas vídeo≈19.8fps não resolveu frames intermediários do fade e houve relato físico de piscada. Hipótese do código: splash.remove durante preDraw pode anteceder o primeiro quadro da cobertura criada ali; não é prova de diagnóstico no aparelho.
