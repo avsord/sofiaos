@@ -94,6 +94,7 @@ test('078 composited one-layer S + background fades after actual system icon rem
  assert.ok(!exit.includes('ValueAnimator.ofFloat('));
  assert.ok(!exit.includes('icon?.animate()?.alpha(0f)'));
  const completion=native.slice(native.indexOf('private fun completeReveal'),native.indexOf('private fun reveal'));
- assert.ok(completion.indexOf('postOnAnimation')<completion.indexOf('visible = true'));
+ assert.ok(completion.includes('if (Build.VERSION.SDK_INT >= 31 && exitStarted) notifyReady()'));
+ assert.ok(completion.includes('else activity.window.decorView.postOnAnimation { notifyReady() }'));
  assert.ok(completion.indexOf('visible = true')<completion.indexOf('record(activity, if (success) "DATA"'));
 });

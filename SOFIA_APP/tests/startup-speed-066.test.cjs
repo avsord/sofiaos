@@ -225,3 +225,12 @@ test('078 Android removes system icon before 95ms one-layer fade',()=>{
  assert.ok(smoke.includes("result['fade_to_done_median_ms']<=250"));
  assert.ok(smoke.includes("result['ready_to_splash_remove_median_ms']<=150"));
 });
+
+test('078 Android 12 completed fade reports visible without another costly frame',()=>{
+ const code=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
+ const complete=code.slice(code.indexOf('private fun completeReveal('),code.indexOf('private fun reveal('));
+ assert.ok(complete.includes('if (Build.VERSION.SDK_INT >= 31 && exitStarted) notifyReady()'));
+ assert.ok(complete.includes('else activity.window.decorView.postOnAnimation { notifyReady() }'));
+ assert.ok(complete.includes('if (success) activity.reportFullyDrawn()'));
+ assert.ok(complete.indexOf('record(activity, if (success) "DATA"')<complete.indexOf('activity.reportFullyDrawn()'));
+});

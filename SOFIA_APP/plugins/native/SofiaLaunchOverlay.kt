@@ -207,16 +207,20 @@ object SofiaLaunchOverlay {
     if (visible || host?.get() !== activity) return
     if (!transition.finish()) return
     detach()
-    // Keep the same next-frame DATA boundary used by the comparison APK.
-    // Layout readiness alone must never be reported as usable presentation.
-    activity.window.decorView.postOnAnimation {
-      if (host?.get() !== activity || activity.isFinishing) return@postOnAnimation
+    // The Android 12+ system starting window has already been removed and
+    // the single composed fade has completed. Waiting for ANOTHER frame here
+    // stalled 500+ ms on overloaded emulators, despite Home being usable.
+    // Older platforms still need their original frame fence.
+    fun notifyReady() {
+      if (host?.get() !== activity || activity.isFinishing || visible) return
       visible = true
       record(activity, if (success) "DATA" else "ERROR")
       val callbacks = visibleWaiting.toList(); visibleWaiting.clear()
       callbacks.forEach { it.resolve(success) }
       if (success) activity.reportFullyDrawn()
     }
+    if (Build.VERSION.SDK_INT >= 31 && exitStarted) notifyReady()
+    else activity.window.decorView.postOnAnimation { notifyReady() }
   }
 
   private fun reveal(activity: Activity, success: Boolean) {
