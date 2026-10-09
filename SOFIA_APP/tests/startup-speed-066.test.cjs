@@ -81,9 +81,14 @@ test('067 cached Home and Agenda remain primary; catalog, widgets and monitors s
 
 test('068 S animation never extends the existing native Home handoff',()=>{
  const logo=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
- assert.ok(logo.includes('sofia_letter_reveal.xml'));
+ assert.ok(logo.includes('sofia_letter_motion.xml'));
  assert.ok(logo.includes('sofia_launch_mark_animated'));
- assert.ok(logo.includes('android:duration="260"'));assert.ok(logo.includes('android:valueFrom="0.06"'));assert.ok(logo.includes('android:windowSplashScreenAnimationDuration'));
+ assert.ok(logo.includes('sofiaLetterMotion'));
+ assert.ok(logo.includes('android:propertyName="rotation"'));
+ assert.ok(logo.includes('android:propertyName="scaleX"'));
+ assert.ok(logo.includes('android:propertyName="scaleY"'));
+ assert.ok(logo.includes('android:duration="420"'));
+ assert.ok(logo.includes('android:windowSplashScreenAnimationDuration'));
  const launch=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  assert.ok(!launch.includes('sofia_letter_reveal'),'Splash dismissal must not wait for animation');
 });
@@ -125,4 +130,18 @@ test('069 startup restores photo and cached Home together; menus mount only when
  assert.ok(!launch.includes('fetch('),'No server calls in initial photo/Home restore');
  assert.ok(!mounts.includes('scheduleIdleTask('),'Do not mount offscreen screen trees on idle');
  assert.ok(mounts.includes("previous.has(active)"));
+});
+
+test('070 startup S moves as an actual vector group, never just an opacity fade',()=>{
+ const code=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
+ assert.ok(code.includes('android:name="sofiaLetterMotion"'));
+ assert.ok(code.includes('android:pivotX="48" android:pivotY="48"'));
+ assert.ok(!code.includes('sofia_letter_reveal'));
+ assert.ok(code.includes('@animator/sofia_letter_motion'));
+ const bg=fs.readFileSync(path.join(root,'src/components/BackgroundServices.tsx'),'utf8');
+ assert.ok(bg.includes('if(!enabled||!preloadWhenIdle'));
+ assert.ok(bg.includes('scheduleIdleTask('));
+ assert.ok(bg.includes('1600'));
+ const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
+ assert.ok(app.includes("preloadWhenIdle:screenTab==='home'"));
 });
