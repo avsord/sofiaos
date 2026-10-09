@@ -220,7 +220,7 @@ test('079 Android removes system icon before continuous one-layer fade',()=>{
  assert.ok(callback.indexOf('splash.remove()')<callback.indexOf('record(activity, "FADE_START")'));
  assert.ok(!exit.includes('SofiaUnifiedSplashSurface(activity)'));
  assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(190L)'));
- assert.ok(exit.includes('surface.postDelayed({ complete() }, 240L)'));
+ assert.ok(exit.includes('surface.postDelayed({ complete() }, 230L)'));
  assert.ok(exit.includes('record(activity, "FADE_DONE")'));
  assert.ok(!exit.includes('icon?.animate()?.alpha(0f)'));
  assert.ok(!exit.includes('ValueAnimator.ofFloat('));
