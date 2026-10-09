@@ -1,3 +1,9 @@
+## 0.3.89 — aumentar S e impedir intervalo na troca nativa
+
+Pedido ativo: deixar S maior e corrigir flicker no final, entregar APK. Base d53f2c21bc0b29eaf1c899e0955cb75a881c8284, runtime088 (run37933059646 passou). A087 entregue passou gates, mas vídeo≈19.8fps não resolveu frames intermediários do fade e houve relato físico de piscada. Hipótese do código: splash.remove durante preDraw pode anteceder o primeiro quadro da cobertura criada ali; não é prova de diagnóstico no aparelho.
+
+Delta mínimo: tamanho48dp/anel100.8dp (+50%), mesma escala finita sincronizada com relógio Android. Aguarda registerFrameCommitCallback antes de remover OS; software usa próximo frame, OEM fallback100ms; Runnable protege transferência única e Activity antiga. Fade150ms/cleanup230ms, mantendo todos os gates nativos e correção088 de renders da Shell. Só plugins nativos, identidade/testes e documentação. Rota manual-apk; CI valida suites antes de compilar, assinatura, instalação por cima, Home/conversa/paginação sintéticas e vídeo depois. Sem desinstalação, limpeza de dados ou backend. Investigação/edição≈14:03UTC em diante; CI será registrado separadamente. Build e aceite físico pendentes.
+
 ## Entrega manual validada — 0.3.87/code92, 09/10/2026
 
 Fonte d607bcca1a98aea24b5982ae742c2b295caf3213; execução37931493993. Build/assinatura/TypeScript/suites e smoke de produção passaram. APK51.619.377 bytes; SHA256598af617c5f8f7f4be7b07cd7e62da9b322ffc10f96592e6e002ec2710845bda; certificado existente fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c. Download manual Sofia-OS-0.3.87.apk disponibilizado, sem release do atualizador. Fonte e APK conferidos contra o artefato exato.

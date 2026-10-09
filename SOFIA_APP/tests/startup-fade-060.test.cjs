@@ -109,9 +109,9 @@ test('086 synchronized composited one-layer S + background fades after actual sy
  assert.ok(head.includes('x + icon.width + padX'));
  assert.ok(resources.includes('android:strokeColor="#12FFFFFF"'));
  assert.ok(!resources.includes('#17151F'));
- assert.ok(resources.includes('A22.4,22.4'));
- assert.ok(resources.includes('android:scaleX="0.013772326"'));
- assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(resources.includes('A33.6,33.6'));
+ assert.ok(resources.includes('android:scaleX="0.020658489"'));
+ assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(150L)'));
  assert.ok(!exit.includes('ValueAnimator.ofFloat('));
  assert.ok(exit.includes('decor.overlay.add(view)'));
  assert.ok(exit.includes('decor?.overlay?.remove(surface)'));
@@ -121,4 +121,16 @@ test('086 synchronized composited one-layer S + background fades after actual sy
  assert.ok(completion.includes('if (Build.VERSION.SDK_INT >= 31 && exitStarted) notifyReady()'));
  assert.ok(completion.includes('else activity.window.decorView.postOnAnimation { notifyReady() }'));
  assert.ok(completion.indexOf('visible = true')<completion.indexOf('record(activity, if (success) "DATA"'));
+});
+
+test('089 native cover commits before once-only OS handoff to prevent a blank frame',()=>{
+ const code=file('plugins/native/SofiaLaunchOverlay.kt');
+ const exit=code.slice(code.indexOf('exitSystemSplash = { success ->'),code.indexOf('when (transition.splashReady())'));
+ assert.ok(exit.indexOf('view.layout(')<exit.indexOf('val handoff = Runnable'));
+ assert.ok(exit.includes('surface.viewTreeObserver.registerFrameCommitCallback'));
+ assert.ok(exit.includes('activity.runOnUiThread(handoff)'));
+ assert.ok(exit.includes('if (!transferred && host?.get() === activity)'));
+ assert.ok(exit.indexOf('transferred = true')<exit.indexOf('splash.remove()'));
+ assert.ok(exit.includes('surface.postOnAnimation { handoff.run() }'));
+ assert.ok(exit.includes('surface.postDelayed(handoff, 100L)'));
 });

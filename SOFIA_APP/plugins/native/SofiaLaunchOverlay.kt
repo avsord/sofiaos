@@ -131,37 +131,57 @@ object SofiaLaunchOverlay {
                   view.matchSystemMotion(splash.iconAnimationStart?.toEpochMilli() ?: 0L)
                 }
               else null
-              // The OS icon cannot remain as a separately composited layer.
-              splash.iconView?.animate()?.cancel()
-              splash.animate().cancel()
-              splash.remove()
-              record(activity, "SPLASH_REMOVED")
-              exitSystemSplash = null
-              removeSystemSplash = null
-              if (surface == null) {
-                removeSystemSplash = null
-                completeReveal(activity, success)
-              } else {
-                var finished = false
-                val complete = {
-                  if (!finished) {
-                    finished = true
-                    surface.animate().cancel()
-                    surface.alpha = 0f
-                    decor?.overlay?.remove(surface)
+              // Do not drop the OS layer until our identical replacement has
+              // been rendered. Removing it during pre-draw can expose Home for
+              // one frame before the cover exists: the end-of-launch flicker.
+              var transferred = false
+              val handoff = Runnable {
+                if (!transferred && host?.get() === activity) {
+                  transferred = true
+                  // The OS icon cannot remain as a separately composited layer.
+                  splash.iconView?.animate()?.cancel()
+                  splash.animate().cancel()
+                  splash.remove()
+                  record(activity, "SPLASH_REMOVED")
+                  exitSystemSplash = null
+                  removeSystemSplash = null
+                  if (surface == null) {
                     removeSystemSplash = null
-                    record(activity, "FADE_DONE")
                     completeReveal(activity, success)
+                  } else {
+                    var finished = false
+                    val complete = {
+                      if (!finished) {
+                        finished = true
+                        surface.animate().cancel()
+                        surface.alpha = 0f
+                        decor?.overlay?.remove(surface)
+                        removeSystemSplash = null
+                        record(activity, "FADE_DONE")
+                        completeReveal(activity, success)
+                      }
+                      Unit
+                    }
+                    // Preserve the stable mark size while both S and background
+                    // fade as a single compositor layer over the prepared Home.
+                    record(activity, "FADE_START")
+                    surface.animate().alpha(0f).setDuration(150L)
+                      .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
+                      .withEndAction { complete() }.start()
+                    surface.postDelayed({ complete() }, 230L)
                   }
-                  Unit
                 }
-                // Preserve the stable mark size while both S and background
-                // fade as a single compositor layer over the prepared Home.
-                record(activity, "FADE_START")
-                surface.animate().alpha(0f).setDuration(95L)
-                  .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
-                  .withEndAction { complete() }.start()
-                surface.postDelayed({ complete() }, 180L)
+              }
+              if (surface == null) handoff.run()
+              else {
+                if (surface.isHardwareAccelerated) {
+                  surface.viewTreeObserver.registerFrameCommitCallback {
+                    activity.runOnUiThread(handoff)
+                  }
+                } else surface.postOnAnimation { handoff.run() }
+                surface.invalidate()
+                // OEM fallback; both paths enter the same once-only handoff.
+                surface.postDelayed(handoff, 100L)
               }
             }
             Unit
@@ -264,7 +284,7 @@ object SofiaLaunchOverlay {
     // extra postOnAnimation fence added 400–650 ms on loaded Android emulators:
     // Home was ready, but Android did not start the fade until another frame.
     // Begin the synchronized splash exit in this SAME ready callback. The
-    // underlying prepared Home draws during the 95-ms fade.
+    // underlying prepared Home draws during the 150-ms fade.
     when (transition.contentReady()) {
       SofiaLaunchTransition.Exit.SYSTEM_SPLASH -> exitSystemSplash?.invoke(success)
       SofiaLaunchTransition.Exit.CONTENT -> {
