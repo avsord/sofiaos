@@ -24,7 +24,7 @@ import {NotificationProvider} from './src/components/NotificationCenter';
 import {createMenuMotion} from './src/lib/menu-motion';
 import type {TabPagerHandle} from './src/components/TabPager';
 import {useStartupMounts} from './src/lib/startup-mounts';
-import {DeferredScreen,loadAgenda,loadChat,loadHome,loadNotifications,loadPages,loadProfile,loadWorkspace,loadBackgroundServices,MENU_PRELOADERS} from './src/lib/screen-loader';
+import {DeferredScreen,loadAgenda,loadChat,loadHome,loadNotifications,loadPages,loadProfile,loadWorkspace,loadBackgroundServices} from './src/lib/screen-loader';
 import {Login} from './src/screens/Login';
 
 import {APP_VERSION,checkForUpdate} from './src/lib/update';
@@ -53,28 +53,11 @@ function Shell({startup}:{startup:LocalLaunch}){
  const initialDataReady=prepared===api;
  // Layout releases essential network reads; only the completed visual handoff
  // releases hidden screens, notification inventory and optional prefetch.
- const painted=useAfterFirstPaint(ready),visible=useLaunchVisible(ready),servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady,mountedTabs=useStartupMounts(servicesReady,tab);
+ const painted=useAfterFirstPaint(ready),visible=useLaunchVisible(ready),servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady,mountedTabs=useStartupMounts(initialDataReady,tab);
  useEffect(()=>{if(!auth||initialDataReady)return;let live=true;setPreparationError('');void prepareInitialData(api,()=>preloadAgenda(api)).then(()=>{if(live){setPrepared(api);console.info('SOFIA_STARTUP_CACHE_READY');}}).catch(e=>{if(live)setPreparationError(errorText(e));});return()=>{live=false;};},[api,prepareAttempt]);
  useEffect(()=>{if(painted)api.releaseNetwork();},[painted,api]);
- // Load modules in actual idle windows only. React Native dispatches touches on
- // the JS thread: synchronous Metro require() during a menu press stalls input.
- // A menu tap cancels future background requires until Home is idle again.
- const menuWarmIndex=useRef(0);
- useEffect(()=>{
-  if(!servicesReady||tab!=='home')return;
-  let stopped=false,cancel=()=>{};
-  let timer:ReturnType<typeof setTimeout>|undefined;
-  const next=()=>{
-   if(stopped||menuWarmIndex.current>=MENU_PRELOADERS.length)return;
-   cancel=scheduleIdleTask(()=>{
-    if(stopped)return;
-    try{MENU_PRELOADERS[menuWarmIndex.current]();}catch{/* A chosen screen can retry. */}finally{menuWarmIndex.current++;}
-    timer=setTimeout(next,360);
-   });
-  };
-  timer=setTimeout(next,800);
-  return()=>{stopped=true;cancel();if(timer)clearTimeout(timer);};
- },[servicesReady,tab]);
+ // All six tab trees are initialized behind the real Android splash.
+ // Do not schedule post-launch Metro requires that race the first menu press.
  const launchReady=ready&&(!auth||(!!bootstrap&&servicesReady));
  useEffect(()=>{if(!launchReady)return;return finishLaunchHandoff();},[launchReady,c.bg]);
  const checkingUpdate=useRef(false),lastUpdateCheck=useRef(0),lastUpdatePrompt=useRef('');

@@ -31,7 +31,7 @@ const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'
 
 export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;active:boolean;storageScope:string;onDepthChange?:(open:boolean)=>void}){
  const keyboardVisible=useKeyboardVisible(),scrollPositions=useRef(new Map<string,number>());
- const c=useTheme(),[pages,setPages]=useState<Entity[]>([]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>()),[pageInteraction,setPageInteraction]=useState(false),[pageDragging,setPageDragging]=useState(false);
+ const c=useTheme(),[pages,setPages]=useState<Entity[]>(()=>api.cached<{items:Entity[]}>('/workspace/entities?limit=100&kind=user_page&q=&offset=0')?.items.filter(item=>item.state!=='archived')||[]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>()),[pageInteraction,setPageInteraction]=useState(false),[pageDragging,setPageDragging]=useState(false);
  const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null),[createParent,setCreateParent]=useState<Entity|null|undefined>(undefined);
  const refreshFlight=useRef(false),mutationEpoch=useRef(0),moveBusy=useRef(false),pendingPosition=useRef(new Map<string,Record<string,any>>());
  const history=useRef<string[]>([]),mounted=useRef(true),expandDisk=useRef(Promise.resolve()),inputRefs=useRef(new Map<string,TextInput>());
@@ -76,9 +76,13 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   return()=>{clearInterval(timer);subscription.remove();};
  },[active,ready,store]);
  useEffect(()=>{
-  mounted.current=true;let alive=true;setReady(false);
-  void Promise.all([AsyncStorage.getItem(key+':drafts'),AsyncStorage.getItem(key+':expanded')]).then(async([drafts,branches])=>{
-   if(!alive)return;store.restore(safeJson(drafts,[]));setExpanded(expandedIds(safeJson(branches,[])));await load();if(alive){setReady(true);store.resume();}
+  mounted.current=true;let alive=true;
+  // Local drafts/expansion are enough to render saved pages. Waiting for a
+  // slow server here used to show an empty screen on the first tab press.
+  void Promise.all([AsyncStorage.getItem(key+':drafts'),AsyncStorage.getItem(key+':expanded')]).then(([drafts,branches])=>{
+   if(!alive)return;
+   store.restore(safeJson(drafts,[]));setExpanded(expandedIds(safeJson(branches,[])));
+   setReady(true);store.resume();void load();
   }).catch(e=>{if(alive){setError(errorText(e));setReady(true);void load();}});
   const state=AppState.addEventListener('change',()=>{void store.flushAll();});
   const keyboard=Keyboard.addListener('keyboardDidHide',()=>setFocus(null));

@@ -75,18 +75,35 @@ object SofiaLaunchOverlay {
           exitSystemSplash = { success ->
             if (!exitStarted && host?.get() === activity) {
               exitStarted = true
-              val finish = {
-                if (host?.get() === activity) {
-                  splash.remove(); removeSystemSplash = null; exitSystemSplash = null
-                  record(activity, "SPLASH_REMOVED")
-                  completeReveal(activity, success)
-                } else splash.remove()
+              var finalized = false
+              val finalizeSplash = {
+                if (!finalized) {
+                  finalized = true
+                  splash.remove()
+                  if (host?.get() === activity) {
+                    removeSystemSplash = null; exitSystemSplash = null
+                    record(activity, "SPLASH_REMOVED")
+                    completeReveal(activity, success)
+                  }
+                }
+              }
+              // Fade the WHOLE original splash surface (background + circle +
+              // S), not a letter animation and not a second overlay on Home.
+              val fadeOut = {
+                if (host?.get() === activity && !activity.isFinishing) {
+                  splash.animate().cancel()
+                  splash.animate().alpha(0f).setDuration(190L)
+                    .setInterpolator(android.view.animation.DecelerateInterpolator())
+                    .withEndAction { finalizeSplash() }.start()
+                  // OEMs may cancel view animators; never strand the splash.
+                  splash.postDelayed({ finalizeSplash() }, 300L)
+                } else finalizeSplash()
               }
               // If Home is ready before the native icon moves, finish the
               // 240ms gesture in-place. Never present a separate React overlay.
               val remainder = (240L - (SystemClock.uptimeMillis() - startIconAt)).coerceAtLeast(0L)
-              if (remainder > 0L && icon != null) icon.postDelayed(finish, remainder)
-              else finish()
+              if (remainder > 0L && icon != null) icon.postDelayed(fadeOut, remainder)
+              else fadeOut()
             }
           }
           when (transition.splashReady()) {

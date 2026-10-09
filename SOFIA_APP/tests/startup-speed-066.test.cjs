@@ -97,7 +97,7 @@ test('068 photo preloads without blocking Home; menu prewarm yields to navigatio
  const local=fs.readFileSync(path.join(root,'src/lib/local-launch.ts'),'utf8');
  const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
  assert.ok(local.includes("await Promise.all([snapshot.hydrateLaunch(),photoReady])"));
- assert.ok(app.includes('MENU_PRELOADERS[menuWarmIndex.current]()'));
+ assert.ok(app.includes('useStartupMounts(initialDataReady,tab)'));
  assert.ok(!mounts.includes('scheduleIdleTask('));
  assert.ok(fs.readFileSync(path.join(root,'src/components/ProfileAvatar.tsx'),'utf8').includes('primeProfilePhoto(scope,readProfilePhoto)'));
 });
@@ -143,7 +143,7 @@ test('070 startup S moves as an actual vector group, never just an opacity fade'
  assert.ok(bg.includes('scheduleIdleTask('));
  assert.ok(bg.includes('3400'));
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
- assert.ok(app.includes('timer=setTimeout(next,800)'));
+ assert.ok(!app.includes('timer=setTimeout(next,800)'));
  assert.ok(app.includes("if(!servicesReady||tab!=='home')return"));
  assert.ok(app.includes("preloadWhenIdle:screenTab==='home'"));
 });
@@ -161,4 +161,29 @@ test('072 splash runs in native icon, without Home overlay; tabs memoize hidden 
  assert.ok(!app.includes('<LaunchSAnimation'));
  assert.ok(loader.includes('export const DeferredScreen=React.memo('));
  assert.ok(loader.includes('keys.every(key=>Object.is(left[key],right[key]))'));
+});
+
+test('073 fade exits the entire native S screen after Home is ready',()=>{
+ const overlay=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
+ const start=overlay.indexOf('val fadeOut = {');
+ const end=overlay.indexOf('val remainder = ',start);
+ assert.ok(start>=0 && end>start);
+ const fade=overlay.slice(start,end);
+ assert.ok(fade.includes('splash.animate().alpha(0f)'));
+ assert.ok(fade.includes('setDuration(190L)'));
+ assert.ok(fade.includes('withEndAction { finalizeSplash() }'));
+ assert.ok(fade.includes('splash.postDelayed({ finalizeSplash() }, 300L)'));
+ assert.ok(!fade.includes('icon.animate().alpha'));
+});
+test('073 six authenticated menu panels already exist beneath the splash',()=>{
+ const tabs=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
+ const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
+ const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');
+ const apps=fs.readFileSync(path.join(root,'src/screens/Workspace.tsx'),'utf8');
+ assert.ok(tabs.includes('enabled?MENU_TABS:[]'));
+ assert.ok(app.includes('useStartupMounts(initialDataReady,tab)'));
+ assert.ok(!app.includes('MENU_PRELOADERS'));
+ assert.ok(pages.includes("api.cached<{items:Entity[]}>('/workspace/entities?limit=100&kind=user_page&q=&offset=0')"));
+ assert.ok(pages.includes('setReady(true);store.resume();void load()'));
+ assert.ok(apps.includes("api.cached<Catalog>('/workspace/catalog')"));
 });
