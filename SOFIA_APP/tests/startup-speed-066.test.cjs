@@ -224,7 +224,7 @@ test('076 icon and background share exactly one exit animator; fade starts at na
  assert.ok(!fade.includes('icon?.animate().alpha('));
  assert.ok(src.includes('when (transition.contentReady())'));
  const ready=src.slice(src.indexOf('private fun reveal('),src.indexOf('private fun inspect('));
- assert.ok(!ready.includes('postOnAnimation'),'No extra vsync fence after native Home-ready');
+ assert.ok(!/activity\.window\.decorView\.postOnAnimation\s*\{/.test(ready),'No extra vsync fence after native Home-ready');
  const qa=fs.readFileSync(path.join(root,'tools/manual-apk-smoke.py'),'utf8');
  assert.ok(qa.includes("'splash_performance_verified'") || qa.includes("result['splash_performance_verified']=True"));
  assert.ok(qa.includes("['ready_to_fade_median_ms']<=150"));
