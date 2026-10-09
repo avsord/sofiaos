@@ -154,8 +154,8 @@ test('074 Android splash exits as a single surface with no icon-only overlay',()
  const overlay=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const loader=fs.readFileSync(path.join(root,'src/lib/screen-loader.tsx'),'utf8');
- assert.ok(overlay.includes('splash.animate().alpha(0f).setDuration(110L)'));
- assert.ok(overlay.includes('splash.postDelayed({ finalizeSplash() }, 160L)'));
+ assert.ok(overlay.includes('ValueAnimator.ofFloat(1f, 0f)'));
+ assert.ok(overlay.includes('splash.postDelayed({ finalizeSplash() }, 135L)'));
  assert.ok(!overlay.includes('icon.postDelayed('));
  assert.ok(!overlay.includes('setDuration(240L)'));
  assert.ok(!app.includes('<LaunchSAnimation'));
@@ -168,8 +168,8 @@ test('074 Home may reveal with local layout rather than holding on pending remot
  const code=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
  assert.ok(overlay.includes('if (login || home) {'));
  assert.ok(!overlay.includes('if (login || (home && (signals and 8) != 0))'));
- assert.ok(overlay.includes('splash.animate().alpha(0f)'));
- assert.ok(overlay.includes('withEndAction { finalizeSplash() }'));
+ assert.ok(overlay.includes('splash.alpha = alpha'));
+ assert.ok(overlay.includes('icon?.alpha = alpha'));
  assert.ok(code.includes('android:windowSplashScreenAnimationDuration'));
  assert.ok(code.includes('android:duration="180"'));
 });
@@ -193,7 +193,7 @@ test('075 no persistent duplicate S under Android 12 splash',()=>{
  assert.ok(theme.includes('<item name="android:windowBackground">@color/sofiaLaunchBackground</item>'));
  assert.ok(!theme.includes('<item name="android:windowBackground">@drawable/splashscreen_logo</item>'));
  assert.ok(theme.includes('<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_animated</item>'));
- assert.ok(native.includes('splash.animate().alpha(0f).setDuration(110L)'));
+ assert.ok(native.includes('ValueAnimator.ofFloat(1f, 0f)'));
  assert.ok(native.includes('splash.remove()'));
  assert.ok(!native.includes('icon.postDelayed('));
  assert.ok(native.includes('SOFIA_LAUNCH_SYSTEM_CALLBACK_PROCESS_MS='));
@@ -207,4 +207,25 @@ test('075 launch does not block on optional photo decode or full archive rollove
  assert.ok(snapshot.includes("if(this.entries.has('/home')||this.entries.has('/tasks'))"));
  assert.ok(snapshot.includes('void this.hydrate().then(()=>this.flushLaunch()).catch(()=>{})'));
  assert.ok(snapshot.includes('await this.hydrate();void this.flushLaunch()'),'No-cache sessions can still recover the entire archive');
+});
+
+test('076 icon and background share exactly one exit animator; fade starts at native Home readiness',()=>{
+ const src=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
+ const fade=src.slice(src.indexOf('exitSystemSplash = { success ->'),src.indexOf('when (transition.splashReady())'));
+ assert.ok(fade.includes('ValueAnimator.ofFloat(1f, 0f)'));
+ assert.equal((fade.match(/ValueAnimator\.ofFloat/g)||[]).length,1,'One shared animation timeline');
+ assert.ok(fade.includes('splash.alpha = alpha'));
+ assert.ok(fade.includes('icon?.alpha = alpha'));
+ assert.ok(fade.includes('icon?.alpha = 0f'));
+ assert.ok(fade.includes('splash.alpha = 0f'));
+ assert.ok(fade.includes('duration = 95L'));
+ assert.ok(fade.includes('record(activity, "FADE_START")'));
+ assert.ok(!fade.includes('splash.animate().alpha('));
+ assert.ok(!fade.includes('icon?.animate().alpha('));
+ assert.ok(src.includes('when (transition.contentReady())'));
+ const ready=src.slice(src.indexOf('private fun reveal('),src.indexOf('private fun inspect('));
+ assert.ok(!ready.includes('postOnAnimation'),'No extra vsync fence after native Home-ready');
+ const qa=fs.readFileSync(path.join(root,'tools/manual-apk-smoke.py'),'utf8');
+ assert.ok(qa.includes("'splash_performance_verified'") || qa.includes("result['splash_performance_verified']=True"));
+ assert.ok(qa.includes("['ready_to_fade_median_ms']<=150"));
 });

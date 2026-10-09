@@ -67,6 +67,23 @@ try:
  result['authenticated_home_tested']=True
  result['baseline_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['baseline_runs'])
  result['candidate_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['candidate_runs'])
+ # A working APK is NOT an acceptable startup if the system keeps the S over
+ # usable content for another half-second. Measure actual native timestamps,
+ # not synthetic UI assertions, and compare against the retained 0.3.65 APK.
+ spans=[]
+ for run in result['candidate_runs']:
+  events=run['stages_ms']
+  assert 'FADE_START' in events, 'Native fade never started: '+str(events)
+  assert events['LOCAL_READY']<=events['FADE_START']<=events['SPLASH_REMOVED']<=events['DATA'],events
+  spans.append({'ready_to_fade_ms':events['FADE_START']-events['LOCAL_READY'],
+                'fade_to_remove_ms':events['SPLASH_REMOVED']-events['FADE_START']})
+ result['exit_spans']=spans
+ result['ready_to_fade_median_ms']=statistics.median(row['ready_to_fade_ms'] for row in spans)
+ result['fade_to_remove_median_ms']=statistics.median(row['fade_to_remove_ms'] for row in spans)
+ assert result['ready_to_fade_median_ms']<=150,'Home ready but fade starts too late: '+str(spans)
+ assert result['fade_to_remove_median_ms']<=250,'Fade is keeping icon over Home: '+str(spans)
+ assert result['candidate_median_ms']<=result['baseline_median_ms']+200, 'Startup slower than baseline by over 200 ms: '+str(result['candidate_median_ms']-result['baseline_median_ms'])
+ result['splash_performance_verified']=True
  # Verify that an actual menu touch works and retained conversation survives.
  tap_label(after,'Conversa');time.sleep(1)
  conversation=capture('conversation')

@@ -1,5 +1,8 @@
 package com.avsord.sofiaapp
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.app.Activity
 import android.os.Build
 import android.os.Process
@@ -67,10 +70,15 @@ object SofiaLaunchOverlay {
             if (!exitStarted && host?.get() === activity) {
               exitStarted = true
               var finalized = false
+              val icon = splash.iconView
               val finalizeSplash = {
                 if (!finalized) {
                   finalized = true
-                  splash.animate().cancel()
+                  // OEM icon surfaces are sometimes composed independently of
+                  // the splash background. Force both to transparent BEFORE
+                  // removing the single system SplashScreenView.
+                  icon?.alpha = 0f
+                  splash.alpha = 0f
                   splash.remove()
                   if (host?.get() === activity) {
                     removeSystemSplash = null; exitSystemSplash = null
@@ -80,17 +88,26 @@ object SofiaLaunchOverlay {
                 }
                 Unit
               }
-              // Keep the icon attached to the original splash until the
-              // parent fades. A cancelled icon animator must not remain drawn
-              // above the real app as an independent layer.
-              splash.iconView?.animate()?.cancel()
-              splash.animate().cancel()
-              splash.animate().alpha(0f).setDuration(110L)
-                .setInterpolator(android.view.animation.DecelerateInterpolator())
-                .withEndAction { finalizeSplash() }.start()
-              // Some Android variants cancel end callbacks. Never retain the
-              // starting screen or strand whenRevealed after cancellation.
-              splash.postDelayed({ finalizeSplash() }, 160L)
+              // One progress value controls BOTH Android layers. On some
+              // devices fading only SplashScreenView leaves the S visible.
+              // No separate ViewPropertyAnimator, overlay or second timeline.
+              val fade = ValueAnimator.ofFloat(1f, 0f).apply {
+                duration = 95L
+                interpolator = android.view.animation.DecelerateInterpolator()
+                addUpdateListener { animator ->
+                  val alpha = animator.animatedValue as Float
+                  splash.alpha = alpha
+                  icon?.alpha = alpha
+                }
+                addListener(object : AnimatorListenerAdapter() {
+                  override fun onAnimationEnd(animation: Animator) { finalizeSplash() }
+                  override fun onAnimationCancel(animation: Animator) { finalizeSplash() }
+                })
+              }
+              record(activity, "FADE_START")
+              fade.start()
+              // Bound the remaining S if an OEM cancels frame callbacks.
+              splash.postDelayed({ finalizeSplash() }, 135L)
             }
             Unit
           }
@@ -184,17 +201,17 @@ object SofiaLaunchOverlay {
     if (Build.VERSION.SDK_INT < 31) {
       activity.window.setBackgroundDrawableResource(R.color.sofiaLaunchBackground)
     }
-    // Home layout is already real and touch-ready. Do not wait for slow
-    // secondary tab mounts or live server data to remove the starting screen.
-    activity.window.decorView.postOnAnimation {
-      if (host?.get() !== activity || activity.isFinishing) return@postOnAnimation
-      when (transition.contentReady()) {
-        SofiaLaunchTransition.Exit.SYSTEM_SPLASH -> exitSystemSplash?.invoke(success)
-        SofiaLaunchTransition.Exit.CONTENT -> {
-          completeReveal(activity, success) // legacy/recreation without a starting window
-        }
-        else -> Unit // Android owns a splash: wait for its exit callback, not a timer.
+    // inspect() is called by the actual Home pre-draw observer. The previous
+    // extra postOnAnimation fence added 400–650 ms on loaded Android emulators:
+    // Home was ready, but Android did not start the fade until another frame.
+    // Begin the synchronized splash exit in this SAME ready callback. The
+    // underlying prepared Home draws during the 95-ms fade.
+    when (transition.contentReady()) {
+      SofiaLaunchTransition.Exit.SYSTEM_SPLASH -> exitSystemSplash?.invoke(success)
+      SofiaLaunchTransition.Exit.CONTENT -> {
+        completeReveal(activity, success) // legacy/recreation without a starting window
       }
+      else -> Unit // Android owns a splash: await its exit callback.
     }
   }
 
