@@ -88,26 +88,21 @@ object SofiaLaunchOverlay {
                 }
                 Unit
               }
-              // One progress value controls BOTH Android layers. On some
-              // devices fading only SplashScreenView leaves the S visible.
-              // No separate ViewPropertyAnimator, overlay or second timeline.
-              val fade = ValueAnimator.ofFloat(1f, 0f).apply {
-                duration = 95L
-                interpolator = android.view.animation.DecelerateInterpolator()
-                addUpdateListener { animator ->
-                  val alpha = animator.animatedValue as Float
-                  splash.alpha = alpha
-                  icon?.alpha = alpha
-                }
-                addListener(object : AnimatorListenerAdapter() {
-                  override fun onAnimationEnd(animation: Animator) { finalizeSplash() }
-                  override fun onAnimationCancel(animation: Animator) { finalizeSplash() }
-                })
-              }
+              // RenderThread-backed property animators continue to move when
+              // React's UI thread is busy. ValueAnimator was driven by main
+              // thread frames, causing 600-770ms stalls for a 95ms fade.
+              // Both independent system layers start together on one frame.
+              val fadeDuration = 95L
+              val curve = android.view.animation.LinearInterpolator()
               record(activity, "FADE_START")
-              fade.start()
-              // Bound the remaining S if an OEM cancels frame callbacks.
-              splash.postDelayed({ finalizeSplash() }, 135L)
+              splash.animate().alpha(0f).setDuration(fadeDuration)
+                .setInterpolator(curve)
+                .withEndAction { finalizeSplash() }.start()
+              icon?.animate()?.alpha(0f)?.setDuration(fadeDuration)
+                ?.setInterpolator(curve)?.start()
+              // A responsive main thread removes the original splash as soon
+              // as the animation ends. The watchdog is only for OEM issues.
+              splash.postDelayed({ finalizeSplash() }, 140L)
             }
             Unit
           }

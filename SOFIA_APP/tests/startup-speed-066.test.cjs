@@ -209,23 +209,19 @@ test('075 launch does not block on optional photo decode or full archive rollove
  assert.ok(snapshot.includes('await this.hydrate();void this.flushLaunch()'),'No-cache sessions can still recover the entire archive');
 });
 
-test('076 icon and background share exactly one exit animator; fade starts at native Home readiness',()=>{
- const src=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
- const fade=src.slice(src.indexOf('exitSystemSplash = { success ->'),src.indexOf('when (transition.splashReady())'));
- assert.ok(fade.includes('ValueAnimator.ofFloat(1f, 0f)'));
- assert.equal((fade.match(/ValueAnimator\.ofFloat/g)||[]).length,1,'One shared animation timeline');
- assert.ok(fade.includes('splash.alpha = alpha'));
- assert.ok(fade.includes('icon?.alpha = alpha'));
- assert.ok(fade.includes('icon?.alpha = 0f'));
- assert.ok(fade.includes('splash.alpha = 0f'));
- assert.ok(fade.includes('duration = 95L'));
- assert.ok(fade.includes('record(activity, "FADE_START")'));
- assert.ok(!fade.includes('splash.animate().alpha('));
- assert.ok(!fade.includes('icon?.animate().alpha('));
- assert.ok(src.includes('when (transition.contentReady())'));
- const ready=src.slice(src.indexOf('private fun reveal('),src.indexOf('private fun inspect('));
- assert.ok(!/activity\.window\.decorView\.postOnAnimation\s*\{/.test(ready),'No extra vsync fence after native Home-ready');
- const qa=fs.readFileSync(path.join(root,'tools/manual-apk-smoke.py'),'utf8');
- assert.ok(qa.includes("'splash_performance_verified'") || qa.includes("result['splash_performance_verified']=True"));
- assert.ok(qa.includes("['ready_to_fade_median_ms']<=150"));
+test('077 fade uses RenderThread property animators; no UI-thread ValueAnimator',()=>{
+ const native=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
+ const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
+ const smoke=fs.readFileSync(path.join(root,'tools/manual-apk-smoke.py'),'utf8');
+ assert.ok(native.includes('val fadeDuration = 95L'));
+ assert.ok(native.includes('splash.animate().alpha(0f).setDuration(fadeDuration)'));
+ assert.ok(native.includes('icon?.animate()?.alpha(0f)?.setDuration(fadeDuration)'));
+ assert.ok(native.includes('withEndAction { finalizeSplash() }'));
+ assert.ok(native.includes('splash.postDelayed({ finalizeSplash() }, 140L)'));
+ assert.ok(!native.includes('ValueAnimator.ofFloat('));
+ assert.ok(native.includes('record(activity, "FADE_START")'));
+ assert.ok(app.includes("const cachedOpening=!!(api.cached('/home')||api.cached('/tasks'))"));
+ assert.ok(app.includes('if(painted&&(!cachedOpening||visible))api.releaseNetwork()'));
+ assert.ok(smoke.includes("result['ready_to_fade_median_ms']<=150"));
+ assert.ok(smoke.includes("result['fade_to_remove_median_ms']<=250"));
 });

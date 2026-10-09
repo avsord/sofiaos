@@ -82,13 +82,14 @@ test('060 unmount or launch failure cannot release stale optional services',asyn
 test('060 old platforms without the visibility bridge keep a cancellable fallback',async()=>{
  const f=visibilityFixture(false);assert.deepEqual(f.states,[false]);f.frames.shift()();f.frames.shift()();assert.deepEqual(f.states,[false,true]);f.dispose();
 });
-test('074 shorter unified fade does not wait for secondary screens or icon animation',()=>{
+test('077 no main-thread driven startup fade after Home is ready',()=>{
  const native=file('plugins/native/SofiaLaunchOverlay.kt');
  for(const token of ['fun whenRevealed','SOFIA_LAUNCH_${stage}_PROCESS_MS=','record(activity, "LOCAL_READY")','record(activity, "SPLASH_REMOVED")'])assert.ok(native.includes(token),token);
- assert.ok(native.includes('ValueAnimator.ofFloat(1f, 0f)'));
- assert.ok(native.includes('duration = 95L'));
- assert.ok(native.includes('icon?.alpha = alpha')&&native.includes('splash.alpha = alpha'));
- assert.ok(native.includes('splash.postDelayed({ finalizeSplash() }, 135L)'));
+ assert.ok(native.includes('splash.animate().alpha(0f).setDuration(fadeDuration)'));
+ assert.ok(native.includes('icon?.animate()?.alpha(0f)?.setDuration(fadeDuration)'));
+ assert.ok(native.includes('withEndAction { finalizeSplash() }'));
+ assert.ok(native.includes('splash.postDelayed({ finalizeSplash() }, 140L)'));
+ assert.ok(!native.includes('ValueAnimator.ofFloat('));
  for(const absent of ['root.addView','Thread.sleep','.translationY(', 'content.alpha = 0f','icon.postDelayed('])assert.ok(!native.includes(absent),absent);
  const completion=native.slice(native.indexOf('private fun completeReveal'),native.indexOf('private fun reveal'));
  assert.ok(completion.indexOf('postOnAnimation')<completion.indexOf('visible = true'));

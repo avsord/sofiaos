@@ -55,7 +55,13 @@ function Shell({startup}:{startup:LocalLaunch}){
  // releases hidden screens, notification inventory and optional prefetch.
  const painted=useAfterFirstPaint(ready),visible=useLaunchVisible(ready),servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady,mountedTabs=useStartupMounts(visible&&!!auth,tab);
  useEffect(()=>{if(!auth||initialDataReady)return;let live=true;setPreparationError('');void prepareInitialData(api,()=>preloadAgenda(api)).then(()=>{if(live){setPrepared(api);console.info('SOFIA_STARTUP_CACHE_READY');}}).catch(e=>{if(live)setPreparationError(errorText(e));});return()=>{live=false;};},[api,prepareAttempt]);
- useEffect(()=>{if(painted)api.releaseNetwork();},[painted,api]);
+ // Do not start network completion renders over the native splash fade
+ // when there is already a cached Home to present. In 0.3.76, React work
+ // starved the UI-thread ValueAnimator for 600-770ms despite its 95ms
+ // duration. With no cached Home, essential requests retain first-paint
+ // permission so login and a first run cannot get stuck.
+ const cachedOpening=!!(api.cached('/home')||api.cached('/tasks'));
+ useEffect(()=>{if(painted&&(!cachedOpening||visible))api.releaseNetwork();},[painted,visible,cachedOpening,api]);
  // All six tab trees are initialized behind the real Android splash.
  // Do not schedule post-launch Metro requires that race the first menu press.
  const launchReady=ready&&(!auth||(!!bootstrap&&servicesReady));
