@@ -155,7 +155,7 @@ test('074 Android splash exits as a single surface with no icon-only overlay',()
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const loader=fs.readFileSync(path.join(root,'src/lib/screen-loader.tsx'),'utf8');
  assert.ok(overlay.includes('splash.animate().alpha(0f).setDuration(fadeDuration)'));
- assert.ok(overlay.includes('splash.postDelayed({ finalizeSplash() }, 135L)'));
+ assert.ok(overlay.includes('splash.postDelayed({ finalizeSplash() }, 140L)'));
  assert.ok(!overlay.includes('icon.postDelayed('));
  assert.ok(!overlay.includes('setDuration(240L)'));
  assert.ok(!app.includes('<LaunchSAnimation'));
@@ -168,8 +168,8 @@ test('074 Home may reveal with local layout rather than holding on pending remot
  const code=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
  assert.ok(overlay.includes('if (login || home) {'));
  assert.ok(!overlay.includes('if (login || (home && (signals and 8) != 0))'));
- assert.ok(overlay.includes('splash.alpha = alpha'));
- assert.ok(overlay.includes('icon?.alpha = alpha'));
+ assert.ok(overlay.includes('splash.animate().alpha(0f).setDuration(fadeDuration)'));
+ assert.ok(overlay.includes('icon?.animate()?.alpha(0f)?.setDuration(fadeDuration)'));
  assert.ok(code.includes('android:windowSplashScreenAnimationDuration'));
  assert.ok(code.includes('android:duration="180"'));
 });
