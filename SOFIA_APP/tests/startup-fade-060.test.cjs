@@ -103,7 +103,11 @@ test('079 continuous composited one-layer S + background fades after actual syst
  assert.ok(callback.includes('view.matchSystemIcon(splash.iconView)'));
  assert.ok(head.includes('icon.getLocationOnScreen(iconPosition)'));
  assert.ok(head.includes('logo?.setBounds(bounds)'));
- assert.ok(head.includes('icon.width, y + icon.height'));
+ assert.ok(head.includes('icon.width / 4'));
+ assert.ok(head.includes('x + icon.width + padX'));
+ assert.ok(resources.includes('android:strokeColor="#12FFFFFF"'));
+ assert.ok(!resources.includes('#17151F'));
+ assert.ok(resources.includes('android:valueFrom="1" android:valueTo="1.055"'));
  assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(190L)'));
  assert.ok(!exit.includes('ValueAnimator.ofFloat('));
  assert.ok(!exit.includes('icon?.animate()?.alpha(0f)'));

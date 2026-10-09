@@ -1,3 +1,7 @@
+## 0.3.82 — referência roxa e continuidade real de escala
+
+Pedido: S branco e círculo discreto do anexo sobre fundo roxo, escala orgânica e fade. Base remota 44f58f6f47651aa26191a3791b0196ee6ab023c8 (0.3.81/code86). AOSP AdaptiveForegroundDrawable amplia a região interna em 1,5; reutilizar apenas iconView bounds ainda reduz o desenho em um terço. Compensação de bounds na superfície nativa e viewport compartilhado: círculo 67dp, S 32dp, fundo roxo igual em tema claro/escuro. Animação do sistema mantém escala 1; respiração nativa 1→1.055 reversa em 800ms, sem rotação. Fade existente de 190ms, sem estender a espera de dados. Rota manual. Testes/build/emulador pendentes até evidência da execução. Nenhuma validação física presumida.
+
 ## 0.3.81 — diagnóstico do atraso da animação
 
 A 0.3.79 compilou e instalou por cima, mas o smoke reprovou: fade mediano 538 ms e DATA 1495 ms, contra baseline 886 ms. Na gravação houve troca abrupta de tamanho, tratada por bounds do ícone na 0.3.80. A animação via canvas invalidava a árvore nativa a cada frame; a 0.3.81 usa AnimatedVectorDrawable com repetição suave na RenderThread, sem esse loop de invalidação. Mantém a mesma superfície e bounds, fade 190 ms sem end action e limpeza independente em 230 ms. Não se relaxa o gate de 250 ms nem o limite de abertura. Testes/build nativos da 0.3.81 ainda pendentes ao registrar este delta. Entrega manual, sem backend ou publicação no atualizador.

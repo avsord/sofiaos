@@ -84,10 +84,10 @@ test('068 S animation never extends the existing native Home handoff',()=>{
  assert.ok(logo.includes('sofia_letter_motion.xml'));
  assert.ok(logo.includes('sofia_launch_mark_animated'));
  assert.ok(logo.includes('sofiaLetterMotion'));
- assert.ok(logo.includes('android:propertyName="rotation"'));
+ assert.ok(!logo.includes('android:propertyName="rotation"'));
  assert.ok(logo.includes('android:propertyName="scaleX"'));
  assert.ok(logo.includes('android:propertyName="scaleY"'));
- assert.ok(logo.includes('android:duration="180"'));
+ assert.ok(logo.includes('android:duration="1"'));
  assert.ok(logo.includes('android:windowSplashScreenAnimationDuration'));
  const launch=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  assert.ok(!launch.includes('sofia_letter_reveal'),'Splash dismissal must not wait for animation');
@@ -135,7 +135,7 @@ test('069 startup restores photo and cached Home together; menus mount only when
 test('070 startup S moves as an actual vector group, never just an opacity fade',()=>{
  const code=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
  assert.ok(code.includes('android:name="sofiaLetterMotion"'));
- assert.ok(code.includes('android:pivotX="48" android:pivotY="48"'));
+ assert.ok(code.includes('android:pivotX="144" android:pivotY="144"'));
  assert.ok(!code.includes('sofia_letter_reveal'));
  assert.ok(code.includes('@animator/sofia_letter_motion'));
  const bg=fs.readFileSync(path.join(root,'src/components/BackgroundServices.tsx'),'utf8');
@@ -172,7 +172,7 @@ test('078 Home is allowed to reveal without waiting for server or prefetch',()=>
  assert.ok(overlay.includes('splash.remove()'));
  assert.ok(overlay.includes('record(activity, "FADE_DONE")'));
  assert.ok(logo.includes('android:windowSplashScreenAnimationDuration'));
- assert.ok(logo.includes('android:duration="180"'));
+ assert.ok(logo.includes('android:duration="1"'));
 });
 test('074 hidden tabs mount one idle slice at a time after original splash exits',()=>{
  const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
