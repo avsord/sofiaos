@@ -22,8 +22,8 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 
-/** Retain Android's original splash until the saved Home is ready. Remove it
- * through one animated native surface; optional work waits for visual completion. */
+/** Prepare the original static splash pixels before Home is ready. Fade one
+ * cached native surface; optional work waits for visual completion. */
 object SofiaLaunchOverlay {
   private var host: WeakReference<Activity>? = null
   private var observer: ViewTreeObserver? = null
