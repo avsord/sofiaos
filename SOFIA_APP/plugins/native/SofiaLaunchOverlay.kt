@@ -32,6 +32,8 @@ private class SofiaUnifiedSplashSurface(activity: Activity) : View(activity) {
   private val logo = activity.getDrawable(R.drawable.sofia_launch_mark)?.mutate()
   private val background = activity.getColor(R.color.sofiaLaunchBackground)
   private var markBounds: Rect? = null
+  private var motionStart = 0L
+  fun matchSystemMotion(start: Long) { motionStart = start }
   fun matchSystemIcon(icon: View?) {
     if (icon == null || icon.width <= 0 || icon.height <= 0) return
     val iconPosition = IntArray(2)
@@ -60,10 +62,16 @@ private class SofiaUnifiedSplashSurface(activity: Activity) : View(activity) {
     // OEM splash icon dimensions can be 288dp rather than our old 192dp.
     // Reuse its real bounds so transfer never shrinks or recenters the mark.
     val bounds = markBounds ?: Rect(left, top, left + size, top + size)
-    // This is the same stable vector the OS drew: no animator or scale
-    // reset at handoff. Background and mark leave as one alpha layer.
+    // Continue the OS clock instead of restarting scale during handoff.
+    val now = System.currentTimeMillis()
+    val scale = SofiaLaunchMotion.scaleAt(motionStart, now)
+    canvas.save()
+    canvas.scale(scale, scale, bounds.exactCenterX(), bounds.exactCenterY())
     logo?.setBounds(bounds)
     logo?.draw(canvas)
+    canvas.restore()
+    if (motionStart > 0L && now - motionStart < SofiaLaunchMotion.DURATION_MS)
+      postInvalidateOnAnimation()
   }
 }
 
@@ -113,14 +121,14 @@ object SofiaLaunchOverlay {
               val decor = activity.window.decorView as? ViewGroup
               val surface = if (decor != null && decor.width > 0 && decor.height > 0)
                 SofiaUnifiedSplashSurface(activity).also { view ->
-                  // A ViewOverlay invalidates pixels without requesting a new
-                  // layout of the already prepared React Home tree.
+                  // Add a drawing layer without relayout of the prepared Home.
                   decor.overlay.add(view)
                   view.measure(
                     View.MeasureSpec.makeMeasureSpec(decor.width, View.MeasureSpec.EXACTLY),
                     View.MeasureSpec.makeMeasureSpec(decor.height, View.MeasureSpec.EXACTLY))
                   view.layout(0, 0, decor.width, decor.height)
                   view.matchSystemIcon(splash.iconView)
+                  view.matchSystemMotion(splash.iconAnimationStart?.toEpochMilli() ?: 0L)
                 }
               else null
               // The OS icon cannot remain as a separately composited layer.
@@ -153,7 +161,6 @@ object SofiaLaunchOverlay {
                 surface.animate().alpha(0f).setDuration(95L)
                   .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
                   .withEndAction { complete() }.start()
-                // Independent cleanup remains as a bounded fallback.
                 surface.postDelayed({ complete() }, 180L)
               }
             }

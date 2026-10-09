@@ -1,3 +1,9 @@
+## 0.3.87 — escala orgânica sem reinício e proporção do anexo
+
+Base atual725ff51dc2d974fb315619dbfc86e9976ecd25c3 (0.3.86/code91); integra ViewOverlay sem relayout concorrente. Pedido ativo desta conversa exige escala orgânica e fade, além de remover o encolhimento brusco. A0.3.85 concorrente resolveu o reinício removendo movimento; este delta preserva a superfície única, fade95/limpeza180 e troca sem loop independente, usando uma entrada finita0.88→1 em800ms. A superfície de saída segue `SplashScreenView.iconAnimationStart`, curva accelerate/decelerate e bounds1.5× do foreground Android. Sem aguardar fim do movimento para liberar Home. S32dp/círculo67.2dp correspondem ao anexo; são maiores que os20–22px reais do vídeo083. Não adota48dp da085, pois diverge desta referência.
+
+Teste JVM verifica início, fim, monotonicidade e curva; TypeScript e suite prévia executados. Nenhum gate nativo alterado. Fonte e alteração somente no Android e documentação; entrega manual. CI, assinatura, instalação por cima, Home/conversa/paginação sintéticas e inspeção de gravação pendentes. Investigação/edição deste delta iniciada12:30UTC; CI será registrada separadamente. Sem prova de aparelho físico.
+
 ## 0.3.86 — saída sem relayout da Home
 
 0.3.85/run37929974207 compilou, mas o smoke reprovou: fade mediano584ms, DATA1332ms vsbaseline904ms. Instalação por cima e Home offline sintética passaram antes do gate. Arquivo085 retido como candidato reprovado; não entregar como validado.
