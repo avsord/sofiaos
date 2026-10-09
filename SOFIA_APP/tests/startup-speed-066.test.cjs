@@ -129,7 +129,7 @@ test('069 startup restores photo and cached Home together; menus mount only when
  assert.ok(launch.includes('await Promise.all([snapshot.hydrateLaunch(),photoReady])'));
  assert.ok(!launch.includes('fetch('),'No server calls in initial photo/Home restore');
  assert.ok(!mounts.includes('scheduleIdleTask('),'Do not mount offscreen screen trees on idle');
- assert.ok(mounts.includes("previous.has(active)"));
+ assert.ok(mounts.includes('enabled?MENU_TABS:[]'));
 });
 
 test('070 startup S moves as an actual vector group, never just an opacity fade',()=>{
@@ -144,7 +144,7 @@ test('070 startup S moves as an actual vector group, never just an opacity fade'
  assert.ok(bg.includes('3400'));
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  assert.ok(!app.includes('timer=setTimeout(next,800)'));
- assert.ok(app.includes("if(!servicesReady||tab!=='home')return"));
+ assert.ok(app.includes('useStartupMounts(initialDataReady,tab)'));
  assert.ok(app.includes("preloadWhenIdle:screenTab==='home'"));
 });
 
@@ -157,7 +157,7 @@ test('072 splash runs in native icon, without Home overlay; tabs memoize hidden 
  assert.ok(overlay.includes('val icon = splash.iconView'));
  assert.ok(overlay.includes('rotation = -22f'));
  assert.ok(overlay.includes('setDuration(240L)'));
- assert.ok(overlay.includes('icon.postDelayed(finish, remainder)'));
+ assert.ok(overlay.includes('icon.postDelayed(fadeOut, remainder)'));
  assert.ok(!app.includes('<LaunchSAnimation'));
  assert.ok(loader.includes('export const DeferredScreen=React.memo('));
  assert.ok(loader.includes('keys.every(key=>Object.is(left[key],right[key]))'));
