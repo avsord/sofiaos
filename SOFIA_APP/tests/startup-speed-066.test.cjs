@@ -154,7 +154,7 @@ test('074 Android splash exits as a single surface with no icon-only overlay',()
  const overlay=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const loader=fs.readFileSync(path.join(root,'src/lib/screen-loader.tsx'),'utf8');
- assert.ok(overlay.includes('ValueAnimator.ofFloat(1f, 0f)'));
+ assert.ok(overlay.includes('splash.animate().alpha(0f).setDuration(fadeDuration)'));
  assert.ok(overlay.includes('splash.postDelayed({ finalizeSplash() }, 135L)'));
  assert.ok(!overlay.includes('icon.postDelayed('));
  assert.ok(!overlay.includes('setDuration(240L)'));
@@ -193,7 +193,7 @@ test('075 no persistent duplicate S under Android 12 splash',()=>{
  assert.ok(theme.includes('<item name="android:windowBackground">@color/sofiaLaunchBackground</item>'));
  assert.ok(!theme.includes('<item name="android:windowBackground">@drawable/splashscreen_logo</item>'));
  assert.ok(theme.includes('<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_animated</item>'));
- assert.ok(native.includes('ValueAnimator.ofFloat(1f, 0f)'));
+ assert.ok(native.includes('icon?.animate()?.alpha(0f)?.setDuration(fadeDuration)'));
  assert.ok(native.includes('splash.remove()'));
  assert.ok(!native.includes('icon.postDelayed('));
  assert.ok(native.includes('SOFIA_LAUNCH_SYSTEM_CALLBACK_PROCESS_MS='));
