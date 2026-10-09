@@ -1,3 +1,9 @@
+## 0.3.85 — pedido de S maior e correção de flicker
+
+Base fd26883977a00b14fc2b99091eb05932a5cba9bb (0.3.84), ainda não entregue nesta conversa. Usuário aprovou 0.3.83 e pediu aumento e correção da piscada. A 0.3.84 compilou, mas run37928451677 reprovou o gate nativo: fade mediano650ms e DATA1473ms contra907ms. Não entregar esse APK como aprovado.
+
+Causa candidata do flicker: o sistema e a superfície de saída usam instâncias independentes de AnimatedVectorDrawable, reiniciando o pulso1→1.025 na transferência. O código confirma o reinício; não é diagnóstico comprovado do aparelho. Delta085: mesmo vetor estável em ambas, sem pulso/reinício; S e círculo1.5× maiores que084, viewport192 mantido; compensação de bounds1.5 e fallback288 mantidos. Duração retorna95ms/limpeza180ms, caminho que passou na083. Sem dados, rede ou navegação alterados. TypeScript e suites locais executados; APK/certificado/instalação/Home/histórico/gravação ainda pendentes. Rota manual-apk, sem release do atualizador. Tempo de CI será registrado separadamente da investigação/edição.
+
 ## 0.3.84 — proporção do anexo e fade mais perceptível
 
 Base 2e7d5c5e31374cb87ddade2e6826bb90b7e2e327, runtime a0ec56250181a0c755e09a97267e0dff4659d84e (0.3.83). Run 37926742074 passou instalação por cima, Home offline autenticada sintética, conversa e paginação; DATA mediana 1007ms contra955ms, fade118ms. Não representa teste físico.

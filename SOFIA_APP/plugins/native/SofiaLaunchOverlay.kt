@@ -1,8 +1,5 @@
 package com.avsord.sofiaapp
 
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
-import android.animation.ValueAnimator
 import android.app.Activity
 import android.os.Build
 import android.os.Process
@@ -10,7 +7,6 @@ import android.os.SystemClock
 import android.util.Log
 import android.graphics.Canvas
 import android.graphics.Rect
-import android.graphics.drawable.Animatable
 import android.graphics.drawable.Drawable
 import android.view.Gravity
 import android.view.View
@@ -33,7 +29,7 @@ import com.facebook.react.bridge.ReactMethod
  * Unlike fading SplashScreenView/icon separately, this has one compositor
  * layer on Android 12-15 and can be disposed immediately. */
 private class SofiaUnifiedSplashSurface(activity: Activity) : View(activity) {
-  private val logo = activity.getDrawable(R.drawable.sofia_launch_mark_breathing)?.mutate()
+  private val logo = activity.getDrawable(R.drawable.sofia_launch_mark)?.mutate()
   private val background = activity.getColor(R.color.sofiaLaunchBackground)
   private var markBounds: Rect? = null
   fun matchSystemIcon(icon: View?) {
@@ -56,15 +52,6 @@ private class SofiaUnifiedSplashSurface(activity: Activity) : View(activity) {
     importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
   }
   override fun verifyDrawable(who: Drawable): Boolean = who === logo || super.verifyDrawable(who)
-  override fun onAttachedToWindow() {
-    super.onAttachedToWindow()
-    if (ValueAnimator.areAnimatorsEnabled()) (logo as? Animatable)?.start()
-  }
-  override fun onDetachedFromWindow() {
-    (logo as? Animatable)?.stop()
-    logo?.callback = null
-    super.onDetachedFromWindow()
-  }
   override fun onDraw(canvas: Canvas) {
     canvas.drawColor(background)
     val size = (288f * resources.displayMetrics.density + 0.5f).toInt()
@@ -73,8 +60,8 @@ private class SofiaUnifiedSplashSurface(activity: Activity) : View(activity) {
     // OEM splash icon dimensions can be 288dp rather than our old 192dp.
     // Reuse its real bounds so transfer never shrinks or recenters the mark.
     val bounds = markBounds ?: Rect(left, top, left + size, top + size)
-    // AnimatedVectorDrawable runs its motion on Android's RenderThread.
-    // Never invalidate the whole Home tree at 60 Hz just to move this mark.
+    // This is the same stable vector the OS drew: no animator or scale
+    // reset at handoff. Background and mark leave as one alpha layer.
     logo?.setBounds(bounds)
     logo?.draw(canvas)
   }
@@ -159,13 +146,13 @@ object SofiaLaunchOverlay {
                   }
                   Unit
                 }
-                // Preserve size and breathing phase while both S and background
+                // Preserve the stable mark size while both S and background
                 // fade as a single compositor layer over the prepared Home.
                 record(activity, "FADE_START")
-                surface.animate().alpha(0f).setDuration(160L)
+                surface.animate().alpha(0f).setDuration(95L)
                   .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
                   .withEndAction { complete() }.start()
-                surface.postDelayed({ complete() }, 225L)
+                surface.postDelayed({ complete() }, 180L)
               }
             }
             Unit
@@ -268,7 +255,7 @@ object SofiaLaunchOverlay {
     // extra postOnAnimation fence added 400–650 ms on loaded Android emulators:
     // Home was ready, but Android did not start the fade until another frame.
     // Begin the synchronized splash exit in this SAME ready callback. The
-    // underlying prepared Home draws during the 160-ms fade.
+    // underlying prepared Home draws during the 95-ms fade.
     when (transition.contentReady()) {
       SofiaLaunchTransition.Exit.SYSTEM_SPLASH -> exitSystemSplash?.invoke(success)
       SofiaLaunchTransition.Exit.CONTENT -> {

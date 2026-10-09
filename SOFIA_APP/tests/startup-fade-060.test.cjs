@@ -82,7 +82,7 @@ test('060 unmount or launch failure cannot release stale optional services',asyn
 test('060 old platforms without the visibility bridge keep a cancellable fallback',async()=>{
  const f=visibilityFixture(false);assert.deepEqual(f.states,[false]);f.frames.shift()();f.frames.shift()();assert.deepEqual(f.states,[false,true]);f.dispose();
 });
-test('079 continuous composited one-layer S + background fades after actual system icon removed',()=>{
+test('085 stable composited one-layer S + background fades after actual system icon removed',()=>{
  const native=file('plugins/native/SofiaLaunchOverlay.kt');
  const head=native.slice(native.indexOf('private class SofiaUnifiedSplashSurface'),native.indexOf('object SofiaLaunchOverlay'));
  assert.ok(head.includes('canvas.drawColor(background)'));
@@ -92,13 +92,14 @@ test('079 continuous composited one-layer S + background fades after actual syst
  const callback=native.slice(native.indexOf('val decor = activity.window.decorView'),native.indexOf('when (transition.splashReady())'));
  assert.ok(callback.indexOf('splash.remove()')>=0);
  assert.ok(callback.indexOf('splash.remove()')<callback.indexOf('record(activity, "FADE_START")'));
- assert.ok(head.includes('R.drawable.sofia_launch_mark_breathing'));
- assert.ok(head.includes('(logo as? Animatable)?.start()'));
- assert.ok(head.includes('(logo as? Animatable)?.stop()'));
+ assert.ok(head.includes('R.drawable.sofia_launch_mark'));
+ assert.ok(!head.includes('Animatable'));
+ assert.ok(!head.includes('onAttachedToWindow()'));
  assert.ok(!head.includes('postInvalidateOnAnimation()'));
  assert.ok(head.includes('288f * resources.displayMetrics.density'));
  const resources=file('plugins/with-sofia-logo.cjs');
- assert.ok(resources.includes('android:repeatCount="-1" android:repeatMode="reverse"'));
+ assert.ok(!resources.includes('<objectAnimator'));
+ assert.ok(resources.includes('@drawable/sofia_launch_mark</item>'));
  assert.ok(callback.includes('view.matchSystemIcon(splash.iconView)'));
  assert.ok(head.includes('icon.getLocationOnScreen(iconPosition)'));
  assert.ok(head.includes('logo?.setBounds(bounds)'));
@@ -106,8 +107,9 @@ test('079 continuous composited one-layer S + background fades after actual syst
  assert.ok(head.includes('x + icon.width + padX'));
  assert.ok(resources.includes('android:strokeColor="#12FFFFFF"'));
  assert.ok(!resources.includes('#17151F'));
- assert.ok(resources.includes('android:valueTo="1.025"'));
- assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(160L)'));
+ assert.ok(resources.includes('A33.6,33.6'));
+ assert.ok(resources.includes('android:scaleX="0.020658489"'));
+ assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
  assert.ok(!exit.includes('ValueAnimator.ofFloat('));
  assert.ok(!exit.includes('icon?.animate()?.alpha(0f)'));
  const completion=native.slice(native.indexOf('private fun completeReveal'),native.indexOf('private fun reveal'));
