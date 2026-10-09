@@ -83,7 +83,7 @@ test('068 S animation never extends the existing native Home handoff',()=>{
  const logo=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
  assert.ok(logo.includes('sofia_letter_reveal.xml'));
  assert.ok(logo.includes('sofia_launch_mark_animated'));
- assert.ok(logo.includes('android:duration="260"'));
+ assert.ok(logo.includes('android:duration="260"'));assert.ok(logo.includes('android:valueFrom="0.06"'));assert.ok(logo.includes('android:windowSplashScreenAnimationDuration'));
  const launch=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  assert.ok(!launch.includes('sofia_letter_reveal'),'Splash dismissal must not wait for animation');
 });
@@ -91,9 +91,9 @@ test('068 photo preloads without blocking Home; menu prewarm yields to navigatio
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const local=fs.readFileSync(path.join(root,'src/lib/local-launch.ts'),'utf8');
  const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
- assert.ok(local.indexOf("void import('./profile-photo')")<local.indexOf('await snapshot.hydrateLaunch()'));
+ assert.ok(local.includes("await Promise.all([snapshot.hydrateLaunch(),photoReady])"));
  assert.ok(app.includes('MENU_PRELOADERS[index++]()'));
- assert.ok(mounts.includes("if(active!=='home')return;"));
+ assert.ok(!mounts.includes('scheduleIdleTask('));
  assert.ok(fs.readFileSync(path.join(root,'src/components/ProfileAvatar.tsx'),'utf8').includes('primeProfilePhoto(scope,readProfilePhoto)'));
 });
 test('068 bell actions share one horizontal row and capsule reads remain server-backed',()=>{
@@ -106,4 +106,23 @@ test('068 bell actions share one horizontal row and capsule reads remain server-
  const server=fs.readFileSync(path.join(root,'../src/channels/mobile.js'),'utf8');
  assert.ok(server.includes("p === '/api/mobile/md/capsules/doses'"));
  assert.ok(server.includes("mobile_capsule_doses"));
+});
+
+test('069 unread bell actions use identical neutral color, one no-wrap row',()=>{
+ const bell=fs.readFileSync(path.join(root,'src/components/NotificationCenter.tsx'),'utf8');
+ const section=bell.slice(bell.indexOf('    {n.items.length?<View style='),bell.indexOf('    <Button title="Ver todas as notificações"'));
+ assert.ok(section.includes("flexDirection:'row'"));
+ assert.ok(!section.includes("flexWrap:'wrap'"));
+ const mark=section.slice(section.indexOf('Marcar todas as notificações como lidas'),section.indexOf('Limpar todas as notificações'));
+ const clean=section.slice(section.indexOf('Limpar todas as notificações'));
+ assert.ok(mark.includes('color:c.muted')&&clean.includes('color:c.muted'));
+ assert.ok(mark.includes('numberOfLines={1}')&&clean.includes('numberOfLines={1}'));
+});
+test('069 startup restores photo and cached Home together; menus mount only when visited',()=>{
+ const launch=fs.readFileSync(path.join(root,'src/lib/local-launch.ts'),'utf8');
+ const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
+ assert.ok(launch.includes('await Promise.all([snapshot.hydrateLaunch(),photoReady])'));
+ assert.ok(!launch.includes('fetch('),'No server calls in initial photo/Home restore');
+ assert.ok(!mounts.includes('scheduleIdleTask('),'Do not mount offscreen screen trees on idle');
+ assert.ok(mounts.includes("previous.has(active)"));
 });

@@ -19,9 +19,14 @@ export async function prepareLocalLaunch(
  const restored=account.then(async auth=>{
   if(!auth)return {auth,snapshot:null};
   const snapshot=snapshotFor(auth.profile.email);
-  // Photo I/O overlaps cache restoration without blocking Home.
-  void import('./profile-photo').then(({readProfilePhoto})=>import('./profile-photo-events').then(({primeProfilePhoto})=>primeProfilePhoto(auth.profile.email,readProfilePhoto))).catch(()=>{});
-  await snapshot.hydrateLaunch();
+  // Restore the already-saved profile photo alongside Home and Agenda.
+  // The first real Home frame must not briefly fall back to initials.
+  // Offline startup still uses only local storage: no HTTP dependency.
+  const photoReady=import('./profile-photo')
+   .then(({readProfilePhoto})=>import('./profile-photo-events')
+    .then(({primeProfilePhoto})=>primeProfilePhoto(auth.profile.email,readProfilePhoto)))
+   .catch(()=>{});
+  await Promise.all([snapshot.hydrateLaunch(),photoReady]);
   console.info('SOFIA_STARTUP_CACHE_READY');
   return {auth,snapshot};
  });
