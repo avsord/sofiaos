@@ -77,3 +77,33 @@ test('067 cached Home and Agenda remain primary; catalog, widgets and monitors s
  assert.ok(home.includes('if(!active||!launchVisible||agendaCatalog)return'),'catalog waits for real Home');
  assert.ok(home.includes('if(!launchVisible||!active)return'),'widgets wait for real Home');
 });
+
+
+test('068 S animation never extends the existing native Home handoff',()=>{
+ const logo=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
+ assert.ok(logo.includes('sofia_letter_reveal.xml'));
+ assert.ok(logo.includes('sofia_launch_mark_animated'));
+ assert.ok(logo.includes('android:duration="260"'));
+ const launch=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
+ assert.ok(!launch.includes('sofia_letter_reveal'),'Splash dismissal must not wait for animation');
+});
+test('068 photo preloads without blocking Home; menu prewarm yields to navigation',()=>{
+ const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
+ const local=fs.readFileSync(path.join(root,'src/lib/local-launch.ts'),'utf8');
+ const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
+ assert.ok(local.indexOf("void import('./profile-photo')")<local.indexOf('await snapshot.hydrateLaunch()'));
+ assert.ok(app.includes('MENU_PRELOADERS[index++]()'));
+ assert.ok(mounts.includes("if(active!=='home')return;"));
+ assert.ok(fs.readFileSync(path.join(root,'src/components/ProfileAvatar.tsx'),'utf8').includes('primeProfilePhoto(scope,readProfilePhoto)'));
+});
+test('068 bell actions share one horizontal row and capsule reads remain server-backed',()=>{
+ const bell=fs.readFileSync(path.join(root,'src/components/NotificationCenter.tsx'),'utf8');
+ const code=bell.slice(bell.indexOf('    {n.items.length?<View style='),bell.indexOf('    <Button title="Ver todas as notificações"'));
+ assert.ok(code.includes("flexDirection:'row'"));
+ assert.ok(code.includes('Marcar tudo como lido')&&code.includes('Limpar todas'));
+ const api=fs.readFileSync(path.join(root,'src/lib/api.ts'),'utf8');
+ assert.ok(api.includes("'/md/capsules/doses"));
+ const server=fs.readFileSync(path.join(root,'../src/channels/mobile.js'),'utf8');
+ assert.ok(server.includes("p === '/api/mobile/md/capsules/doses'"));
+ assert.ok(server.includes("mobile_capsule_doses"));
+});

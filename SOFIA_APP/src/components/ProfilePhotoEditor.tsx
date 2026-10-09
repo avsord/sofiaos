@@ -6,11 +6,11 @@ import {Icon} from './Icon';
 import {useTheme} from '../lib/theme';
 import {errorText,initials} from '../lib/chat-model';
 import {readProfilePhoto,removeProfilePhoto,saveProfilePhoto} from '../lib/profile-photo';
-import {photoChanged} from '../lib/profile-photo-events';
+import {photoChanged,photoPreview,primeProfilePhoto,subscribeProfilePhoto} from '../lib/profile-photo-events';
 
 export function ProfilePhotoEditor({scope,name}:{scope:string;name:string}){
- const c=useTheme(),[uri,setUri]=useState(''),[busy,setBusy]=useState(false);
- useEffect(()=>{let alive=true;void readProfilePhoto(scope).then(value=>{if(alive)setUri(value);});return()=>{alive=false;};},[scope]);
+ const c=useTheme(),[uri,setUri]=useState(()=>photoPreview(scope)),[busy,setBusy]=useState(false);
+ useEffect(()=>{let alive=true;setUri(photoPreview(scope));const stop=subscribeProfilePhoto(scope,setUri);void primeProfilePhoto(scope,readProfilePhoto).then(value=>{if(alive)setUri(value);}).catch(()=>{});return()=>{alive=false;stop();};},[scope]);
  async function pick(camera=false){
   if(busy)return;setBusy(true);
   try{

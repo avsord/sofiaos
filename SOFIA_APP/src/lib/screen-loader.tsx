@@ -21,6 +21,9 @@ export const loadProfile=()=>once('profile',()=>require('../screens/Profile').Pr
 export const loadNotifications=()=>once('notifications',()=>require('../screens/Notifications').Notifications);
 export const loadBackgroundServices=()=>once('background-services',()=>require('../components/BackgroundServices').BackgroundServices);
 
+// Prepare lazy module definitions, without mounting hidden screens or fetching data.
+export const MENU_PRELOADERS=[loadChat,loadAgenda,loadPages,loadWorkspace,loadProfile] as const;
+
 export function DeferredScreen({load,screenProps}:{load:()=>Screen;screenProps:Record<string,unknown>}){
  const Component=load();return <Component {...screenProps}/>;
 }

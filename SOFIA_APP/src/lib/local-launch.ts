@@ -1,5 +1,6 @@
 import type {Auth,Prefs} from './types';
 import type {StartupSnapshot} from './startup-snapshot';
+import {primeProfilePhoto} from './profile-photo-events';
 export type LocalLaunch={auth:Auth|null;prefs:Prefs;snapshot:StartupSnapshot|null};
 /** The entrypoint starts disk preparation before React's first mount. Consume
  * it once; retries and later mounts must read the current account again. */
@@ -18,6 +19,8 @@ export async function prepareLocalLaunch(
  const restored=account.then(async auth=>{
   if(!auth)return {auth,snapshot:null};
   const snapshot=snapshotFor(auth.profile.email);
+  // Photo I/O overlaps cache restoration without blocking Home.
+  void import('./profile-photo').then(({readProfilePhoto})=>primeProfilePhoto(auth.profile.email,readProfilePhoto)).catch(()=>{});
   await snapshot.hydrateLaunch();
   console.info('SOFIA_STARTUP_CACHE_READY');
   return {auth,snapshot};

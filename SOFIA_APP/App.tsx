@@ -24,7 +24,7 @@ import {NotificationProvider} from './src/components/NotificationCenter';
 import {createMenuMotion} from './src/lib/menu-motion';
 import type {TabPagerHandle} from './src/components/TabPager';
 import {useStartupMounts} from './src/lib/startup-mounts';
-import {DeferredScreen,loadAgenda,loadChat,loadHome,loadNotifications,loadPages,loadProfile,loadWorkspace,loadBackgroundServices} from './src/lib/screen-loader';
+import {DeferredScreen,loadAgenda,loadChat,loadHome,loadNotifications,loadPages,loadProfile,loadWorkspace,loadBackgroundServices,MENU_PRELOADERS} from './src/lib/screen-loader';
 import {Login} from './src/screens/Login';
 import {APP_VERSION,checkForUpdate} from './src/lib/update';
 import {finishLaunchHandoff} from './src/lib/launch-handoff';
@@ -55,6 +55,14 @@ function Shell({startup}:{startup:LocalLaunch}){
  const painted=useAfterFirstPaint(ready),visible=useLaunchVisible(ready),servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady,mountedTabs=useStartupMounts(servicesReady,tab);
  useEffect(()=>{if(!auth||initialDataReady)return;let live=true;setPreparationError('');void prepareInitialData(api,()=>preloadAgenda(api)).then(()=>{if(live){setPrepared(api);console.info('SOFIA_STARTUP_CACHE_READY');}}).catch(e=>{if(live)setPreparationError(errorText(e));});return()=>{live=false;};},[api,prepareAttempt]);
  useEffect(()=>{if(painted)api.releaseNetwork();},[painted,api]);
+ // Warm only one secondary menu module per idle slice, never during Home reveal.
+ useEffect(()=>{
+  if(!servicesReady)return;let stopped=false,cancel=()=>{},index=0;
+  const next=()=>{if(stopped||index>=MENU_PRELOADERS.length)return;
+   cancel=scheduleIdleTask(()=>{if(stopped)return;try{MENU_PRELOADERS[index++]();}catch{}next();});
+  };
+  next();return()=>{stopped=true;cancel();};
+ },[servicesReady]);
  const launchReady=ready&&(!auth||(!!bootstrap&&servicesReady));
  useEffect(()=>{if(!launchReady)return;return finishLaunchHandoff();},[launchReady,c.bg]);
  const checkingUpdate=useRef(false),lastUpdateCheck=useRef(0),lastUpdatePrompt=useRef('');
