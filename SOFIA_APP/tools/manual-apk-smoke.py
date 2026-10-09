@@ -20,7 +20,7 @@ def cold(label):
   time.sleep(.2)
  (out/(label+'.txt')).write_text(logs)
  assert 'FATAL EXCEPTION' not in logs,logs
- stages={name:int(value) for name,value in re.findall(r'SOFIA_LAUNCH_(UI|LOCAL_READY|FADE_START|SPLASH_REMOVED|DATA)_PROCESS_MS=(\d+)',logs)}
+ stages={name:int(value) for name,value in re.findall(r'SOFIA_LAUNCH_(UI|LOCAL_READY|FADE_START|FADE_DONE|SPLASH_REMOVED|DATA)_PROCESS_MS=(\d+)',logs)}
  assert 'DATA' in stages,logs
  assert stages['UI']<=stages['LOCAL_READY']<=stages['DATA'],stages
  return {'stages_ms':stages,'activity_manager':manager}
@@ -74,14 +74,17 @@ try:
  for run in result['candidate_runs']:
   events=run['stages_ms']
   assert 'FADE_START' in events, 'Native fade never started: '+str(events)
-  assert events['LOCAL_READY']<=events['FADE_START']<=events['SPLASH_REMOVED']<=events['DATA'],events
+  assert events['LOCAL_READY']<=events['SPLASH_REMOVED']<=events['FADE_START']<=events['FADE_DONE']<=events['DATA'],events
   spans.append({'ready_to_fade_ms':events['FADE_START']-events['LOCAL_READY'],
-                'fade_to_remove_ms':events['SPLASH_REMOVED']-events['FADE_START']})
+                'ready_to_splash_remove_ms':events['SPLASH_REMOVED']-events['LOCAL_READY'],
+                'fade_to_done_ms':events['FADE_DONE']-events['FADE_START']})
  result['exit_spans']=spans
  result['ready_to_fade_median_ms']=statistics.median(row['ready_to_fade_ms'] for row in spans)
- result['fade_to_remove_median_ms']=statistics.median(row['fade_to_remove_ms'] for row in spans)
+ result['ready_to_splash_remove_median_ms']=statistics.median(row['ready_to_splash_remove_ms'] for row in spans)
+ result['fade_to_done_median_ms']=statistics.median(row['fade_to_done_ms'] for row in spans)
  assert result['ready_to_fade_median_ms']<=150,'Home ready but fade starts too late: '+str(spans)
- assert result['fade_to_remove_median_ms']<=250,'Fade is keeping icon over Home: '+str(spans)
+ assert result['ready_to_splash_remove_median_ms']<=150,'OS S still exists after Home ready: '+str(spans)
+ assert result['fade_to_done_median_ms']<=250,'Full-screen S is still visible too long: '+str(spans)
  assert result['candidate_median_ms']<=result['baseline_median_ms']+200, 'Startup slower than baseline by over 200 ms: '+str(result['candidate_median_ms']-result['baseline_median_ms'])
  result['splash_performance_verified']=True
  # Verify that an actual menu touch works and retained conversation survives.

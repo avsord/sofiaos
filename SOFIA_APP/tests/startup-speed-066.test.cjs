@@ -150,28 +150,29 @@ test('070 startup S moves as an actual vector group, never just an opacity fade'
 
 
 
-test('074 Android splash exits as a single surface with no icon-only overlay',()=>{
+test('078 unified image takes over native splash without a second icon layer',()=>{
  const overlay=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const loader=fs.readFileSync(path.join(root,'src/lib/screen-loader.tsx'),'utf8');
- assert.ok(overlay.includes('splash.animate().alpha(0f).setDuration(fadeDuration)'));
- assert.ok(overlay.includes('splash.postDelayed({ finalizeSplash() }, 140L)'));
- assert.ok(!overlay.includes('icon.postDelayed('));
- assert.ok(!overlay.includes('setDuration(240L)'));
+ assert.ok(overlay.includes('class SofiaUnifiedSplashSurface(activity: Activity) : View(activity)'));
+ assert.ok(overlay.includes('canvas.drawColor(background)'));
+ assert.ok(overlay.includes('logo?.draw(canvas)'));
+ assert.ok(overlay.includes('surface.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(!overlay.includes('ValueAnimator.ofFloat('));
  assert.ok(!app.includes('<LaunchSAnimation'));
  assert.ok(loader.includes('export const DeferredScreen=React.memo('));
  assert.ok(loader.includes('keys.every(key=>Object.is(left[key],right[key]))'));
 });
 
-test('074 Home may reveal with local layout rather than holding on pending remote data',()=>{
+test('078 Home is allowed to reveal without waiting for server or prefetch',()=>{
  const overlay=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
- const code=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
+ const logo=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
  assert.ok(overlay.includes('if (login || home) {'));
  assert.ok(!overlay.includes('if (login || (home && (signals and 8) != 0))'));
- assert.ok(overlay.includes('splash.animate().alpha(0f).setDuration(fadeDuration)'));
- assert.ok(overlay.includes('icon?.animate()?.alpha(0f)?.setDuration(fadeDuration)'));
- assert.ok(code.includes('android:windowSplashScreenAnimationDuration'));
- assert.ok(code.includes('android:duration="180"'));
+ assert.ok(overlay.includes('splash.remove()'));
+ assert.ok(overlay.includes('record(activity, "FADE_DONE")'));
+ assert.ok(logo.includes('android:windowSplashScreenAnimationDuration'));
+ assert.ok(logo.includes('android:duration="180"'));
 });
 test('074 hidden tabs mount one idle slice at a time after original splash exits',()=>{
  const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
@@ -187,13 +188,13 @@ test('074 hidden tabs mount one idle slice at a time after original splash exits
  assert.ok(apps.includes("api.cached<Catalog>('/workspace/catalog')"));
 });
 
-test('075 no persistent duplicate S under Android 12 splash',()=>{
+test('078 no second OS S persists underneath the single composited image',()=>{
  const theme=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
  const native=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  assert.ok(theme.includes('<item name="android:windowBackground">@color/sofiaLaunchBackground</item>'));
  assert.ok(!theme.includes('<item name="android:windowBackground">@drawable/splashscreen_logo</item>'));
  assert.ok(theme.includes('<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_animated</item>'));
- assert.ok(native.includes('icon?.animate()?.alpha(0f)?.setDuration(fadeDuration)'));
+ assert.ok(native.includes('class SofiaUnifiedSplashSurface(activity: Activity) : View(activity)'));
  assert.ok(native.includes('splash.remove()'));
  assert.ok(!native.includes('icon.postDelayed('));
  assert.ok(native.includes('SOFIA_LAUNCH_SYSTEM_CALLBACK_PROCESS_MS='));
@@ -209,19 +210,18 @@ test('075 launch does not block on optional photo decode or full archive rollove
  assert.ok(snapshot.includes('await this.hydrate();void this.flushLaunch()'),'No-cache sessions can still recover the entire archive');
 });
 
-test('077 fade uses RenderThread property animators; no UI-thread ValueAnimator',()=>{
+test('078 Android removes system icon before 95ms one-layer fade',()=>{
  const native=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const smoke=fs.readFileSync(path.join(root,'tools/manual-apk-smoke.py'),'utf8');
- assert.ok(native.includes('val fadeDuration = 95L'));
- assert.ok(native.includes('splash.animate().alpha(0f).setDuration(fadeDuration)'));
- assert.ok(native.includes('icon?.animate()?.alpha(0f)?.setDuration(fadeDuration)'));
- assert.ok(native.includes('withEndAction { finalizeSplash() }'));
- assert.ok(native.includes('splash.postDelayed({ finalizeSplash() }, 140L)'));
- assert.ok(!native.includes('ValueAnimator.ofFloat('));
- assert.ok(native.includes('record(activity, "FADE_START")'));
+ const exit=native.slice(native.indexOf('exitSystemSplash = { success ->'),native.indexOf('when (transition.splashReady())'));
+ assert.ok(exit.indexOf('splash.remove()')<exit.indexOf('record(activity, "FADE_START")'));
+ assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(exit.includes('surface.postDelayed({ complete() }, 180L)'));
+ assert.ok(exit.includes('record(activity, "FADE_DONE")'));
+ assert.ok(!exit.includes('icon?.animate()?.alpha(0f)'));
+ assert.ok(!exit.includes('ValueAnimator.ofFloat('));
  assert.ok(app.includes("const cachedOpening=!!(api.cached('/home')||api.cached('/tasks'))"));
- assert.ok(app.includes('if(painted&&(!cachedOpening||visible))api.releaseNetwork()'));
- assert.ok(smoke.includes("result['ready_to_fade_median_ms']<=150"));
- assert.ok(smoke.includes("result['fade_to_remove_median_ms']<=250"));
+ assert.ok(smoke.includes("result['fade_to_done_median_ms']<=250"));
+ assert.ok(smoke.includes("result['ready_to_splash_remove_median_ms']<=150"));
 });

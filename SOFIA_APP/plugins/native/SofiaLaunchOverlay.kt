@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Process
 import android.os.SystemClock
 import android.util.Log
+import android.graphics.Canvas
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -24,6 +25,28 @@ import com.facebook.react.bridge.ReactMethod
 
 /** Retain Android's original splash until the saved Home is ready. Remove it
  * directly; optional work still waits for the following usable display frame. */
+/** One atomic canvas surface: the background and mark are painted in the
+ * SAME native View so neither can remain above Home after the other fades.
+ * Unlike fading SplashScreenView/icon separately, this has one compositor
+ * layer on Android 12-15 and can be disposed immediately. */
+private class SofiaUnifiedSplashSurface(activity: Activity) : View(activity) {
+  private val logo = activity.getDrawable(R.drawable.sofia_launch_mark)?.mutate()
+  private val background = activity.getColor(R.color.sofiaLaunchBackground)
+  init {
+    setWillNotDraw(false)
+    isClickable = false; isFocusable = false
+    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+  }
+  override fun onDraw(canvas: Canvas) {
+    canvas.drawColor(background)
+    val size = (192f * resources.displayMetrics.density + 0.5f).toInt()
+    val left = (width - size) / 2
+    val top = (height - size) / 2
+    logo?.setBounds(left, top, left + size, top + size)
+    logo?.draw(canvas)
+  }
+}
+
 object SofiaLaunchOverlay {
   private var host: WeakReference<Activity>? = null
   private var observer: ViewTreeObserver? = null
@@ -63,46 +86,55 @@ object SofiaLaunchOverlay {
         else {
           Log.i("SofiaLaunch", "SOFIA_LAUNCH_SYSTEM_CALLBACK_PROCESS_MS=${SystemClock.uptimeMillis() - Process.getStartUptimeMillis()}")
           removeSystemSplash = { splash.remove() }
-          // The splash is ONE visual surface: background, purple mark and S
-          // all fade together. Do not animate the icon separately, and never
-          // wait 240 ms before starting the fade as 0.3.73 did.
+          // Android's SplashScreenView icon can be a separate OEM layer.
+          // Remove the OS starting window NOW that Home is drawn. Draw the
+          // identical brand on one opaque native canvas while fading it.
+          // No second S can survive independently or cover Home afterward.
           exitSystemSplash = { success ->
             if (!exitStarted && host?.get() === activity) {
               exitStarted = true
-              var finalized = false
-              val icon = splash.iconView
-              val finalizeSplash = {
-                if (!finalized) {
-                  finalized = true
-                  // OEM icon surfaces are sometimes composed independently of
-                  // the splash background. Force both to transparent BEFORE
-                  // removing the single system SplashScreenView.
-                  icon?.alpha = 0f
-                  splash.alpha = 0f
-                  splash.remove()
-                  if (host?.get() === activity) {
-                    removeSystemSplash = null; exitSystemSplash = null
-                    record(activity, "SPLASH_REMOVED")
+              val decor = activity.window.decorView as? ViewGroup
+              val surface = if (decor != null && decor.width > 0 && decor.height > 0)
+                SofiaUnifiedSplashSurface(activity).also { view ->
+                  decor.addView(view, ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+                  view.measure(
+                    View.MeasureSpec.makeMeasureSpec(decor.width, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(decor.height, View.MeasureSpec.EXACTLY))
+                  view.layout(0, 0, decor.width, decor.height)
+                }
+              else null
+              // This is the ONLY Android system splash icon. It is removed
+              // synchronously before the transition begins, never after.
+              splash.iconView?.animate()?.cancel()
+              splash.animate().cancel()
+              splash.remove()
+              removeSystemSplash = null; exitSystemSplash = null
+              record(activity, "SPLASH_REMOVED")
+              if (surface == null) {
+                completeReveal(activity, success)
+              } else {
+                var finished = false
+                val complete = {
+                  if (!finished) {
+                    finished = true
+                    surface.animate().cancel()
+                    surface.alpha = 0f
+                    (surface.parent as? ViewGroup)?.removeView(surface)
+                    record(activity, "FADE_DONE")
                     completeReveal(activity, success)
                   }
+                  Unit
                 }
-                Unit
+                // One RenderThread-friendly ViewPropertyAnimator fades the
+                // background and S atomically; it never runs an extra icon
+                // animation or waits for React JS to finish.
+                record(activity, "FADE_START")
+                surface.animate().alpha(0f).setDuration(95L)
+                  .setInterpolator(android.view.animation.LinearInterpolator())
+                  .withEndAction { complete() }.start()
+                surface.postDelayed({ complete() }, 180L)
               }
-              // RenderThread-backed property animators continue to move when
-              // React's UI thread is busy. ValueAnimator was driven by main
-              // thread frames, causing 600-770ms stalls for a 95ms fade.
-              // Both independent system layers start together on one frame.
-              val fadeDuration = 95L
-              val curve = android.view.animation.LinearInterpolator()
-              record(activity, "FADE_START")
-              splash.animate().alpha(0f).setDuration(fadeDuration)
-                .setInterpolator(curve)
-                .withEndAction { finalizeSplash() }.start()
-              icon?.animate()?.alpha(0f)?.setDuration(fadeDuration)
-                ?.setInterpolator(curve)?.start()
-              // A responsive main thread removes the original splash as soon
-              // as the animation ends. The watchdog is only for OEM issues.
-              splash.postDelayed({ finalizeSplash() }, 140L)
             }
             Unit
           }
