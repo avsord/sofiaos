@@ -1,5 +1,5 @@
 # Sofia OS Android 0.3.82
 
-Tela inicial conforme a referência: fundo roxo #7258E8, S branco com 32dp de altura e círculo discreto de 67dp. Escala de respiração com suavização, sem rotação. O desenho do Android mantém a mesma escala na passagem para a superfície nativa, compensando a expansão interna de 1,5 vezes do sistema. S e fundo saem juntos em fade de 190ms.
+O ícone original do Android mantém a escala vetorial suave durante toda a abertura. A saída retoma o caminho nativo de 95 ms validado na 0.3.78, com fade conjunto do fundo e do S. Os limites do ícone são reaproveitados quando disponíveis; quando Android usa SurfaceView sem expor o ícone, o tamanho padrão é 288dp, evitando a redução antiga para 192dp.
 
-Entrega manual, instalação por cima, pacote com.avsord.sofiaapp, código 87 e assinatura existente. Sem publicação no atualizador. Validação nativa/visual do APK exato pendente até a conclusão da execução.
+Entrega manual de produção. Pacote com.avsord.sofiaapp, versionCode 87 e assinatura existente; instalação por cima. Testes nativos e gravação do APK exato ainda serão verificados. Sem resultado físico presumido.

@@ -1,6 +1,6 @@
-## 0.3.82 — referência roxa e continuidade real de escala
+## 0.3.82 — retornar à coordenação validada e animar a splash original
 
-Pedido: S branco e círculo discreto do anexo sobre fundo roxo, escala orgânica e fade. Base remota 44f58f6f47651aa26191a3791b0196ee6ab023c8 (0.3.81/code86). AOSP AdaptiveForegroundDrawable amplia a região interna em 1,5; reutilizar apenas iconView bounds ainda reduz o desenho em um terço. Compensação de bounds na superfície nativa e viewport compartilhado: círculo 67dp, S 32dp, fundo roxo igual em tema claro/escuro. Animação do sistema mantém escala 1; respiração nativa 1→1.055 reversa em 800ms, sem rotação. Fade existente de 190ms, sem estender a espera de dados. Rota manual. Testes/build/emulador pendentes até evidência da execução. Nenhuma validação física presumida.
+A 0.3.81 também reprovou: fade mediano 673 ms; DATA 1667 ms vs baseline 976 ms. A animação vetorial sozinha não resolveu o atraso introduzido pela transferência antecipada da splash. Retoma-se a criação da superfície somente na saída, com fade 95 ms como na 0.3.78 (mediana anterior 117 ms), preservando o logo original do Android enquanto Home prepara. O animador da splash original agora repete a escala suave sem overshoot. O ícone ausente/sem bounds usa 288dp (padrão Android sem icon background), não 192dp; a gravação mostrou que a fallback anterior ainda encolhia o S. Não se relaxa nenhum gate de desempenho. 0.3.82/code87 manual; build/smoke pendentes neste registro.
 
 ## 0.3.81 — diagnóstico do atraso da animação
 

@@ -44,11 +44,7 @@ private class SofiaUnifiedSplashSurface(activity: Activity) : View(activity) {
     getLocationOnScreen(rootPosition)
     val x = iconPosition[0] - rootPosition[0]
     val y = iconPosition[1] - rootPosition[1]
-    // AOSP AdaptiveForegroundDrawable expands the inner vector by 1.5.
-    // Matching only iconView bounds shrinks it by one third at handoff.
-    val padX = icon.width / 4
-    val padY = icon.height / 4
-    markBounds = Rect(x - padX, y - padY, x + icon.width + padX, y + icon.height + padY)
+    markBounds = Rect(x, y, x + icon.width, y + icon.height)
   }
   init {
     setWillNotDraw(false)
@@ -68,7 +64,7 @@ private class SofiaUnifiedSplashSurface(activity: Activity) : View(activity) {
   }
   override fun onDraw(canvas: Canvas) {
     canvas.drawColor(background)
-    val size = (432f * resources.displayMetrics.density + 0.5f).toInt()
+    val size = (288f * resources.displayMetrics.density + 0.5f).toInt()
     val left = (width - size) / 2
     val top = (height - size) / 2
     // OEM splash icon dimensions can be 288dp rather than our old 192dp.
@@ -119,33 +115,30 @@ object SofiaLaunchOverlay {
         if (host?.get() !== activity) splash.remove()
         else {
           Log.i("SofiaLaunch", "SOFIA_LAUNCH_SYSTEM_CALLBACK_PROCESS_MS=${SystemClock.uptimeMillis() - Process.getStartUptimeMillis()}")
-          // Transfer the starting window on its first display frame, before
-          // Home is ready. Keep THIS surface and its animation phase until fade.
-          val decor = activity.window.decorView as? ViewGroup
-          val surface = if (decor != null && decor.width > 0 && decor.height > 0)
-            SofiaUnifiedSplashSurface(activity).also { view ->
-              decor.addView(view, ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-              view.measure(
-                View.MeasureSpec.makeMeasureSpec(decor.width, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(decor.height, View.MeasureSpec.EXACTLY))
-              view.layout(0, 0, decor.width, decor.height)
-              view.matchSystemIcon(splash.iconView)
-            }
-          else null
-          // The OS icon cannot remain as a separately composited layer.
-          splash.iconView?.animate()?.cancel()
-          splash.animate().cancel()
-          splash.remove()
-          record(activity, "SPLASH_REMOVED")
-          removeSystemSplash = {
-            surface?.animate()?.cancel()
-            (surface?.parent as? ViewGroup)?.removeView(surface)
-          }
+          removeSystemSplash = { splash.remove() }
+          // Keep the original animated Android splash until Home is prepared.
           exitSystemSplash = { success ->
             if (!exitStarted && host?.get() === activity) {
               exitStarted = true
+              val decor = activity.window.decorView as? ViewGroup
+              val surface = if (decor != null && decor.width > 0 && decor.height > 0)
+                SofiaUnifiedSplashSurface(activity).also { view ->
+                  decor.addView(view, ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+                  view.measure(
+                    View.MeasureSpec.makeMeasureSpec(decor.width, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(decor.height, View.MeasureSpec.EXACTLY))
+                  view.layout(0, 0, decor.width, decor.height)
+                  view.matchSystemIcon(splash.iconView)
+                }
+              else null
+              // The OS icon cannot remain as a separately composited layer.
+              splash.iconView?.animate()?.cancel()
+              splash.animate().cancel()
+              splash.remove()
+              record(activity, "SPLASH_REMOVED")
               exitSystemSplash = null
+              removeSystemSplash = null
               if (surface == null) {
                 removeSystemSplash = null
                 completeReveal(activity, success)
@@ -166,12 +159,10 @@ object SofiaLaunchOverlay {
                 // Preserve size and breathing phase while both S and background
                 // fade as a single compositor layer over the prepared Home.
                 record(activity, "FADE_START")
-                surface.animate().alpha(0f).setDuration(190L)
+                surface.animate().alpha(0f).setDuration(95L)
                   .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
-                  .start()
-                // Keep cleanup separate: end actions force animator callbacks
-                // onto the UI thread and can disable native animation paths.
-                surface.postDelayed({ complete() }, 230L)
+                  .withEndAction { complete() }.start()
+                surface.postDelayed({ complete() }, 180L)
               }
             }
             Unit
@@ -274,7 +265,7 @@ object SofiaLaunchOverlay {
     // extra postOnAnimation fence added 400–650 ms on loaded Android emulators:
     // Home was ready, but Android did not start the fade until another frame.
     // Begin the synchronized splash exit in this SAME ready callback. The
-    // underlying prepared Home draws during the 190-ms fade.
+    // underlying prepared Home draws during the 95-ms fade.
     when (transition.contentReady()) {
       SofiaLaunchTransition.Exit.SYSTEM_SPLASH -> exitSystemSplash?.invoke(success)
       SofiaLaunchTransition.Exit.CONTENT -> {
