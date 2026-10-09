@@ -111,6 +111,9 @@ test('085 stable composited one-layer S + background fades after actual system i
  assert.ok(resources.includes('android:scaleX="0.020658489"'));
  assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
  assert.ok(!exit.includes('ValueAnimator.ofFloat('));
+ assert.ok(exit.includes('decor.overlay.add(view)'));
+ assert.ok(exit.includes('decor?.overlay?.remove(surface)'));
+ assert.ok(!exit.includes('decor.addView(view'));
  assert.ok(!exit.includes('icon?.animate()?.alpha(0f)'));
  const completion=native.slice(native.indexOf('private fun completeReveal'),native.indexOf('private fun reveal'));
  assert.ok(completion.includes('if (Build.VERSION.SDK_INT >= 31 && exitStarted) notifyReady()'));

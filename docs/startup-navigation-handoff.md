@@ -1,3 +1,9 @@
+## 0.3.86 — saída sem relayout da Home
+
+0.3.85/run37929974207 compilou, mas o smoke reprovou: fade mediano584ms, DATA1332ms vsbaseline904ms. Instalação por cima e Home offline sintética passaram antes do gate. Arquivo085 retido como candidato reprovado; não entregar como validado.
+
+Delta086 mantém o S maior/estável e o mesmo desenho. A superfície adicionada via decor.addView durante preDraw solicita outro layout da árvore; muda para decor.overlay, que apenas invalida a camada desenhada. A hipótese do atraso deve ser confirmada no APK. Mantém o animador existente com cleanup independente180ms e fade95ms, sem relaxar gates ou alterar dados. Testes focados e TypeScript executados; CI e inspeção visual pendentes. Rota manual-apk.
+
 ## 0.3.85 — pedido de S maior e correção de flicker
 
 Base fd26883977a00b14fc2b99091eb05932a5cba9bb (0.3.84), ainda não entregue nesta conversa. Usuário aprovou 0.3.83 e pediu aumento e correção da piscada. A 0.3.84 compilou, mas run37928451677 reprovou o gate nativo: fade mediano650ms e DATA1473ms contra907ms. Não entregar esse APK como aprovado.

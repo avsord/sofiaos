@@ -113,8 +113,9 @@ object SofiaLaunchOverlay {
               val decor = activity.window.decorView as? ViewGroup
               val surface = if (decor != null && decor.width > 0 && decor.height > 0)
                 SofiaUnifiedSplashSurface(activity).also { view ->
-                  decor.addView(view, ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+                  // A ViewOverlay invalidates pixels without requesting a new
+                  // layout of the already prepared React Home tree.
+                  decor.overlay.add(view)
                   view.measure(
                     View.MeasureSpec.makeMeasureSpec(decor.width, View.MeasureSpec.EXACTLY),
                     View.MeasureSpec.makeMeasureSpec(decor.height, View.MeasureSpec.EXACTLY))
@@ -139,7 +140,7 @@ object SofiaLaunchOverlay {
                     finished = true
                     surface.animate().cancel()
                     surface.alpha = 0f
-                    (surface.parent as? ViewGroup)?.removeView(surface)
+                    decor?.overlay?.remove(surface)
                     removeSystemSplash = null
                     record(activity, "FADE_DONE")
                     completeReveal(activity, success)
@@ -152,6 +153,7 @@ object SofiaLaunchOverlay {
                 surface.animate().alpha(0f).setDuration(95L)
                   .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
                   .withEndAction { complete() }.start()
+                // Independent cleanup remains as a bounded fallback.
                 surface.postDelayed({ complete() }, 180L)
               }
             }
