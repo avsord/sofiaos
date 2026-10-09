@@ -135,7 +135,7 @@ test('069 startup restores photo and cached Home together; menus mount only when
 test('070 startup S moves as an actual vector group, never just an opacity fade',()=>{
  const code=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
  assert.ok(code.includes('android:name="sofiaLetterMotion"'));
- assert.ok(code.includes('android:pivotX="48" android:pivotY="48"'));
+ assert.ok(code.includes('android:pivotX="144" android:pivotY="144"'));
  assert.ok(!code.includes('sofia_letter_reveal'));
  assert.ok(code.includes('@animator/sofia_letter_motion'));
  const bg=fs.readFileSync(path.join(root,'src/components/BackgroundServices.tsx'),'utf8');

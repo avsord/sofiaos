@@ -1,3 +1,7 @@
+## 0.3.83 — consolidar a referência roxa concorrente com saída validada
+
+Enquanto este trabalho estava ativo, entrou o commit 945cca31e9aa6f91e635b6af57df6010e7554b2f com a referência roxa da 0.3.82. A consolidação anterior havia sobrescrito dois arquivos dessa alteração concorrente; a 0.3.83 restaura o visual do anexo 1000266787.png: fundo #7258E8, S branco 32dp e círculo discreto 67dp. Mantém a compensação AOSP de 1,5 nos bounds e fallback432dp para esse novo viewport288. Combina o visual com a splash original mantida até Home, escala repetida 1→1.025 no RenderThread e fade conjunto de95ms, como no caminho validado da0.3.78. Não reduz os gates de teste. 0.3.83/code88 manual; build/smoke pendentes neste registro.
+
 ## 0.3.82 — retornar à coordenação validada e animar a splash original
 
 A 0.3.81 também reprovou: fade mediano 673 ms; DATA 1667 ms vs baseline 976 ms. A animação vetorial sozinha não resolveu o atraso introduzido pela transferência antecipada da splash. Retoma-se a criação da superfície somente na saída, com fade 95 ms como na 0.3.78 (mediana anterior 117 ms), preservando o logo original do Android enquanto Home prepara. O animador da splash original agora repete a escala suave sem overshoot. O ícone ausente/sem bounds usa 288dp (padrão Android sem icon background), não 192dp; a gravação mostrou que a fallback anterior ainda encolhia o S. Não se relaxa nenhum gate de desempenho. 0.3.82/code87 manual; build/smoke pendentes neste registro.

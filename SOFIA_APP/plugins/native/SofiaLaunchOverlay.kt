@@ -44,7 +44,10 @@ private class SofiaUnifiedSplashSurface(activity: Activity) : View(activity) {
     getLocationOnScreen(rootPosition)
     val x = iconPosition[0] - rootPosition[0]
     val y = iconPosition[1] - rootPosition[1]
-    markBounds = Rect(x, y, x + icon.width, y + icon.height)
+    // AOSP's adaptive foreground expands the inner vector by 1.5.
+    val padX = icon.width / 4
+    val padY = icon.height / 4
+    markBounds = Rect(x - padX, y - padY, x + icon.width + padX, y + icon.height + padY)
   }
   init {
     setWillNotDraw(false)
@@ -64,7 +67,7 @@ private class SofiaUnifiedSplashSurface(activity: Activity) : View(activity) {
   }
   override fun onDraw(canvas: Canvas) {
     canvas.drawColor(background)
-    val size = (288f * resources.displayMetrics.density + 0.5f).toInt()
+    val size = (432f * resources.displayMetrics.density + 0.5f).toInt()
     val left = (width - size) / 2
     val top = (height - size) / 2
     // OEM splash icon dimensions can be 288dp rather than our old 192dp.
