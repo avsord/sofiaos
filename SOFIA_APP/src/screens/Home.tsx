@@ -1,0 +1,76 @@
+import {readHomeRows} from '../lib/home-rows';
+import {scheduleIdleTask} from '../lib/idle-task';
+import {ProfileAvatar} from '../components/ProfileAvatar';
+import {DeferredScreen,loadHomeCommitmentEditor,loadHomeTaskDetails} from '../lib/screen-loader';
+import type {Catalog} from '../lib/types';
+import {CapsuleWidget} from '../components/CapsuleWidget';
+import {useAgendaMonth} from '../lib/use-agenda-month';
+
+import {TASK_PRIORITIES,taskPriority} from '../lib/task-filters';
+import {Sheet} from '../components/Sheet';
+import {TaskPriority} from '../components/TaskPriority';
+import {SortableWidgets} from '../components/SortableWidgets';
+import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import {Alert,AppState,Pressable,RefreshControl,ScrollView,Text,View} from 'react-native';
+import {SofiaApi} from '../lib/api';
+import {useTheme} from '../lib/theme';
+import {errorText} from '../lib/chat-model';
+import type {AgendaItem,Bootstrap,Entity,HomeData,Tab,Task} from '../lib/types';
+import {dayRecords,observationPoints,stableProductColor,localDateKey} from '../lib/dashboard';
+import type {DayRecord,PriceSeries} from '../lib/dashboard';
+import {Brand,Empty,ErrorBanner,ScreenTitle} from '../components/UI';
+import {Icon} from '../components/Icon';
+import {NotificationBell} from '../components/NotificationCenter';
+import {subscribeSystemChanged} from '../lib/system-events';
+import {MiniAgenda,PriceWidget} from '../components/DashboardWidgets';
+export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisible=true,onGestureLock,onOpenCapsules,onDiscussTask}:{onDiscussTask?:(task:Task)=>void;onOpenCapsules?:()=>void;onGestureLock?:(locked:boolean)=>void;api:SofiaApi;bootstrap:Bootstrap;navigate:(tab:Tab)=>void;onOpenAgenda?:(date:string,id?:string,create?:boolean)=>void;active?:boolean;launchVisible?:boolean}){
+ const [agendaDraft,setAgendaDraft]=useState<Partial<Entity>|null>(null),[agendaCatalog,setAgendaCatalog]=useState<Catalog|null>(()=>api.cached<Catalog>('/workspace/catalog')||null);
+ // Catalog metadata is optional on launch. Keep cached areas synchronously,
+ // then refresh after native Home is actually visible and the JS thread yields.
+ useEffect(()=>{
+  if(!active||!launchVisible||agendaCatalog)return;
+  let alive=true;
+  const cancel=scheduleIdleTask(()=>{void api.catalog().then(cat=>{if(alive)setAgendaCatalog(cat);}).catch(()=>{});});
+  return()=>{alive=false;cancel();};
+ },[api,active,launchVisible,agendaCatalog]);
+ function createHomeCommitment(day:string){setAgendaDraft({kind:'commitment',title:'',data:{home_day:day}});}
+ const [detail,setDetail]=useState<Task|null>(null),[detailOpen,setDetailOpen]=useState(false);
+ const openTask=(task:Task)=>{setDetail(task);setDetailOpen(true);};
+ const [priority,setPriority]=useState(''),[areaFilter,setAreaFilter]=useState(''),[filterOpen,setFilterOpen]=useState(false),[areaFilterOpen,setAreaFilterOpen]=useState(false);
+ const [widgets,setWidgets]=useState(()=>api.cached<{widgets:string[]}>('/md/dashboard')?.widgets.filter(x=>['monitoring','tasks','capsules'].includes(x))||['monitoring','tasks']),[dragging,setDragging]=useState(false);
+ const c=useTheme(),[data,setData]=useState<HomeData|null>(()=>api.cached<HomeData>('/home')||null),[tasks,setTasks]=useState<Task[]>(()=>api.cached<{items:Task[]}>('/tasks')?.items||[]),[tasksReady,setTasksReady]=useState(()=>!!api.cached('/tasks')),[series,setSeries]=useState<PriceSeries[]>([]),[refreshing,setRefreshing]=useState(false),[error,setError]=useState(''),[saving,setSaving]=useState(''),[refreshEpoch,setRefreshEpoch]=useState(0);
+ useEffect(()=>subscribeSystemChanged(owner=>{if(owner===api)setRefreshEpoch(x=>x+1);}),[api]);
+ useEffect(()=>{if(!refreshEpoch)return;let alive=true;void api.catalog().then(value=>{if(alive)setAgendaCatalog(value);}).catch(()=>{});return()=>{alive=false;};},[api,refreshEpoch]);
+ const homeActive=useRef(active);homeActive.current=active;
+ useEffect(()=>{let alive=true;async function load(){
+ // Tasks may already be local while /home is slow or failing. Publish each
+ // independent result immediately rather than holding both behind Promise.all.
+ const results=await readHomeRows(api,home=>{if(alive)setData(home);},rows=>{if(alive){setTasks(rows);setTasksReady(true);}});
+ if(!alive)return;
+ const failure=results.find((r):r is PromiseRejectedResult=>r.status==='rejected');
+ setRefreshing(false);setError(failure?errorText(failure.reason):'');if(failure)return;
+ }void load();const timer=setInterval(()=>{if(homeActive.current&&AppState.currentState==='active')void load();},60000);const foreground=AppState.addEventListener('change',state=>{if(state==='active'&&homeActive.current)void load();});return()=>{alive=false;clearInterval(timer);foreground.remove();};},[api,refreshEpoch]);
+ // Widget order comes from the encrypted launch snapshot. Refreshing its
+ // metadata must not compete with Home tasks and the current Agenda month.
+ useEffect(()=>{
+  if(!launchVisible||!active)return;
+  let alive=true;
+  const cancel=scheduleIdleTask(()=>{void api.dashboardWidgets().then(r=>{if(alive)setWidgets(r.widgets.filter(x=>['monitoring','tasks','capsules'].includes(x)));}).catch(()=>{});});
+  return()=>{alive=false;cancel();};
+ },[api,refreshEpoch,launchVisible,active]);
+ // Monitoring may involve many reads; it must not compete with the first usable frame.
+ useEffect(()=>{if(!launchVisible)return;let alive=true;async function load(){try{const monitors:Entity[]=[];for(let offset=0;;offset+=100){const r=await api.entities('monitor','',offset);monitors.push(...r.items.filter(e=>e.state!=='archived'));if(r.items.length<100)break;}const result:PriceSeries[]=[];for(const monitor of monitors){try{const observation=await api.observations(monitor.id);result.push({monitor,status:observation.status,points:observationPoints(observation.items.filter((p:any)=>!monitor.data.preferred_url||p.source===monitor.data.preferred_url)),sources:observation.items,color:monitor.data.line_color||stableProductColor(String(monitor.data.target_id||monitor.id)+'|'+String(monitor.data.variant||'')),currency:String(monitor.data.currency||'BRL')});}catch{/* One broken monitor must not turn the whole Home into an error. */}}if(alive)setSeries(result);}catch{/* Monitoring is secondary; Home, Agenda and Tasks stay usable. */}}const cancel=scheduleIdleTask(()=>{void load();});const timer=setInterval(()=>{if(homeActive.current&&AppState.currentState==='active')void load();},60000);const foreground=AppState.addEventListener('change',state=>{if(state==='active'&&homeActive.current)void load();});return()=>{alive=false;cancel();clearInterval(timer);foreground.remove();};},[api,refreshEpoch,launchVisible]);
+ const [calendarDate,setCalendarDate]=useState(()=>new Date());
+ const calendar=useAgendaMonth(api,calendarDate,active,launchVisible),events=calendar.items;
+ const calendarMonth=useCallback((month:Date)=>setCalendarDate(month),[]);
+ useEffect(()=>{if(refreshEpoch)void calendar.refresh();},[refreshEpoch]);
+ async function toggle(task:Task){if(saving)return;setSaving(task.id);try{await api.taskState(task,task.state==='done'?'todo':'done');setTasks((await api.tasks()).items);}catch(e){setError(errorText(e));}finally{setSaving('');}}
+ const openAgenda=(day:string,id?:string)=>{if(onOpenAgenda)onOpenAgenda(day,id);else navigate('agenda');};
+ function itemDetails(item:DayRecord){if(!item.isTask){openAgenda(localDateKey(item.date),item.original.id);return;}openTask(item.original as Task);}
+ const calendarRecords=useMemo(()=>dayRecords(events,tasks),[events,tasks]);
+ const areaOptions=useMemo(()=>[...new Set(['Pessoal',...(agendaCatalog?.areas||[]),...tasks.map(t=>t.area?.trim()||'Pessoal'),...events.map(e=>(e as AgendaItem & {area?:string}).area?.trim()||'').filter(Boolean)])].sort((a,b)=>a.localeCompare(b,'pt-BR')),[agendaCatalog,events,tasks]);
+ const first=bootstrap.profile.name.split(' ')[0],todo=useMemo(()=>[...tasks].sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||'')).filter(t=>!['done','cancelled'].includes(t.state)&&(!priority||taskPriority(t).value===priority)&&(!areaFilter||(t.area?.trim()||'Pessoal')===areaFilter)),[tasks,priority,areaFilter]);
+ async function saveWidgets(next:string[]){const old=widgets;setWidgets(next);try{await api.saveDashboardWidgets(next);setError('');}catch(e){setWidgets(old);setError(errorText(e));throw e;}}
+ const lockWidgets=(locked:boolean)=>{setDragging(locked);onGestureLock?.(locked);};
+ return <><ScrollView nestedScrollEnabled={false} keyboardShouldPersistTaps="always" testID="home-scroll" nativeID="sofia-home-scroll" scrollEnabled={!dragging} contentContainerStyle={{paddingBottom:28}} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{console.info('SOFIA_HOME_PULL_REFRESH');setRefreshing(true);setRefreshEpoch(x=>x+1);}} tintColor={c.accent}/>}><ScreenTitle title={`Olá, ${first}.`} eyebrow={new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}).toUpperCase()} right={<View style={{flexDirection:'row',alignItems:'center',gap:8}}><NotificationBell onViewAll={()=>navigate('notifications')}/><Pressable accessibilityLabel="Abrir configurações" onPress={()=>navigate('profile')}><ProfileAvatar scope={bootstrap.profile.email} name={bootstrap.profile.name}/></Pressable></View>}/>{error||calendar.error?<View nativeID={!tasksReady||!calendar.loadedAt?'sofia-launch-error':undefined} collapsable={false}><ErrorBanner text={error||(calendar.error?errorText(calendar.error):'')} onRetry={()=>{setRefreshing(true);setRefreshEpoch(x=>x+1);}}/></View>:null}<View style={{paddingHorizontal:22,gap:18}}>{tasksReady&&calendar.loadedAt>0?<View nativeID="sofia-home-data-ready" collapsable={false} style={{width:1,height:1}}/>:null}<MiniAgenda onCreate={day=>void createHomeCommitment(day)} loading={calendar.loading} pending={calendar.pending} onMonthChange={calendarMonth} active={active} viewOwner={api} onGestureLock={onGestureLock} items={calendarRecords} onOpen={openAgenda} onItem={itemDetails}/><SortableWidgets items={[{id:'capsules',title:'Cápsulas',content:<CapsuleWidget api={api} active={active} onOpen={()=>onOpenCapsules?onOpenCapsules():navigate('apps')}/>},{id:'monitoring',title:'Monitoramentos',content:<PriceWidget series={series}/>},{id:'tasks',title:'Tarefas',content:<><View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginTop:0,marginBottom:18}}><Text style={{fontSize:20,fontWeight:'600',color:c.text}}>Tarefas</Text><View style={{flexDirection:'row',alignItems:'center',gap:6}}><Pressable accessibilityRole="button" accessibilityLabel="Filtrar áreas das tarefas do Início" onPress={()=>setAreaFilterOpen(true)} style={{paddingHorizontal:9,paddingVertical:7,borderRadius:14,backgroundColor:c.accentSoft}}><Text numberOfLines={1} style={{fontSize:11,color:c.accent,maxWidth:90}}>{areaFilter||'Áreas'} ▾</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Filtrar níveis das tarefas do Início" onPress={()=>setFilterOpen(true)} style={{paddingHorizontal:10,paddingVertical:7,borderRadius:14,backgroundColor:c.accentSoft}}><Text style={{fontSize:11,color:c.accent}}>{TASK_PRIORITIES.find(p=>p.value===priority)?.label||'Todas'} ▾</Text></Pressable><Text accessibilityLabel="Total de tarefas no Início" style={{color:c.muted}}>{todo.length}</Text></View></View>{!tasksReady?<Text accessibilityRole="progressbar" style={{color:c.muted,padding:16,fontSize:13}}>Sincronizando tarefas…</Text>:todo.length?<View style={{backgroundColor:c.surface,borderRadius:18,paddingHorizontal:14,borderWidth:1,borderColor:c.line}}>{todo.slice(0,12).map((task,i)=><View key={task.id} style={{flexDirection:'row',gap:12,alignItems:'center',paddingVertical:14,borderBottomWidth:i<Math.min(todo.length,12)-1?1:0,borderColor:c.line}}><Pressable disabled={!!saving} accessibilityRole="checkbox" accessibilityLabel={'Concluir '+task.title} accessibilityState={{checked:task.state==='done'}} onPress={()=>void toggle(task)} style={{minWidth:44,minHeight:44,alignItems:'center',justifyContent:'center'}}><View style={{width:22,height:22,borderWidth:1.5,borderColor:c.accent,borderRadius:7}}/></Pressable><Pressable accessibilityRole="button" accessibilityLabel={'Abrir tarefa '+task.title} onLongPress={()=>onDiscussTask&&Alert.alert(task.title,'Opções da tarefa',[{text:'Levar para conversa',onPress:()=>onDiscussTask(task)},{text:'Abrir detalhes',onPress:()=>openTask(task)},{text:'Cancelar',style:'cancel'}])} onPress={()=>openTask(task)} style={{flex:1,gap:4,paddingVertical:6}}><Text style={{color:c.text,fontSize:14}}>{task.title}</Text><TaskPriority task={task}/>{task.due_at?<Text style={{color:c.muted,fontSize:11}}>{new Date(task.due_at).toLocaleString('pt-BR')}</Text>:null}</Pressable></View>)}</View>:<Empty icon="check" title={priority||areaFilter?'Nenhuma tarefa neste filtro':'Tudo em dia por aqui'} body={priority||areaFilter?'Escolha outra área ou prioridade.':'Suas próximas tarefas aparecem neste espaço.'}/>}</>}]} order={widgets} onSave={saveWidgets} onLock={lockWidgets}/><Pressable accessibilityLabel="Abrir apps" onPress={()=>navigate('apps')} style={{flexDirection:'row',alignItems:'center',gap:10,padding:14}}><Icon name="grid" color={c.accent}/><Text style={{color:c.accent,fontSize:14}}>Todos os seus espaços</Text></Pressable>{!bootstrap.ai.ready?<Text style={{fontSize:12,color:c.danger}}>{bootstrap.ai.reason}</Text>:null}</View><Sheet visible={filterOpen} onClose={()=>setFilterOpen(false)} label="Fechar filtro de tarefas"><Text style={{fontSize:20,color:c.text,fontWeight:'600'}}>Nível das tarefas</Text>{[{value:'',label:'Todas'},...TASK_PRIORITIES].map(p=><Pressable key={p.value} accessibilityRole="radio" accessibilityState={{checked:priority===p.value}} accessibilityLabel={p.label} onPress={()=>{setPriority(p.value);setFilterOpen(false);}} style={{paddingVertical:16,borderBottomWidth:1,borderColor:c.line}}><Text style={{color:priority===p.value?c.accent:c.text}}>{p.label}</Text></Pressable>)}</Sheet><Sheet visible={areaFilterOpen} onClose={()=>setAreaFilterOpen(false)} label="Fechar filtro por área"><Text style={{fontSize:20,color:c.text,fontWeight:'600'}}>Áreas das tarefas</Text>{[{value:'',label:'Todas as áreas'},...areaOptions.map(value=>({value,label:value}))].map(area=><Pressable key={area.value} accessibilityRole="radio" accessibilityState={{checked:areaFilter===area.value}} onPress={()=>{setAreaFilter(area.value);setAreaFilterOpen(false);}} style={{paddingVertical:16,borderBottomWidth:1,borderColor:c.line}}><Text style={{color:areaFilter===area.value?c.accent:c.text}}>{area.label}</Text></Pressable>)}</Sheet>{detail&&detailOpen?<DeferredScreen key={detail.id} load={loadHomeTaskDetails} screenProps={{areas:areaOptions,onDiscuss:onDiscussTask,task:detail,visible:detailOpen,api,onClose:()=>setDetailOpen(false),onSaved:(item:Task)=>{setTasks(previous=>previous.map(t=>t.id===item.id?item:t));setDetail(item);}}}/>:null}</ScrollView>{agendaDraft?<DeferredScreen load={loadHomeCommitmentEditor} screenProps={{api,day:String(agendaDraft.data?.home_day||''),areas:areaOptions,onClose:()=>setAgendaDraft(null),onSaved:()=>{setAgendaDraft(null);void calendar.refresh();void api.catalog().then(setAgendaCatalog).catch(()=>{});}}}/>:null}</>;
+}

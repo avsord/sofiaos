@@ -1,0 +1,43 @@
+name: Sofia main validation
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/sofia-main-validation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Backend test suite
+        run: node --test tests/*.test.cjs
+      - name: Syntax check routing and mobile API
+        run: |
+          node --check src/services/credentials.js
+          node --check src/core/runtime.js
+          node --check src/services/routing.js
+          node --check src/channels/mobile.js
+          node --check public/app.js
+      - name: Verify deployed server reaches v142
+        run: |
+          for i in $(seq 1 30); do
+            body=$(curl --silent --show-error --max-time 15 https://sofiaos.up.railway.app/health || true)
+            echo "$body"
+            echo "$body" | grep -q '"version":"142.0.0"' && exit 0
+            sleep 10
+          done
+          echo "Railway did not report v142.0.0 within the validation window."
+          exit 1
