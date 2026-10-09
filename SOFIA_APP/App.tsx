@@ -55,14 +55,25 @@ function Shell({startup}:{startup:LocalLaunch}){
  const painted=useAfterFirstPaint(ready),visible=useLaunchVisible(ready),servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady,mountedTabs=useStartupMounts(servicesReady,tab);
  useEffect(()=>{if(!auth||initialDataReady)return;let live=true;setPreparationError('');void prepareInitialData(api,()=>preloadAgenda(api)).then(()=>{if(live){setPrepared(api);console.info('SOFIA_STARTUP_CACHE_READY');}}).catch(e=>{if(live)setPreparationError(errorText(e));});return()=>{live=false;};},[api,prepareAttempt]);
  useEffect(()=>{if(painted)api.releaseNetwork();},[painted,api]);
- // Warm only one secondary menu module per idle slice, never during Home reveal.
+ // Load modules in actual idle windows only. React Native dispatches touches on
+ // the JS thread: synchronous Metro require() during a menu press stalls input.
+ // A menu tap cancels future background requires until Home is idle again.
+ const menuWarmIndex=useRef(0);
  useEffect(()=>{
-  if(!servicesReady)return;let stopped=false,cancel=()=>{},index=0;
-  const next=()=>{if(stopped||index>=MENU_PRELOADERS.length)return;
-   cancel=scheduleIdleTask(()=>{if(stopped)return;try{MENU_PRELOADERS[index++]();}catch{}next();});
+  if(!servicesReady||tab!=='home')return;
+  let stopped=false,cancel=()=>{};
+  let timer:ReturnType<typeof setTimeout>|undefined;
+  const next=()=>{
+   if(stopped||menuWarmIndex.current>=MENU_PRELOADERS.length)return;
+   cancel=scheduleIdleTask(()=>{
+    if(stopped)return;
+    try{MENU_PRELOADERS[menuWarmIndex.current]();}catch{/* A chosen screen can retry. */}finally{menuWarmIndex.current++;}
+    timer=setTimeout(next,360);
+   });
   };
-  next();return()=>{stopped=true;cancel();};
- },[servicesReady]);
+  timer=setTimeout(next,800);
+  return()=>{stopped=true;cancel();if(timer)clearTimeout(timer);};
+ },[servicesReady,tab]);
  const launchReady=ready&&(!auth||(!!bootstrap&&servicesReady));
  useEffect(()=>{if(!launchReady)return;return finishLaunchHandoff();},[launchReady,c.bg]);
  const checkingUpdate=useRef(false),lastUpdateCheck=useRef(0),lastUpdatePrompt=useRef('');

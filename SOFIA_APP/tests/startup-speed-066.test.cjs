@@ -97,7 +97,7 @@ test('068 photo preloads without blocking Home; menu prewarm yields to navigatio
  const local=fs.readFileSync(path.join(root,'src/lib/local-launch.ts'),'utf8');
  const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
  assert.ok(local.includes("await Promise.all([snapshot.hydrateLaunch(),photoReady])"));
- assert.ok(app.includes('MENU_PRELOADERS[index++]()'));
+ assert.ok(app.includes('MENU_PRELOADERS[menuWarmIndex.current]()'));
  assert.ok(!mounts.includes('scheduleIdleTask('));
  assert.ok(fs.readFileSync(path.join(root,'src/components/ProfileAvatar.tsx'),'utf8').includes('primeProfilePhoto(scope,readProfilePhoto)'));
 });
@@ -141,7 +141,9 @@ test('070 startup S moves as an actual vector group, never just an opacity fade'
  const bg=fs.readFileSync(path.join(root,'src/components/BackgroundServices.tsx'),'utf8');
  assert.ok(bg.includes('if(!enabled||!preloadWhenIdle'));
  assert.ok(bg.includes('scheduleIdleTask('));
- assert.ok(bg.includes('1600'));
+ assert.ok(bg.includes('3400'));
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
+ assert.ok(app.includes('timer=setTimeout(next,800)'));
+ assert.ok(app.includes("if(!servicesReady||tab!=='home')return"));
  assert.ok(app.includes("preloadWhenIdle:screenTab==='home'"));
 });

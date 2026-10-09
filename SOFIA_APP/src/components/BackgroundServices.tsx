@@ -16,7 +16,7 @@ export function BackgroundServices({api,scope,enabled,preloadWhenIdle=true,onCap
    if(started.current===api)return;
    started.current=api;
    void api.preload(()=>preloadAgenda(api)).catch(()=>{});
-  });},1600);
+  });},3400);
   return()=>{clearTimeout(timer);cancel();};
  },[api,enabled,preloadWhenIdle]);
  useCapsuleNotifications(api,scope,enabled,onCapsules);
