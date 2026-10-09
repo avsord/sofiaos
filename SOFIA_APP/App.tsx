@@ -53,7 +53,7 @@ function Shell({startup}:{startup:LocalLaunch}){
  const initialDataReady=prepared===api;
  // Layout releases essential network reads; only the completed visual handoff
  // releases hidden screens, notification inventory and optional prefetch.
- const painted=useAfterFirstPaint(ready),visible=useLaunchVisible(ready),servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady,mountedTabs=useStartupMounts(initialDataReady,tab);
+ const painted=useAfterFirstPaint(ready),visible=useLaunchVisible(ready),servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady,mountedTabs=useStartupMounts(visible&&!!auth,tab);
  useEffect(()=>{if(!auth||initialDataReady)return;let live=true;setPreparationError('');void prepareInitialData(api,()=>preloadAgenda(api)).then(()=>{if(live){setPrepared(api);console.info('SOFIA_STARTUP_CACHE_READY');}}).catch(e=>{if(live)setPreparationError(errorText(e));});return()=>{live=false;};},[api,prepareAttempt]);
  useEffect(()=>{if(painted)api.releaseNetwork();},[painted,api]);
  // All six tab trees are initialized behind the real Android splash.

@@ -59,19 +59,9 @@ object SofiaLaunchOverlay {
         if (host?.get() !== activity) splash.remove()
         else {
           removeSystemSplash = { splash.remove() }
-          // Android/OEMs sometimes display AnimatedVectorDrawable statically.
-          // Animate the actual icon in the SAME system splash that users see,
-          // instead of layering a second logo on top of Home.
-          val icon = splash.iconView
-          val startIconAt = SystemClock.uptimeMillis()
-          icon?.apply {
-            pivotX = width / 2f; pivotY = height / 2f
-            rotation = -22f; scaleX = 0.70f; scaleY = 0.70f
-            animate().rotation(0f).scaleX(1f).scaleY(1f)
-              .setDuration(240L)
-              .setInterpolator(android.view.animation.OvershootInterpolator(1.0f))
-              .start()
-          }
+          // The splash is ONE visual surface: background, purple mark and S
+          // all fade together. Do not animate the icon separately, and never
+          // wait 240 ms before starting the fade as 0.3.73 did.
           exitSystemSplash = { success ->
             if (!exitStarted && host?.get() === activity) {
               exitStarted = true
@@ -79,6 +69,7 @@ object SofiaLaunchOverlay {
               val finalizeSplash = {
                 if (!finalized) {
                   finalized = true
+                  splash.animate().cancel()
                   splash.remove()
                   if (host?.get() === activity) {
                     removeSystemSplash = null; exitSystemSplash = null
@@ -86,26 +77,21 @@ object SofiaLaunchOverlay {
                     completeReveal(activity, success)
                   }
                 }
+                Unit
               }
-              // Fade the WHOLE original splash surface (background + circle +
-              // S), not a letter animation and not a second overlay on Home.
-              val fadeOut = {
-                if (host?.get() === activity && !activity.isFinishing) {
-                  splash.animate().cancel()
-                  splash.animate().alpha(0f).setDuration(190L)
-                    .setInterpolator(android.view.animation.DecelerateInterpolator())
-                    .withEndAction { finalizeSplash() }.start()
-                  // OEMs may cancel view animators; never strand the splash.
-                  splash.postDelayed({ finalizeSplash() }, 300L)
-                } else finalizeSplash()
-                Unit // The delayed-fade callback must return Kotlin Unit, not Boolean.
-              }
-              // If Home is ready before the native icon moves, finish the
-              // 240ms gesture in-place. Never present a separate React overlay.
-              val remainder = (240L - (SystemClock.uptimeMillis() - startIconAt)).coerceAtLeast(0L)
-              if (remainder > 0L && icon != null) icon.postDelayed(fadeOut, remainder)
-              else fadeOut()
+              // Keep the icon attached to the original splash until the
+              // parent fades. A cancelled icon animator must not remain drawn
+              // above the real app as an independent layer.
+              splash.iconView?.animate()?.cancel()
+              splash.animate().cancel()
+              splash.animate().alpha(0f).setDuration(110L)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .withEndAction { finalizeSplash() }.start()
+              // Some Android variants cancel end callbacks. Never retain the
+              // starting screen or strand whenRevealed after cancellation.
+              splash.postDelayed({ finalizeSplash() }, 170L)
             }
+            Unit
           }
           when (transition.splashReady()) {
             SofiaLaunchTransition.Exit.SYSTEM_SPLASH -> exitSystemSplash?.invoke(!failed)
@@ -192,8 +178,8 @@ object SofiaLaunchOverlay {
     if (revealed || host?.get() !== activity) return
     revealed = true; failed = !success
     record(activity, "LOCAL_READY")
-    // Wait for the prepared Home draw before removing the original starting
-    // surface. No extra logo, transparent content or timed opacity animation.
+    // Home layout is already real and touch-ready. Do not wait for slow
+    // secondary tab mounts or live server data to remove the starting screen.
     activity.window.decorView.postOnAnimation {
       if (host?.get() !== activity || activity.isFinishing) return@postOnAnimation
       when (transition.contentReady()) {
@@ -219,7 +205,7 @@ object SofiaLaunchOverlay {
       val callbacks = waiting.toList(); waiting.clear()
       root.post { callbacks.forEach { it.resolve(true) } }
     }
-    if (login || (home && (signals and 8) != 0)) {
+    if (login || home) {
       dataSeen = true
       reveal(activity, true)
     } else if ((signals and 16) != 0) {

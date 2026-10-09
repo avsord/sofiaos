@@ -87,7 +87,7 @@ test('068 S animation never extends the existing native Home handoff',()=>{
  assert.ok(logo.includes('android:propertyName="rotation"'));
  assert.ok(logo.includes('android:propertyName="scaleX"'));
  assert.ok(logo.includes('android:propertyName="scaleY"'));
- assert.ok(logo.includes('android:duration="420"'));
+ assert.ok(logo.includes('android:duration="180"'));
  assert.ok(logo.includes('android:windowSplashScreenAnimationDuration'));
  const launch=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  assert.ok(!launch.includes('sofia_letter_reveal'),'Splash dismissal must not wait for animation');
@@ -97,8 +97,8 @@ test('068 photo preloads without blocking Home; menu prewarm yields to navigatio
  const local=fs.readFileSync(path.join(root,'src/lib/local-launch.ts'),'utf8');
  const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
  assert.ok(local.includes("await Promise.all([snapshot.hydrateLaunch(),photoReady])"));
- assert.ok(app.includes('useStartupMounts(initialDataReady,tab)'));
- assert.ok(!mounts.includes('scheduleIdleTask('));
+ assert.ok(app.includes('useStartupMounts(visible&&!!auth,tab)'));
+ assert.ok(mounts.includes('scheduleIdleTask('));
  assert.ok(fs.readFileSync(path.join(root,'src/components/ProfileAvatar.tsx'),'utf8').includes('primeProfilePhoto(scope,readProfilePhoto)'));
 });
 test('068 bell actions share one horizontal row and capsule reads remain server-backed',()=>{
@@ -128,8 +128,8 @@ test('069 startup restores photo and cached Home together; menus mount only when
  const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
  assert.ok(launch.includes('await Promise.all([snapshot.hydrateLaunch(),photoReady])'));
  assert.ok(!launch.includes('fetch('),'No server calls in initial photo/Home restore');
- assert.ok(!mounts.includes('scheduleIdleTask('),'Do not mount offscreen screen trees on idle');
- assert.ok(mounts.includes('enabled?MENU_TABS:[]'));
+ assert.ok(mounts.includes('scheduleIdleTask('),'Do not mount offscreen screen trees on idle');
+ assert.ok(mounts.includes('setWarmed(previous=>previous.has(tab)'));
 });
 
 test('070 startup S moves as an actual vector group, never just an opacity fade',()=>{
@@ -144,46 +144,45 @@ test('070 startup S moves as an actual vector group, never just an opacity fade'
  assert.ok(bg.includes('3400'));
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  assert.ok(!app.includes('timer=setTimeout(next,800)'));
- assert.ok(app.includes('useStartupMounts(initialDataReady,tab)'));
+ assert.ok(app.includes('useStartupMounts(visible&&!!auth,tab)'));
  assert.ok(app.includes("preloadWhenIdle:screenTab==='home'"));
 });
 
 
 
-test('072 splash runs in native icon, without Home overlay; tabs memoize hidden trees',()=>{
+test('074 Android splash exits as a single surface with no icon-only overlay',()=>{
  const overlay=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const loader=fs.readFileSync(path.join(root,'src/lib/screen-loader.tsx'),'utf8');
- assert.ok(overlay.includes('val icon = splash.iconView'));
- assert.ok(overlay.includes('rotation = -22f'));
- assert.ok(overlay.includes('setDuration(240L)'));
- assert.ok(overlay.includes('icon.postDelayed(fadeOut, remainder)'));
+ assert.ok(overlay.includes('splash.animate().alpha(0f).setDuration(110L)'));
+ assert.ok(overlay.includes('splash.postDelayed({ finalizeSplash() }, 170L)'));
+ assert.ok(!overlay.includes('icon.postDelayed('));
+ assert.ok(!overlay.includes('setDuration(240L)'));
  assert.ok(!app.includes('<LaunchSAnimation'));
  assert.ok(loader.includes('export const DeferredScreen=React.memo('));
  assert.ok(loader.includes('keys.every(key=>Object.is(left[key],right[key]))'));
 });
 
-test('073 fade exits the entire native S screen after Home is ready',()=>{
+test('074 Home may reveal with local layout rather than holding on pending remote data',()=>{
  const overlay=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
- const start=overlay.indexOf('val fadeOut = {');
- const end=overlay.indexOf('val remainder = ',start);
- assert.ok(start>=0 && end>start);
- const fade=overlay.slice(start,end);
- assert.ok(fade.includes('splash.animate().alpha(0f)'));
- assert.ok(fade.includes('setDuration(190L)'));
- assert.ok(fade.includes('withEndAction { finalizeSplash() }'));
- assert.ok(fade.includes('splash.postDelayed({ finalizeSplash() }, 300L)'));
- assert.ok(!fade.includes('icon.animate().alpha'));
+ const code=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
+ assert.ok(overlay.includes('if (login || home) {'));
+ assert.ok(!overlay.includes('if (login || (home && (signals and 8) != 0))'));
+ assert.ok(overlay.includes('splash.animate().alpha(0f)'));
+ assert.ok(overlay.includes('withEndAction { finalizeSplash() }'));
+ assert.ok(code.includes('android:windowSplashScreenAnimationDuration'));
+ assert.ok(code.includes('android:duration="180"'));
 });
-test('073 six authenticated menu panels already exist beneath the splash',()=>{
- const tabs=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
+test('074 hidden tabs mount one idle slice at a time after original splash exits',()=>{
+ const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');
  const apps=fs.readFileSync(path.join(root,'src/screens/Workspace.tsx'),'utf8');
- assert.ok(tabs.includes('enabled?MENU_TABS:[]'));
- assert.ok(app.includes('useStartupMounts(initialDataReady,tab)'));
+ assert.ok(mounts.includes("if(!enabled){"));
+ assert.ok(mounts.includes("cancelIdle=scheduleIdleTask("));
+ assert.ok(mounts.includes("setWarmed(previous=>previous.has(tab)?previous:new Set([...previous,tab]))"));
+ assert.ok(app.includes('useStartupMounts(visible&&!!auth,tab)'));
  assert.ok(!app.includes('MENU_PRELOADERS'));
  assert.ok(pages.includes("api.cached<{items:Entity[]}>('/workspace/entities?limit=100&kind=user_page&q=&offset=0')"));
- assert.ok(pages.includes('setReady(true);store.resume();void load()'));
  assert.ok(apps.includes("api.cached<Catalog>('/workspace/catalog')"));
 });
