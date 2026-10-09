@@ -314,6 +314,12 @@ private class SofiaEarlySplashSurface(
 ) : View(activity) {
   private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
   private val startedAt = SystemClock.uptimeMillis()
+  init {
+    // Enter Android's composed-alpha path on the early visible frame,
+    // not for the first time when Home is ready. Over the matching original
+    // splash, 254/255 differs by at most one 8-bit channel step.
+    alpha = 254f / 255f
+  }
   val markCenterX = markLeft + (pixels?.width ?: 0) / 2f
   val markCenterY = markTop + (pixels?.height ?: 0) / 2f
   override fun onDraw(canvas: Canvas) {
