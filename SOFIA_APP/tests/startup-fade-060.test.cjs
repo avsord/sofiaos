@@ -82,16 +82,19 @@ test('060 unmount or launch failure cannot release stale optional services',asyn
 test('060 old platforms without the visibility bridge keep a cancellable fallback',async()=>{
  const f=visibilityFixture(false);assert.deepEqual(f.states,[false]);f.frames.shift()();f.frames.shift()();assert.deepEqual(f.states,[false,true]);f.dispose();
 });
-test('095 early visible snapshot preserves system pixels through scale and fade',()=>{
+test('096 early visible snapshot preserves system pixels through scale and fade',()=>{
  const native=file('plugins/native/SofiaLaunchOverlay.kt');
  const exit=native.slice(native.indexOf('exitSystemSplash = { success ->'),native.indexOf('when (transition.splashReady())'));
  assert.ok(!native.includes('SofiaLaunchFadeLayer'));
  assert.ok(native.indexOf('decor.overlay.add(surface)')<native.indexOf('exitSystemSplash = { success ->'));
  assert.ok(!native.includes('SurfaceControl.Transaction'));
  assert.ok(!native.includes('setUpdateListener'));
- assert.ok(!native.includes('postInvalidateOnAnimation'));
- assert.ok(native.includes('surface.animate().scaleX(1f / 0.88f).scaleY(1f / 0.88f)'));
- assert.ok(native.includes('setDuration(SofiaLaunchMotion.DURATION_MS)'));
+ assert.ok(native.includes('if (now - startedAt < SofiaLaunchMotion.DURATION_MS && alpha > 0f)'));
+ assert.ok(native.includes('postInvalidateOnAnimation()'));
+ assert.ok(!native.includes('.scaleX('));
+ assert.ok(native.includes('SofiaLaunchMotion.scaleAt(startedAt, now) / 0.88f'));
+ assert.ok(native.includes('canvas.scale(scale, scale, markCenterX, markCenterY)'));
+ assert.ok(native.includes('private val startedAt = SystemClock.uptimeMillis()'));
  assert.ok(!exit.includes('postOnAnimation'));
  assert.ok(!exit.includes('registerFrameCommitCallback'));
  assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));

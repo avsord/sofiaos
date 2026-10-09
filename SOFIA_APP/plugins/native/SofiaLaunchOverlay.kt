@@ -83,12 +83,9 @@ object SofiaLaunchOverlay {
           surface.measure(View.MeasureSpec.makeMeasureSpec(decor.width, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(decor.height, View.MeasureSpec.EXACTLY))
           surface.layout(0, 0, decor.width, decor.height)
-          surface.pivotX = surface.markCenterX
-          surface.pivotY = surface.markCenterY
-          // Transform the already drawn layer, never redraw or replace the S.
-          surface.animate().scaleX(1f / 0.88f).scaleY(1f / 0.88f)
-            .setDuration(SofiaLaunchMotion.DURATION_MS)
-            .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator()).start()
+          // Scale is painted from one finite UI clock. The native property
+          // animator is reserved for alpha, avoiding a live scale animator
+          // during the Home/fade handoff.
           var finished = false
           fun disposeSurface() {
             surface.alpha = 0f
@@ -308,7 +305,7 @@ object SofiaLaunchOverlay {
   }
 }
 
-/** One cached Canvas draw; scale and fade only change native view properties. */
+/** Preserve the captured system pixels; one finite Canvas scale, alpha-only exit. */
 private class SofiaEarlySplashSurface(
   activity: Activity,
   private val pixels: Bitmap?,
@@ -316,11 +313,19 @@ private class SofiaEarlySplashSurface(
   private val markTop: Float
 ) : View(activity) {
   private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+  private val startedAt = SystemClock.uptimeMillis()
   val markCenterX = markLeft + (pixels?.width ?: 0) / 2f
   val markCenterY = markTop + (pixels?.height ?: 0) / 2f
   override fun onDraw(canvas: Canvas) {
     canvas.drawColor(android.graphics.Color.rgb(114, 88, 232))
+    val now = SystemClock.uptimeMillis()
+    val scale = SofiaLaunchMotion.scaleAt(startedAt, now) / 0.88f
+    canvas.save()
+    canvas.scale(scale, scale, markCenterX, markCenterY)
     pixels?.let { canvas.drawBitmap(it, markLeft, markTop, paint) }
+    canvas.restore()
+    if (now - startedAt < SofiaLaunchMotion.DURATION_MS && alpha > 0f)
+      postInvalidateOnAnimation()
   }
 }
 
