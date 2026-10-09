@@ -27,7 +27,12 @@ test('rapid taps use the latest selection, not a stale render closure',()=>{
   fn('home');assert.equal(calls.length,3);navigation.current.locked=true;fn('profile');assert.equal(calls.at(-1),'blocked');assert.equal(navigation.current.tab,'home');
 });
 test('tap selection has no timer, vertical translation, fade or animated jump',()=>{
-  for(const token of ['PanResponder','Animated','Easing','transitioning','translateY','requestAnimationFrame','setTimeout'])assert.ok(!source.includes(token),token);
+  // Verify the actual tap-to-selection path, not unrelated optional startup
+  // read-ahead. Its cancellable timers are outside the synchronous touch handler.
+  for(const token of ['PanResponder','Animated','Easing','transitioning','translateY','requestAnimationFrame'])assert.ok(!source.includes(token),token);
+  const immediate=source.slice(source.indexOf('const switchTab=useCallback('),source.indexOf('const [taskContext'));
+  assert.ok(immediate.includes('pager.current?.goTo(next)'));
+  assert.ok(!immediate.includes('setTimeout'),'No timer in tab selection/navigation');
   assert.ok(!pager.slice(pager.indexOf('const goTo'),pager.indexOf('useImperativeHandle')).includes('animated:true'));assert.ok(pager.includes('animated:false'));assert.ok(!pager.includes('setTimeout'));
 });
 test('gestures use the native horizontal pager and do not steal vertical scrolls with JS responders',()=>{
