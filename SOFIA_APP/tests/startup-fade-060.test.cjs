@@ -107,7 +107,7 @@ test('079 continuous composited one-layer S + background fades after actual syst
  assert.ok(resources.includes('android:strokeColor="#12FFFFFF"'));
  assert.ok(!resources.includes('#17151F'));
  assert.ok(resources.includes('android:valueTo="1.025"'));
- assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(160L)'));
+ assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
  assert.ok(!exit.includes('ValueAnimator.ofFloat('));
  assert.ok(!exit.includes('icon?.animate()?.alpha(0f)'));
  const completion=native.slice(native.indexOf('private fun completeReveal'),native.indexOf('private fun reveal'));

@@ -1,3 +1,7 @@
+## 0.3.85 — tamanho correto com a duração de fade aprovada
+
+0.3.84 / fd26883977a00b14fc2b99091eb05932a5cba9bb compilou e assinou, mas run37928451677 reprovou fade mediano650ms com160ms configurados. A duração ampliada atravessa uma janela de montagem na UI; não será entregue como fade validado. Novo delta mantém viewport192, S32dp e círculo67dp, mas restaura95ms e contingência180ms, a combinação que passou na0.3.83 (118ms reais). Nenhum gate foi afrouxado. Código90 e testes da versão exata pendentes.
+
 ## 0.3.84 — proporção do anexo e fade mais perceptível
 
 Base 2e7d5c5e31374cb87ddade2e6826bb90b7e2e327, runtime a0ec56250181a0c755e09a97267e0dff4659d84e (0.3.83). Run 37926742074 passou instalação por cima, Home offline autenticada sintética, conversa e paginação; DATA mediana 1007ms contra955ms, fade118ms. Não representa teste físico.

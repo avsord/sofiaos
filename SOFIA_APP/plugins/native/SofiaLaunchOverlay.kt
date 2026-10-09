@@ -162,10 +162,10 @@ object SofiaLaunchOverlay {
                 // Preserve size and breathing phase while both S and background
                 // fade as a single compositor layer over the prepared Home.
                 record(activity, "FADE_START")
-                surface.animate().alpha(0f).setDuration(160L)
+                surface.animate().alpha(0f).setDuration(95L)
                   .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
                   .withEndAction { complete() }.start()
-                surface.postDelayed({ complete() }, 225L)
+                surface.postDelayed({ complete() }, 180L)
               }
             }
             Unit
@@ -268,7 +268,7 @@ object SofiaLaunchOverlay {
     // extra postOnAnimation fence added 400–650 ms on loaded Android emulators:
     // Home was ready, but Android did not start the fade until another frame.
     // Begin the synchronized splash exit in this SAME ready callback. The
-    // underlying prepared Home draws during the 160-ms fade.
+    // underlying prepared Home draws during the 95-ms fade.
     when (transition.contentReady()) {
       SofiaLaunchTransition.Exit.SYSTEM_SPLASH -> exitSystemSplash?.invoke(success)
       SofiaLaunchTransition.Exit.CONTENT -> {
