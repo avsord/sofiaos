@@ -8,11 +8,11 @@ dist = source / 'SOFIA_APP/dist'
 out = dist / 'startup-trace'
 out.mkdir(parents=True, exist_ok=True)
 pkg = 'com.avsord.sofiaapp'
-expected_source = 'b8e778a1956f5ae87f0c0406f2760c052969f964'
-expected_hash = 'dc3562c79c7f61aa934fdf2ef20c3b62b11e1a3e8f5f2eb590e8fffe7b9ca0cb'
+expected_source = '0a2a7f1db0e23f65e0356c99af2c62513d60f198'
+expected_hash = 'ae4e0b768f2e05bf31694c02498afee12a1423208ea78661b73782173c83d9e6'
 assert (dist / 'SOURCE_COMMIT.txt').read_text().strip() == expected_source
 assert hashlib.sha256((dist / 'Sofia-OS.apk').read_bytes()).hexdigest() == expected_hash
-with zipfile.ZipFile(dist / 'Sofia-OS-0.3.97-source.zip') as archive:
+with zipfile.ZipFile(dist / 'Sofia-OS-0.3.98-source.zip') as archive:
     for name in archive.namelist():
         assert (source / name).resolve().is_relative_to(source.resolve()), name
     archive.extractall(source)

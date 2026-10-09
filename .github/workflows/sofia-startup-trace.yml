@@ -9,7 +9,7 @@ permissions:
   actions: read
 jobs:
   trace:
-    name: Trace exact 097 APK without rebuilding or publishing
+    name: Trace exact 098 APK without rebuilding or publishing
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     env:
@@ -23,8 +23,8 @@ jobs:
         java-version: '17'
     - uses: actions/download-artifact@v4
       with:
-        name: Sofia-build-38000667173-1
-        run-id: 38000667173
+        name: Sofia-build-38003945981-1
+        run-id: 38003945981
         github-token: ${{ github.token }}
         path: trace-source/SOFIA_APP/dist
     - uses: actions/download-artifact@v4
