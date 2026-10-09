@@ -1,3 +1,17 @@
+## Entrega manual de candidato — 0.3.94/code99, 09/10/2026
+
+Fonte7f95502bf8a894611e2d947428d6bed246836a82; execução37977881730. APK51.619.493 bytes; SHA256b783cd88c499cace1b29e4e564f23d26b45674d82dfe2d87537c3acd1cbea223; assinatura existente fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c. Arquivo exato Sofia-OS-0.3.94.apk disponibilizado como CANDIDATO PARA TESTE, com ressalva explícita de reprovação do tempo de abertura; não é APK aprovado nem release do atualizador. Não afirmar validação completa.
+
+094 substitui AnimatedVectorDrawable da entrada por vetor estático com escala0.88 embutida. O Android usa AppCompatImageView (confirmado no log), sem SurfaceView separada. A própria imagem original cresce por transformação nativa até1/0.88 em800ms, interpolador accelerate/decelerate. O mesmo SplashScreenView faz fade95ms; limpeza180ms, cancelamento e conclusão únicos. Sem nova cobertura, transferência do S, reinício de escala ou controle SurfaceControl do sistema. Mantém desenho maior/anel discreto/roxo#7258E8 e cache/funcionalidades da fonte atual.
+
+Build, tipos, suites prévias, pacote/hash/assinatura passaram. Instalação por cima e Home autenticada offline com dados sintéticos passaram antes do gate. Native smoke REPROVOU: DATA mediana1427ms vsbaseline842ms; fade mediano536ms, remoção mediana535ms, início0ms. Limites150/150/250 ebaseline+200 mantidos; nenhum resultado falsificado ou teste retirado. O gate interrompeu o script: conversa/paginação/primeiro toque desta versão NÃO foram executados. Sem prova de aparelho físico ou preservação de dados reais.
+
+Gravação de migração inspecionada: S37→44px em320×640, aumento contínuo, sem intervalo sem S nem reaparecimento após saída. Dois quadros mostram fade simultâneo de marca/fundo para Home; sem troca de símbolo. O vídeo variável não resolve a pausa de cerca de500ms como causa de UI/RenderThread. Não confundir correção visual observada com aprovação do tempo de abertura.
+
+093/run37975371047 também reprovou (fade mediano581ms, DATA1414 vs899) e seu vídeo mostrou roxo sem S antes de a cobertura aparecer; não entregue. 092 é hipótese DESCARTADA: SurfaceView.getSurfaceControl não permite alterar propriedades do controle retornado. O runtime094 não usa essa transação. 089/090/091 igualmente não entregues como aprovados.
+
+Investigação/edição e CI separadas: runtime094 promovido19:05:57UTC, CI19:05:59–19:15:54UTC. Retomada após pedidos de status18:46BRT: resultado real consultado, evidência baixada e arquivo verificado; candidato oferecido com falha declarada. Houve interrupção de acesso ao terminal durante a sessão, sem entrega ou acompanhamento em segundo plano. Documentação final não recompila APK. Limitação pendente: atraso nativo da saída; não publicar oficialmente enquanto esse gate falhar.
+
 ## 0.3.92 — opacidade do ícone no compositor
 
 091/run37972406277 compilou, mas fade mediano≈520ms e remoção≈520ms reprovaram. Mantém desenho50% maior e splash original sem transferência. Troca somente SurfaceView.setAlpha no update listener por SurfaceControl.Transaction.setAlpha, API pública29+, ramoAndroid31+. Evita invalidação/layout da hierarquia do ícone e usa o valor absoluto do RenderNode do fundo. Transaction única, fechada em conclusão/cancelamento. Sem restauraçãoalpha1, acúmulo, cópia do S ou frame novo. Todos os limites numéricos e a ordem real dos eventos preservados. Fonte091 atual como base; teste de contrato local passou. APK/assinatura/smoke/visual92 pendentes. Hipótese de custo da setter precisa de evidência nativa.
