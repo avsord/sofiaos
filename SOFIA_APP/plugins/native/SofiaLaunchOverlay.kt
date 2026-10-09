@@ -9,6 +9,7 @@ import android.os.Process
 import android.os.SystemClock
 import android.util.Log
 import android.graphics.Canvas
+import android.graphics.Rect
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -33,6 +34,17 @@ private class SofiaUnifiedSplashSurface(activity: Activity) : View(activity) {
   private val logo = activity.getDrawable(R.drawable.sofia_launch_mark)?.mutate()
   private val background = activity.getColor(R.color.sofiaLaunchBackground)
   private val startedAt = SystemClock.uptimeMillis()
+  private var markBounds: Rect? = null
+  fun matchSystemIcon(icon: View?) {
+    if (icon == null || icon.width <= 0 || icon.height <= 0) return
+    val iconPosition = IntArray(2)
+    val rootPosition = IntArray(2)
+    icon.getLocationOnScreen(iconPosition)
+    getLocationOnScreen(rootPosition)
+    val x = iconPosition[0] - rootPosition[0]
+    val y = iconPosition[1] - rootPosition[1]
+    markBounds = Rect(x, y, x + icon.width, y + icon.height)
+  }
   init {
     setWillNotDraw(false)
     isClickable = false; isFocusable = false
@@ -43,13 +55,16 @@ private class SofiaUnifiedSplashSurface(activity: Activity) : View(activity) {
     val size = (192f * resources.displayMetrics.density + 0.5f).toInt()
     val left = (width - size) / 2
     val top = (height - size) / 2
+    // OEM splash icon dimensions can be 288dp rather than our old 192dp.
+    // Reuse its real bounds so transfer never shrinks or recenters the mark.
+    val bounds = markBounds ?: Rect(left, top, left + size, top + size)
     // Continuous, low-amplitude breathing: no final size reset.
     val phase = (SystemClock.uptimeMillis() - startedAt).toDouble() * (2.0 * Math.PI / 1600.0)
     val scale = if (ValueAnimator.areAnimatorsEnabled())
       (1.0 + 0.025 * kotlin.math.sin(phase)).toFloat() else 1f
     canvas.save()
-    canvas.scale(scale, scale, width / 2f, height / 2f)
-    logo?.setBounds(left, top, left + size, top + size)
+    canvas.scale(scale, scale, bounds.exactCenterX(), bounds.exactCenterY())
+    logo?.setBounds(bounds)
     logo?.draw(canvas)
     canvas.restore()
     if (isAttachedToWindow && ValueAnimator.areAnimatorsEnabled()) postInvalidateOnAnimation()
@@ -105,6 +120,7 @@ object SofiaLaunchOverlay {
                 View.MeasureSpec.makeMeasureSpec(decor.width, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(decor.height, View.MeasureSpec.EXACTLY))
               view.layout(0, 0, decor.width, decor.height)
+              view.matchSystemIcon(splash.iconView)
             }
           else null
           // The OS icon cannot remain as a separately composited layer.

@@ -1,8 +1,8 @@
-## Retomada 09/10/2026 — 0.3.79 manual
+## Retomada 09/10/2026 — 0.3.80 manual
 
 Base observada: 5935635d43f579f035ef9f42030113b5023a0f5c, após APK 0.3.78/code83. A execução 37917803822 falhou antes de compilar porque startup-fade-060 exigia 95 ms, embora o código tivesse sido alterado para 190 ms. Outros contratos também mantinham o literal antigo.
 
-Delta: a única superfície nativa é criada no primeiro callback da splash, mantida durante a preparação da Home e reutilizada no fade; o movimento não reinicia na saída. Invalidação acompanha frames e respeita animações desativadas. O marcador SPLASH_REMOVED agora pode anteceder LOCAL_READY; o smoke exige ambos antes de FADE_START, mantendo limites de início, duração e interação. Versão 0.3.79/code84; sem backend ou publicação no atualizador. Build e smoke ainda pendentes no momento deste registro. Sem evidência física.
+Delta: a única superfície nativa é criada no primeiro callback da splash, mantida durante a preparação da Home e reutilizada no fade; o movimento não reinicia na saída. Invalidação acompanha frames e respeita animações desativadas. O marcador SPLASH_REMOVED agora pode anteceder LOCAL_READY; o smoke exige ambos antes de FADE_START, mantendo limites de início, duração e interação. A superfície também captura os limites reais do ícone do sistema antes de removê-lo, evitando trocar as dimensões OEM pelo tamanho fixo de 192dp. Versão 0.3.80/code85; sem backend ou publicação no atualizador. Build e smoke ainda pendentes no momento deste registro. Sem evidência física.
 
 ## 0.3.65 — toque dos menus, círculo na abertura e caminho manual sem testes
 

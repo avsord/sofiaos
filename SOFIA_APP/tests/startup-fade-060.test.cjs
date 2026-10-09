@@ -95,6 +95,10 @@ test('079 continuous composited one-layer S + background fades after actual syst
  assert.ok(!exit.includes('SofiaUnifiedSplashSurface(activity)'), 'Exit must reuse the running animation, without a size/phase reset');
  assert.ok(head.includes('kotlin.math.sin(phase)'));
  assert.ok(head.includes('postInvalidateOnAnimation()'));
+ assert.ok(callback.includes('view.matchSystemIcon(splash.iconView)'));
+ assert.ok(head.includes('icon.getLocationOnScreen(iconPosition)'));
+ assert.ok(head.includes('logo?.setBounds(bounds)'));
+ assert.ok(head.includes('bounds.exactCenterX()'));
  assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(190L)'));
  assert.ok(!exit.includes('ValueAnimator.ofFloat('));
  assert.ok(!exit.includes('icon?.animate()?.alpha(0f)'));
