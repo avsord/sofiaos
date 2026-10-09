@@ -32,6 +32,7 @@ import com.facebook.react.bridge.ReactMethod
 private class SofiaUnifiedSplashSurface(activity: Activity) : View(activity) {
   private val logo = activity.getDrawable(R.drawable.sofia_launch_mark)?.mutate()
   private val background = activity.getColor(R.color.sofiaLaunchBackground)
+  private val startedAt = SystemClock.uptimeMillis()
   init {
     setWillNotDraw(false)
     isClickable = false; isFocusable = false
@@ -42,8 +43,15 @@ private class SofiaUnifiedSplashSurface(activity: Activity) : View(activity) {
     val size = (192f * resources.displayMetrics.density + 0.5f).toInt()
     val left = (width - size) / 2
     val top = (height - size) / 2
+    // Continuous, low-amplitude breathing: no final size reset.
+    val phase = (SystemClock.uptimeMillis() - startedAt).toDouble() * (2.0 * Math.PI / 1600.0)
+    val scale = (1.0 + 0.025 * kotlin.math.sin(phase)).toFloat()
+    canvas.save()
+    canvas.scale(scale, scale, width / 2f, height / 2f)
     logo?.setBounds(left, top, left + size, top + size)
     logo?.draw(canvas)
+    canvas.restore()
+    postInvalidateDelayed(16L)
   }
 }
 
@@ -130,10 +138,10 @@ object SofiaLaunchOverlay {
                 // background and S atomically; it never runs an extra icon
                 // animation or waits for React JS to finish.
                 record(activity, "FADE_START")
-                surface.animate().alpha(0f).setDuration(95L)
-                  .setInterpolator(android.view.animation.LinearInterpolator())
+                surface.animate().alpha(0f).setDuration(190L)
+                  .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
                   .withEndAction { complete() }.start()
-                surface.postDelayed({ complete() }, 180L)
+                surface.postDelayed({ complete() }, 240L)
               }
             }
             Unit
