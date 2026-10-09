@@ -26,7 +26,12 @@ export async function prepareLocalLaunch(
    .then(({readProfilePhoto})=>import('./profile-photo-events')
     .then(({primeProfilePhoto})=>primeProfilePhoto(auth.profile.email,readProfilePhoto)))
    .catch(()=>{});
-  await Promise.all([snapshot.hydrateLaunch(),photoReady]);
+  // The native disk projection is the only work that must finish before the
+  // first Home draw. ProfileAvatar already subscribes to the photo cache and
+  // updates itself; waiting for a separate image decode/module import here
+  // prolonged the entire S splash on slower devices.
+  void photoReady;
+  await snapshot.hydrateLaunch();
   console.info('SOFIA_STARTUP_CACHE_READY');
   return {auth,snapshot};
  });

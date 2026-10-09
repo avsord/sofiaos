@@ -58,6 +58,7 @@ object SofiaLaunchOverlay {
       activity.splashScreen.setOnExitAnimationListener { splash ->
         if (host?.get() !== activity) splash.remove()
         else {
+          Log.i("SofiaLaunch", "SOFIA_LAUNCH_SYSTEM_CALLBACK_PROCESS_MS=${SystemClock.uptimeMillis() - Process.getStartUptimeMillis()}")
           removeSystemSplash = { splash.remove() }
           // The splash is ONE visual surface: background, purple mark and S
           // all fade together. Do not animate the icon separately, and never
@@ -89,7 +90,7 @@ object SofiaLaunchOverlay {
                 .withEndAction { finalizeSplash() }.start()
               // Some Android variants cancel end callbacks. Never retain the
               // starting screen or strand whenRevealed after cancellation.
-              splash.postDelayed({ finalizeSplash() }, 170L)
+              splash.postDelayed({ finalizeSplash() }, 160L)
             }
             Unit
           }
@@ -178,6 +179,11 @@ object SofiaLaunchOverlay {
     if (revealed || host?.get() !== activity) return
     revealed = true; failed = !success
     record(activity, "LOCAL_READY")
+    // The old legacy windowBackground is a second S underneath the system
+    // splash. Clear it as soon as Home is ready, before beginning native fade.
+    if (Build.VERSION.SDK_INT < 31) {
+      activity.window.setBackgroundDrawableResource(R.color.sofiaLaunchBackground)
+    }
     // Home layout is already real and touch-ready. Do not wait for slow
     // secondary tab mounts or live server data to remove the starting screen.
     activity.window.decorView.postOnAnimation {

@@ -45,6 +45,14 @@ export class StartupSnapshot {
   if(this.entries.has('/tasks')&&this.entries.has('/agenda?month='+month)){this.launchOnly=true;return;}
   // Upgrade/month rollover: recover the existing full snapshot once. Never
   // substitute invented empty tasks or calendar for missing user records.
+  // An already-usable Home projection must not wait for decrypting/parsing
+  // the much larger history archive merely because the current month changed.
+  // Recover secondary entries safely in the background; never discard them.
+  if(this.entries.has('/home')||this.entries.has('/tasks')){
+   this.launchOnly=true;
+   void this.hydrate().then(()=>this.flushLaunch()).catch(()=>{});
+   return;
+  }
   await this.hydrate();void this.flushLaunch();
  }
  async hydrate(){

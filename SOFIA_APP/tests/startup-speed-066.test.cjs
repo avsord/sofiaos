@@ -96,7 +96,7 @@ test('068 photo preloads without blocking Home; menu prewarm yields to navigatio
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const local=fs.readFileSync(path.join(root,'src/lib/local-launch.ts'),'utf8');
  const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
- assert.ok(local.includes("await Promise.all([snapshot.hydrateLaunch(),photoReady])"));
+ assert.ok(local.includes("void photoReady;\n  await snapshot.hydrateLaunch()"));
  assert.ok(app.includes('useStartupMounts(visible&&!!auth,tab)'));
  assert.ok(mounts.includes('scheduleIdleTask('));
  assert.ok(fs.readFileSync(path.join(root,'src/components/ProfileAvatar.tsx'),'utf8').includes('primeProfilePhoto(scope,readProfilePhoto)'));
@@ -126,7 +126,7 @@ test('069 unread bell actions use identical neutral color, one no-wrap row',()=>
 test('069 startup restores photo and cached Home together; menus mount only when visited',()=>{
  const launch=fs.readFileSync(path.join(root,'src/lib/local-launch.ts'),'utf8');
  const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
- assert.ok(launch.includes('await Promise.all([snapshot.hydrateLaunch(),photoReady])'));
+ assert.ok(launch.includes('void photoReady;\n  await snapshot.hydrateLaunch()'));
  assert.ok(!launch.includes('fetch('),'No server calls in initial photo/Home restore');
  assert.ok(mounts.includes('scheduleIdleTask('),'Do not mount offscreen screen trees on idle');
  assert.ok(mounts.includes('setWarmed(previous=>previous.has(tab)'));
@@ -155,7 +155,7 @@ test('074 Android splash exits as a single surface with no icon-only overlay',()
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const loader=fs.readFileSync(path.join(root,'src/lib/screen-loader.tsx'),'utf8');
  assert.ok(overlay.includes('splash.animate().alpha(0f).setDuration(110L)'));
- assert.ok(overlay.includes('splash.postDelayed({ finalizeSplash() }, 170L)'));
+ assert.ok(overlay.includes('splash.postDelayed({ finalizeSplash() }, 160L)'));
  assert.ok(!overlay.includes('icon.postDelayed('));
  assert.ok(!overlay.includes('setDuration(240L)'));
  assert.ok(!app.includes('<LaunchSAnimation'));
@@ -185,4 +185,26 @@ test('074 hidden tabs mount one idle slice at a time after original splash exits
  assert.ok(!app.includes('MENU_PRELOADERS'));
  assert.ok(pages.includes("api.cached<{items:Entity[]}>('/workspace/entities?limit=100&kind=user_page&q=&offset=0')"));
  assert.ok(apps.includes("api.cached<Catalog>('/workspace/catalog')"));
+});
+
+test('075 no persistent duplicate S under Android 12 splash',()=>{
+ const theme=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
+ const native=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
+ assert.ok(theme.includes('<item name="android:windowBackground">@color/sofiaLaunchBackground</item>'));
+ assert.ok(!theme.includes('<item name="android:windowBackground">@drawable/splashscreen_logo</item>'));
+ assert.ok(theme.includes('<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_animated</item>'));
+ assert.ok(native.includes('splash.animate().alpha(0f).setDuration(110L)'));
+ assert.ok(native.includes('splash.remove()'));
+ assert.ok(!native.includes('icon.postDelayed('));
+ assert.ok(native.includes('SOFIA_LAUNCH_SYSTEM_CALLBACK_PROCESS_MS='));
+});
+test('075 launch does not block on optional photo decode or full archive rollover',()=>{
+ const launch=fs.readFileSync(path.join(root,'src/lib/local-launch.ts'),'utf8');
+ const snapshot=fs.readFileSync(path.join(root,'src/lib/startup-snapshot.ts'),'utf8');
+ assert.ok(launch.includes('void photoReady;'));
+ assert.ok(launch.includes('await snapshot.hydrateLaunch()'));
+ assert.ok(!launch.includes('await Promise.all([snapshot.hydrateLaunch(),photoReady])'));
+ assert.ok(snapshot.includes("if(this.entries.has('/home')||this.entries.has('/tasks'))"));
+ assert.ok(snapshot.includes('void this.hydrate().then(()=>this.flushLaunch()).catch(()=>{})'));
+ assert.ok(snapshot.includes('await this.hydrate();void this.flushLaunch()'),'No-cache sessions can still recover the entire archive');
 });
