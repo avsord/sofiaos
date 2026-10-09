@@ -98,6 +98,7 @@ object SofiaLaunchOverlay {
                   // OEMs may cancel view animators; never strand the splash.
                   splash.postDelayed({ finalizeSplash() }, 300L)
                 } else finalizeSplash()
+                Unit // The delayed-fade callback must return Kotlin Unit, not Boolean.
               }
               // If Home is ready before the native icon moves, finish the
               // 240ms gesture in-place. Never present a separate React overlay.
