@@ -66,7 +66,7 @@ object SofiaLaunchOverlay {
           Log.i("SofiaLaunch", "SOFIA_LAUNCH_ICON_KIND=${icon?.javaClass?.simpleName}")
           // Copy the exact initial system pixels before its bitmap is recycled.
           // Prepare a visible single draw layer now, well before Home is ready.
-          val decor = activity.window.decorView
+          val decor = activity.window.decorView as ViewGroup
           val iconPosition = IntArray(2)
           val decorPosition = IntArray(2)
           decor.getLocationOnScreen(decorPosition)
