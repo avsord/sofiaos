@@ -148,17 +148,17 @@ test('070 startup S moves as an actual vector group, never just an opacity fade'
  assert.ok(app.includes("preloadWhenIdle:screenTab==='home'"));
 });
 
-test('071 visible S animation is attached after native reveal and never blocks Home interactions',()=>{
- const code=fs.readFileSync(path.join(root,'src/components/LaunchSAnimation.tsx'),'utf8');
+
+
+test('072 splash runs in native icon, without Home overlay; tabs memoize hidden trees',()=>{
+ const overlay=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
- assert.ok(code.includes('testID="sofia-visible-logo-animation"'));
- assert.ok(code.includes('pointerEvents="none"'));
- assert.ok(code.includes('useNativeDriver:true'));
- assert.ok(code.includes("transform:[{rotate},{scale}]"));
- assert.ok(code.includes('duration:620'));
- assert.ok(code.includes("AppState.addEventListener('change'"));
- assert.ok(app.includes('<LaunchSAnimation visible={visible}/>'));
- const guard=fs.readFileSync(path.join(root,'plugins/native/SofiaCalendarTouchGuard.kt'),'utf8');
- assert.ok(guard.includes('pager.scrollTo(target, 0)'));
- assert.ok(guard.includes('tag != "sofia-menu-blocked"'));
+ const loader=fs.readFileSync(path.join(root,'src/lib/screen-loader.tsx'),'utf8');
+ assert.ok(overlay.includes('val icon = splash.iconView'));
+ assert.ok(overlay.includes('rotation = -22f'));
+ assert.ok(overlay.includes('setDuration(240L)'));
+ assert.ok(overlay.includes('icon.postDelayed(finish, remainder)'));
+ assert.ok(!app.includes('<LaunchSAnimation'));
+ assert.ok(loader.includes('export const DeferredScreen=React.memo('));
+ assert.ok(loader.includes('keys.every(key=>Object.is(left[key],right[key]))'));
 });

@@ -24,6 +24,14 @@ export const loadBackgroundServices=()=>once('background-services',()=>require('
 // Prepare lazy module definitions, without mounting hidden screens or fetching data.
 export const MENU_PRELOADERS=[loadChat,loadAgenda,loadPages,loadWorkspace,loadProfile] as const;
 
-export function DeferredScreen({load,screenProps}:{load:()=>Screen;screenProps:Record<string,unknown>}){
+/** Skip unchanged hidden screens when the active tab changes.
+ * Creating new JSX/props objects must not rerender chat history, workspaces,
+ * calendar grids, or Page trees on each bottom-menu press. */
+export const DeferredScreen=React.memo(function DeferredScreen({load,screenProps}:{load:()=>Screen;screenProps:Record<string,unknown>}){
  const Component=load();return <Component {...screenProps}/>;
-}
+},(a,b)=>{
+ if(a.load!==b.load)return false;
+ const left=a.screenProps,right=b.screenProps;
+ const keys=Object.keys(left);
+ return keys.length===Object.keys(right).length&&keys.every(key=>Object.is(left[key],right[key]));
+});

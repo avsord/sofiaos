@@ -59,12 +59,34 @@ object SofiaLaunchOverlay {
         if (host?.get() !== activity) splash.remove()
         else {
           removeSystemSplash = { splash.remove() }
+          // Android/OEMs sometimes display AnimatedVectorDrawable statically.
+          // Animate the actual icon in the SAME system splash that users see,
+          // instead of layering a second logo on top of Home.
+          val icon = splash.iconView
+          val startIconAt = SystemClock.uptimeMillis()
+          icon?.apply {
+            pivotX = width / 2f; pivotY = height / 2f
+            rotation = -22f; scaleX = 0.70f; scaleY = 0.70f
+            animate().rotation(0f).scaleX(1f).scaleY(1f)
+              .setDuration(240L)
+              .setInterpolator(android.view.animation.OvershootInterpolator(1.0f))
+              .start()
+          }
           exitSystemSplash = { success ->
             if (!exitStarted && host?.get() === activity) {
               exitStarted = true
-              splash.remove(); removeSystemSplash = null; exitSystemSplash = null
-              record(activity, "SPLASH_REMOVED")
-              completeReveal(activity, success)
+              val finish = {
+                if (host?.get() === activity) {
+                  splash.remove(); removeSystemSplash = null; exitSystemSplash = null
+                  record(activity, "SPLASH_REMOVED")
+                  completeReveal(activity, success)
+                } else splash.remove()
+              }
+              // If Home is ready before the native icon moves, finish the
+              // 240ms gesture in-place. Never present a separate React overlay.
+              val remainder = (240L - (SystemClock.uptimeMillis() - startIconAt)).coerceAtLeast(0L)
+              if (remainder > 0L && icon != null) icon.postDelayed(finish, remainder)
+              else finish()
             }
           }
           when (transition.splashReady()) {
