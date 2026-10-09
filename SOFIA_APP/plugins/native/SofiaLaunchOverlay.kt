@@ -4,6 +4,8 @@ import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Typeface
 import android.os.Build
 import android.os.Process
 import android.os.SystemClock
@@ -314,6 +316,13 @@ private class SofiaEarlySplashSurface(
 ) : View(activity) {
   private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
   private val startedAt = SystemClock.uptimeMillis()
+  private val backgroundColor = android.graphics.Color.rgb(114, 88, 232)
+  private val warmPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
+    color = backgroundColor
+    textSize = 18f * resources.displayMetrics.scaledDensity
+    typeface = Typeface.DEFAULT
+  }
+  private var homeProgramsQueued = false
   init {
     // Enter Android's composed-alpha path on the early visible frame,
     // not for the first time when Home is ready. Over the matching original
@@ -323,7 +332,11 @@ private class SofiaEarlySplashSurface(
   val markCenterX = markLeft + (pixels?.width ?: 0) / 2f
   val markCenterY = markTop + (pixels?.height ?: 0) / 2f
   override fun onDraw(canvas: Canvas) {
-    canvas.drawColor(android.graphics.Color.rgb(114, 88, 232))
+    canvas.drawColor(backgroundColor)
+    if (!homeProgramsQueued) {
+      homeProgramsQueued = true
+      queueHomePrograms(canvas)
+    }
     val now = SystemClock.uptimeMillis()
     val scale = SofiaLaunchMotion.scaleAt(startedAt, now) / 0.88f
     canvas.save()
@@ -333,6 +346,28 @@ private class SofiaEarlySplashSurface(
     if (now - startedAt < SofiaLaunchMotion.DURATION_MS && alpha > 0f)
       postInvalidateOnAnimation()
   }
+  private fun queueHomePrograms(canvas: Canvas) {
+    // Perfetto found CircleOp, CircularRRectOp, AtlasTextOp and FillRectOp
+    // compiling for 300 ms in the first Home draw. Record these primitives
+    // on the early splash frame, in its SAME background color: they change
+    // no visible pixels and do not gate or fabricate any readiness marker.
+    warmPaint.style = Paint.Style.FILL
+    warmPaint.alpha = 255
+    canvas.drawCircle(12f, 12f, 8f, warmPaint)
+    val rounded = RectF(24f, 4f, 64f, 28f)
+    canvas.drawRoundRect(rounded, 8f, 8f, warmPaint)
+    canvas.drawText("Olá, Sofia. Agenda", 4f, 52f, warmPaint)
+    warmPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    canvas.drawText("Conversa", 4f, 76f, warmPaint)
+    canvas.drawRect(2.25f, 82.25f, 18.75f, 96.75f, warmPaint)
+    warmPaint.alpha = 128
+    canvas.drawRect(24.25f, 82.25f, 40.75f, 96.75f, warmPaint)
+    warmPaint.style = Paint.Style.STROKE
+    warmPaint.strokeWidth = 1f
+    canvas.drawCircle(12f, 12f, 8f, warmPaint)
+    canvas.drawRoundRect(rounded, 8f, 8f, warmPaint)
+  }
+
 }
 
 class SofiaLaunchModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
