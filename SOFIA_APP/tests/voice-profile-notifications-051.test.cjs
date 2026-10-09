@@ -38,7 +38,7 @@ test('cold start stays on one native brand surface until the final themed Home i
  const app=file('App.tsx'),plugin=file('plugins/with-sofia-launch.cjs'),native=file('plugins/native/SofiaLaunchOverlay.kt'),config=JSON.parse(file('app.json')).expo;
  assert.ok(app.includes("launchReady=ready&&(!auth||(!!bootstrap&&servicesReady))"));assert.ok(app.includes('finishLaunchHandoff()'));
  assert.ok(plugin.includes('SofiaLaunchOverlay.install(this)'));assert.ok(plugin.includes("super.onCreate(null)"));
- assert.ok(native.includes('OnPreDrawListener'));assert.ok(!native.includes('FrameLayout'));assert.ok(!native.includes('root.addView'));assert.ok(!native.includes('SOFIA_LAUNCH_TIMEOUT'));assert.ok(native.includes('Process.getStartUptimeMillis()'));assert.ok(native.includes('reportFullyDrawn()'));
+ assert.ok(native.includes('OnPreDrawListener'));assert.ok(native.includes('alpha = 0f'));assert.ok(native.includes('isClickable = false; isFocusable = false'));assert.ok(native.includes('surface?.continueSystemMotion()'));assert.ok(!native.includes('postInvalidateOnAnimation'));assert.ok(!native.includes('root.addView'));assert.ok(!native.includes('SOFIA_LAUNCH_TIMEOUT'));assert.ok(native.includes('Process.getStartUptimeMillis()'));assert.ok(native.includes('reportFullyDrawn()'));
  assert.equal(config.backgroundColor,'#7258E8');assert.ok(config.plugins.includes('./plugins/with-sofia-launch.cjs'));
 });
 test('instant fallback bootstrap uses the same expanded transport ceiling as the mobile server',()=>{

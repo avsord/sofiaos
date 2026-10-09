@@ -31,7 +31,12 @@ test('057 unmount cancels the native startup fence without firing stale services
 });
 test('057 no duplicate logo, timer or touch blocker is installed; process-to-data readiness is explicit',()=>{
  const native=fs.readFileSync(path.join(__dirname,'../plugins/native/SofiaLaunchOverlay.kt'),'utf8');
- for(const absent of ['FrameLayout','root.addView','}, 5000)','SOFIA_LAUNCH_TIMEOUT'])assert.ok(!native.includes(absent),absent);
+ for(const absent of ['root.addView','}, 5000)','SOFIA_LAUNCH_TIMEOUT'])assert.ok(!native.includes(absent),absent);
+ const cover=native.slice(native.indexOf('private class SofiaLaunchFadeLayer'),native.indexOf('object SofiaLaunchOverlay'));
+ assert.ok(cover.includes('alpha = 0f'));assert.ok(cover.includes('isClickable = false; isFocusable = false'));
+ assert.ok(cover.includes('View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS'));
+ assert.ok(native.indexOf('view.prepare(decor, splash.iconView')<native.indexOf('exitSystemSplash = { success ->'));
+ assert.ok(native.includes('decor?.overlay?.remove(surface)'));
  for(const present of ['Process.getStartUptimeMillis()','sofia-home-data-ready','reportFullyDrawn()','whenInteractive'])assert.ok(native.includes(present),present);
  const app=fs.readFileSync(path.join(__dirname,'../App.tsx'),'utf8');assert.ok(app.includes('startup.snapshot||undefined'));assert.ok(!app.includes("from './src/lib/capsule-notifications'"));
 });
