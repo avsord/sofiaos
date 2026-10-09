@@ -85,10 +85,10 @@ test('060 old platforms without the visibility bridge keep a cancellable fallbac
 test('074 shorter unified fade does not wait for secondary screens or icon animation',()=>{
  const native=file('plugins/native/SofiaLaunchOverlay.kt');
  for(const token of ['fun whenRevealed','SOFIA_LAUNCH_${stage}_PROCESS_MS=','record(activity, "LOCAL_READY")','record(activity, "SPLASH_REMOVED")'])assert.ok(native.includes(token),token);
- assert.ok(native.includes('splash.animate().alpha(0f)'));
- assert.ok(native.includes('setDuration(110L)'));
- assert.ok(native.includes('withEndAction { finalizeSplash() }'));
- assert.ok(native.includes('splash.postDelayed({ finalizeSplash() }, 160L)'));
+ assert.ok(native.includes('ValueAnimator.ofFloat(1f, 0f)'));
+ assert.ok(native.includes('duration = 95L'));
+ assert.ok(native.includes('icon?.alpha = alpha')&&native.includes('splash.alpha = alpha'));
+ assert.ok(native.includes('splash.postDelayed({ finalizeSplash() }, 135L)'));
  for(const absent of ['root.addView','Thread.sleep','.translationY(', 'content.alpha = 0f','icon.postDelayed('])assert.ok(!native.includes(absent),absent);
  const completion=native.slice(native.indexOf('private fun completeReveal'),native.indexOf('private fun reveal'));
  assert.ok(completion.indexOf('postOnAnimation')<completion.indexOf('visible = true'));
