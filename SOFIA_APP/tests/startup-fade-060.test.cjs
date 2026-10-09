@@ -82,7 +82,7 @@ test('060 unmount or launch failure cannot release stale optional services',asyn
 test('060 old platforms without the visibility bridge keep a cancellable fallback',async()=>{
  const f=visibilityFixture(false);assert.deepEqual(f.states,[false]);f.frames.shift()();f.frames.shift()();assert.deepEqual(f.states,[false,true]);f.dispose();
 });
-test('085 stable composited one-layer S + background fades after actual system icon removed',()=>{
+test('086 synchronized composited one-layer S + background fades after actual system icon removed',()=>{
  const native=file('plugins/native/SofiaLaunchOverlay.kt');
  const head=native.slice(native.indexOf('private class SofiaUnifiedSplashSurface'),native.indexOf('object SofiaLaunchOverlay'));
  assert.ok(head.includes('canvas.drawColor(background)'));
@@ -95,11 +95,13 @@ test('085 stable composited one-layer S + background fades after actual system i
  assert.ok(head.includes('R.drawable.sofia_launch_mark'));
  assert.ok(!head.includes('Animatable'));
  assert.ok(!head.includes('onAttachedToWindow()'));
- assert.ok(!head.includes('postInvalidateOnAnimation()'));
+ assert.ok(head.includes('SofiaLaunchMotion.scaleAt(motionStart, now)'));
+ assert.ok(callback.includes('splash.iconAnimationStart?.toEpochMilli()')); 
  assert.ok(head.includes('288f * resources.displayMetrics.density'));
  const resources=file('plugins/with-sofia-logo.cjs');
- assert.ok(!resources.includes('<objectAnimator'));
- assert.ok(resources.includes('@drawable/sofia_launch_mark</item>'));
+ assert.ok(resources.includes('<objectAnimator'));
+ assert.ok(!resources.includes('repeatCount')); 
+ assert.ok(resources.includes('@drawable/sofia_launch_mark_animated</item>'));
  assert.ok(callback.includes('view.matchSystemIcon(splash.iconView)'));
  assert.ok(head.includes('icon.getLocationOnScreen(iconPosition)'));
  assert.ok(head.includes('logo?.setBounds(bounds)'));
@@ -107,8 +109,8 @@ test('085 stable composited one-layer S + background fades after actual system i
  assert.ok(head.includes('x + icon.width + padX'));
  assert.ok(resources.includes('android:strokeColor="#12FFFFFF"'));
  assert.ok(!resources.includes('#17151F'));
- assert.ok(resources.includes('A33.6,33.6'));
- assert.ok(resources.includes('android:scaleX="0.020658489"'));
+ assert.ok(resources.includes('A22.4,22.4'));
+ assert.ok(resources.includes('android:scaleX="0.013772326"'));
  assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
  assert.ok(!exit.includes('ValueAnimator.ofFloat('));
  assert.ok(!exit.includes('icon?.animate()?.alpha(0f)'));

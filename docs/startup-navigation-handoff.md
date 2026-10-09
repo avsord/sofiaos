@@ -1,3 +1,9 @@
+## 0.3.86 — escala orgânica sem reinício e proporção do anexo
+
+Base atual d9df226ee1a13f7a994f5be5bf5d24d95373b063 (0.3.85/code90). Pedido ativo desta conversa exige escala orgânica e fade, além de remover o encolhimento brusco. A0.3.85 concorrente resolveu o reinício removendo movimento; este delta preserva a superfície única, fade95/limpeza180 e troca sem loop independente, usando uma entrada finita0.88→1 em800ms. A superfície de saída segue `SplashScreenView.iconAnimationStart`, curva accelerate/decelerate e bounds1.5× do foreground Android. Sem aguardar fim do movimento para liberar Home. S32dp/círculo67.2dp correspondem ao anexo; são maiores que os20–22px reais do vídeo083. Não adota48dp da085, pois diverge desta referência.
+
+Teste JVM verifica início, fim, monotonicidade e curva; TypeScript e suite prévia executados. Nenhum gate nativo alterado. Fonte e alteração somente no Android e documentação; entrega manual. CI, assinatura, instalação por cima, Home/conversa/paginação sintéticas e inspeção de gravação pendentes. Investigação/edição deste delta iniciada12:30UTC; CI será registrada separadamente. Sem prova de aparelho físico.
+
 ## 0.3.85 — pedido de S maior e correção de flicker
 
 Base fd26883977a00b14fc2b99091eb05932a5cba9bb (0.3.84), ainda não entregue nesta conversa. Usuário aprovou 0.3.83 e pediu aumento e correção da piscada. A 0.3.84 compilou, mas run37928451677 reprovou o gate nativo: fade mediano650ms e DATA1473ms contra907ms. Não entregar esse APK como aprovado.

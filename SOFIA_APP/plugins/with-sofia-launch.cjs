@@ -18,6 +18,7 @@ module.exports=config=>{
     fs.mkdirSync(path.dirname(target),{recursive:true});
     fs.copyFileSync(path.join(__dirname,'native/SofiaLaunchOverlay.kt'),target);
     fs.copyFileSync(path.join(__dirname,'native/SofiaLaunchTransition.java'),path.join(path.dirname(target),'SofiaLaunchTransition.java'));
+    fs.copyFileSync(path.join(__dirname,'native/SofiaLaunchMotion.java'),path.join(path.dirname(target),'SofiaLaunchMotion.java'));
     return c;
   }]);
 };
