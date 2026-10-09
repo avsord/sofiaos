@@ -24,7 +24,7 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 
 /** Retain Android's original splash until the saved Home is ready. Remove it
- * directly; optional work still waits for the following usable display frame. */
+ * through one animated native surface; optional work waits for visual completion. */
 /** One atomic canvas surface: the background and mark are painted in the
  * SAME native View so neither can remain above Home after the other fades.
  * Unlike fading SplashScreenView/icon separately, this has one compositor
@@ -45,13 +45,14 @@ private class SofiaUnifiedSplashSurface(activity: Activity) : View(activity) {
     val top = (height - size) / 2
     // Continuous, low-amplitude breathing: no final size reset.
     val phase = (SystemClock.uptimeMillis() - startedAt).toDouble() * (2.0 * Math.PI / 1600.0)
-    val scale = (1.0 + 0.025 * kotlin.math.sin(phase)).toFloat()
+    val scale = if (ValueAnimator.areAnimatorsEnabled())
+      (1.0 + 0.025 * kotlin.math.sin(phase)).toFloat() else 1f
     canvas.save()
     canvas.scale(scale, scale, width / 2f, height / 2f)
     logo?.setBounds(left, top, left + size, top + size)
     logo?.draw(canvas)
     canvas.restore()
-    postInvalidateDelayed(16L)
+    if (isAttachedToWindow && ValueAnimator.areAnimatorsEnabled()) postInvalidateOnAnimation()
   }
 }
 
@@ -93,33 +94,34 @@ object SofiaLaunchOverlay {
         if (host?.get() !== activity) splash.remove()
         else {
           Log.i("SofiaLaunch", "SOFIA_LAUNCH_SYSTEM_CALLBACK_PROCESS_MS=${SystemClock.uptimeMillis() - Process.getStartUptimeMillis()}")
-          removeSystemSplash = { splash.remove() }
-          // Android's SplashScreenView icon can be a separate OEM layer.
-          // Remove the OS starting window NOW that Home is drawn. Draw the
-          // identical brand on one opaque native canvas while fading it.
-          // No second S can survive independently or cover Home afterward.
+          // Transfer the starting window on its first display frame, before
+          // Home is ready. Keep THIS surface and its animation phase until fade.
+          val decor = activity.window.decorView as? ViewGroup
+          val surface = if (decor != null && decor.width > 0 && decor.height > 0)
+            SofiaUnifiedSplashSurface(activity).also { view ->
+              decor.addView(view, ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+              view.measure(
+                View.MeasureSpec.makeMeasureSpec(decor.width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(decor.height, View.MeasureSpec.EXACTLY))
+              view.layout(0, 0, decor.width, decor.height)
+            }
+          else null
+          // The OS icon cannot remain as a separately composited layer.
+          splash.iconView?.animate()?.cancel()
+          splash.animate().cancel()
+          splash.remove()
+          record(activity, "SPLASH_REMOVED")
+          removeSystemSplash = {
+            surface?.animate()?.cancel()
+            (surface?.parent as? ViewGroup)?.removeView(surface)
+          }
           exitSystemSplash = { success ->
             if (!exitStarted && host?.get() === activity) {
               exitStarted = true
-              val decor = activity.window.decorView as? ViewGroup
-              val surface = if (decor != null && decor.width > 0 && decor.height > 0)
-                SofiaUnifiedSplashSurface(activity).also { view ->
-                  decor.addView(view, ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-                  view.measure(
-                    View.MeasureSpec.makeMeasureSpec(decor.width, View.MeasureSpec.EXACTLY),
-                    View.MeasureSpec.makeMeasureSpec(decor.height, View.MeasureSpec.EXACTLY))
-                  view.layout(0, 0, decor.width, decor.height)
-                }
-              else null
-              // This is the ONLY Android system splash icon. It is removed
-              // synchronously before the transition begins, never after.
-              splash.iconView?.animate()?.cancel()
-              splash.animate().cancel()
-              splash.remove()
-              removeSystemSplash = null; exitSystemSplash = null
-              record(activity, "SPLASH_REMOVED")
+              exitSystemSplash = null
               if (surface == null) {
+                removeSystemSplash = null
                 completeReveal(activity, success)
               } else {
                 var finished = false
@@ -129,14 +131,14 @@ object SofiaLaunchOverlay {
                     surface.animate().cancel()
                     surface.alpha = 0f
                     (surface.parent as? ViewGroup)?.removeView(surface)
+                    removeSystemSplash = null
                     record(activity, "FADE_DONE")
                     completeReveal(activity, success)
                   }
                   Unit
                 }
-                // One RenderThread-friendly ViewPropertyAnimator fades the
-                // background and S atomically; it never runs an extra icon
-                // animation or waits for React JS to finish.
+                // Preserve size and breathing phase while both S and background
+                // fade as a single compositor layer over the prepared Home.
                 record(activity, "FADE_START")
                 surface.animate().alpha(0f).setDuration(190L)
                   .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
@@ -244,7 +246,7 @@ object SofiaLaunchOverlay {
     // extra postOnAnimation fence added 400–650 ms on loaded Android emulators:
     // Home was ready, but Android did not start the fade until another frame.
     // Begin the synchronized splash exit in this SAME ready callback. The
-    // underlying prepared Home draws during the 95-ms fade.
+    // underlying prepared Home draws during the 190-ms fade.
     when (transition.contentReady()) {
       SofiaLaunchTransition.Exit.SYSTEM_SPLASH -> exitSystemSplash?.invoke(success)
       SofiaLaunchTransition.Exit.CONTENT -> {

@@ -82,15 +82,20 @@ test('060 unmount or launch failure cannot release stale optional services',asyn
 test('060 old platforms without the visibility bridge keep a cancellable fallback',async()=>{
  const f=visibilityFixture(false);assert.deepEqual(f.states,[false]);f.frames.shift()();f.frames.shift()();assert.deepEqual(f.states,[false,true]);f.dispose();
 });
-test('078 composited one-layer S + background fades after actual system icon removed',()=>{
+test('079 continuous composited one-layer S + background fades after actual system icon removed',()=>{
  const native=file('plugins/native/SofiaLaunchOverlay.kt');
  const head=native.slice(native.indexOf('private class SofiaUnifiedSplashSurface'),native.indexOf('object SofiaLaunchOverlay'));
  assert.ok(head.includes('canvas.drawColor(background)'));
  assert.ok(head.includes('logo?.draw(canvas)'));
  for(const token of ['fun whenRevealed','record(activity, "LOCAL_READY")','record(activity, "SPLASH_REMOVED")','record(activity, "FADE_DONE")'])assert.ok(native.includes(token),token);
  const exit=native.slice(native.indexOf('exitSystemSplash = { success ->'),native.indexOf('when (transition.splashReady())'));
- assert.ok(exit.indexOf('splash.remove()')<exit.indexOf('record(activity, "FADE_START")'));
- assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
+ const callback=native.slice(native.indexOf('activity.splashScreen.setOnExitAnimationListener'),native.indexOf('when (transition.splashReady())'));
+ assert.ok(callback.indexOf('SofiaUnifiedSplashSurface(activity)')<callback.indexOf('record(activity, "SPLASH_REMOVED")'));
+ assert.ok(callback.indexOf('record(activity, "SPLASH_REMOVED")')<callback.indexOf('exitSystemSplash = { success ->'));
+ assert.ok(!exit.includes('SofiaUnifiedSplashSurface(activity)'), 'Exit must reuse the running animation, without a size/phase reset');
+ assert.ok(head.includes('kotlin.math.sin(phase)'));
+ assert.ok(head.includes('postInvalidateOnAnimation()'));
+ assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(190L)'));
  assert.ok(!exit.includes('ValueAnimator.ofFloat('));
  assert.ok(!exit.includes('icon?.animate()?.alpha(0f)'));
  const completion=native.slice(native.indexOf('private fun completeReveal'),native.indexOf('private fun reveal'));

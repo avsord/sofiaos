@@ -157,7 +157,7 @@ test('078 unified image takes over native splash without a second icon layer',()
  assert.ok(overlay.includes('class SofiaUnifiedSplashSurface(activity: Activity) : View(activity)'));
  assert.ok(overlay.includes('canvas.drawColor(background)'));
  assert.ok(overlay.includes('logo?.draw(canvas)'));
- assert.ok(overlay.includes('surface.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(overlay.includes('surface.animate().alpha(0f).setDuration(190L)'));
  assert.ok(!overlay.includes('ValueAnimator.ofFloat('));
  assert.ok(!app.includes('<LaunchSAnimation'));
  assert.ok(loader.includes('export const DeferredScreen=React.memo('));
@@ -210,14 +210,17 @@ test('075 launch does not block on optional photo decode or full archive rollove
  assert.ok(snapshot.includes('await this.hydrate();void this.flushLaunch()'),'No-cache sessions can still recover the entire archive');
 });
 
-test('078 Android removes system icon before 95ms one-layer fade',()=>{
+test('079 Android removes system icon before continuous one-layer fade',()=>{
  const native=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const smoke=fs.readFileSync(path.join(root,'tools/manual-apk-smoke.py'),'utf8');
  const exit=native.slice(native.indexOf('exitSystemSplash = { success ->'),native.indexOf('when (transition.splashReady())'));
- assert.ok(exit.indexOf('splash.remove()')<exit.indexOf('record(activity, "FADE_START")'));
- assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
- assert.ok(exit.includes('surface.postDelayed({ complete() }, 180L)'));
+ const callback=native.slice(native.indexOf('val decor = activity.window.decorView'),native.indexOf('when (transition.splashReady())'));
+ assert.ok(callback.indexOf('splash.remove()')>=0);
+ assert.ok(callback.indexOf('splash.remove()')<callback.indexOf('record(activity, "FADE_START")'));
+ assert.ok(!exit.includes('SofiaUnifiedSplashSurface(activity)'));
+ assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(190L)'));
+ assert.ok(exit.includes('surface.postDelayed({ complete() }, 240L)'));
  assert.ok(exit.includes('record(activity, "FADE_DONE")'));
  assert.ok(!exit.includes('icon?.animate()?.alpha(0f)'));
  assert.ok(!exit.includes('ValueAnimator.ofFloat('));

@@ -61,7 +61,12 @@ try:
  for i in range(5):result['baseline_runs'].append(cold('baseline-'+str(i)))
  before=capture('baseline');assert 'Olá, Teste.' in before,'Previous production APK did not restore the saved account'
  adb('install','-r',str(dist/'Sofia-OS.apk'));result['in_place_install']=True
+ # Retain the actual production transition for visual inspection.
+ recording=subprocess.Popen(['adb','shell','screenrecord','--time-limit','8','/sdcard/sofia-launch-079.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+ time.sleep(.5)
  result['migration_run']=cold('candidate-migration')
+ recording.wait(timeout=15)
+ adb('pull','/sdcard/sofia-launch-079.mp4',str(out/'candidate-launch.mp4'))
  for i in range(5):result['candidate_runs'].append(cold('candidate-'+str(i)))
  after=capture('candidate');assert 'Olá, Teste.' in after,'Production authenticated Home is not visible';assert 'com compromissos' in after,'Saved agenda records are not available at startup'
  result['authenticated_home_tested']=True
@@ -74,7 +79,7 @@ try:
  for run in result['candidate_runs']:
   events=run['stages_ms']
   assert 'FADE_START' in events, 'Native fade never started: '+str(events)
-  assert events['LOCAL_READY']<=events['SPLASH_REMOVED']<=events['FADE_START']<=events['FADE_DONE']<=events['DATA'],events
+  assert events['SPLASH_REMOVED']<=events['FADE_START'] and events['LOCAL_READY']<=events['FADE_START']<=events['FADE_DONE']<=events['DATA'],events
   spans.append({'ready_to_fade_ms':events['FADE_START']-events['LOCAL_READY'],
                 'ready_to_splash_remove_ms':events['SPLASH_REMOVED']-events['LOCAL_READY'],
                 'fade_to_done_ms':events['FADE_DONE']-events['FADE_START']})
