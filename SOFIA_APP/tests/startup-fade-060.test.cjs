@@ -74,7 +74,7 @@ function visibilityFixture(withNative=true){
 }
 test('060 optional services do not start at layout permission, only at completed visual handoff',async()=>{
  const f=visibilityFixture();assert.deepEqual(f.states,[false]);f.resolve(true);await tick();assert.deepEqual(f.states,[false,true]);f.dispose();
- const app=file('App.tsx');assert.ok(app.includes('servicesReady=visible&&'));assert.ok(app.includes('if(painted)api.releaseNetwork()'));assert.ok(app.includes('useStartupMounts(visible&&!!auth,tab)'));assert.ok(app.includes('{visible?<DeferredScreen load={loadBackgroundServices}')); 
+ const app=file('App.tsx');assert.ok(app.includes('servicesReady=visible&&'));assert.ok(app.includes('if(painted&&(!cachedOpening||visible))api.releaseNetwork()'));assert.ok(app.includes('useStartupMounts(visible&&!!auth,tab)'));assert.ok(app.includes('{visible?<DeferredScreen load={loadBackgroundServices}')); 
 });
 test('060 unmount or launch failure cannot release stale optional services',async()=>{
  for(const cancel of [true,false]){const f=visibilityFixture();if(cancel)f.dispose();f.resolve(!cancel?false:true);await tick();assert.deepEqual(f.states,[false]);}
