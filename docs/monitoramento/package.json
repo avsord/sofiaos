@@ -1,0 +1,7 @@
+{
+  "name": "sofia-monitoramento-extratores",
+  "private": true,
+  "description": "Extratores de preço e de links de loja para a coleta no aparelho (Sofia OS). Rodar: npm install && npm test",
+  "scripts": { "test": "node --test extract-price.test.js find-store-links.test.js" },
+  "devDependencies": { "jsdom": "^24.0.0" }
+}

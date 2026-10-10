@@ -1,15 +1,23 @@
 # Sofia OS — entrega de alterações
 
-## Pedido de alteração inclui entrega
-Quando o usuário pede para corrigir ou alterar a Sofia, implemente, valide e publique a atualização aplicável no mesmo trabalho. Não espere outro pedido de “atualizar”, “subir”, “gerar APK” ou “enviar”. Não peça confirmação repetida para a publicação já solicitada. Uma conversa sobre ideias, por si só, não autoriza implementação.
+## Primeiro passo de qualquer agente
+Leia [docs/SOFIA_MASTER.md](docs/SOFIA_MASTER.md) inteiro. É o ponto único de continuidade. Os demais documentos de continuidade são históricos. Se o MASTER divergir do código, dos logs ou do pedido atual do dono, verifique a evidência e atualize o MASTER; não use o documento para ignorar essa divergência. O estado vivo (HEAD, versão, release publicada) se lê pelos comandos da seção 3 dele, nunca de número escrito.
+
+## Pedido de alteração gera candidato, publicação só com aprovação
+Quando o dono pede para corrigir ou alterar a Sofia, implemente, valide e entregue um APK candidato `[manual-apk]` no mesmo trabalho, sem esperar outro pedido de "gerar APK". Publicar no atualizador (`[approved-apk]`) exige o "aprovado" explícito do dono para aquele candidato. Uma conversa sobre ideias, por si só, não autoriza implementação.
+
+## Manter o MASTER vivo (obrigatório em toda rodada)
+No mesmo PR de qualquer rodada que mude comportamento, decisão ou pendência:
+- acrescente uma linha na seção 10 (Diário de rodadas) do `docs/SOFIA_MASTER.md`: data, versão, PR, o quê, resultado real;
+- atualize a seção 9 (Pendências): remova o que foi concluído, acrescente o que surgiu;
+- registre na seção 7 qualquer decisão nova do dono.
+Não grave no MASTER valores que o repositório já informa ao vivo. Não crie outro documento de continuidade.
 
 ## Padrão de trabalho: Sofia Delta
-Comece pelo mapa de leitura em [Master operacional](docs/SOFIA_MASTER.md). Ele separa estado atual, fluxo Delta, aplicação no projeto e histórico sob demanda. Não releia masters inteiras a cada pedido; essa orientação substitui a leitura integral rotineira indicada em documentos antigos.
-
 Se o usuário pedir entrega manual, use o caminho `[manual-apk]`: um único APK de produção, testes prévios identificados e envio direto, sem publicação no atualizador. Não apresente o smoke de login do emulador como teste da Home autenticada ou do aparelho físico. Os critérios de publicação oficial permanecem obrigatórios para a publicação oficial.
 
 Use o padrão [Sofia Delta](docs/sofia-delta.md) em cada alteração: selecionar o caminho de menor tempo total entre os que cumprem o pedido e os critérios de aceite.
-- Retome `docs/startup-navigation-handoff.md`, o head e a execução relevante; leia apenas o código e os logs necessários ao delta. Reuse leituras atuais da mesma sessão.
+- Retome o `docs/SOFIA_MASTER.md`, o head e a execução relevante; leia apenas o código e os logs necessários ao delta. Reuse leituras atuais da mesma sessão.
 - Classifique o pedido antes de compilar: documentação, processo/testes, runtime Android, backend/web ou retomada de artefato existente. Não gere APK para registrar instruções.
 - Faça a menor mudança completa, com validação proporcional antes do build. Não acrescente refatorações ou novas dependências sem causa demonstrada.
 - Reuse o APK exato e os resultados válidos quando nenhuma entrada do build mudou. Se um teste ou critério mudou, revalide-o; nunca atribua aprovação antiga à nova condição.
@@ -24,9 +32,9 @@ Use o padrão [Sofia Delta](docs/sofia-delta.md) em cada alteração: selecionar
 - `sofia-app-android` é a branch de entrega automática Android. Não atualize `main`, Railway, banco de dados ou serviços externos apenas para entregar um APK.
 
 ## Publicação automática
-O workflow `.github/workflows/sofia-native-047-update.yml` tem nome de arquivo histórico, mas não deve ser duplicado a cada versão. `SOFIA_APP/tools/delivery.cjs` escolhe a próxima versão, sincroniza identidade/lock/updater/testes de identidade e impede colisões ou downgrade. O commit de alteração dispara o fluxo completo sem confirmação adicional.
+O workflow `.github/workflows/sofia-native-047-update.yml` tem nome de arquivo histórico, mas não deve ser duplicado a cada versão. `SOFIA_APP/tools/delivery.cjs` escolhe a próxima versão, sincroniza identidade/lock/updater/testes de identidade e impede colisões ou downgrade. O commit `[manual-apk]` dispara o candidato sem confirmação adicional; a publicação depende do `[approved-apk]` após aprovação do dono.
 
-O fluxo preserva a compilação em andamento, mantém apenas a solicitação pendente mais recente, usa cache Gradle e não recompila APK por alterações exclusivas de documentação, testes ou do próprio processo. Os testes de comportamento, instalação por cima, assinatura, servidor compatível e descoberta da atualização continuam obrigatórios. Não retire testes nem masque falhas para publicar rápido.
+O job build pode cancelar uma compilação obsoleta da mesma branch; a publicação usa grupo separado não cancelável. O fluxo usa cache Gradle. Atenção: delivery.cjs compara o HEAD com a última release publicada, não apenas com o último commit; alterações só de documentação/testes em SOFIA_APP/** ainda podem disparar uma compilação por mudanças antigas não publicadas. Para uma instalação exclusivamente documental já validada fora do fluxo Android, use [skip ci] no commit promovido, sem [manual-apk] ou [approved-apk]. Nunca use essa exceção em alterações do app ou para ocultar falha de teste. Os testes de comportamento, instalação por cima, assinatura, servidor compatível e descoberta da atualização continuam obrigatórios. Não retire testes nem masque falhas para publicar rápido.
 
 Se houver erro, investigue a etapa e o log, corrija no trabalho atual e reexecute somente o necessário. Use os relatórios de etapas; não faça consultas em loop a cada poucos segundos. Não afirme estar corrigindo ou acompanhando em segundo plano depois de encerrar a conversa.
 
