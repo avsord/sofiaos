@@ -1,0 +1,42 @@
+name: Sofia R5 - isolated code verification (no APK)
+'on':
+  push:
+    branches: [test/sofia-r5-verify-20261010]
+    paths: [.github/workflows/sofia-r5-verify.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    name: Full tests before one Android build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: SOFIA_APP/package-lock.json
+      - name: Locked app dependencies
+        working-directory: SOFIA_APP
+        run: npm ci
+      - name: Typecheck and all app tests including first tap regression
+        working-directory: SOFIA_APP
+        run: |
+          npm run check
+          npm test
+      - name: Delivery/native contract checks and Python smoke syntax
+        run: |
+          python3 SOFIA_APP/tools/native-delivery-test.py
+          python3 -m py_compile SOFIA_APP/tools/manual-apk-smoke.py
+          node --test SOFIA_APP/tools/delivery.test.cjs
+      - name: MASTER and continuity safety tests
+        run: |
+          node --test SOFIA_APP/tests/master-sync-106.test.cjs
+          node --test tools/sofia-state.test.cjs
+      - name: No Android output from this isolated workflow
+        run: |
+          test ! -e SOFIA_APP/dist/Sofia-OS.apk
+          echo 'R5 code verified; no APK was built by this workflow'
