@@ -127,12 +127,18 @@ try:
   nodes=[n for n in ET.fromstring(menu_tree).iter('node') if n.attrib.get('text')==label or n.attrib.get('content-desc')==label]
   assert nodes,'Missing menu '+label
   b=list(map(int,re.findall(r'\d+',nodes[-1].attrib['bounds'])));menu_points.append(((b[0]+b[2])//2,(b[1]+b[3])//2))
+ adb('logcat','-c')
  menu_record=subprocess.Popen(['adb','shell','screenrecord','--time-limit','10','/sdcard/sofia-menus.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
  time.sleep(.4)
  for _ in range(4):
   for x,y in menu_points:adb('shell','input','tap',str(x),str(y))
  menu_record.wait(timeout=15)
  adb('pull','/sdcard/sofia-menus.mp4',str(out/'candidate-menus.mp4'))
+ menu_logs=adb('logcat','-d','-s','SofiaMenu:I').decode(errors='replace')
+ (out/'candidate-menu-native.txt').write_text(menu_logs)
+ result['native_first_taps']=menu_logs.count('nativeFirst=true')
+ result['react_guarded_taps']=menu_logs.count('nativeFirst=false')
+ assert result['native_first_taps']>=12, 'Warmed tabs did not preserve native touch-down responsiveness'
  tap_label(xml(),'Início');time.sleep(.3)
  assert 'Olá, Teste.' in capture('after-menu-home')
  tap_label(xml(),'Conversa');time.sleep(.3)

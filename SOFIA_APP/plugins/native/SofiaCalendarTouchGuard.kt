@@ -155,18 +155,31 @@ internal class SofiaCalendarTouchGuard {
     // guard. The native first hop is only for an enabled pager and real tab.
     if (index != null && index in 0..5 && tag != "sofia-menu-blocked") {
       val pager = taggedVisible(root, "sofia-tab-pager") as? ReactHorizontalScrollView
-      if (pager != null && pager.scrollEnabled && pager.width > 0) {
+      if (pager != null && pager.scrollEnabled && pager.width > 0 && tabReadyForNativeJump(pager,index)) {
         val target = index * pager.width
         if (pager.scrollX != target) {
-          // The UI thread moves the viewport on DOWN; React onPressIn updates
-          // activeTab, accessibility, history and content on the same choice.
-          // No animation, JS bridge wait, timer, or loss of stored screen state.
+          // Already-mounted tabs jump on ACTION_DOWN. React still owns
+          // history, accessibility and selection; no JS timer or animation.
           pager.scrollTo(target, 0)
         }
         android.util.Log.i("SofiaMenu", "TOUCH_DOWN index=$index nativeFirst=true")
+      } else {
+        // The destination is not in the native hierarchy yet. React onPressIn
+        // will select, mount and commit it before TabPager's layout-effect jump.
+        // Moving immediately here used to expose a genuinely blank page slot.
+        android.util.Log.i("SofiaMenu", "TOUCH_DOWN index=$index nativeFirst=false")
       }
     }
     return true // Locked buttons still reach React's existing recording guard.
+  }
+
+  private fun tabReadyForNativeJump(pager: ReactHorizontalScrollView, index: Int): Boolean {
+    // Updated together with the mounted React children. Never walk the large
+    // hidden screen tree on a touch; a missing/invalid mask falls back safely.
+    val marker = pager.getTag(com.facebook.react.R.id.react_test_id) as? String ?: return false
+    val prefix = "sofia-pager-ready:"
+    return index in 0..5 && marker.length == prefix.length + 6 &&
+      marker.startsWith(prefix) && marker[prefix.length + index] == '1'
   }
 
   private fun menuAt(view: View, x: Int, y: Int): View? {
