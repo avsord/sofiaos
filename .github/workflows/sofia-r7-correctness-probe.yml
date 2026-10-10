@@ -1,0 +1,96 @@
+name: Sofia R7 existing APK correctness diagnosis
+'on':
+  push:
+    branches: [test/sofia-r7-correctness-probe-20261010]
+    paths: [.github/workflows/sofia-r7-correctness-probe.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  probe:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/download-artifact@v4
+        with:
+          name: Sofia-build-38089508740-1
+          run-id: 38089508740
+          github-token: ${{ github.token }}
+          path: SOFIA_APP/dist
+      - name: Verify existing signed APKs and create test-only probe
+        run: |
+          set -euo pipefail
+          cd SOFIA_APP
+          sha256sum -c dist/Sofia-OS.apk.sha256
+          python3 tools/verify-abi-equivalence.py
+          cd ..
+          cat > /tmp/r7-correctness-probe.py <<'PY'
+          import json,time,hashlib,subprocess
+          from pathlib import Path
+          source=Path('SOFIA_APP/tools/fluency-heavy-smoke.py').resolve()
+          prefix=source.read_text().split('\ntry:\n for key in ')[0]
+          g={'__file__':str(source),'__name__':'r7_probe'}
+          exec(compile(prefix,str(source),'exec'),g)
+          adb=g['adb'];out=g['OUT'];result=g['RESULT'];result['probe_only']=True
+          result['original_performance_targets_met']=False
+          result['settling_is_not_performance_approval']=True
+          def settled_pages():
+              started=time.monotonic();tree=''
+              for i in range(8):
+                  tree=g['xml']();(out/f'pages-settle-{i}.xml').write_text(tree)
+                  if 'Página QA' in tree:
+                      result['page_settle_ms']=round((time.monotonic()-started)*1000)
+                      return tree
+                  if time.monotonic()-started>=12:break
+                  time.sleep(.5)
+              result['page_settle_timeout_ms']=round((time.monotonic()-started)*1000)
+              return tree
+          # Only this diagnostic waits for functional settling. The original
+          # performance run and its 2+ second freezes remain recorded as FAILED.
+          old="tap(points['Páginas']);time.sleep(.5);tree=xml();"
+          patched=prefix[prefix.index('def correctness(points):'):prefix.index('\ndef percentile')]
+          assert old in patched
+          patched=patched.replace(old,"tap(points['Páginas']);time.sleep(.5);tree=settled_pages();",1)
+          g['settled_pages']=settled_pages
+          exec(compile(patched,'bounded-correctness-only','exec'),g)
+          try:
+              assert hashlib.sha256(g['QA'].read_bytes()).hexdigest()=='448f088e745702994810f087f6006ac2255da1c4a13e140338ea38a07f4d4692'
+              for key in ['window_animation_scale','transition_animation_scale','animator_duration_scale']:adb('shell','settings','put','global',key,'1')
+              adb('shell','svc','wifi','disable');adb('shell','svc','data','disable');adb('shell','cmd','connectivity','airplane-mode','enable')
+              result['fixture']=g['seed']('new');g['start']();g['wait_data']();time.sleep(2)
+              tree=g['xml']();points={s:g['point'](tree,s) for s in ['Início','Páginas','Conversa','Agenda','Apps','Perfil']}
+              g['cold_trial']('new',1,points,video=True)
+              g['correctness'](points);result['correctness_passed']=True
+          except BaseException as error:
+              result['error']=str(error)
+              (out/'failure-logcat.txt').write_text(g['collect_logs']())
+              (out/'failure-screen.png').write_bytes(subprocess.check_output(['adb','exec-out','screencap','-p']))
+              raise
+          finally:
+              (out/'probe-result.json').write_text(json.dumps(result,indent=2,ensure_ascii=False))
+          PY
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Probe Pages after actual heavy interaction using existing APK
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          target: default
+          disable-animations: false
+          emulator-options: -no-window -gpu swangle -no-snapshot -noaudio -no-boot-anim
+          script: python3 /tmp/r7-correctness-probe.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sofia-R7-correctness-probe-${{ github.run_id }}
+          path: SOFIA_APP/dist/fluency-evidence/
+          retention-days: 14
