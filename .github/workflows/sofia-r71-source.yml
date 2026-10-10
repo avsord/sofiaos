@@ -1,0 +1,26 @@
+name: Sofia R7.1 exact source audit (no APK)
+'on':
+  push:
+    branches: [test/sofia-r71-source-20261010]
+    paths: [.github/workflows/sofia-r71-source.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 39121fd0bccf9c9f43f41332c70e187550b16faa
+          fetch-depth: 1
+      - name: Export exact public source without credentials or build
+        run: |
+          test "$(git rev-parse HEAD)" = '39121fd0bccf9c9f43f41332c70e187550b16faa'
+          git archive --format=tar.gz -o /tmp/Sofia-R7-source.tar.gz HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sofia-R7-exact-source
+          path: /tmp/Sofia-R7-source.tar.gz
+          retention-days: 7
+          if-no-files-found: error
