@@ -16,7 +16,7 @@ minificou em nenhuma das 104 versões. Os quatro `classes*.dex` somam ~32 MB.
 **Instalar a dependência** (com `npx expo install`, nunca npm direto, para
 casar a versão com o Expo 57):
 
-```bash
+```
 npx expo install expo-build-properties
 ```
 
@@ -64,7 +64,7 @@ Em `.github/workflows/sofia-native-047-update.yml` existem **duas** linhas
 `assembleRelease` idênticas. Alterar **somente a primeira (linha ~136)**, que
 é o APK de produção entregue ao Pedro:
 
-```bash
+```
 ./gradlew :app:assembleRelease --build-cache --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a
 ```
 
