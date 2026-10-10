@@ -53,7 +53,10 @@ test('pager keeps six fixed slots, prioritizes Home and warms hidden screens wit
   const startup=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
   assert.ok(startup.includes("const [warmed,setWarmed]=useState"));assert.ok(startup.includes("frame=requestAnimationFrame(advance)"));assert.ok(startup.includes("MENU_TABS.includes(active)?[active]:[]"));
   assert.ok(startup.includes('timer=setTimeout(start,500)'),'Warming waits after navigation without postponing the tap');
-  assert.ok(source.includes('useStartupMounts(visible&&!!auth&&hydratedApi===api,tab,!!auth)'));
+  assert.ok(source.includes('useStartupMounts(visible&&!!auth,tab,!!auth)'));
+  assert.ok(!source.includes('hydratedApi===api'),'archive I/O must not delay first menu warmup');
+  assert.ok(!source.includes('setHydratedApi('),'archive completion must not render all tab slots again');
+  assert.ok(source.includes('void api.hydrate().then(()=>'),'Pages/chat archive is still hydrated safely');
   assert.ok(pager.includes('removeClippedSubviews={false}'));assert.ok(!source.includes('setBootstrap(null);setTab('));
 });
 test('screen instances stay cached after lazy loading, preserving drafts and scroll positions',()=>{
