@@ -156,3 +156,24 @@ test('direct menu jump reaches native scroll before any highlight updates',()=>{
  p=pager({motion});for(const tab of ['profile','home','agenda','pages','apps','chat'])p.ref.current.goTo(tab);
  assert.equal(p.commands.length,6);assert.ok(p.commands.every(c=>c.animated===false));
 });
+
+test('native hop mask follows committed lazy tabs; unavailable content cannot jump ahead of React',()=>{
+ const p=pager({measure:false});
+ const onlyHome=new Set(['home']);
+ p.render({readyTabs:onlyHome});p.measure();
+ assert.equal(p.scroll.testID,'sofia-pager-ready:100000');
+ const warmed=new Set(['home','chat','agenda','pages','apps','profile']);
+ p.render({readyTabs:warmed});
+ assert.equal(p.scroll.testID,'sofia-pager-ready:111111');
+ const source=fs.readFileSync(path.join(root,'plugins/native/SofiaCalendarTouchGuard.kt'),'utf8');
+ const segment=source.slice(source.indexOf('private fun immediateMenu('),source.indexOf('private fun menuAt('));
+ assert.ok(segment.includes('tabReadyForNativeJump(pager,index)'));
+ assert.ok(segment.includes('pager.getTag(com.facebook.react.R.id.react_test_id)'));
+ assert.ok(segment.includes('marker.length == prefix.length + 6'));
+ assert.ok(segment.includes("marker[prefix.length + index] == '1'"));
+ assert.ok(segment.includes('nativeFirst=false'));
+ assert.ok(segment.includes('pager.scrollTo(target, 0)'));
+ const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
+ assert.ok(app.includes('readyTabs={mountedTabs}'));
+ assert.ok(app.includes('menuMotion.select(next);navigation.current.tab=next;setTab(next)'));
+});

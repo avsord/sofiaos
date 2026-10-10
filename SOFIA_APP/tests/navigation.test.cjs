@@ -15,8 +15,8 @@ test('production starts on Início for saved sessions and immediately after logi
 test('menu selection commits its screen before the native jump',()=>{
   const match=source.match(/const switchTab=useCallback\(\(next:Tab\)=>\{([^}]*)\},\[\]\)/);
   assert.ok(match);
-  const calls=[],navigation={current:{tab:'chat'}},pager={current:{goTo:next=>calls.push(['native',next])}};
-  const fn=vm.runInNewContext('(next)=>{'+match[1]+'}',{navigation,pager,setTab:next=>calls.push(['react',next])});
+  const calls=[],navigation={current:{tab:'chat'}},pager={current:{goTo:next=>calls.push(['native',next])}},menuMotion={select:next=>calls.push(['highlight',next])};
+  const fn=vm.runInNewContext('(next)=>{'+match[1]+'}',{navigation,pager,menuMotion,setTab:next=>calls.push(['react',next])});
   for(let i=0;i<100;i++) {const next=TAB_ORDER[i%TAB_ORDER.length];fn(next);assert.equal(navigation.current.tab,next);assert.deepEqual(calls.slice(-1),[['react',next]]);}
 });
 test('rapid taps use the latest selection, not a stale render closure',()=>{
@@ -49,7 +49,7 @@ test('pager keeps six fixed slots, prioritizes Home and warms hidden screens wit
   let previous=-1;for(const marker of markers){const index=body.indexOf(marker);assert.ok(index>previous,marker);previous=index;}
   for(const tab of ['chat','pages','agenda','apps','profile'])assert.ok(body.includes("mountedTabs.has('"+tab+"')"));
   const startup=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
-  assert.ok(startup.includes("const [warmed,setWarmed]=useState"));assert.ok(startup.includes("scheduleIdleTask("));assert.ok(startup.includes("MENU_TABS.includes(active)?[active]:[]"));
+  assert.ok(startup.includes("const [warmed,setWarmed]=useState"));assert.ok(startup.includes("frame=requestAnimationFrame(next)"));assert.ok(startup.includes("MENU_TABS.includes(active)?[active]:[]"));
   assert.ok(!startup.includes('setTimeout'));
   assert.ok(source.includes('useStartupMounts(visible&&!!auth,tab)'));
   assert.ok(pager.includes('removeClippedSubviews={false}'));assert.ok(!source.includes('setBootstrap(null);setTab('));

@@ -6,7 +6,7 @@ import type {MenuMotion} from '../lib/menu-motion';
 import {TAB_ORDER,tabIndex,createPagerSelection} from '../lib/tab-navigation';
 
 export type TabPagerHandle = {goTo: (tab: Tab) => void};
-type Props = {initialWidth?: number; motion: MenuMotion; activeTab: Tab; enabled: boolean; onSelect: (tab: Tab) => void; children: React.ReactNode};
+type Props = {initialWidth?: number; motion: MenuMotion; activeTab: Tab; enabled: boolean; onSelect: (tab: Tab) => void; readyTabs?: ReadonlySet<Tab>; children: React.ReactNode};
 
 /** Read the same root metrics already used by SafeAreaProvider. A recreated
  * window may differ, so this is only a render seed; onLayout is authoritative.
@@ -21,7 +21,7 @@ function nativeInitialWidth():number {
 }
 
 /** Native paging with a measured initial offset; taps never wait for an animation. */
-export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({activeTab,enabled,onSelect,children,motion,initialWidth},ref) {
+export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({activeTab,enabled,onSelect,children,motion,initialWidth,readyTabs},ref) {
   const scroll = useRef<ScrollView>(null);
   const aligned = useRef<{width:number;x:number}|null>(null);
   const dragStart=useRef(0);
@@ -109,10 +109,15 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
     if (w > 0 && velocity !== undefined && Math.abs(velocity) < 0.01 && Math.abs(x - Math.round(x/w)*w) < 0.5) finish(event);
   },[finish]);
 
+  // Native ACTION_DOWN reads the pager testID mask in O(1): only a screen
+  // already mounted in React may receive the immediate native jump. Otherwise
+  // the React commit path must install content before changing the viewport.
   // Explicit intervals select the adjacent page from fling direction on Android.
   // Plain pagingEnabled predicts travel and otherwise falls back to half a screen.
   return <View style={styles.fill} onLayout={layout}>
-    {width>0?<Animated.ScrollView nativeID="sofia-tab-pager" ref={scroll} horizontal pagingEnabled snapToInterval={width}
+    {width>0?<Animated.ScrollView nativeID="sofia-tab-pager"
+      testID={'sofia-pager-ready:'+TAB_ORDER.map(id=>readyTabs?.has(id)?'1':'0').join('')}
+      ref={scroll} horizontal pagingEnabled snapToInterval={width}
       contentOffset={initialOffset} onLayout={nativeLayout} scrollsChildToFocus={false}
       decelerationRate="fast" disableIntervalMomentum directionalLockEnabled nestedScrollEnabled
       scrollEnabled={enabled && readyWidth===width} showsHorizontalScrollIndicator={false}
