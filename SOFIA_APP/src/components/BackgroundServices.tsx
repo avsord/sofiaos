@@ -1,3 +1,4 @@
+import {newFluency,queueOptional} from '../lib/fluency';
 import React,{useEffect,useRef} from 'react';
 import {scheduleIdleTask} from '../lib/idle-task';
 import type {SofiaApi} from '../lib/api';
@@ -11,6 +12,13 @@ export function BackgroundServices({api,scope,enabled,preloadWhenIdle=true,onCap
  // read-ahead only after Home remains active and the JS thread is idle.
  useEffect(()=>{
   if(!enabled||!preloadWhenIdle||started.current===api)return;
+  if(newFluency()){
+   if(started.current===api)return;
+   const paths=['/workspace/catalog','/workspace/entities?limit=100&kind=user_page&q=&offset=0','/conversations?offset=0','/md/dashboard'];
+   const cancellations=paths.map((path,i)=>queueOptional('prefetch:'+['apps','pages','chat','home'][i],()=>{void api.prefetchCache(path).catch(()=>{});},6));
+   started.current=api;
+   return()=>{cancellations.forEach(cancel=>cancel());started.current=null;};
+  }
   let cancel=()=>{};
   const timer=setTimeout(()=>{cancel=scheduleIdleTask(()=>{
    if(started.current===api)return;

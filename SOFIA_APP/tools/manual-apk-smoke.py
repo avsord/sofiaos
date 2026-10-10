@@ -82,6 +82,22 @@ try:
  adb('install','-r',str(previous106))
  result['previous_106_runs']=[cold('previous106-'+str(i)) for i in range(5)]
  result['previous_106_medians_ms']={stage:statistics.median(x['stages_ms'][stage] for x in result['previous_106_runs']) for stage in ['SYSTEM_CALLBACK','UI','DATA']}
+ previous107=dist/'previous-107/QA-ONLY-manual-universal.apk'
+ result['previous_107_qa_sha256']=hashlib.sha256(previous107.read_bytes()).hexdigest()
+ adb('install','-r',str(previous107))
+ result['previous_107_runs']=[cold('previous107-'+str(i)) for i in range(5)]
+ result['previous_107_medians_ms']={stage:statistics.median(x['stages_ms'][stage] for x in result['previous_107_runs']) for stage in ['SYSTEM_CALLBACK','UI','DATA']}
+ # The unchanged 24 native-first gate belongs to the OLD policy. New Activity
+ # hides native destinations intentionally; the heavy job tests that policy
+ # with guarded taps, state/draft retention, swipe video and honest timings.
+ adb('shell','am','force-stop',pkg)
+ adb('install','-r',str(dist/'QA-ONLY-fluency-seed.apk'))
+ adb('shell','am','start','-W','-n',pkg+'/.MainActivity')
+ tap_label(xml(),'Definir Antigo sem dados')
+ mode_tree=xml();assert 'QA R7 pronto old mode' in mode_tree,'Failed to select instrumented Old control'
+ result['policy_mode']='old'
+ result['new_policy_measured_in_separate_heavy_job']=True
+ adb('shell','am','force-stop',pkg)
  adb('install','-r',str(dist/'QA-ONLY-manual-universal.apk'));result['in_place_install']=True
  # Retain the actual production transition for visual inspection.
  recording=subprocess.Popen(['adb','shell','screenrecord','--time-limit','8','/sdcard/sofia-launch-079.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -118,6 +134,8 @@ try:
  result['baseline_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['baseline_runs'])
  result['candidate_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['candidate_runs'])
  result['candidate_medians_ms']={stage:statistics.median(x['stages_ms'][stage] for x in result['candidate_runs']) for stage in ['SYSTEM_CALLBACK','UI','DATA']}
+ result['startup_vs_107_ms']={stage:result['candidate_medians_ms'][stage]-result['previous_107_medians_ms'][stage] for stage in ['SYSTEM_CALLBACK','UI','DATA']}
+ result['r7_startup_plus30_target_met']=all(delta<=30 for delta in result['startup_vs_107_ms'].values())
  result['startup_vs_105_ms']={stage:result['candidate_medians_ms'][stage]-result['previous_105_medians_ms'][stage] for stage in ['SYSTEM_CALLBACK','UI','DATA']}
  result['startup_vs_106_ms']={stage:result['candidate_medians_ms'][stage]-result['previous_106_medians_ms'][stage] for stage in ['SYSTEM_CALLBACK','UI','DATA']}
  result['startup_no_worse_than_106']=all(delta<=0 for delta in result['startup_vs_106_ms'].values())

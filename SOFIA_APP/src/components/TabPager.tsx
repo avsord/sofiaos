@@ -1,3 +1,6 @@
+import {Activity} from 'react';
+import {noteFluencyInput,type FluencyMode} from '../lib/fluency';
+import {MountTimer} from './MountTimer';
 import React,{forwardRef,useCallback,useImperativeHandle,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Animated,ScrollView,View,StyleSheet,Platform} from 'react-native';
 import type {LayoutChangeEvent,NativeScrollEvent,NativeSyntheticEvent} from 'react-native';
@@ -6,7 +9,7 @@ import type {MenuMotion} from '../lib/menu-motion';
 import {TAB_ORDER,tabIndex,createPagerSelection} from '../lib/tab-navigation';
 
 export type TabPagerHandle = {goTo: (tab: Tab) => void};
-type Props = {initialWidth?: number; motion: MenuMotion; activeTab: Tab; enabled: boolean; onSelect: (tab: Tab) => void; readyTabs?: ReadonlySet<Tab>; children: React.ReactNode};
+type Props = {initialWidth?: number; motion: MenuMotion; activeTab: Tab; enabled: boolean; onSelect: (tab: Tab) => void; readyTabs?: ReadonlySet<Tab>; fluencyMode?:FluencyMode; onPreviewTabs?:(tabs:readonly Tab[])=>void; children: React.ReactNode};
 
 /** Read the same root metrics already used by SafeAreaProvider. A recreated
  * window may differ, so this is only a render seed; onLayout is authoritative.
@@ -21,10 +24,13 @@ function nativeInitialWidth():number {
 }
 
 /** Native paging with a measured initial offset; taps never wait for an animation. */
-export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({activeTab,enabled,onSelect,children,motion,initialWidth,readyTabs},ref) {
+export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({activeTab,enabled,onSelect,children,motion,initialWidth,readyTabs,fluencyMode='old',onPreviewTabs},ref) {
   const scroll = useRef<ScrollView>(null);
   const aligned = useRef<{width:number;x:number}|null>(null);
   const dragStart=useRef(0);
+  const [preview,setPreview]=useState<readonly Tab[]>([]);
+  const clearPreview=()=>{setPreview([]);onPreviewTabs?.([]);};
+  const visibleTab=(id:Tab)=>fluencyMode==='old'||id===activeTab||preview.includes(id);
   // The native root frame is a render seed, never proof of measured geometry.
   // Avoid mounting an empty pager, waiting for JS onLayout, then mounting Home.
   const supplied=initialWidth??nativeInitialWidth();
@@ -83,8 +89,10 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
   // Recomputed only for a new viewport (first mount / resize).
   const initialOffset=useMemo(()=>({x:Math.max(0,tabIndex(selection.current.current()))*width,y:0}),[width]);
   const begin = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    noteFluencyInput();
+    if(fluencyMode==='new'){const i=tabIndex(latest.current.activeTab),neighbors=TAB_ORDER.filter((_,n)=>Math.abs(i-n)<=1);setPreview(neighbors);onPreviewTabs?.(neighbors);}
     if (latest.current.enabled) {dragStart.current=event.nativeEvent.contentOffset.x;aligned.current=null;selection.current.beginDrag();motion.beginDrag(event.nativeEvent.contentOffset.x);}
-  },[motion]);
+  },[motion,fluencyMode,onPreviewTabs]);
   const finish = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (!latest.current.enabled) {goTo(latest.current.activeTab);return;}
     if (!selection.current.canFinish(event.timeStamp)) return;
@@ -94,7 +102,8 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
     const next = selection.current.finishDrag(x,w,event.timeStamp);
     motion.settle(selection.current.current(),event.nativeEvent.contentOffset.x);
     if (next) latest.current.onSelect(next);
-  },[goTo,motion]);
+    clearPreview();
+  },[goTo,motion,onPreviewTabs]);
   const endDrag = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     selection.current.release(event.timeStamp);
     const x = event.nativeEvent.contentOffset.x, w = size.current;
@@ -116,7 +125,7 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
   // Plain pagingEnabled predicts travel and otherwise falls back to half a screen.
   return <View style={styles.fill} onLayout={layout}>
     {width>0?<Animated.ScrollView nativeID="sofia-tab-pager"
-      testID={'sofia-pager-ready:'+TAB_ORDER.map(id=>readyTabs?.has(id)?'1':'0').join('')}
+      testID={'sofia-pager-ready:'+TAB_ORDER.map(id=>readyTabs?.has(id)&&visibleTab(id)?'1':'0').join('')}
       ref={scroll} horizontal pagingEnabled snapToInterval={width}
       contentOffset={initialOffset} onLayout={nativeLayout} scrollsChildToFocus={false}
       decelerationRate="fast" disableIntervalMomentum directionalLockEnabled nestedScrollEnabled
@@ -129,7 +138,7 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
       contentContainerStyle={[styles.row,{width:width*TAB_ORDER.length}]}>
       {React.Children.map(children,(child,index) => <View key={TAB_ORDER[index]} collapsable={false}
         style={[styles.page,{width}]} pointerEvents={activeTab===TAB_ORDER[index]?'auto':'none'} accessibilityElementsHidden={activeTab !== TAB_ORDER[index]}
-        importantForAccessibility={activeTab === TAB_ORDER[index] ? 'auto' : 'no-hide-descendants'}>{child}</View>)}
+        importantForAccessibility={activeTab === TAB_ORDER[index] ? 'auto' : 'no-hide-descendants'}><Activity mode={visibleTab(TAB_ORDER[index])?'visible':'hidden'}>{readyTabs?.has(TAB_ORDER[index])||TAB_ORDER[index]==='home'?<MountTimer tab={TAB_ORDER[index]}>{child}</MountTimer>:child}</Activity></View>)}
     </Animated.ScrollView>:null}
   </View>;
 });

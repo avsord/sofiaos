@@ -1,0 +1,123 @@
+"""R7: heavy synthetic data, both policies, one QA-equivalent emulator binary.
+No owner's records, no network, no uninstall or storage clearing. Re-seed each
+trial because the existing 32-route/4MiB cache eviction policy remains intact.
+Timing goals are REPORTED only in R7; crashes/lost local drafts fail correctness.
+"""
+import json, re, time, statistics, subprocess, xml.etree.ElementTree as ET, hashlib
+from pathlib import Path
+ROOT=Path(__file__).resolve().parents[1];DIST=ROOT/'dist';OUT=DIST/'fluency-evidence';OUT.mkdir(parents=True,exist_ok=True)
+PKG='com.avsord.sofiaapp';SEED=DIST/'QA-ONLY-fluency-seed.apk';QA=DIST/'QA-ONLY-manual-universal.apk'
+RESULT={'correctness_passed':False,'performance_gate_enforced':False,'physical_device':False,'owner_apk_directly_executed':False,'same_qa_binary_both_modes':True,'offline':True,'trials':[], 'scope':'same-emulator New versus instrumented Old policy; cache only, no real user data'}
+def adb(*args): return subprocess.check_output(['adb',*args],stderr=subprocess.STDOUT,timeout=90).decode(errors='replace')
+def xml():
+ adb('shell','uiautomator','dump','/sdcard/r7.xml');return adb('shell','cat','/sdcard/r7.xml')
+def point(tree,label):
+ found=[x for x in ET.fromstring(tree).iter('node') if x.get('text')==label or x.get('content-desc')==label]
+ assert found,'Missing QA control '+label
+ b=list(map(int,re.findall(r'\d+',found[-1].attrib['bounds'])));return (b[0]+b[2])//2,(b[1]+b[3])//2
+def tap(coords):adb('shell','input','tap',*[str(n) for n in coords])
+def start():return adb('shell','am','start','-W','-n',PKG+'/.MainActivity')
+def stop():adb('shell','am','force-stop',PKG)
+def collect_logs():return adb('logcat','-d','-v','raw','-s','SofiaLaunch:I','SofiaMenu:I','ReactNativeJS:V','AndroidRuntime:E')
+def seed(mode,scale=1):
+ stop();adb('install','-r',str(SEED));start();time.sleep(.3)
+ tree=xml()
+ for i in range(1,scale):tap(point(tree,'Escala '+str(i)));tree=xml()
+ tap(point(tree,'Semear '+('Novo' if mode=='new' else 'Antigo')))
+ for _ in range(18):
+  tree=xml()
+  if 'QA R7 pronto '+mode+' seed' in tree:break
+  assert 'QA R7 ERRO' not in tree,tree
+  time.sleep(.25)
+ else:raise AssertionError('Heavy QA seed did not finish')
+ logs=collect_logs();entries=re.findall(r'SOFIA_QA_VOLUME (\{.*\})',logs)
+ assert entries,'QA seed volume not recorded'
+ volume=json.loads(entries[-1]);stop();adb('install','-r',str(QA));return volume
+def wait_data():
+ for _ in range(120):
+  logs=collect_logs()
+  assert 'FATAL EXCEPTION' not in logs,logs[-3000:]
+  if 'SOFIA_LAUNCH_DATA_PROCESS_MS=' in logs:return time.monotonic(),logs
+  time.sleep(.03)
+ raise AssertionError('No Home DATA marker')
+def events(logs):
+ out={}
+ for kind,line in re.findall(r'SOFIA_PERF_([A-Z]+) (\{[^\n]*\})',logs):
+  try: out.setdefault(kind,[]).append(json.loads(line))
+  except json.JSONDecodeError:pass
+ return out
+def cold_trial(mode,index,points,scale=1,video=False):
+ expected=seed(mode,scale);stop();adb('logcat','-c')
+ rec=None;label=f'{index:02d}-{mode}-x{scale}'
+ if video:
+  rec=subprocess.Popen(['adb','shell','screenrecord','--time-limit','15','/sdcard/r7.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);time.sleep(.25)
+ am=start();observed,launch=wait_data();commands=[]
+ for offset,name in [(0.5,'Páginas'),(1,'Conversa'),(1.5,'Agenda'),(2,'Apps'),(6,'Páginas'),(6.5,'Conversa'),(7,'Agenda'),(7.5,'Apps')]:
+  pause=observed+offset-time.monotonic()
+  if pause>0:time.sleep(pause)
+  before=time.monotonic();tap(points[name]);commands.append({'tab':name,'targetSeconds':offset,'actualSeconds':round(before-observed,3),'adbDurationMs':round((time.monotonic()-before)*1000,1)})
+ time.sleep(max(0,observed+12.8-time.monotonic()));logs=collect_logs();assert 'FATAL EXCEPTION' not in logs,logs[-4000:]
+ (OUT/(label+'.log')).write_text(logs)
+ if rec:
+  rec.wait(timeout=20);adb('pull','/sdcard/r7.mp4',str(OUT/(label+'.mp4')))
+ data=events(logs);assert data.get('SUMMARY'),'Missing R7 JS metrics summary, cannot claim performance test'
+ summary=data['SUMMARY'][-1];assert summary['mode']==mode,(mode,summary)
+ volumes=data.get('VOLUME',[]);assert volumes,'Full heavy cache was never observed'
+ actual=max(volumes,key=lambda d:d['messages'])
+ for field in ['pages','conversations','messages']:assert actual[field]>=expected[field],(field,actual,expected)
+ assert actual['entities']>=expected['entities'],(actual,expected)
+ timings={k:int(v) for k,v in re.findall(r'SOFIA_LAUNCH_(SYSTEM_CALLBACK|UI|DATA)_PROCESS_MS=(\d+)',launch)}
+ result={'label':label,'mode':mode,'fixture':expected,'observedVolume':actual,'stages_ms':timings,'commands':commands,'metrics':data,'summary':summary,'activity_manager':am}
+ (OUT/(label+'.json')).write_text(json.dumps(result,indent=2,ensure_ascii=False));RESULT['trials'].append(result)
+ return result
+
+def correctness(points):
+ # No network or deleting: verify the actual editor survives hide/show with a dirty draft.
+ tap(points['Páginas']);time.sleep(.5);tree=xml();(OUT/'pages-heavy.xml').write_text(tree)
+ assert 'Sua primeira página' not in tree,'False empty Page list with confirmed heavy cache'
+ assert 'Página QA' in tree,'Heavy page list not visible'
+ tap(point(tree,'Abrir página principal Página QA 0000'));time.sleep(.4);tree=xml()
+ tap(point(tree,'Título da página'));adb('shell','input','keyevent','KEYCODE_MOVE_END');adb('shell','input','text','_R7_KEEP')
+ adb('shell','input','keyevent','BACK');time.sleep(.3)
+ tap(points['Conversa']);time.sleep(.4);tap(points['Páginas']);time.sleep(.4)
+ tree=xml();(OUT/'draft-after-return.xml').write_text(tree);assert '_R7_KEEP' in tree,'Actual Page draft lost across Activity hide/show'
+ RESULT['page_draft_preserved']=True
+ # Page is open and blocks horizontal gestures; use Home, then swipe to Chat.
+ tap(points['Início']);time.sleep(.5);tree=xml();(OUT/'home-before-swipe.xml').write_text(tree)
+ size=adb('shell','wm','size');w,h=map(int,re.findall(r'(\d+)x(\d+)',size)[-1]);
+ rec=subprocess.Popen(['adb','shell','screenrecord','--time-limit','6','/sdcard/r7-swipe.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);time.sleep(.3)
+ adb('shell','input','swipe',str(int(w*.8)),str(int(h*.55)),str(int(w*.15)),str(int(h*.55)),'450');time.sleep(.8)
+ tree=xml();(OUT/'after-swipe.xml').write_text(tree)
+ assert 'Mensagem para a Sofia' in tree,'Swipe did not reach neighboring content'
+ rec.wait(timeout=10);adb('pull','/sdcard/r7-swipe.mp4',str(OUT/'swipe-neighbor.mp4'))
+ RESULT['swipe_video_retained']=True;RESULT['audio_behavior_observed']=False
+
+def percentile(values,p=.95):
+ if not values:return None
+ a=sorted(values);return a[min(len(a)-1,max(0,int((len(a)-1)*p+.999999)))]
+def summarize():
+ out={}
+ for mode in ['old','new']:
+  trials=[t for t in RESULT['trials'] if t['mode']==mode]
+  taps=[p['ms'] for t in trials for p in t['metrics'].get('TAP',[])]
+  blocks=[p for t in trials for p in t['metrics'].get('BLOCK',[]) if p['early']]
+  out[mode]={'trials':len(trials),'first5sBlocksOver50':len(blocks),'first5sBlocksOver100':sum(p['delayMs']>100 for p in blocks),'first5sMaxMs':max([p['delayMs'] for p in blocks] or [0]),'tapP95Ms':percentile(taps),'tapSamples':len(taps),'stagesMedianMs':{k:statistics.median(t['stages_ms'][k] for t in trials) for k in ['SYSTEM_CALLBACK','UI','DATA']},'top5Blocks':sorted(blocks,key=lambda p:p['delayMs'],reverse=True)[:5]}
+ RESULT['comparison']=out
+ RESULT['old_reproduced']=out['old']['first5sBlocksOver100']>0 or (out['old']['tapP95Ms'] or 0)>100
+ RESULT['new_targets_met']=out['new']['first5sBlocksOver100']==0 and out['new']['tapP95Ms'] is not None and out['new']['tapP95Ms']<=100
+try:
+ for key in ['window_animation_scale','transition_animation_scale','animator_duration_scale']:adb('shell','settings','put','global',key,'1')
+ adb('shell','svc','wifi','disable');adb('shell','svc','data','disable');adb('shell','cmd','connectivity','airplane-mode','enable')
+ RESULT['qa_sha256']=hashlib.sha256(QA.read_bytes()).hexdigest();RESULT['source_sha']=(DIST/'SOURCE_COMMIT.txt').read_text().strip()
+ seed('old');start();wait_data();time.sleep(2);tree=xml()
+ points={label:point(tree,label) for label in ['Início','Páginas','Conversa','Agenda','Apps','Perfil']};RESULT['menu_points']=points
+ for i,mode in enumerate(['old','new','new','old','old','new','new','old','old','new']):cold_trial(mode,i+1,points,video=i<2)
+ summarize()
+ if not RESULT['old_reproduced']:
+  RESULT['fixture_escalated']=True
+  cold_trial('old',11,points,scale=2,video=True);cold_trial('new',12,points,scale=2,video=True);summarize()
+  RESULT['caution']='Escalated trials x2 reported separately by label; mixed-volume summary is exploratory, not equal-load improvement percent'
+ correctness(points);RESULT['correctness_passed']=True
+finally:
+ (OUT/'result.json').write_text(json.dumps(RESULT,indent=2,ensure_ascii=False)+'\n')
+print(json.dumps({k:v for k,v in RESULT.items() if k!='trials'},ensure_ascii=False))

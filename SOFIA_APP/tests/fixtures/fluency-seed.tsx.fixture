@@ -1,0 +1,30 @@
+// SOFIA_R7_SEED_ONLY: Never imported by the production entrypoint or uploaded as owner APK.
+import React,{useState} from 'react';
+import {View,Text,Pressable,ScrollView,NativeModules} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import {fluencyData} from './tests/fixtures/fluency-data';
+export default function Seed(){
+ const [status,setStatus]=useState('QA R7 seed only'),[scale,setScale]=useState(1),[busy,setBusy]=useState(false);
+ async function seed(mode:'old'|'new',full:boolean){
+  if(busy)return;setBusy(true);setStatus('QA R7 preparando');
+  try{
+   await AsyncStorage.setItem('sofia.fluency.mode.v1',mode);
+   if(full){
+    const d=fluencyData(scale);if(d.rawChars>8*1024*1024)throw Error('Synthetic archive exceeds existing import guard');
+    await SecureStore.setItemAsync('sofia.native.session.v1',JSON.stringify(d.auth),{keychainAccessible:SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY});
+    await AsyncStorage.setItem('sofia.native.preferences.v1',JSON.stringify({appearance:'light',enterToSend:false,autoSendVoice:true}));
+    await NativeModules.SofiaSnapshot.write(d.scope,d.raw);
+    await NativeModules.SofiaSnapshot.write(d.scope+'|home-v1',d.launch);
+    console.info('SOFIA_QA_VOLUME '+JSON.stringify({...d.counts,rawChars:d.rawChars,mode,scale}));
+   }
+   setStatus('QA R7 pronto '+mode+' '+(full?'seed':'mode'));
+  }catch(error){setStatus('QA R7 ERRO '+String(error));}finally{setBusy(false);}
+ }
+ const button=(label:string,fn:()=>void)=><Pressable accessibilityRole="button" accessibilityLabel={label} onPress={fn} disabled={busy} style={{padding:16,marginVertical:6,backgroundColor:'#eee'}}><Text style={{fontSize:16}}>{label}</Text></Pressable>;
+ return <View nativeID="sofia-login-ready" style={{flex:1,backgroundColor:'#fff',padding:24,paddingTop:45}}><ScrollView><Text accessibilityLabel={status} style={{fontSize:20}}>{status}</Text>
+ {button('Semear Antigo',()=>void seed('old',true))}{button('Semear Novo',()=>void seed('new',true))}
+ {button('Definir Antigo sem dados',()=>void seed('old',false))}{button('Definir Novo sem dados',()=>void seed('new',false))}
+ {button('Escala '+scale,()=>setScale(scale===3?1:scale+1))}
+ <Text>Dados exclusivamente sintéticos; este APK não é o aplicativo de produção.</Text></ScrollView></View>;
+}

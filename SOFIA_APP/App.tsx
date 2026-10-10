@@ -1,3 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {startFluency,revealFluency,noteFluencyInput,queueOptional,FLUENCY_MODE_KEY,type FluencyMode} from './src/lib/fluency';
+import {perfActive,perfNow,perfTap} from './src/lib/fluency-metrics';
 import {scheduleIdleTask} from './src/lib/idle-task';
 import {prepareLocalLaunch,createLaunchPreparation} from './src/lib/local-launch';
 import type {LocalLaunch} from './src/lib/local-launch';
@@ -43,6 +46,9 @@ function Shell({startup}:{startup:LocalLaunch}){
  const tabHistory=useRef<Tab[]>([]),pager=useRef<TabPagerHandle>(null),navigation=useRef({tab,locked});
  const tabTap=useRef<{tab:Tab;at:number;early:boolean}|null>(null);
  const nativeRevealAt=useRef(0);
+ const [fluency,setFluency]=useState<FluencyMode|'pending'>('pending');
+ const [previewTabs,setPreviewTabs]=useState<readonly Tab[]>([]);
+ const [backgroundReady,setBackgroundReady]=useState(false);
  navigation.current={tab,locked};
  const screenTab=tab;
  const menuMotion=useMemo(()=>createMenuMotion('home'),[]);
@@ -63,7 +69,14 @@ function Shell({startup}:{startup:LocalLaunch}){
  // Archive loading remains post-reveal, but is not a prerequisite for lazy tabs.
  // No hydration-completion setState: re-rendering the entire Shell would
  // compete with the user's first menu interaction.
- useEffect(()=>{if(visible&&!nativeRevealAt.current)nativeRevealAt.current=Date.now();},[visible]);
+ useEffect(()=>{
+  if(!visible)return;
+  if(!nativeRevealAt.current){nativeRevealAt.current=Date.now();revealFluency();}
+  let live=true;
+  void AsyncStorage.getItem(FLUENCY_MODE_KEY).then(saved=>{if(live){const mode=saved==='old'?'old':'new';startFluency(mode);setFluency(mode);}}).catch(()=>{if(live){startFluency('new');setFluency('new');}});
+  const sub=AppState.addEventListener('change',state=>perfActive(state==='active'));
+  return()=>{live=false;sub.remove();};
+ },[visible]);
  // Tap-to-next-React-frame is a JS-side estimate, not a physical GPU latency.
  // Explicitly label 0-3s vs. later; the Android native hop can be faster.
  useEffect(()=>{
@@ -72,6 +85,7 @@ function Shell({startup}:{startup:LocalLaunch}){
    const tap=tabTap.current;
    if(!tap||tap.tab!==tab||navigation.current.tab!==tab)return;
    console.info('SOFIA_TAB_TAP_TO_FRAME_MS tab='+tab+' ms='+Math.max(0,Date.now()-tap.at)+' window='+(tap.early?'first_3s':'after_3s'));
+   perfTap(tab,perfNow()-Math.max(0,Date.now()-tap.at));
    tabTap.current=null;
   });
   return()=>cancelAnimationFrame(frame);
@@ -79,20 +93,21 @@ function Shell({startup}:{startup:LocalLaunch}){
  // The full encrypted archive may include years of Page/chat history. Never
  // parse it during the native splash: prepare it only after the final fade.
  useEffect(()=>{
-  if(!visible||!auth||!initialDataReady)return;
+  if(!visible||!auth||!initialDataReady||fluency==='pending')return;
   let live=true;const started=Date.now();
-  void api.hydrate().then(()=>{
+  const cancel=queueOptional('hidratar',()=>api.hydrate().then(()=>{
    if(live)console.info('SOFIA_HYDRATE_MS='+Math.max(0,Date.now()-started));
   }).catch(error=>{
    // Cached history is optional; network reads and manual navigation must
    // remain available when the encrypted archive is temporarily unreadable.
    if(live)console.warn('SOFIA_HYDRATE_FAILED',errorText(error));
-  });
-  return()=>{live=false;};
- },[visible,auth,initialDataReady,api]);
+  }),2,8000);
+  return()=>{live=false;cancel();};
+ },[visible,auth,initialDataReady,api,fluency]);
  // Warm code/screens after the native fade, concurrently with archive I/O;
  // Pages owns its loading/empty-state gate and never fabricates a page list.
- const mountedTabs=useStartupMounts(visible&&!!auth,tab,!!auth);
+ const mountedTabs=useStartupMounts(visible&&!!auth,tab,!!auth,fluency,previewTabs);
+ useEffect(()=>{if(!visible||fluency==='pending')return;if(fluency==='old'){setBackgroundReady(true);return;}return queueOptional('background-services:mount',()=>setBackgroundReady(true),7,5000);},[visible,fluency]);
  useEffect(()=>{if(!auth||initialDataReady)return;let live=true;setPreparationError('');void prepareInitialData(api,()=>preloadAgenda(api)).then(()=>{if(live){setPrepared(api);console.info('SOFIA_STARTUP_CACHE_READY');}}).catch(e=>{if(live)setPreparationError(errorText(e));});return()=>{live=false;};},[api,prepareAttempt]);
  // Do not start network completion renders over the native splash fade
  // when there is already a cached Home to present. In 0.3.76, React work
@@ -121,14 +136,14 @@ function Shell({startup}:{startup:LocalLaunch}){
  useEffect(()=>{const a=Keyboard.addListener('keyboardDidShow',()=>setKeyboard(true)),b=Keyboard.addListener('keyboardDidHide',()=>setKeyboard(false));return()=>{a.remove();b.remove();};},[]);
 
  useEffect(()=>{
-  if(!servicesReady)return;
-  const cancel=scheduleIdleTask(()=>void checkUpdate(false));
+  if(!servicesReady||fluency==='pending')return;
+  const cancel=fluency==='new'?queueOptional('atualizador',()=>void checkUpdate(false),8):scheduleIdleTask(()=>void checkUpdate(false));
   const interval=setInterval(()=>void checkUpdate(false),300000);
   const sub=AppState.addEventListener('change',state=>{if(state==='active')void checkUpdate(false);});
   return()=>{cancel();clearInterval(interval);sub.remove();};
- },[servicesReady,checkUpdate]);
+ },[servicesReady,checkUpdate,fluency]);
  const boot=useCallback(async()=>{if(!auth)return;setBooting(true);try{const b=await api.liveBootstrap();setBootstrap(previous=>JSON.stringify(previous)===JSON.stringify(b)?previous:b);const next=authWithBootstrap(auth,b);setAuth(next);if(JSON.stringify(auth.startup)!==JSON.stringify(next.startup))void saveAuth(next).catch(()=>{});setError('');}catch(e){setError(errorText(e));}finally{setBooting(false);}},[api,auth]);
- useEffect(()=>{if(auth&&visible)void boot();},[api,visible]);
+ useEffect(()=>{if(auth&&visible&&fluency!=='pending')return queueOptional('bootstrap',()=>{void boot();},7);},[api,visible,fluency]);
  useEffect(()=>{if(!auth)return;const sub=AppState.addEventListener('change',state=>{if(state!=='active')void api.persistLaunch().catch(()=>{});});return()=>sub.remove();},[api,auth]);
  useEffect(()=>{if(!auth)return;const sub=AppState.addEventListener('change',state=>{if(state==='active'&&!locked&&visible)void boot();else if(state!=='active')void silenceVoices();});return()=>sub.remove();},[auth,locked,visible,boot]);
  // Commit the selected screen before TabPager dispatches the native jump.
@@ -166,10 +181,10 @@ function Shell({startup}:{startup:LocalLaunch}){
  const manualUpdate=useCallback(()=>checkUpdate(true),[checkUpdate]);
  const clearChat=useCallback(()=>setChatEpoch(v=>v+1),[]);
  const notificationBack=useCallback(()=>{void goBack();},[goBack]);
- return <ThemeContext.Provider value={c}><NotificationProvider api={api} enabled={!!auth&&!!bootstrap&&servicesReady} scope={auth?.profile.email||''}><SafeAreaView style={{flex:1,backgroundColor:c.bg}} edges={['top','left','right','bottom']}><StatusBar barStyle={c===dark?'light-content':'dark-content'} backgroundColor={c.bg}/><View style={{flex:1,width:'100%',maxWidth:760,alignSelf:'center',backgroundColor:c.bg}}>
+ return <ThemeContext.Provider value={c}><NotificationProvider api={api} enabled={!!auth&&!!bootstrap&&servicesReady&&fluency!=='pending'} scope={auth?.profile.email||''}><SafeAreaView style={{flex:1,backgroundColor:c.bg}} edges={['top','left','right','bottom']}><StatusBar barStyle={c===dark?'light-content':'dark-content'} backgroundColor={c.bg}/><View onStartShouldSetResponderCapture={()=>{noteFluencyInput();return false;}} onTouchStart={noteFluencyInput} onTouchMove={noteFluencyInput} style={{flex:1,width:'100%',maxWidth:760,alignSelf:'center',backgroundColor:c.bg}}>
  {!ready?<StartupHome/>:!auth?<Login onLogin={login}/>:!bootstrap?<View style={{flex:1,justifyContent:'center',padding:24,gap:14}}>{booting?<ActivityIndicator color={c.accent}/>:null}<Text style={{fontSize:23,fontWeight:'600',color:c.text}}>Abrindo sua Sofia…</Text>{error?<ErrorBanner text={error}/>:null}<Button title="Tentar novamente" onPress={()=>void boot()} loading={booting}/><Button title="Voltar para o login" secondary onPress={()=>void logout()}/></View>:!initialDataReady?<View style={{flex:1}}><StartupHome profile={bootstrap.profile}/>{preparationError?<View style={{padding:24,gap:12}}><ErrorBanner text={preparationError}/><Button title="Tentar novamente" onPress={()=>setPrepareAttempt(n=>n+1)}/></View>:null}</View>:<><View style={{flex:1}}>
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?0:1}]} pointerEvents={tab==='notifications'?'none':'auto'} accessibilityElementsHidden={tab==='notifications'} importantForAccessibility={tab==='notifications'?'no-hide-descendants':'auto'}>
-  <TabPager motion={menuMotion} ref={pager} activeTab={tab} readyTabs={mountedTabs} enabled={!gestureLocked&&!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)&&!(tab==='apps'&&workspaceDepth)} onSelect={navigate}>
+  <TabPager motion={menuMotion} ref={pager} activeTab={tab} readyTabs={mountedTabs} fluencyMode={fluency==='new'?'new':'old'} onPreviewTabs={setPreviewTabs} enabled={!gestureLocked&&!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)&&!(tab==='apps'&&workspaceDepth)} onSelect={navigate}>
    {initialDataReady?<DeferredScreen load={loadHome} screenProps={{launchVisible:visible,onDiscussTask:discussTask,onOpenCapsules:openCapsules,onGestureLock:setGestureLocked,api,bootstrap,navigate,onOpenAgenda:openAgenda,active:screenTab==='home'}}/>:<StartupHome profile={bootstrap.profile}/>}
    {mountedTabs.has('chat')?<DeferredScreen key={'chat-'+chatEpoch} load={loadChat} screenProps={{taskContext,onClearTaskContext:clearTaskContext,api,bootstrap,enterToSend:prefs.enterToSend,autoSendVoice:prefs.autoSendVoice,onLock:setLocked,active:screenTab==='chat',onRefreshBootstrap:boot}}/>:<View style={{flex:1}}/>}
    {mountedTabs.has('pages')?<DeferredScreen key={bootstrap.profile.email} load={loadPages} screenProps={{api,active:screenTab==='pages',storageScope:bootstrap.profile.email,onDepthChange:setPagesDepth}}/>:<View style={{flex:1}}/>}
@@ -181,7 +196,7 @@ function Shell({startup}:{startup:LocalLaunch}){
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?1:0,backgroundColor:c.bg}]} pointerEvents={tab==='notifications'?'auto':'none'} accessibilityElementsHidden={tab!=='notifications'} importantForAccessibility={tab==='notifications'?'auto':'no-hide-descendants'}>{tab==='notifications'?<DeferredScreen load={loadNotifications} screenProps={{api,onBack:notificationBack}}/>:null}</View>
  </View>
  {!keyboard?<View nativeID="sofia-menu-bar" style={{flexDirection:'row',backgroundColor:c.surface,borderTopWidth:1,borderColor:c.line,paddingHorizontal:8,paddingTop:7,paddingBottom:4}}>{tabs.map(item=><MenuTab locked={locked} motion={menuMotion} key={item.id} item={item} selected={tab===item.id} onSelect={navigate}/>)}</View>:null}</>}
- {visible?<DeferredScreen load={loadBackgroundServices} screenProps={{api,scope:auth?.profile.email||'',enabled:!auth?false:servicesReady?true:null,preloadWhenIdle:screenTab==='home',onCapsules:openCapsules,onAgenda:openAgenda}}/>:null}</View></SafeAreaView></NotificationProvider></ThemeContext.Provider>;
+ {visible&&backgroundReady?<DeferredScreen load={loadBackgroundServices} screenProps={{api,scope:auth?.profile.email||'',enabled:!auth?false:servicesReady?true:null,preloadWhenIdle:screenTab==='home',onCapsules:openCapsules,onAgenda:openAgenda}}/>:null}</View></SafeAreaView></NotificationProvider></ThemeContext.Provider>;
 }
 const launchPreparation=createLaunchPreparation(()=>prepareLocalLaunch(readAuth,readPrefs,startupSnapshotFor));
 export function prepareStartup(){launchPreparation.prime();}

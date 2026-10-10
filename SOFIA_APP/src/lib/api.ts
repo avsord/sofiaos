@@ -59,6 +59,7 @@ export class SofiaApi {
   }
   async hydrate(){if(!this.hydration)this.hydration=this.snapshots.hydrate().then(()=>{for(const [key,value] of this.snapshots.all())this.startupReads.seed(key,value);});return this.hydration;}
   async persistLaunch(){await this.snapshots.flush();}
+  async prefetchCache(path:string){if(!/^\/(workspace\/|conversations\?|agenda\?|md\/dashboard)/.test(path))return;const value=await this.fetchRequest(path,undefined,'GET',20000);this.startupReads.seed(path,value);}
   cached<T>(path:string){return this.snapshots.peek<T>(path);}
   async discardCache(){this.cacheGeneration++;this.startupReads.invalidate();await this.snapshots.clear();}
   async liveBootstrap(){return this.fetchRequest<Bootstrap>('/bootstrap',undefined,'GET',20000);}

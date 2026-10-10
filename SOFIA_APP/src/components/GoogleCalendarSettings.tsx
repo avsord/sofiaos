@@ -1,3 +1,4 @@
+import {useVisibleLoad} from '../lib/visible-load';
 import React,{useEffect,useState} from 'react';
 import {View,Text,AppState,Alert,Linking} from 'react-native';
 import {SofiaApi} from '../lib/api';
@@ -8,7 +9,7 @@ import {Choice} from '../screens/Workspace';
 export function GoogleCalendarSettings({api}:{api:SofiaApi}){
  const c=useTheme(),[status,setStatus]=useState<Awaited<ReturnType<SofiaApi['calendarStatus']>>|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  async function load(){try{setStatus(await api.calendarStatus());setError('');}catch(e){setError(errorText(e));}}
- useEffect(()=>{void load();const s=AppState.addEventListener('change',v=>{if(v==='active')void load();});return()=>s.remove();},[api]);
+ useVisibleLoad(()=>{void load();const s=AppState.addEventListener('change',v=>{if(v==='active')void load();});return()=>s.remove();},[api]);
  async function act(task:()=>Promise<unknown>){if(busy)return;setBusy(true);try{await task();await load();}catch(e){setError(errorText(e));}finally{setBusy(false);}}
  function connect(){Alert.alert('Conectar Google Agenda','Os compromissos e lembretes da Sofia serão sincronizados com o calendário escolhido. Criações, edições e exclusões serão refletidas nos dois lados. Registros marcados como somente local não serão enviados.',[{text:'Cancelar',style:'cancel'},{text:'Conectar',onPress:()=>void act(async()=>{const result=await api.calendarConnect();const url=new URL(result.url);if(url.protocol!=='https:')throw Error('Endereço de autorização inválido.');await Linking.openURL(url.toString());})}]);}
  return <View style={[forms.card,{backgroundColor:c.surface,borderWidth:1,borderColor:c.line}]}><Text style={{fontSize:18,fontWeight:'600',color:c.text}}>Google Agenda</Text>

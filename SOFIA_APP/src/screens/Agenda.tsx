@@ -1,3 +1,4 @@
+import {useVisibleLoad} from '../lib/visible-load';
 import {agendaPriority,priorityColorsByDay} from '../lib/agenda-priority';
 import {expandAgenda,eventStart,readRepeat,REPEATS} from '../lib/agenda-recurrence';
 import {useAgendaMonth} from '../lib/use-agenda-month';
@@ -14,10 +15,10 @@ import {MonthSwipe} from '../components/MonthSwipe';
 import {EntityEditor,Choice} from './Workspace';
 export function Agenda({api,target,active=true,onGestureLock}:{onGestureLock?:(locked:boolean)=>void;api:SofiaApi;target?:{date:string;id?:string;create?:boolean;nonce:number};active?:boolean}){
  const {month,setMonth,selected:selectedKey,setSelected:setSelectedKey,acceptTarget}=useAgendaView(api,'agenda',active),selected=new Date(selectedKey+'T12:00:00'),setSelected=(value:Date)=>setSelectedKey(localDateKey(value));
- const c=useTheme(),[refreshing,setRefreshing]=useState(false),[actionError,setError]=useState(''),[catalog,setCatalog]=useState<Catalog|null>(null),[editing,setEditing]=useState<Partial<Entity>|null>(null),[kind,setKind]=useState('commitment');
+ const c=useTheme(),[refreshing,setRefreshing]=useState(false),[actionError,setError]=useState(''),[catalog,setCatalog]=useState<Catalog|null>(()=>api.cached<Catalog>('/workspace/catalog')||null),[editing,setEditing]=useState<Partial<Entity>|null>(null),[kind,setKind]=useState('commitment');
  const {items,loading,pending,loadedAt,error:loadError,refresh}=useAgendaMonth(api,month,active),error=actionError||(loadError?errorText(loadError):'');
  async function load(manual=false){if(manual)setRefreshing(true);try{await refresh();}finally{if(manual)setRefreshing(false);}}
- useEffect(()=>{let alive=true;if(!catalog)api.catalog().then(cat=>{if(alive)setCatalog(cat);}).catch(e=>{if(alive)setError(errorText(e));});return()=>{alive=false;};},[api,active,catalog]);
+ useVisibleLoad(()=>{let alive=true;if(!catalog)api.catalog().then(cat=>{if(alive)setCatalog(cat);}).catch(e=>{if(alive)setError(errorText(e));});return()=>{alive=false;};},[api,active,catalog]);
  useEffect(()=>{if(!target?.date||!active||!catalog)return;if(!acceptTarget(target.date,target.nonce))return;if(target.create)create(new Date(target.date+'T12:00:00'));else if(target.id)api.entity(target.id).then(setEditing).catch(e=>setError(errorText(e)));},[target?.nonce,api,active,catalog]);
  const start=(item:AgendaItem)=>item.data.calendar_all_day?item.data.calendar_date_start||'':item.data.start_at||item.data.remind_at||item.data.due_at||'',activeItems=useMemo(()=>expandAgenda(items,month),[items,month.getTime()]);
  const priorityDays=useMemo(()=>priorityColorsByDay(activeItems.map(i=>({date:localDateKey(eventStart(i)),priority_level:i.data.priority_level})),c.accent),[activeItems,c.accent]);

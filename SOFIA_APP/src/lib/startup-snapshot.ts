@@ -1,3 +1,5 @@
+import {newFluency,queueOptional} from './fluency';
+import {perfSync,measureVolume,historyBytes} from './fluency-metrics';
 import {recentChatPage} from './chat-window';
 /** A disposable encrypted view cache. The server remains authoritative. */
 export type SnapshotStorage={read:(scope:string)=>Promise<string|null>;write:(scope:string,value:string)=>Promise<unknown>;remove:(scope:string)=>Promise<unknown>};
@@ -25,18 +27,20 @@ export class StartupSnapshot {
  private launchEntries=new WeakSet<Entry>();
  private encoded=new WeakMap<Entry,string>();private exposed=new WeakSet<Entry>();
  private entries=new Map<string,Entry>();private timer:ReturnType<typeof setTimeout>|undefined;private closed=false;private revision=0;
+ private cancelSave:(()=>void)|null=null;
  private hydration:Promise<void>|null=null;private launchOnly=false;private lastLaunch='';
  private forgotten=new Set<string>();private erasedChat=false;private erasedData=false;
  constructor(private storage:SnapshotStorage,private scope:string,private now=Date.now){}
  private importRaw(raw:string|null,revision:number,onlyLaunch=false){
   if(!raw||raw.length>MAX_BYTES*2||this.closed||revision!==this.revision)return;
-  const parsed=JSON.parse(raw);if(parsed.schema!==1||!Array.isArray(parsed.entries))return;
+  const parsed=perfSync(onlyLaunch?'parse:home':'parse:history',()=>JSON.parse(raw));if(parsed.schema!==1||!Array.isArray(parsed.entries))return;
   for(const pair of parsed.entries){if(!Array.isArray(pair)||pair.length!==2)continue;const [path,e]=pair;
    if(typeof path==='string'&&cacheableRead(path)&&!this.forgotten.has(path)&&!(this.erasedChat&&chatRead(path))&&!(this.erasedData&&path!=='/bootstrap'&&!chatRead(path))&&(!onlyLaunch||launchRead(path,this.now()))&&e&&typeof e.at==='number'&&fresh(path,e.at,this.now())){
     const existing=this.entries.get(path);
     if(!existing||(!onlyLaunch&&this.launchEntries.has(existing)&&existing.at===e.at)){this.entries.set(path,e);if(onlyLaunch)this.launchEntries.add(e);}
    }
   }
+  if(!onlyLaunch)perfSync('count:history',()=>measureVolume([...this.entries].map(([k,e])=>[k,e.value] as const),historyBytes(raw)));
  }
  async hydrateLaunch(){
   const revision=this.revision;
@@ -118,7 +122,10 @@ export class StartupSnapshot {
  forgetData(){if(this.closed)return;this.erasedData=true;this.revision++;for(const key of this.entries.keys())if(key!=='/bootstrap'&&!chatRead(key))this.entries.delete(key);this.schedule();}
  forgetChat(){if(this.closed)return;this.erasedChat=true;this.revision++;for(const key of this.entries.keys())if(chatRead(key))this.entries.delete(key);this.schedule();}
  forget(path:string){if(this.closed)return;this.forgotten.add(path);this.revision++;this.entries.delete(path);this.schedule();}
- private schedule(){if(this.timer)return;this.timer=setTimeout(()=>{this.timer=undefined;void this.flush();},450);}
+ private schedule(){
+  if(newFluency()){if(!this.cancelSave)this.cancelSave=queueOptional('snapshot:write',()=>{this.cancelSave=null;return this.flush();},9,8000);return;}
+  if(this.timer)return;this.timer=setTimeout(()=>{this.timer=undefined;void this.flush();},450);
+ }
  async flush(){
   if(this.closed)return;
   // A write after fast launch must merge the old archive before replacing it.
@@ -141,5 +148,5 @@ export class StartupSnapshot {
   }
   try{await this.storage.write(this.scope,prefix+parts.join(',')+suffix);}catch{/* Confirmed server writes never depend on the optional cache. */}
  }
- async clear(){this.closed=true;if(this.timer)clearTimeout(this.timer);this.entries.clear();this.encoded=new WeakMap();this.exposed=new WeakSet();for(const scope of [this.scope,this.scope+'|home-v1'])try{await this.storage.remove(scope);}catch{}}
+ async clear(){this.cancelSave?.();this.cancelSave=null;this.closed=true;if(this.timer)clearTimeout(this.timer);this.entries.clear();this.encoded=new WeakMap();this.exposed=new WeakSet();for(const scope of [this.scope,this.scope+'|home-v1'])try{await this.storage.remove(scope);}catch{}}
 }

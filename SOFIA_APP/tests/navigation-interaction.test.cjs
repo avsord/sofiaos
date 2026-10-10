@@ -2,6 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
 const root=path.resolve(__dirname,'..');
 function load(file,deps={}){
+ deps={'../lib/fluency':{noteFluencyInput:()=>{}},'./MountTimer':{MountTimer:'MountTimer'},...deps};
  const code=ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{fileName:file,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
  const exports={};vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in deps,'Unexpected dependency: '+name);return deps[name];},setTimeout:()=>assert.fail('Navigation must not defer to a timer'),requestAnimationFrame:()=>assert.fail('Navigation must not wait for another frame'),fetch:()=>assert.fail('Navigation must not await the server')});return exports;
 }
@@ -13,7 +14,7 @@ const {createMenuMotion}=load('src/lib/menu-motion.ts',{'react-native':{Animated
 function hooks(){
  const slots=[];let cursor=0,effects=[];
  const memo=(fn,deps)=>{const i=cursor++,old=slots[i];if(!old||!deps||deps.some((x,n)=>x!==old.deps[n]))slots[i]={value:fn(),deps};return slots[i].value;};
- const React={__esModule:true,memo:fn=>fn,forwardRef:fn=>fn,Children:{map:(kids,fn)=>kids.map(fn)},useRef:initial=>{const i=cursor++;return slots[i]||(slots[i]={current:initial});},useState:initial=>{const i=cursor++;if(!slots[i])slots[i]={value:initial};return[slots[i].value,v=>{slots[i].value=typeof v==='function'?v(slots[i].value):v;}];},useCallback:(fn,deps)=>memo(()=>fn,deps),useMemo:memo,useLayoutEffect:(fn,deps)=>memo(()=>{effects.push(fn);return null;},deps),useImperativeHandle:(ref,fn,deps)=>memo(()=>{effects.push(()=>{ref.current=fn();});return null;},deps)};React.default=React;
+ const React={__esModule:true,Activity:'Activity',memo:fn=>fn,forwardRef:fn=>fn,Children:{map:(kids,fn)=>kids.map(fn)},useRef:initial=>{const i=cursor++;return slots[i]||(slots[i]={current:initial});},useState:initial=>{const i=cursor++;if(!slots[i])slots[i]={value:initial};return[slots[i].value,v=>{slots[i].value=typeof v==='function'?v(slots[i].value):v;}];},useCallback:(fn,deps)=>memo(()=>fn,deps),useMemo:memo,useLayoutEffect:(fn,deps)=>memo(()=>{effects.push(fn);return null;},deps),useImperativeHandle:(ref,fn,deps)=>memo(()=>{effects.push(()=>{ref.current=fn();});return null;},deps)};React.default=React;
  return {React,render:fn=>{cursor=0;return fn();},flush:()=>{const list=effects;effects=[];list.forEach(fn=>fn());}};
 }
 const jsx={jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})};
