@@ -49,22 +49,22 @@ jobs:
           p=Path('SOFIA_APP/tools/fluency-heavy-smoke.py')
           s=p.read_text()
           prefix=s.rsplit('\ntry:\n',1)[0]
-          runner='''
-try:
- for key in ['window_animation_scale','transition_animation_scale','animator_duration_scale']:adb('shell','settings','put','global',key,'1')
- adb('shell','svc','wifi','disable');adb('shell','svc','data','disable');adb('shell','cmd','connectivity','airplane-mode','enable')
- seed('new');adb('logcat','-c');start();wait_data();time.sleep(2)
- tree=xml();points={label:point(tree,label) for label in ['Início','Páginas','Conversa','Agenda','Apps','Perfil']}
- correctness(points,'new')
- RESULT['correctness_passed']=True
-finally:
- (OUT/'after-editor-all.log').write_text(adb('logcat','-d','-v','threadtime'))
- (OUT/'after-editor-react.log').write_text(collect_logs())
- try:(OUT/'after-editor.xml').write_text(xml())
- except Exception:pass
- (OUT/'baseline-diagnosis.json').write_text(json.dumps(RESULT,indent=2,ensure_ascii=False))
-'''
-          p.write_text(prefix+'\n'+runner)
+          runner = '\n'.join([
+            'try:',
+            " for key in ['window_animation_scale','transition_animation_scale','animator_duration_scale']:adb('shell','settings','put','global',key,'1')",
+            " adb('shell','svc','wifi','disable');adb('shell','svc','data','disable');adb('shell','cmd','connectivity','airplane-mode','enable')",
+            " seed('new');adb('logcat','-c');start();wait_data();time.sleep(2)",
+            " tree=xml();points={label:point(tree,label) for label in ['Início','Páginas','Conversa','Agenda','Apps','Perfil']}",
+            " correctness(points,'new')",
+            " RESULT['correctness_passed']=True",
+            'finally:',
+            " (OUT/'after-editor-all.log').write_text(adb('logcat','-d','-v','threadtime'))",
+            " (OUT/'after-editor-react.log').write_text(collect_logs())",
+            " try:(OUT/'after-editor.xml').write_text(xml())",
+            " except Exception:pass",
+            " (OUT/'baseline-diagnosis.json').write_text(json.dumps(RESULT,indent=2,ensure_ascii=False))",
+          ])
+          p.write_text(prefix+'\n'+runner+'\n')
           PY
       - name: Enable KVM
         run: |
