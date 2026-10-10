@@ -12,8 +12,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 421f85d63b120fb34489ffa2eabea3684eabb6f2
-          fetch-depth: 2
+          ref: ae10116a8f2a88bc868fe05638e895040214751e
+          fetch-depth: 3
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -45,7 +45,7 @@ jobs:
             'docs/monitoramento/find-store-links.test.js':'99534ad9db84f67e095b71e372d08a25fcc8c020',
             'docs/monitoramento/package.json':'c674b3df0c2b54f78fb257baa22cb7d17f7e6845'
           }
-          changed=subprocess.check_output(['git','diff','--name-only','HEAD^','HEAD'],text=True).splitlines()
+          changed=subprocess.check_output(['git','diff','--name-only','ef3a6f7665eb06fddb62003337b1e9ae07dde8e2','HEAD'],text=True).splitlines()
           assert sorted(changed)==sorted(expected),(changed,sorted(expected))
           for file,sha in expected.items():
             actual=subprocess.check_output(['git','hash-object',file],text=True).strip()
