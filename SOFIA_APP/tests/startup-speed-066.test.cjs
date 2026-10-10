@@ -95,7 +95,7 @@ test('068 photo preloads without blocking Home; menu prewarm yields to navigatio
  const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
  assert.ok(local.includes("void photoReady;\n  await snapshot.hydrateLaunch()"));
  assert.ok(app.includes('useStartupMounts(visible&&!!auth,tab)'));
- assert.ok(mounts.includes('scheduleIdleTask('));
+ assert.ok(mounts.includes('frame=requestAnimationFrame(next)'));
  assert.ok(fs.readFileSync(path.join(root,'src/components/ProfileAvatar.tsx'),'utf8').includes('primeProfilePhoto(scope,readProfilePhoto)'));
 });
 test('068 bell actions share one horizontal row and capsule reads remain server-backed',()=>{
@@ -125,7 +125,7 @@ test('069 startup restores photo and cached Home together; menus mount only when
  const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
  assert.ok(launch.includes('void photoReady;\n  await snapshot.hydrateLaunch()'));
  assert.ok(!launch.includes('fetch('),'No server calls in initial photo/Home restore');
- assert.ok(mounts.includes('scheduleIdleTask('),'Do not mount offscreen screen trees on idle');
+ assert.ok(mounts.includes('frame=requestAnimationFrame(next)'),'Warm only after reveal, one retained tab per frame');
  assert.ok(mounts.includes('setWarmed(previous=>previous.has(tab)'));
 });
 
@@ -174,13 +174,15 @@ test('078 Home is allowed to reveal without waiting for server or prefetch',()=>
  assert.ok(logo.includes('android:windowSplashScreenAnimationDuration')); 
  assert.ok(logo.includes('android:scaleX="0.70" android:scaleY="0.70"')); 
 });
-test('074 hidden tabs mount one idle slice at a time after original splash exits',()=>{
+test('074 hidden tabs mount one frame at a time after original splash exits',()=>{
  const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');
  const apps=fs.readFileSync(path.join(root,'src/screens/Workspace.tsx'),'utf8');
  assert.ok(mounts.includes("if(!enabled){"));
- assert.ok(mounts.includes("cancelIdle=scheduleIdleTask("));
+ assert.ok(mounts.includes("frame=requestAnimationFrame(()=>{if(!cancelled)frame=requestAnimationFrame(next);})"));
+ assert.ok(mounts.includes("cancelAnimationFrame(frame)"));
+ assert.ok(!mounts.includes("scheduleIdleTask("),"No repeated 1.5s idle waits between menus");
  assert.ok(mounts.includes("setWarmed(previous=>previous.has(tab)?previous:new Set([...previous,tab]))"));
  assert.ok(app.includes('useStartupMounts(visible&&!!auth,tab)'));
  assert.ok(!app.includes('MENU_PRELOADERS'));
