@@ -84,7 +84,7 @@ test('086 finite system S does not extend the native Home handoff or restart an 
  assert.ok(logo.includes('<animated-vector')); 
  assert.ok(logo.includes('android:scaleX="0.70" android:scaleY="0.70"')); 
  assert.ok(logo.includes('android:windowSplashScreenAnimationDuration')); 
- assert.ok(logo.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark</item>'));
+ assert.ok(logo.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_animated</item>'));
  const launch=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  assert.ok(launch.includes('surface.animate().alpha(0f).setDuration(95L)'));
  assert.ok(!launch.includes('Animatable'));
@@ -195,7 +195,7 @@ test('078 no second OS S persists underneath the single composited image',()=>{
  const native=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  assert.ok(theme.includes('<item name="android:windowBackground">@color/sofiaLaunchBackground</item>'));
  assert.ok(!theme.includes('<item name="android:windowBackground">@drawable/splashscreen_logo</item>'));
- assert.ok(theme.includes('<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark</item>'));
+ assert.ok(theme.includes('<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_animated</item>'));
  assert.ok(native.indexOf('decor.overlay.add(surface)')<native.indexOf('exitSystemSplash = { success ->'));
  assert.ok(native.includes('splash.remove()'));
  assert.ok(!native.includes('icon.postDelayed('));
@@ -238,18 +238,29 @@ test('078 Android 12 completed fade reports visible without another costly frame
  assert.ok(complete.includes('if (success) activity.reportFullyDrawn()'));
  assert.ok(complete.indexOf('record(activity, if (success) "DATA"')<complete.indexOf('activity.reportFullyDrawn()'));
 });
-// Controlled stage-1 experiment: change only the active Android 12+ icon kind.
-// Preserve the source vector, native overlay, alpha fade and data-ready gate.
-test('stage1 static system icon is the sole active splash icon; native handoff stays guarded',()=>{
+// The animated system drawable must be ACTIVE on Android 12+, not merely
+// generated but unused. JavaScript cannot animate the Android starting window.
+test('107 system S moves from the first splash frame and keeps the original native clock',()=>{
  const generator=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
  const overlay=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
- const reference='<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark</item>';
- assert.equal(generator.split(reference).length-1,1,'exactly one active static system icon');
- assert.ok(!generator.includes('<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_animated</item>'));
- assert.ok(generator.includes("write('drawable/sofia_launch_mark.xml'"),'original vector source remains');
- assert.ok(generator.includes("write('drawable-v31/sofia_launch_mark_animated.xml'"),'unused animated resource retained for controlled reversal');
+ const motion=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchMotion.java'),'utf8');
+ const reference='<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_animated</item>';
+ assert.equal(generator.split(reference).length-1,1,'animated drawable is the sole active system icon');
+ assert.ok(!generator.includes('<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark</item>'),'static icon cannot postpone movement until callback');
+ assert.ok(generator.includes("write('drawable-v31/sofia_launch_mark_entry.xml'"));
+ assert.ok(generator.includes("write('drawable-v31/sofia_launch_mark_animated.xml'"));
+ assert.ok(generator.includes('<animated-vector'));
+ assert.ok(generator.includes('android:scaleX="0.70" android:scaleY="0.70"'));
+ assert.ok(generator.includes('android:duration="650"'));
  assert.ok(generator.includes('<item name="android:windowSplashScreenAnimationDuration">650</item>'));
- assert.ok(overlay.includes('SOFIA_LAUNCH_ICON_KIND='),'capture actual Android icon type');
+ assert.ok(!generator.includes('repeatCount'),'scale animation is finite');
+ assert.ok(overlay.includes('splash.iconAnimationStart?.let'),'handoff uses the original system start clock');
+ assert.ok(overlay.includes('val motionStart = now - elapsed'));
+ assert.ok(overlay.includes('SofiaLaunchMotion.scaleAt(startedAt, now)'));
+ assert.ok(motion.includes('public static final long DURATION_MS = 650L;'));
  assert.ok(overlay.includes('surface.animate().alpha(0f).setDuration(95L)'));
- assert.ok(overlay.includes('if (login || (home && (signals and 8) != 0)) {'),'essential Home data gate unchanged');
+ const smoke=fs.readFileSync(path.join(root,'tools/manual-apk-smoke.py'),'utf8');
+ assert.ok(smoke.includes("result['candidate_icon_kinds']"),'smoke logs verify animated Android icon type');
+ assert.ok(smoke.includes("kind=='SurfaceView'"),'candidate must use the platform animation on Android 12+');
+ assert.ok(overlay.includes('if (login || (home && (signals and 8) != 0)) {'),'do not reveal Home before essential data');
 });
