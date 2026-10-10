@@ -32,7 +32,7 @@ export function createIdleWork(options:IdleWorkOptions={}){
  const clearTimer=options.clearTimer??(id=>clearTimeout(id as ReturnType<typeof setTimeout>));
  const quietMs=options.quietMs??800,gapMs=options.gapMs??50,startDelayMs=options.startDelayMs??0,maxRecords=options.maxRecords??100;
  const queue:Entry[]=[];const records:IdleRecord[]=[];
- let started=false,startedAt=0,lastInput=-Infinity,timer:Timer|null=null,running=false,disposed=false,seq=0,nextRunAt=0;
+ let started=false,startedAt=0,lastInput=-Infinity,timer:Timer|null=null,running=false,disposed=false,seq=0,nextAllowedAt=0;
 
  const sort=()=>queue.sort((a,b)=>(a.priority??5)-(b.priority??5)||a.seq-b.seq);
  const arm=(ms:number)=>{if(disposed)return;if(timer!==null)clearTimer(timer);timer=setTimer(()=>{timer=null;void pump();},Math.max(0,ms));};
@@ -40,22 +40,32 @@ export function createIdleWork(options:IdleWorkOptions={}){
  async function pump(){
   if(disposed||running||!started||!queue.length)return;
   const t=now();
-  const fromStart=Math.max(startedAt+startDelayMs,nextRunAt)-t;
-  if(fromStart>0){arm(fromStart);return;}
+  // A newly enqueued task may re-arm the timer at zero. The gap is a hard
+  // time fence, not just the delay used for the previously armed timer.
+  const notBefore=Math.max(startedAt+startDelayMs,nextAllowedAt)-t;
+  if(notBefore>0){arm(notBefore);return;}
   sort();
-  const head=queue[0];
+  // Deadlines belong to every entry, not just the first priority group.
+  // Choose the earliest overdue deadline; otherwise retain priority/FIFO.
+  let index=0,earliest=Infinity;
+  for(let i=0;i<queue.length;i++){
+   const q=queue[i],due=q.deadlineMs===undefined?Infinity:q.enqueuedAt+q.deadlineMs;
+   if(due<=t&&due<earliest){earliest=due;index=i;}
+  }
+  const head=queue[index];
   const quietLeft=lastInput+quietMs-t;
   const overdue=head.deadlineMs!==undefined&&t-head.enqueuedAt>=head.deadlineMs;
   if(quietLeft>0&&!overdue){
-   const untilDeadline=head.deadlineMs!==undefined?head.enqueuedAt+head.deadlineMs-t:Infinity;
-   arm(Math.min(quietLeft,untilDeadline));return;
+   const nextDeadline=queue.reduce((due,q)=>Math.min(due,q.deadlineMs===undefined?Infinity:q.enqueuedAt+q.deadlineMs),Infinity);
+   arm(Math.min(quietLeft,nextDeadline-t));return;
   }
-  queue.shift();running=true;
+  queue.splice(index,1);running=true;
   const begin=now();let error:string|undefined;
   try{await head.run();}catch(e){error=e instanceof Error?e.message:String(e);}
   records.push({name:head.name,startedAtMs:begin-startedAt,durationMs:Math.max(0,now()-begin),forcedByDeadline:quietLeft>0&&overdue,error});
   if(records.length>maxRecords)records.splice(0,records.length-maxRecords);
-  running=false;nextRunAt=now()+gapMs;
+  nextAllowedAt=now()+gapMs;
+  running=false;
   if(queue.length)arm(gapMs);
  }
 

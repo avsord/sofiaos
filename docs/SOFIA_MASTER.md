@@ -179,7 +179,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 ## 9. Pendências (atualizar a cada rodada)
 
-0. **R7 em implementação/validação:** agendador, Activity e painel Novo/Antigo. Medir cinco aberturas por modo com semente pesada; só declarar correção física após evidência. Resultados e desvios no PR e relatório da execução; candidato 0.3.108, sem aprovação OTA.
+0. **R7 integrada; R7.1 em validação:** a 0.3.108 compilou no commit `39121fd`, smoke normal passou e smoke pesado falhou em Páginas no modo Novo (run 38089508740). A R7.1 corrige prazos de todas as tarefas mantendo folga de 50ms; movimentos contínuos renovam os 800ms sem setState. A medição de Páginas usa partidas separadas por modo/trial, teto 8s, meta 1s reportada e falha obrigatória para falso vazio/timeout. Candidato 0.3.109; aceite físico e resultados do novo CI pendentes. Não implementar virtualização/R8/R9 nem publicar OTA nesta rodada.
 0. **R8:** virtualizar Páginas/Apps e fragmentar o arquivo de histórico por rota sem perda de dados.
 0. **R9:** calibrar carga ≥3× contagens reais do painel, habilitar gates reprovadores de desempenho e remover Antigo. Não iniciar nesta R7.
 
@@ -213,7 +213,9 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 | 2026-10-10 | 0.3.106 | #14 | Protocolo SOFIA_KEY e estado vivo automático em branch independente; guardas de segredo e aprovação | Validado no workflow 38078156195; nenhum APK novo |
 | 2026-10-10 | 0.3.107 | #15 | Aquecer abas após Home sem esperar histórico e sem rerender geral; manter navegação nativa protegida | [CI 38080609693](https://github.com/avsord/sofiaos/actions/runs/38080609693) compilação e smoke QA aprovados; DATA +19 ms vs 0.3.106 no mesmo emulador; primeiros toques ainda com aba não montada; físico pendente, OTA não publicado |
 
-| 2026-10-10 | 0.3.108 | R7 | Agendador, Activity, proteção de rascunhos, painel e semente pesada Novo/Antigo | Implementação/CI em andamento; nenhum ganho físico alegado; metas numéricas serão registradas após execução |
+| 2026-10-10 | 0.3.108 | R7 | Agendador, Activity, proteção de rascunhos, painel e semente pesada Novo/Antigo | Compilação e smoke normal aprovados no run 38089508740; pesado reprovado no modo Novo, lista não apareceu na captura; nenhuma aprovação de desempenho |
+
+| 2026-10-10 | 0.3.109 | R7.1 | Prazos por tarefa, proteção durante movimento e medição de conteúdo de Páginas por modo/trial | Candidato em validação; metas de desempenho não equivalem a corretude; não publicado OTA |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

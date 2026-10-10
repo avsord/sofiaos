@@ -3,11 +3,11 @@ No owner's records, no network, no uninstall or storage clearing. Re-seed each
 trial because the existing 32-route/4MiB cache eviction policy remains intact.
 Timing goals are REPORTED only in R7; crashes/lost local drafts fail correctness.
 """
-import json, re, time, statistics, subprocess, xml.etree.ElementTree as ET, hashlib
+import json, re, time, statistics, subprocess, xml.etree.ElementTree as ET, hashlib, importlib.util
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];DIST=ROOT/'dist';OUT=DIST/'fluency-evidence';OUT.mkdir(parents=True,exist_ok=True)
 PKG='com.avsord.sofiaapp';SEED=DIST/'QA-ONLY-fluency-seed.apk';QA=DIST/'QA-ONLY-manual-universal.apk'
-RESULT={'correctness_passed':False,'performance_gate_enforced':False,'physical_device':False,'owner_apk_directly_executed':False,'same_qa_binary_both_modes':True,'offline':True,'trials':[], 'scope':'same-emulator New versus instrumented Old policy; cache only, no real user data'}
+RESULT={'pages_trials':[],'original_failure_mode':'new','correctness_passed':False,'performance_gate_enforced':False,'physical_device':False,'owner_apk_directly_executed':False,'same_qa_binary_both_modes':True,'offline':True,'trials':[], 'scope':'same-emulator New versus instrumented Old policy; cache only, no real user data'}
 def adb(*args): return subprocess.check_output(['adb',*args],stderr=subprocess.STDOUT,timeout=90).decode(errors='replace')
 def xml():
  adb('shell','uiautomator','dump','/sdcard/r7.xml');return adb('shell','cat','/sdcard/r7.xml')
@@ -71,11 +71,48 @@ def cold_trial(mode,index,points,scale=1,video=False):
  (OUT/(label+'.json')).write_text(json.dumps(result,indent=2,ensure_ascii=False));RESULT['trials'].append(result)
  return result
 
-def correctness(points):
+
+# Per-mode first-content observations run in a separate fresh process so that
+# probing does not delay the original 0.5/1/1.5/2s stress-tap sequence.
+_spec=importlib.util.spec_from_file_location('pages_probe',Path(__file__).with_name('pages-first-content.py'))
+_probe=importlib.util.module_from_spec(_spec);_spec.loader.exec_module(_probe)
+def xml_bounded(remaining):
+ before=time.monotonic()
+ try:
+  subprocess.check_output(['adb','shell','uiautomator','dump','/sdcard/r71.xml'],stderr=subprocess.STDOUT,timeout=remaining)
+  rest=max(.001,remaining-(time.monotonic()-before))
+  return subprocess.check_output(['adb','shell','cat','/sdcard/r71.xml'],stderr=subprocess.STDOUT,timeout=rest).decode(errors='replace')
+ except subprocess.TimeoutExpired as error:
+  raise TimeoutError('UIAutomator exceeded remaining observation window') from error
+
+def observe_page_list(mode,trial,points):
+ started=time.monotonic();tap(points['Páginas'])
+ def snapshot(label,tree,observed):
+  (OUT/(str(trial)+'-pages-'+label+'.xml')).write_text(tree)
+ result=_probe.measure_pages(xml_bounded,mode=mode,trial=trial,started_at=started,on_snapshot=snapshot)
+ print('SOFIA_PERF_PAGES_CONTENT '+json.dumps(result,ensure_ascii=False),flush=True)
+ (OUT/(str(trial)+'-pages-content.json')).write_text(json.dumps(result,indent=2,ensure_ascii=False))
+ return result
+
+def pages_trial(mode,index,points,scale=1):
+ expected=seed(mode,scale);stop();adb('logcat','-c');start();observed,launch=wait_data()
+ # Matches the first Pages interaction of the stress protocol (0.5s after DATA).
+ time.sleep(max(0,observed+.5-time.monotonic()))
+ row=observe_page_list(mode,f'{index:02d}-{mode}-x{scale}-cold',points)
+ row['fixture']=expected;row['separate_cold_start']=True
+ logs=collect_logs();(OUT/(row['trial']+'-pages.log')).write_text(logs)
+ row['crashed']='FATAL EXCEPTION' in logs
+ row['correctness_passed']=row['correctness_passed'] and not row['crashed']
+ RESULT['pages_trials'].append(row)
+ return row
+
+def correctness(points,mode):
  # No network or deleting: verify the actual editor survives hide/show with a dirty draft.
- tap(points['Páginas']);time.sleep(.5);tree=xml();(OUT/'pages-heavy.xml').write_text(tree)
- assert 'Sua primeira página' not in tree,'False empty Page list with confirmed heavy cache'
- assert 'Página QA' in tree,'Heavy page list not visible'
+ page=observe_page_list(mode,'correctness-'+mode,points);RESULT['correctness_mode']=mode
+ assert not page['false_empty'],'False empty Page list with confirmed heavy cache; mode='+mode
+ assert page['content_visible'],'Heavy page list not visible within 8000ms; mode='+mode
+ tree=(OUT/('correctness-'+mode+'-pages-content.xml')).read_text()
+ (OUT/'pages-heavy.xml').write_text(tree)
  tap(point(tree,'Abrir página principal Página QA 0000'));time.sleep(.4);tree=xml()
  tap(point(tree,'Título da página'));adb('shell','input','keyevent','KEYCODE_MOVE_END');adb('shell','input','text','_R7_KEEP')
  adb('shell','input','keyevent','BACK');time.sleep(.3)
@@ -111,13 +148,19 @@ try:
  RESULT['qa_sha256']=hashlib.sha256(QA.read_bytes()).hexdigest();RESULT['source_sha']=(DIST/'SOURCE_COMMIT.txt').read_text().strip()
  seed('old');start();wait_data();time.sleep(2);tree=xml()
  points={label:point(tree,label) for label in ['Início','Páginas','Conversa','Agenda','Apps','Perfil']};RESULT['menu_points']=points
- for i,mode in enumerate(['old','new','new','old','old','new','new','old','old','new']):cold_trial(mode,i+1,points,video=i<2)
+ for i,mode in enumerate(['old','new','new','old','old','new','new','old','old','new']):
+  cold_trial(mode,i+1,points,video=i<2)
+  pages_trial(mode,i+1,points)
  summarize()
  if not RESULT['old_reproduced']:
   RESULT['fixture_escalated']=True
   cold_trial('old',11,points,scale=2,video=True);cold_trial('new',12,points,scale=2,video=True);summarize()
   RESULT['caution']='Escalated trials x2 reported separately by label; mixed-volume summary is exploratory, not equal-load improvement percent'
- correctness(points);RESULT['correctness_passed']=True
+ RESULT['pages_by_mode']={mode:[{'trial':r['trial'],'pages_first_content_ms':r['pages_first_content_ms'],'correctness_passed':r['correctness_passed'],'goal_met':r['goal_met'],'false_empty':r['false_empty'],'timed_out':r['timed_out']} for r in RESULT['pages_trials'] if r['mode']==mode] for mode in ['old','new']}
+ RESULT['pages_failed_modes']=sorted({r['mode'] for r in RESULT['pages_trials'] if not r['correctness_passed']})
+ RESULT['pages_all_targets_met']=all(r['goal_met'] for r in RESULT['pages_trials'])
+ assert not RESULT['pages_failed_modes'],'First page content correctness failed; modes='+','.join(RESULT['pages_failed_modes'])+'; inspect per-trial JSON (goal is reported separately)'
+ correctness(points,RESULT['trials'][-1]['mode']);RESULT['correctness_passed']=True
 finally:
  (OUT/'result.json').write_text(json.dumps(RESULT,indent=2,ensure_ascii=False)+'\n')
 print(json.dumps({k:v for k,v in RESULT.items() if k!='trials'},ensure_ascii=False))

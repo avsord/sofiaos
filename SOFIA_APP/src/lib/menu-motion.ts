@@ -15,7 +15,7 @@ export const MENU_SPRING={stiffness:300,damping:30,mass:0.85,overshootClamping:t
   restDisplacementThreshold:0.001,restSpeedThreshold:0.001,useNativeDriver:true,isInteraction:false} as const;
 
 /** One native scroll signal drives the pill, icon and caption, without React frames. */
-export function createMenuMotion(initial:Tab='chat') {
+export function createMenuMotion(initial:Tab='chat',onMovement?:()=>void) {
   let selected=initial,width=1,lastOffset=Math.max(0,tabIndex(initial));
   let tracking=false,dragging=false,reduced=false;
   const scrollX=new Animated.Value(lastOffset),viewport=new Animated.Value(width);
@@ -30,9 +30,9 @@ export function createMenuMotion(initial:Tab='chat') {
   let springs:Animated.CompositeAnimation[]=[];
   const stop=()=>{springs.forEach(s=>s.stop());springs=[];};
   const onScroll=Animated.event([{nativeEvent:{contentOffset:{x:scrollX}}}],{
-    // The graph follows the finger entirely on the UI thread. There is no
-    // per-frame JS listener competing with screen refreshes or chat updates.
-    useNativeDriver:true
+    // Position/highlight remain driven by the native graph. The optional
+    // listener only renews a timestamp while scrolling; it never sets state.
+    useNativeDriver:true,listener:onMovement
   });
   function select(next:Tab) {
     if(next===selected&&!dragging)return; // A React commit must not restart the motion.

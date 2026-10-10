@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {startFluency,revealFluency,noteFluencyInput,queueOptional,FLUENCY_MODE_KEY,type FluencyMode} from './src/lib/fluency';
+import {startFluency,revealFluency,noteFluencyInput,noteFluencyMovement,queueOptional,FLUENCY_MODE_KEY,type FluencyMode} from './src/lib/fluency';
 import {perfActive,perfNow,perfTap} from './src/lib/fluency-metrics';
 import {scheduleIdleTask} from './src/lib/idle-task';
 import {prepareLocalLaunch,createLaunchPreparation} from './src/lib/local-launch';
@@ -51,7 +51,7 @@ function Shell({startup}:{startup:LocalLaunch}){
  const [backgroundReady,setBackgroundReady]=useState(false);
  navigation.current={tab,locked};
  const screenTab=tab;
- const menuMotion=useMemo(()=>createMenuMotion('home'),[]);
+ const menuMotion=useMemo(()=>createMenuMotion('home',noteFluencyMovement),[]);
  useEffect(()=>{let mounted=true;void AccessibilityInfo.isReduceMotionEnabled().then(value=>{if(mounted)menuMotion.setReducedMotion(value);}).catch(()=>{});const sub=AccessibilityInfo.addEventListener('reduceMotionChanged',value=>menuMotion.setReducedMotion(value));return()=>{mounted=false;sub.remove();menuMotion.dispose();};},[menuMotion]);
  const [themeClock,setThemeClock]=useState(()=>new Date());
  useEffect(()=>{const update=()=>setThemeClock(previous=>{const now=new Date();return now.getHours()!==previous.getHours()||now.getMinutes()!==previous.getMinutes()?now:previous;}),timer=setInterval(update,1000),sub=AppState.addEventListener('change',state=>{if(state==='active')update();});return()=>{clearInterval(timer);sub.remove();};},[]);

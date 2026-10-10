@@ -10,6 +10,8 @@ export const fluencyMode=()=>selected;
 export function startFluency(mode:FluencyMode){if(initialized)return;initialized=true;selected=mode;perfSetMode(mode);if(mode==='new')idleWork.start();}
 export function revealFluency(){perfStart();}
 export function noteFluencyInput(){perfInput();if(newFluency())idleWork.noteInput();}
+/** Continuous scroll/momentum: update only the idle clock, not React or tap logs. */
+export function noteFluencyMovement(){if(newFluency())idleWork.noteInput();}
 /** Only callers owning non-urgent work use this. Foreground writes never queue. */
 export function queueOptional(name:string,run:()=>void|Promise<void>,priority=6,deadlineMs?:number):()=>void{
  let live=true;const key=name+':'+(++sequence);
