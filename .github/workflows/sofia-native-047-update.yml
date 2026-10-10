@@ -129,11 +129,14 @@ jobs:
         npx expo prebuild --platform android --clean --no-install
         test -f android/app/src/main/res/drawable/sofia_logo.xml
         test -f android/app/src/main/res/values-v31/sofia-splash.xml
+        grep -q '^android.enableMinifyInReleaseBuilds=true$' android/gradle.properties
+        grep -q '^android.enableShrinkResourcesInReleaseBuilds=true$' android/gradle.properties
         ! find android/app/src/main/res -name splashscreen_logo.png | grep -q .
         grep -q '@drawable/sofia_logo_foreground' android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
         cd android
         chmod +x gradlew
-        ./gradlew :app:assembleRelease --build-cache --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a,x86_64
+        ./gradlew :app:assembleRelease --build-cache --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a
+        test -s app/build/outputs/mapping/release/mapping.txt
       id: build
       if: steps.plan.outputs.release == 'true'
     - name: Verify package, increasing version code and existing update signature
@@ -160,6 +163,19 @@ jobs:
         cp /tmp/sofia-baseline/Sofia-OS.apk dist/baseline-Sofia-OS.apk
       id: identity
       if: steps.plan.outputs.release == 'true'
+    - name: Build signed emulator-only QA twin without altering ARM64 owner APK
+      working-directory: SOFIA_APP
+      run: |
+        set -euo pipefail
+        cd android
+        ./gradlew :app:assembleRelease --build-cache --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a,x86_64
+        cp app/build/outputs/apk/release/app-release.apk ../dist/QA-ONLY-manual-universal.apk
+        cd ..
+        python3 tools/verify-abi-equivalence.py
+        SDK_TOOLS="$(python3 -c 'import os,pathlib; p=pathlib.Path(os.environ["ANDROID_HOME"])/"build-tools"; print(max((x for x in p.iterdir() if x.is_dir()), key=lambda x:tuple(int(n) for n in x.name.split(".") if n.isdigit())))')"
+        "$SDK_TOOLS/apksigner" verify --verbose --print-certs dist/QA-ONLY-manual-universal.apk > /tmp/qa-signature.txt
+        test "$(sed -n 's/.*certificate SHA-256 digest: //p' /tmp/qa-signature.txt)" = "$(sed -n 's/.*certificate SHA-256 digest: //p' dist/signature.txt)"
+      if: steps.plan.outputs.release == 'true' && contains(github.event.head_commit.message, '[manual-apk]') && env.SOFIA_MANUAL_NO_TESTS != 'true'
     - name: Build full production shell with isolated transport for acceptance
       working-directory: SOFIA_APP
       run: |
@@ -312,7 +328,7 @@ jobs:
         if-no-files-found: error
         retention-days: 30
   manual_apk:
-    name: Check the single production APK for manual delivery
+    name: Check ARM64 production identity and QA-equivalent runtime on x86 emulator
     needs: build
     if: needs.build.outputs.release == 'true' && contains(github.event.head_commit.message, '[manual-apk]') && !contains(github.event.head_commit.message, '[no-tests]')
     runs-on: ubuntu-22.04
@@ -359,12 +375,14 @@ jobs:
         test "$(git rev-parse HEAD)" = "$SOFIA_SOURCE_SHA"
         sha256sum -c dist/Sofia-OS.apk.sha256
         test ! -e dist/QA-ONLY-full-fixture.apk
+        test -s dist/QA-ONLY-manual-universal.apk
+        python3 tools/verify-abi-equivalence.py
     - name: Enable KVM
       run: |
         echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
         sudo udevadm control --reload-rules
         sudo udevadm trigger --name-match=kvm
-    - name: Compare offline authenticated startup and verify retained conversation
+    - name: Compare QA-equivalent offline authenticated startup and verify retained conversation
       uses: reactivecircus/android-emulator-runner@v2
       with:
         api-level: 33
