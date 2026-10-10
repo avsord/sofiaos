@@ -22,8 +22,8 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 
-/** Prepare the source vector at final resolution before Home is ready. Fade
- * one cached native surface; optional work waits for visual completion. */
+/** Prepare the source vector at final resolution before Home is ready. Fade one
+ * cached native surface; optional work waits for visual completion. */
 object SofiaLaunchOverlay {
   private var host: WeakReference<Activity>? = null
   private var observer: ViewTreeObserver? = null
@@ -97,19 +97,25 @@ object SofiaLaunchOverlay {
           // animator is reserved for alpha, avoiding a live scale animator
           // during the Home/fade handoff.
           var finished = false
+          var originalRemoved = false
+          fun removeOriginal() {
+            if (!originalRemoved) {
+              originalRemoved = true
+              splash.remove()
+              if (host?.get() === activity) record(activity, "SPLASH_REMOVED")
+            }
+          }
           fun disposeSurface() {
             surface.alpha = 0f
             surface.animate().cancel()
             decor.overlay.remove(surface)
           }
-          removeSystemSplash = { finished = true; disposeSurface(); splash.remove() }
+          removeSystemSplash = { finished = true; disposeSurface(); removeOriginal() }
           exitSystemSplash = { success ->
             if (!exitStarted && host?.get() === activity) {
               exitStarted = true
-              // The same opaque layer has already painted over the static icon.
-              // Remove Android's window before fading, without allocating a view.
-              splash.remove()
-              record(activity, "SPLASH_REMOVED")
+              // Reuse the existing mark; no new draw layer at Home readiness.
+              removeOriginal()
               val complete = {
                 if (!finished) {
                   finished = true
@@ -122,20 +128,41 @@ object SofiaLaunchOverlay {
                 Unit
               }
               record(activity, "FADE_START")
-              surface.animate().alpha(0f).setDuration(95L)
+              surface.animate().alpha(0f).setDuration(150L)
                 .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
                 .withEndAction { complete() }.start()
-              surface.postDelayed({ complete() }, 180L)
+              surface.postDelayed({ complete() }, 210L)
             }
             Unit
           }
-          when (transition.splashReady()) {
-            SofiaLaunchTransition.Exit.SYSTEM_SPLASH -> exitSystemSplash?.invoke(!failed)
-            SofiaLaunchTransition.Exit.REMOVE_STALE_SPLASH -> {
-              removeSystemSplash?.invoke(); removeSystemSplash = null; exitSystemSplash = null
+          // Submit the copied vector early, then refresh its motion after
+          // first-use texture work. Transfer only after that fresh frame commits.
+          // Removing the opaque OS View lets real partial menu/Home frames draw
+          // under this almost-opaque S before the final readiness/fade callback.
+          fun copySubmitted() {
+            if (finished || originalRemoved || host?.get() !== activity) return
+            removeOriginal()
+            when (transition.splashReady()) {
+              SofiaLaunchTransition.Exit.SYSTEM_SPLASH -> exitSystemSplash?.invoke(!failed)
+              SofiaLaunchTransition.Exit.REMOVE_STALE_SPLASH -> {
+                removeSystemSplash?.invoke(); removeSystemSplash = null; exitSystemSplash = null
+              }
+              else -> Unit
             }
-            else -> Unit
           }
+          if (decor.isHardwareAccelerated) {
+            decor.viewTreeObserver.registerFrameCommitCallback {
+              activity.runOnUiThread {
+                if (!finished && host?.get() === activity) {
+                  decor.viewTreeObserver.registerFrameCommitCallback {
+                    activity.runOnUiThread { copySubmitted() }
+                  }
+                  surface.invalidate()
+                }
+              }
+            }
+          } else decor.postOnAnimation { copySubmitted() }
+
         }
       }
     }
@@ -315,7 +342,7 @@ object SofiaLaunchOverlay {
   }
 }
 
-/** Continue the system animation clock using sharp source pixels; alpha-only exit. */
+/** Preserve the captured system pixels; one finite Canvas scale, alpha-only exit. */
 private class SofiaEarlySplashSurface(
   activity: Activity,
   private val pixels: Bitmap?,
@@ -325,6 +352,7 @@ private class SofiaEarlySplashSurface(
 ) : View(activity) {
   private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
   private val backgroundColor = android.graphics.Color.rgb(114, 88, 232)
+  init { alpha = 254f / 255f }
   val markCenterX = markLeft + (pixels?.width ?: 0) / 2f
   val markCenterY = markTop + (pixels?.height ?: 0) / 2f
   override fun onDraw(canvas: Canvas) {
@@ -338,6 +366,9 @@ private class SofiaEarlySplashSurface(
     if (now - startedAt < SofiaLaunchMotion.DURATION_MS && alpha > 0f)
       postInvalidateOnAnimation()
   }
+
+
+
 }
 
 class SofiaLaunchModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {

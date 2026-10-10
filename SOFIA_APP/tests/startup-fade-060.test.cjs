@@ -82,9 +82,9 @@ test('060 unmount or launch failure cannot release stale optional services',asyn
 test('060 old platforms without the visibility bridge keep a cancellable fallback',async()=>{
  const f=visibilityFixture(false);assert.deepEqual(f.states,[false]);f.frames.shift()();f.frames.shift()();assert.deepEqual(f.states,[false,true]);f.dispose();
 });
-test('104 source-resolution surface preserves one animation clock without startup warmup',()=>{
+test('105 early visible snapshot preserves system pixels through scale and fade',()=>{
  const native=file('plugins/native/SofiaLaunchOverlay.kt');
- const exit=native.slice(native.indexOf('exitSystemSplash = { success ->'),native.indexOf('when (transition.splashReady())'));
+ const exit=native.slice(native.indexOf('exitSystemSplash = { success ->'),native.indexOf('// Submit the copied vector early'));
  assert.ok(!native.includes('SofiaLaunchFadeLayer'));
  assert.ok(native.indexOf('decor.overlay.add(surface)')<native.indexOf('exitSystemSplash = { success ->'));
  assert.ok(!native.includes('SurfaceControl.Transaction'));
@@ -98,22 +98,26 @@ test('104 source-resolution surface preserves one animation clock without startu
  assert.ok(native.includes('splash.iconAnimationStart?.let')); 
  assert.ok(!exit.includes('postOnAnimation'));
  assert.ok(!exit.includes('registerFrameCommitCallback'));
- assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
- assert.ok(exit.includes('surface.postDelayed({ complete() }, 180L)'));
+ assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(150L)'));
+ assert.ok(exit.includes('surface.postDelayed({ complete() }, 210L)'));
  const complete=exit.slice(exit.indexOf('val complete ='),exit.indexOf('record(activity, "FADE_START")'));
  assert.ok(complete.includes('if (!finished)'));
  assert.ok(complete.indexOf('finished = true')<complete.indexOf('disposeSurface()'));
- assert.ok(exit.indexOf('splash.remove()')<exit.indexOf('record(activity, "FADE_START")'));
+ assert.ok(exit.indexOf('removeOriginal()')<exit.indexOf('record(activity, "FADE_START")'));
  assert.ok(complete.indexOf('disposeSurface()')<complete.indexOf('record(activity, "FADE_DONE")'));
  assert.ok(native.includes('mark.draw(Canvas(pixels))'));
  assert.ok(!native.includes('icon.draw(Canvas(it))')); 
- assert.ok(!native.includes('alpha = 254f / 255f'));
+ assert.ok(native.includes('alpha = 254f / 255f'));
  assert.ok(!native.includes('HardwareRenderer'));
  assert.ok(!native.includes('SofiaHomeDrawingWarmup'));
- assert.ok(!native.includes('queueWindowProgram'));
- assert.ok(!native.includes('warmPaint'));
  assert.ok(!native.includes('preparationStep'));
- assert.ok(!native.includes('Paint.Style.STROKE'));
+ assert.ok(!native.includes('queueWindowProgram'));
+ assert.ok(native.includes('decor.viewTreeObserver.registerFrameCommitCallback'));
+ assert.ok(native.includes('activity.runOnUiThread { copySubmitted() }'));
+ assert.ok(native.includes('if (finished || originalRemoved || host?.get() !== activity) return'));
+ assert.ok(native.includes('surface.invalidate()'));
+ const transfer=native.slice(native.indexOf('fun copySubmitted()'),native.indexOf('if (decor.isHardwareAccelerated)'));
+ assert.ok(transfer.indexOf('removeOriginal()')<transfer.indexOf('transition.splashReady()'));
  assert.ok(!native.includes('View.INVISIBLE'));
  assert.ok(native.includes('Bitmap.createBitmap(markSize, markSize, Bitmap.Config.ARGB_8888)'));
  assert.ok(!native.includes('.recycle()'));
