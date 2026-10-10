@@ -4,11 +4,6 @@ import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.HardwareRenderer
-import android.graphics.PixelFormat
-import android.graphics.RenderNode
-import android.hardware.HardwareBuffer
-import android.media.ImageReader
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.os.Build
@@ -51,7 +46,6 @@ object SofiaLaunchOverlay {
   private const val STORE = "sofia.launch.timings.v1"
 
   fun start(activity: Activity) {
-    SofiaHomeDrawingWarmup.start(activity.resources.displayMetrics.scaledDensity)
     // A hot start reuses this Activity and does not call start. Configuration
     // recreation has no new starting window; cold/warm launches do.
     val expectsSplash = Build.VERSION.SDK_INT >= 31 &&
@@ -119,11 +113,12 @@ object SofiaLaunchOverlay {
                 }
                 Unit
               }
+              surface.stopPreparation()
               record(activity, "FADE_START")
-              surface.animate().alpha(0f).setDuration(140L)
+              surface.animate().alpha(0f).setDuration(180L)
                 .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
                 .withEndAction { complete() }.start()
-              surface.postDelayed({ complete() }, 210L)
+              surface.postDelayed({ complete() }, 230L)
             }
             Unit
           }
@@ -225,7 +220,7 @@ object SofiaLaunchOverlay {
     // extra postOnAnimation fence added 400–650 ms on loaded Android emulators:
     // Home was ready, but Android did not start the fade until another frame.
     // Begin the synchronized splash exit in this SAME ready callback. The
-    // underlying prepared Home draws during the 140-ms fade.
+    // underlying prepared Home draws during the 180-ms fade.
     when (transition.contentReady()) {
       SofiaLaunchTransition.Exit.SYSTEM_SPLASH -> exitSystemSplash?.invoke(success)
       SofiaLaunchTransition.Exit.CONTENT -> {
@@ -323,16 +318,27 @@ private class SofiaEarlySplashSurface(
   private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
   private val startedAt = SystemClock.uptimeMillis()
   private val backgroundColor = android.graphics.Color.rgb(114, 88, 232)
-  init {
-    // Enter Android's composed-alpha path on the early visible frame,
-    // not for the first time when Home is ready. Over the matching original
-    // splash, 254/255 differs by at most one 8-bit channel step.
-    alpha = 254f / 255f
+  private val warmPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
+    color = backgroundColor
+    textSize = 18f * resources.displayMetrics.scaledDensity
+    typeface = Typeface.DEFAULT
   }
+  private var preparationStep = 0
+  private var fading = false
+  fun stopPreparation() { fading = true }
   val markCenterX = markLeft + (pixels?.width ?: 0) / 2f
   val markCenterY = markTop + (pixels?.height ?: 0) / 2f
   override fun onDraw(canvas: Canvas) {
     canvas.drawColor(backgroundColor)
+    // First prepare ordinary window programs with alpha=1. Priming inside an
+    // alpha layer compiled different Circle/RRect programs in the 101 trace.
+    // One primitive family per frame avoids stroke/fill batch substitutions.
+    if (!fading && preparationStep < 3) {
+      queueWindowProgram(canvas, preparationStep++)
+      if (preparationStep == 3) postOnAnimation {
+        if (!fading) alpha = 254f / 255f
+      }
+    }
     val now = SystemClock.uptimeMillis()
     val scale = SofiaLaunchMotion.scaleAt(startedAt, now) / 0.88f
     canvas.save()
@@ -342,92 +348,26 @@ private class SofiaEarlySplashSurface(
     if (now - startedAt < SofiaLaunchMotion.DURATION_MS && alpha > 0f)
       postInvalidateOnAnimation()
   }
-
-
-}
-
-/** Warm the shared Android render context without work in the S animation. */
-private object SofiaHomeDrawingWarmup {
-  private var scheduled = false
-  @Synchronized fun start(scaledDensity: Float) {
-    if (scheduled || Build.VERSION.SDK_INT < 31) return
-    scheduled = true
-    // Called before Activity.super.onCreate, so React and shader preparation
-    // can proceed together. No UI readiness, I/O or animation waits on this.
-    Thread({
-      var reader: ImageReader? = null
-      var renderer: HardwareRenderer? = null
-      var scene: RenderNode? = null
-      try {
-        val target = ImageReader.newInstance(192, 192, PixelFormat.RGBA_8888, 2,
-          HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE or HardwareBuffer.USAGE_GPU_COLOR_OUTPUT)
-        reader = target
-        val content = RenderNode("SofiaHomeDrawingWarmup")
-        scene = content
-        content.setPosition(0, 0, 192, 192)
-        val painter = HardwareRenderer()
-        renderer = painter
-        painter.setName("SofiaHomeDrawingWarmup")
-        painter.setOpaque(true)
-        painter.setSurface(target.surface)
-        painter.setContentRoot(content)
-        val canvas = content.beginRecording()
-        recordPrograms(canvas, scaledDensity)
-        content.endRecording()
-        // One offscreen frame only. Wait on THIS worker, consume it promptly,
-        // then release every resource. Never wait on the UI/React/data worker.
-        val result = painter.createRenderRequest().setWaitForPresent(true).syncAndDraw()
-        target.acquireNextImage()?.close()
-        Log.i("SofiaLaunch", "SOFIA_DRAW_WARM_PROCESS_MS=${SystemClock.uptimeMillis() - Process.getStartUptimeMillis()} RESULT=$result")
-      } catch (error: Throwable) {
-        // Optional optimization: platform/driver failure retains normal launch.
-        Log.w("SofiaLaunch", "Drawing preparation unavailable", error)
-      } finally {
-        renderer?.destroy()
-        scene?.discardDisplayList()
-        reader?.close()
+  private fun queueWindowProgram(canvas: Canvas, step: Int) {
+    canvas.save()
+    canvas.translate(0f, canvas.clipBounds.top + 96f * resources.displayMetrics.density)
+    when (step) {
+      0 -> canvas.drawCircle(24.25f, 24.25f, 14f, warmPaint)
+      1 -> canvas.drawRoundRect(RectF(52.25f, 8.25f, 118.25f, 40.25f), 10f, 10f, warmPaint)
+      2 -> {
+        canvas.drawText("Olá, Sofia. Agenda", 4f, 74f, warmPaint)
+        warmPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("Conversa", 4f, 106f, warmPaint)
+        warmPaint.alpha = 128
+        canvas.drawRect(76.25f, 112.25f, 92.75f, 128.75f, warmPaint)
+        warmPaint.alpha = 255
       }
-    }, "SofiaHomeDrawingWarmup").start()
+    }
+    canvas.restore()
   }
 
-  private fun recordPrograms(canvas: Canvas, scaledDensity: Float) {
-    canvas.drawColor(android.graphics.Color.rgb(24, 22, 30))
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
-      color = android.graphics.Color.rgb(181, 160, 255)
-      textSize = 18f * scaledDensity
-      typeface = Typeface.DEFAULT
-    }
-    canvas.drawCircle(24f, 24f, 14f, paint)
-    paint.style = Paint.Style.STROKE
-    paint.strokeWidth = 1f
-    canvas.drawCircle(24f, 24f, 14f, paint)
-    paint.style = Paint.Style.FILL
-    val rounded = RectF(52f, 8f, 118f, 40f)
-    canvas.drawRoundRect(rounded, 10f, 10f, paint)
-    paint.style = Paint.Style.STROKE
-    canvas.drawRoundRect(rounded, 10f, 10f, paint)
-    paint.style = Paint.Style.FILL
-    canvas.drawText("Olá, Sofia. Agenda", 4f, 74f, paint)
-    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-    canvas.drawText("Conversa", 4f, 106f, paint)
-    // Match both ordinary opaque/transparent fills and AA coverage variants.
-    paint.isAntiAlias = false
-    canvas.drawRect(4f, 112f, 20f, 128f, paint)
-    paint.alpha = 128
-    canvas.drawRect(28f, 112f, 44f, 128f, paint)
-    paint.isAntiAlias = true
-    paint.alpha = 255
-    canvas.drawRect(52.25f, 112.25f, 68.75f, 128.75f, paint)
-    paint.alpha = 128
-    canvas.drawRect(76.25f, 112.25f, 92.75f, 128.75f, paint)
-    // Prepare the bitmap/alpha composition used by the single S surface too.
-    val sample = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
-    sample.setPixel(4, 4, android.graphics.Color.WHITE)
-    val layer = canvas.saveLayerAlpha(4f, 136f, 28f, 160f, 254)
-    canvas.drawBitmap(sample, 8.25f, 140.25f,
-      Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
-    canvas.restoreToCount(layer)
-  }
+
+
 }
 
 class SofiaLaunchModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
