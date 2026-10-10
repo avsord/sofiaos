@@ -21,19 +21,21 @@ test('menu selection commits its screen before the native jump',()=>{
 });
 test('rapid taps use the latest selection, not a stale render closure',()=>{
   const match=source.match(/const navigate=useCallback\(\(next:Tab\)=>\{([\s\S]*?)\},\[switchTab\]\)/);assert.ok(match);
-  const calls=[],navigation={current:{tab:'chat',locked:false}},tabHistory={current:[]};
-  const fn=vm.runInNewContext('(next)=>{'+match[1]+'}',{navigation,tabHistory,pager:{current:{goTo:()=>{}}},Alert:{alert:()=>calls.push('blocked')},switchTab:next=>{navigation.current.tab=next;calls.push(next);}});
+  const calls=[],navigation={current:{tab:'chat',locked:false}},tabHistory={current:[]},tabTap={current:null},nativeRevealAt={current:Date.now()-1000};
+  const fn=vm.runInNewContext('(next)=>{'+match[1]+'}',{navigation,tabHistory,tabTap,nativeRevealAt,pager:{current:{goTo:()=>{}}},Alert:{alert:()=>calls.push('blocked')},switchTab:next=>{navigation.current.tab=next;calls.push(next);}});
   fn('pages');fn('agenda');fn('home');assert.deepEqual(calls,['pages','agenda','home']);assert.deepEqual(Array.from(tabHistory.current),['chat','pages','agenda']);
   fn('home');assert.equal(calls.length,3);navigation.current.locked=true;fn('profile');assert.equal(calls.at(-1),'blocked');assert.equal(navigation.current.tab,'home');
 });
 test('tap selection has no timer, vertical translation, fade or animated jump',()=>{
   // Verify the actual tap-to-selection path, not unrelated optional startup
   // read-ahead. Its cancellable timers are outside the synchronous touch handler.
-  for(const token of ['PanResponder','Animated','Easing','transitioning','translateY','requestAnimationFrame'])assert.ok(!source.includes(token),token);
+  for(const token of ['PanResponder','Animated','Easing','transitioning','translateY'])assert.ok(!source.includes(token),token);
   const immediate=source.slice(source.indexOf('const switchTab=useCallback('),source.indexOf('const [taskContext'));
   assert.ok(immediate.includes('setTab(next)'));
   assert.ok(!immediate.includes('pager.current?.goTo(next)')); 
   assert.ok(!immediate.includes('setTimeout'),'No timer in tab selection/navigation');
+  assert.ok(!immediate.includes('requestAnimationFrame'),'No frame deferral in the synchronous touch handler');
+  assert.ok(source.includes('SOFIA_TAB_TAP_TO_FRAME_MS'),'A separate post-commit frame measurement is permitted');
   assert.ok(!pager.slice(pager.indexOf('const goTo'),pager.indexOf('useImperativeHandle')).includes('animated:true'));assert.ok(pager.includes('animated:false'));assert.ok(!pager.includes('setTimeout'));
 });
 test('gestures use the native horizontal pager and do not steal vertical scrolls with JS responders',()=>{
@@ -49,9 +51,9 @@ test('pager keeps six fixed slots, prioritizes Home and warms hidden screens wit
   let previous=-1;for(const marker of markers){const index=body.indexOf(marker);assert.ok(index>previous,marker);previous=index;}
   for(const tab of ['chat','pages','agenda','apps','profile'])assert.ok(body.includes("mountedTabs.has('"+tab+"')"));
   const startup=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
-  assert.ok(startup.includes("const [warmed,setWarmed]=useState"));assert.ok(startup.includes("frame=requestAnimationFrame(next)"));assert.ok(startup.includes("MENU_TABS.includes(active)?[active]:[]"));
-  assert.ok(!startup.includes('setTimeout'));
-  assert.ok(source.includes('useStartupMounts(visible&&!!auth,tab)'));
+  assert.ok(startup.includes("const [warmed,setWarmed]=useState"));assert.ok(startup.includes("frame=requestAnimationFrame(advance)"));assert.ok(startup.includes("MENU_TABS.includes(active)?[active]:[]"));
+  assert.ok(startup.includes('timer=setTimeout(start,500)'),'Warming waits after navigation without postponing the tap');
+  assert.ok(source.includes('useStartupMounts(visible&&!!auth&&hydratedApi===api,tab,!!auth)'));
   assert.ok(pager.includes('removeClippedSubviews={false}'));assert.ok(!source.includes('setBootstrap(null);setTab('));
 });
 test('screen instances stay cached after lazy loading, preserving drafts and scroll positions',()=>{
@@ -108,8 +110,8 @@ test('notifications are outside the swipe sequence without losing the underlying
 test('Android identity, discovery prefix and version stay compatible',()=>{
   const config=JSON.parse(fs.readFileSync(path.join(root,'app.json'))).expo,pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json')));
   const update=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');
-  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,110);
-  assert.equal(config.version,'0.3.105');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
+  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,111);
+  assert.equal(config.version,'0.3.106');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
 });
 test('Pages opens a preloaded entity synchronously without a network wait',()=>{
  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');

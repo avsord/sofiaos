@@ -338,6 +338,11 @@ private class SofiaEarlySplashSurface(
     val scale = SofiaLaunchMotion.scaleAt(startedAt, now)
     canvas.save()
     canvas.scale(scale, scale, markCenterX, markCenterY)
+    // Never flash a fully opaque stationary S on the native handoff frame.
+    // The purple surface stays opaque; only the pre-rendered letter fades in.
+    val fade = ((now - startedAt).coerceAtLeast(0L).toFloat() /
+      SofiaLaunchMotion.S_FADE_IN_MS.toFloat()).coerceIn(0f, 1f)
+    paint.alpha = (255f * fade).toInt()
     pixels?.let { canvas.drawBitmap(it, markLeft, markTop, paint) }
     canvas.restore()
     if (now - startedAt < SofiaLaunchMotion.DURATION_MS && alpha > 0f)

@@ -28,11 +28,13 @@ import {freshTemplate,insertTemplateBlocks} from '../lib/page-templates';
 import {subscribeSystemChanged} from '../lib/system-events';
 import type {PageTemplate} from '../lib/page-templates';
 const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'null')??fallback;}catch{return fallback;}};
+const PAGE_LIST_KEY='/workspace/entities?limit=100&kind=user_page&q=&offset=0';
+const cachedPageRows=(api:SofiaApi)=>api.cached<{items:Entity[]}>(PAGE_LIST_KEY)?.items.filter(item=>item.state!=='archived');
 
 export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;active:boolean;storageScope:string;onDepthChange?:(open:boolean)=>void}){
  const keyboardVisible=useKeyboardVisible(),scrollPositions=useRef(new Map<string,number>());
- const c=useTheme(),[pages,setPages]=useState<Entity[]>(()=>api.cached<{items:Entity[]}>('/workspace/entities?limit=100&kind=user_page&q=&offset=0')?.items.filter(item=>item.state!=='archived')||[]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>()),[pageInteraction,setPageInteraction]=useState(false),[pageDragging,setPageDragging]=useState(false);
- const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null),[createParent,setCreateParent]=useState<Entity|null|undefined>(undefined);
+ const c=useTheme(),[pages,setPages]=useState<Entity[]>(()=>cachedPageRows(api)||[]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>()),[pageInteraction,setPageInteraction]=useState(false),[pageDragging,setPageDragging]=useState(false);
+ const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[loaded,setLoaded]=useState(()=>cachedPageRows(api)!==undefined),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null),[createParent,setCreateParent]=useState<Entity|null|undefined>(undefined);
  const refreshFlight=useRef(false),mutationEpoch=useRef(0),moveBusy=useRef(false),pendingPosition=useRef(new Map<string,Record<string,any>>());
  const history=useRef<string[]>([]),mounted=useRef(true),expandDisk=useRef(Promise.resolve()),inputRefs=useRef(new Map<string,TextInput>());
  const selectedRef=useRef<string|null>(null),paneWidth=useRef(0),backAction=useRef<()=>void>(()=>{});
@@ -53,6 +55,21 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   onSaved:saved=>{mutationEpoch.current++;if(mounted.current)setPages(prev=>prev.map(p=>p.id===saved.id?{...saved,data:{...saved.data,...pendingPosition.current.get(saved.id)}}:p));}
  }),[api,key]);
  useEffect(()=>store.subscribe(()=>setTick(v=>v+1)),[store]);
+ // A fast tab touch can race Shell's post-reveal archive hydration. Restore the
+ // existing page list as soon as that disk read finishes; do not wait for I/O
+ // or paint a false empty state. Never overwrite an active local edit.
+ useEffect(()=>{
+  let live=true;
+  void api.hydrate().then(()=>{
+   if(!live||!mounted.current)return;
+   const local=cachedPageRows(api);
+   if(local!==undefined){
+    setPages(prev=>prev.length?prev:local);
+    setLoaded(true);
+   }
+  }).catch(()=>{});
+  return()=>{live=false;};
+ },[api]);
  useEffect(()=>subscribeSystemChanged(owner=>{if(owner===api)void load();}),[api,store]);
  async function load(manual=false){
   if(refreshFlight.current||moveBusy.current||(!manual&&pageInteractionRef.current))return;
@@ -63,7 +80,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
    for(let offset=0;offset<10000;offset+=100){const r=await api.entities('user_page','',offset);items.push(...r.items.filter(x=>x.state!=='archived'));if(r.items.length<100)break;if(offset===9900)throw Error('Há mais páginas do que esta sincronização consegue carregar. Nenhuma página foi removida.');}
    if(mounted.current&&!moveBusy.current&&epoch===mutationEpoch.current){
     items.forEach(page=>store.open(page));
-    setPages(prev=>mergeRemotePages(prev,items.map(p=>{const e=store.get(p.id);return e&&e.base.revision>p.revision?e.base:p;}),id=>{const e=store.get(id);return !!e&&e.state!=='saved';}));setError('');
+    setPages(prev=>mergeRemotePages(prev,items.map(p=>{const e=store.get(p.id);return e&&e.base.revision>p.revision?e.base:p;}),id=>{const e=store.get(id);return !!e&&e.state!=='saved';}));setLoaded(true);setError('');
    }
   }catch(e){if(mounted.current)setError(errorText(e));}
   finally{refreshFlight.current=false;if(manual&&mounted.current)setRefreshing(false);}
@@ -186,7 +203,8 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   {api.mdLocalOnly?<Text style={{paddingHorizontal:20,paddingBottom:8,color:c.muted,fontSize:10}}>Ordem salva neste aparelho. A hierarquia e o conteúdo continuam sincronizados.</Text>:null}
   {error?<ErrorBanner text={error} onRetry={()=>void load()}/>:null}
   <View style={{paddingHorizontal:10}}><PageTreeList roots={children.get('')||[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={changePageInteraction} onDragChange={setPageDragging}/></View>
-  {ready&&!pages.length?<Empty icon="book" title="Sua primeira página" body="Toque em + para criar uma página."/>:null}
+  {ready&&!loaded&&!error&&!pages.length?<View testID="pages-loading-placeholder" accessibilityLabel="Carregando páginas" style={{minHeight:80}}/>:null}
+  {ready&&loaded&&!pages.length&&!error?<Empty icon="book" title="Sua primeira página" body="Toque em + para criar uma página."/>:null}
  </ScrollView>;
  const createPicker=<PageCreateMenu visible={createParent!==undefined} parentTitle={createParent?.title} onClose={()=>setCreateParent(undefined)}
   onBlank={()=>void create(createParent||undefined)} onTemplate={template=>selectedId?applyTemplate(template):void create(undefined,template)}/>;

@@ -366,6 +366,13 @@ jobs:
         run-id: 37977881730
         github-token: ${{ github.token }}
         path: SOFIA_APP/dist/previous-094
+    - name: Restore exact 0.3.105 QA APK for same-emulator before/after timing
+      uses: actions/download-artifact@v4
+      with:
+        name: Sofia-build-38066335139-1
+        run-id: 38066335139
+        github-token: ${{ github.token }}
+        path: SOFIA_APP/dist/previous-105
     - name: Verify exact candidate source and bytes
       working-directory: SOFIA_APP
       env:
@@ -377,6 +384,7 @@ jobs:
         test ! -e dist/QA-ONLY-full-fixture.apk
         test -s dist/QA-ONLY-manual-universal.apk
         python3 tools/verify-abi-equivalence.py
+        test -s dist/previous-105/QA-ONLY-manual-universal.apk
     - name: Enable KVM
       run: |
         echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

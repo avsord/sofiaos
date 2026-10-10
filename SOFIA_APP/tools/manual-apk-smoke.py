@@ -22,7 +22,7 @@ def cold(label):
   time.sleep(.2)
  (out/(label+'.txt')).write_text(logs)
  assert 'FATAL EXCEPTION' not in logs,logs
- stages={name:int(value) for name,value in re.findall(r'SOFIA_LAUNCH_(UI|LOCAL_READY|FADE_START|FADE_DONE|SPLASH_REMOVED|DATA)_PROCESS_MS=(\d+)',logs)}
+ stages={name:int(value) for name,value in re.findall(r'SOFIA_LAUNCH_(SYSTEM_CALLBACK|UI|LOCAL_READY|FADE_START|FADE_DONE|SPLASH_REMOVED|DATA)_PROCESS_MS=(\d+)',logs)}
  assert 'DATA' in stages,logs
  assert stages['UI']<=stages['LOCAL_READY']<=stages['DATA'],stages
  icon=re.search(r'SOFIA_LAUNCH_ICON_KIND=([A-Za-z0-9_$]+)',logs)
@@ -38,7 +38,7 @@ def tap_label(tree,label):
   if n.attrib.get('text')==label or n.attrib.get('content-desc')==label:
    bounds=list(map(int,re.findall(r'\d+',n.attrib['bounds'])));adb('shell','input','tap',str((bounds[0]+bounds[2])//2),str((bounds[1]+bounds[3])//2));return
  raise AssertionError('Missing control '+label)
-result={'passed':False,'production_apk':False,'qa_emulator_twin':True,'exact_owner_apk_executed':False,'synthetic_seed_records':True,'synthetic_transport_in_tested_apk':False,'physical_device':False,'real_user_data_preservation_tested':False,'published':False,'source_sha':(dist/'SOURCE_COMMIT.txt').read_text().strip(),'apk_sha256':hashlib.sha256((dist/'Sofia-OS.apk').read_bytes()).hexdigest(),'qa_apk_sha256':hashlib.sha256((dist/'QA-ONLY-manual-universal.apk').read_bytes()).hexdigest(),'baseline_runs':[],'candidate_runs':[]}
+result={'passed':False,'production_apk':False,'qa_emulator_twin':True,'exact_owner_apk_executed':False,'synthetic_seed_records':True,'synthetic_transport_in_tested_apk':False,'physical_device':False,'real_user_data_preservation_tested':False,'published':False,'source_sha':(dist/'SOURCE_COMMIT.txt').read_text().strip(),'apk_sha256':hashlib.sha256((dist/'Sofia-OS.apk').read_bytes()).hexdigest(),'qa_apk_sha256':hashlib.sha256((dist/'QA-ONLY-manual-universal.apk').read_bytes()).hexdigest(),'baseline_runs':[],'previous_105_runs':[],'candidate_runs':[]}
 try:
  for name in ['window_animation_scale','transition_animation_scale','animator_duration_scale']:adb('shell','settings','put','global',name,'1')
  adb('install',str(dist/'baseline-Sofia-OS.apk'))
@@ -72,6 +72,11 @@ try:
  adb('install','-r',str(owner_baseline))
  result['owner_baseline_runs']=[cold('owner-baseline-'+str(i)) for i in range(5)]
  result['owner_baseline_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['owner_baseline_runs'])
+ previous105=dist/'previous-105/QA-ONLY-manual-universal.apk'
+ result['previous105_apk_sha256']=hashlib.sha256(previous105.read_bytes()).hexdigest()
+ adb('install','-r',str(previous105))
+ result['previous_105_runs']=[cold('previous105-'+str(i)) for i in range(5)]
+ result['previous_105_medians_ms']={stage:statistics.median(x['stages_ms'][stage] for x in result['previous_105_runs']) for stage in ['SYSTEM_CALLBACK','UI','DATA']}
  adb('install','-r',str(dist/'QA-ONLY-manual-universal.apk'));result['in_place_install']=True
  # Retain the actual production transition for visual inspection.
  recording=subprocess.Popen(['adb','shell','screenrecord','--time-limit','8','/sdcard/sofia-launch-079.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -87,6 +92,12 @@ try:
  result['authenticated_home_tested']=True
  result['baseline_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['baseline_runs'])
  result['candidate_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['candidate_runs'])
+ result['candidate_medians_ms']={stage:statistics.median(x['stages_ms'][stage] for x in result['candidate_runs']) for stage in ['SYSTEM_CALLBACK','UI','DATA']}
+ result['startup_vs_105_ms']={stage:result['candidate_medians_ms'][stage]-result['previous_105_medians_ms'][stage] for stage in ['SYSTEM_CALLBACK','UI','DATA']}
+ result['startup_no_worse_than_105']=all(diff<=0 for diff in result['startup_vs_105_ms'].values())
+ # Preserve all existing timing gates. Compare the immediately previous R8
+ # candidate explicitly instead of claiming older baselines represent 0.3.105.
+ assert result['startup_vs_105_ms']['DATA']<=100, 'Startup regression compared with 0.3.105 QA exceeds 100 ms'
  # A working APK is NOT an acceptable startup if the system keeps the S over
  # usable content for another half-second. Measure actual native timestamps,
  # not synthetic UI assertions, and compare against the retained 0.3.65 APK.
@@ -146,6 +157,11 @@ try:
  adb('pull','/sdcard/sofia-menus.mp4',str(out/'candidate-menus.mp4'))
  menu_logs=adb('logcat','-d','-s','SofiaMenu:I').decode(errors='replace')
  (out/'candidate-menu-native.txt').write_text(menu_logs)
+ js_logs=adb('logcat','-d','-s','ReactNativeJS:I').decode(errors='replace')
+ (out/'candidate-menu-js.txt').write_text(js_logs)
+ samples=re.findall(r'SOFIA_TAB_TAP_TO_FRAME_MS tab=([a-z]+) ms=(\d+) window=(first_3s|after_3s)',js_logs)
+ result['tab_to_next_js_frame_samples']=[{'tab':tab,'ms':int(ms),'window':window} for tab,ms,window in samples]
+ result['tab_frame_measurement_kind']='JS onPressIn through next requestAnimationFrame after React commit, not a physical GPU timestamp'
  result['native_first_taps']=menu_logs.count('nativeFirst=true')
  result['react_guarded_taps']=menu_logs.count('nativeFirst=false')
  assert result['native_first_taps']>=12, 'Warmed tabs did not preserve native touch-down responsiveness'

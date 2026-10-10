@@ -74,7 +74,7 @@ function visibilityFixture(withNative=true){
 }
 test('060 optional services do not start at layout permission, only at completed visual handoff',async()=>{
  const f=visibilityFixture();assert.deepEqual(f.states,[false]);f.resolve(true);await tick();assert.deepEqual(f.states,[false,true]);f.dispose();
- const app=file('App.tsx');assert.ok(app.includes('servicesReady=visible&&'));assert.ok(app.includes('if(cachedOpening?visible:painted)api.releaseNetwork()'));assert.ok(app.includes('useStartupMounts(visible&&!!auth,tab)'));assert.ok(app.includes('{visible?<DeferredScreen load={loadBackgroundServices}'));
+ const app=file('App.tsx');assert.ok(app.includes('servicesReady=visible&&'));assert.ok(app.includes('if(cachedOpening?visible:painted)api.releaseNetwork()'));assert.ok(app.includes('useStartupMounts(visible&&!!auth&&hydratedApi===api,tab,!!auth)'));assert.ok(app.includes('{visible?<DeferredScreen load={loadBackgroundServices}'));
 });
 test('060 unmount or launch failure cannot release stale optional services',async()=>{
  for(const cancel of [true,false]){const f=visibilityFixture();if(cancel)f.dispose();f.resolve(!cancel?false:true);await tick();assert.deepEqual(f.states,[false]);}
@@ -93,6 +93,9 @@ test('104 source-resolution surface preserves one animation clock without startu
  assert.ok(native.includes('postInvalidateOnAnimation()'));
  assert.ok(!native.includes('.scaleX('));
  assert.ok(native.includes('SofiaLaunchMotion.scaleAt(startedAt, now)'));
+ assert.ok(native.includes('SofiaLaunchMotion.S_FADE_IN_MS'));
+ assert.ok(native.includes('paint.alpha = (255f * fade).toInt()'));
+ assert.ok(file('plugins/native/SofiaLaunchMotion.java').includes('S_FADE_IN_MS = 140L;'));
  assert.ok(native.includes('canvas.scale(scale, scale, markCenterX, markCenterY)'));
  assert.ok(native.includes('private val startedAt: Long'));
  assert.ok(native.includes('val motionStart = now'));
@@ -124,7 +127,7 @@ test('104 source-resolution surface preserves one animation clock without startu
  assert.ok(resources.includes('android:scaleX="0.020658489"'));
  assert.ok(resources.includes('android:strokeColor="#12FFFFFF"'));
  assert.ok(resources.includes('android:scaleX="0.70" android:scaleY="0.70"'));
- assert.ok(resources.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_entry</item>'));
+ assert.ok(resources.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_empty</item>'));
  assert.ok(resources.includes('<animated-vector')); 
  assert.ok(!resources.includes('repeatCount'));
  const smoke=file('tools/manual-apk-smoke.py');
