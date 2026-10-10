@@ -44,6 +44,10 @@ ambiente precisa de seus próprios conectores/permissões; confirme-os antes de 
 
 ## 3. Estado vivo — sempre ler ao vivo, nunca confiar em número escrito
 
+Antes dos comandos abaixo, consulte **[ESTADO_VIVO.md](https://raw.githubusercontent.com/avsord/sofiaos/sofia-state/ESTADO_VIVO.md)** na branch separada `sofia-state`. O workflow `Sofia estado vivo` gera esse *snapshot* após pushes em `sofia-app-android`: versão, último HEAD, releases, PRs, resultados disponíveis e alertas de possível defasagem do MASTER. A versão do snapshot não é necessariamente o resultado final de uma compilação ainda em andamento; confira a execução ao vivo para aprovar ou entregar um APK.
+
+Se a branch ainda não existir, o arquivo estiver desatualizado ou a consulta falhar, use os comandos/conectores abaixo. O detector sinaliza alterações de código sem atualização do MASTER, mas não substitui a revisão das decisões humanas. Para um agente novo, o protocolo inicial está em [SOFIA_KEY.md](SOFIA_KEY.md).
+
 ```bash
 git clone --branch sofia-app-android https://github.com/avsord/sofiaos.git
 cd sofiaos
@@ -186,6 +190,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 | 2026-10-10 | 0.3.105 | #9, #10 | R8, APK só arm64, ícone estático, curva reinicia no handoff | APK 51,6 → 26,25 MB; dono: S ainda parado no início; abas com delay/branco |
 | 2026-10-10 | 0.3.106 | — | Rodada 4: S único, restauração de cache e aquecimento que cede aos toques; base `ef3a6f7` | [Execução 38070454563](https://github.com/avsord/sofiaos/actions/runs/38070454563) concluída com sucesso; validação física pendente, sem aprovação OTA |
 | 2026-10-10 | — | — | Instalação do MASTER permanente, prompt fixo e guardião de estrutura | Commit exclusivamente documental/testes; ver resultado no PR de instalação, sem novo APK |
+
+| 2026-10-10 | 0.3.106 | — | Protocolo SOFIA_KEY e estado vivo automático em branch independente; guardas de segredo e aprovação | Implantação documental; GitHub Actions validará a geração; nenhum APK novo |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
