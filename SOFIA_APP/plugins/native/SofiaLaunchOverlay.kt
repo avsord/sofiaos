@@ -66,21 +66,31 @@ object SofiaLaunchOverlay {
           Log.i("SofiaLaunch", "SOFIA_LAUNCH_SYSTEM_CALLBACK_PROCESS_MS=${SystemClock.uptimeMillis() - Process.getStartUptimeMillis()}")
           val icon = splash.iconView
           Log.i("SofiaLaunch", "SOFIA_LAUNCH_ICON_KIND=${icon?.javaClass?.simpleName}")
-          // Copy the exact initial system pixels before its bitmap is recycled.
-          // Prepare a visible single draw layer now, well before Home is ready.
+          // Rasterize the SOURCE vector once at its largest displayed size.
+          // Android's masked splash foreground occupies 1.5x the icon bounds.
+          // Never magnify a capture of its initial, already reduced pixels.
           val decor = activity.window.decorView as ViewGroup
           val iconPosition = IntArray(2)
           val decorPosition = IntArray(2)
           decor.getLocationOnScreen(decorPosition)
           icon?.getLocationOnScreen(iconPosition)
-          val pixels = if (icon != null && icon.width > 0 && icon.height > 0) {
-            Bitmap.createBitmap(icon.width, icon.height, Bitmap.Config.ARGB_8888).also {
-              icon.draw(Canvas(it))
-            }
-          } else null
-          val surface = SofiaEarlySplashSurface(activity, pixels,
-            (iconPosition[0] - decorPosition[0]).toFloat(),
-            (iconPosition[1] - decorPosition[1]).toFloat())
+          val iconSize = icon?.width?.takeIf { it > 0 }
+            ?: (192f * activity.resources.displayMetrics.density).toInt()
+          val markSize = (iconSize * 1.5f).toInt()
+          val pixels = Bitmap.createBitmap(markSize, markSize, Bitmap.Config.ARGB_8888)
+          val mark = activity.resources.getDrawable(R.drawable.sofia_launch_mark, activity.theme).mutate()
+          mark.setBounds(0, 0, markSize, markSize)
+          mark.draw(Canvas(pixels))
+          val now = SystemClock.uptimeMillis()
+          val elapsed = splash.iconAnimationStart?.let {
+            (System.currentTimeMillis() - it.toEpochMilli()).coerceAtLeast(0L)
+          } ?: (now - activityStartedAt).coerceAtLeast(0L)
+          val motionStart = now - elapsed
+          val left = if (icon != null) iconPosition[0] - decorPosition[0] + (icon.width - markSize) / 2f
+            else (decor.width - markSize) / 2f
+          val top = if (icon != null) iconPosition[1] - decorPosition[1] + (icon.height - markSize) / 2f
+            else (decor.height - markSize) / 2f
+          val surface = SofiaEarlySplashSurface(activity, pixels, left, top, motionStart)
           decor.overlay.add(surface)
           surface.measure(View.MeasureSpec.makeMeasureSpec(decor.width, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(decor.height, View.MeasureSpec.EXACTLY))
@@ -115,10 +125,10 @@ object SofiaLaunchOverlay {
               }
               surface.stopPreparation()
               record(activity, "FADE_START")
-              surface.animate().alpha(0f).setDuration(180L)
+              surface.animate().alpha(0f).setDuration(95L)
                 .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
                 .withEndAction { complete() }.start()
-              surface.postDelayed({ complete() }, 230L)
+              surface.postDelayed({ complete() }, 180L)
             }
             Unit
           }
@@ -220,7 +230,7 @@ object SofiaLaunchOverlay {
     // extra postOnAnimation fence added 400–650 ms on loaded Android emulators:
     // Home was ready, but Android did not start the fade until another frame.
     // Begin the synchronized splash exit in this SAME ready callback. The
-    // underlying prepared Home draws during the 180-ms fade.
+    // underlying prepared Home draws during the 95-ms fade.
     when (transition.contentReady()) {
       SofiaLaunchTransition.Exit.SYSTEM_SPLASH -> exitSystemSplash?.invoke(success)
       SofiaLaunchTransition.Exit.CONTENT -> {
@@ -243,7 +253,7 @@ object SofiaLaunchOverlay {
       val callbacks = waiting.toList(); waiting.clear()
       root.post { callbacks.forEach { it.resolve(true) } }
     }
-    if (login || home) {
+    if (login || (home && (signals and 8) != 0)) {
       dataSeen = true
       reveal(activity, true)
     } else if ((signals and 16) != 0) {
@@ -313,10 +323,10 @@ private class SofiaEarlySplashSurface(
   activity: Activity,
   private val pixels: Bitmap?,
   private val markLeft: Float,
-  private val markTop: Float
+  private val markTop: Float,
+  private val startedAt: Long
 ) : View(activity) {
   private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-  private val startedAt = SystemClock.uptimeMillis()
   private val backgroundColor = android.graphics.Color.rgb(114, 88, 232)
   private val warmPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
     color = backgroundColor
@@ -340,7 +350,7 @@ private class SofiaEarlySplashSurface(
       }
     }
     val now = SystemClock.uptimeMillis()
-    val scale = SofiaLaunchMotion.scaleAt(startedAt, now) / 0.88f
+    val scale = SofiaLaunchMotion.scaleAt(startedAt, now)
     canvas.save()
     canvas.scale(scale, scale, markCenterX, markCenterY)
     pixels?.let { canvas.drawBitmap(it, markLeft, markTop, paint) }

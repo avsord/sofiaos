@@ -12,12 +12,12 @@ test('production starts on Início for saved sessions and immediately after logi
   assert.ok(source.includes("switchTab('home');setError('');"));
   assert.ok(!source.includes("[tab,setTab]=useState<Tab>('chat')"));
 });
-test('native menu jump happens synchronously before the selected tab renders',()=>{
+test('menu selection commits its screen before the native jump',()=>{
   const match=source.match(/const switchTab=useCallback\(\(next:Tab\)=>\{([^}]*)\},\[\]\)/);
   assert.ok(match);
   const calls=[],navigation={current:{tab:'chat'}},pager={current:{goTo:next=>calls.push(['native',next])}};
   const fn=vm.runInNewContext('(next)=>{'+match[1]+'}',{navigation,pager,setTab:next=>calls.push(['react',next])});
-  for(let i=0;i<100;i++) {const next=TAB_ORDER[i%TAB_ORDER.length];fn(next);assert.equal(navigation.current.tab,next);assert.deepEqual(calls.slice(-2),[['native',next],['react',next]]);}
+  for(let i=0;i<100;i++) {const next=TAB_ORDER[i%TAB_ORDER.length];fn(next);assert.equal(navigation.current.tab,next);assert.deepEqual(calls.slice(-1),[['react',next]]);}
 });
 test('rapid taps use the latest selection, not a stale render closure',()=>{
   const match=source.match(/const navigate=useCallback\(\(next:Tab\)=>\{([\s\S]*?)\},\[switchTab\]\)/);assert.ok(match);
@@ -31,7 +31,8 @@ test('tap selection has no timer, vertical translation, fade or animated jump',(
   // read-ahead. Its cancellable timers are outside the synchronous touch handler.
   for(const token of ['PanResponder','Animated','Easing','transitioning','translateY','requestAnimationFrame'])assert.ok(!source.includes(token),token);
   const immediate=source.slice(source.indexOf('const switchTab=useCallback('),source.indexOf('const [taskContext'));
-  assert.ok(immediate.includes('pager.current?.goTo(next)'));
+  assert.ok(immediate.includes('setTab(next)'));
+  assert.ok(!immediate.includes('pager.current?.goTo(next)')); 
   assert.ok(!immediate.includes('setTimeout'),'No timer in tab selection/navigation');
   assert.ok(!pager.slice(pager.indexOf('const goTo'),pager.indexOf('useImperativeHandle')).includes('animated:true'));assert.ok(pager.includes('animated:false'));assert.ok(!pager.includes('setTimeout'));
 });
@@ -75,7 +76,7 @@ test('automatic update checks and notifications wait until the completed visual 
   assert.ok(source.includes("if(!servicesReady)return;"));
   assert.ok(source.includes("enabled={!!auth&&!!bootstrap&&servicesReady}"));
   assert.ok(source.includes('prepareInitialData(api,()=>preloadAgenda(api))'));
-  assert.ok(source.includes('painted=useAfterFirstPaint(ready&&!cachedOpening)')&&source.includes('servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady')&&source.includes('visible=useLaunchVisible(ready)')&&source.includes('if(cachedOpening?visible:painted)api.releaseNetwork()')&&source.includes("const cachedOpening=!!(api.cached('/home')||api.cached('/tasks'))"));
+  assert.ok(source.includes('painted=useAfterFirstPaint(ready&&!cachedOpening)')&&source.includes('servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady')&&source.includes('visible=useLaunchVisible(ready)')&&source.includes('if(cachedOpening?visible:painted)api.releaseNetwork()')&&source.includes("const cachedOpening=!!(api.cached('/home')&&api.cached('/tasks')&&api.cached('/agenda?month='+monthKey(new Date())))"));
 });
 test('notification overlay cannot capture touches or accessibility focus while hidden',()=>{
   assert.ok(source.includes("pointerEvents={tab==='notifications'?'auto':'none'}"));
@@ -107,8 +108,8 @@ test('notifications are outside the swipe sequence without losing the underlying
 test('Android identity, discovery prefix and version stay compatible',()=>{
   const config=JSON.parse(fs.readFileSync(path.join(root,'app.json'))).expo,pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json')));
   const update=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');
-  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,107);
-  assert.equal(config.version,'0.3.102');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
+  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,108);
+  assert.equal(config.version,'0.3.103');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
 });
 test('Pages opens a preloaded entity synchronously without a network wait',()=>{
  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');

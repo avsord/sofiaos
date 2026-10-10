@@ -60,6 +60,11 @@ try:
  adb('install','-r',str(previous))
  for i in range(5):result['baseline_runs'].append(cold('baseline-'+str(i)))
  before=capture('baseline');assert 'Olá, Teste.' in before,'Previous production APK did not restore the saved account'
+ owner_baseline=dist/'previous-094/Sofia-OS.apk'
+ assert hashlib.sha256(owner_baseline.read_bytes()).hexdigest()=='b783cd88c499cace1b29e4e564f23d26b45674d82dfe2d87537c3acd1cbea223'
+ adb('install','-r',str(owner_baseline))
+ result['owner_baseline_runs']=[cold('owner-baseline-'+str(i)) for i in range(5)]
+ result['owner_baseline_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['owner_baseline_runs'])
  adb('install','-r',str(dist/'Sofia-OS.apk'));result['in_place_install']=True
  # Retain the actual production transition for visual inspection.
  recording=subprocess.Popen(['adb','shell','screenrecord','--time-limit','8','/sdcard/sofia-launch-079.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -91,6 +96,8 @@ try:
  assert result['ready_to_splash_remove_median_ms']<=150,'OS S still exists after Home ready: '+str(spans)
  assert result['fade_to_done_median_ms']<=250,'Full-screen S is still visible too long: '+str(spans)
  assert result['candidate_median_ms']<=result['baseline_median_ms']+200, 'Startup slower than baseline by over 200 ms: '+str(result['candidate_median_ms']-result['baseline_median_ms'])
+ assert result['candidate_median_ms']<=result['owner_baseline_median_ms']+100, 'Startup regression compared with installed 0.3.94'
+ result['owner_startup_regression_checked']=True
  result['splash_performance_verified']=True
  # Verify that an actual menu touch works and retained conversation survives.
  tap_label(after,'Conversa');time.sleep(1)
@@ -113,6 +120,26 @@ try:
  capture('older-page-by-scroll');result['automatic_local_pagination_tested']=True
  result['saved_conversation_preserved']=True
  result['first_menu_touch_works']=True
+ # Real fast menu taps in the exact production APK. Record every transition
+ # for frame inspection, then verify Home and retained chat after the sequence.
+ menu_tree=xml();menu_points=[]
+ for label in ['Início','Conversa','Páginas','Agenda','Apps','Perfil']:
+  nodes=[n for n in ET.fromstring(menu_tree).iter('node') if n.attrib.get('text')==label or n.attrib.get('content-desc')==label]
+  assert nodes,'Missing menu '+label
+  b=list(map(int,re.findall(r'\d+',nodes[-1].attrib['bounds'])));menu_points.append(((b[0]+b[2])//2,(b[1]+b[3])//2))
+ menu_record=subprocess.Popen(['adb','shell','screenrecord','--time-limit','10','/sdcard/sofia-menus.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+ time.sleep(.4)
+ for _ in range(4):
+  for x,y in menu_points:adb('shell','input','tap',str(x),str(y))
+ menu_record.wait(timeout=15)
+ adb('pull','/sdcard/sofia-menus.mp4',str(out/'candidate-menus.mp4'))
+ tap_label(xml(),'Início');time.sleep(.3)
+ assert 'Olá, Teste.' in capture('after-menu-home')
+ tap_label(xml(),'Conversa');time.sleep(.3)
+ assert 'FIM DA RESPOSTA QA' in capture('after-menu-chat')
+ result['rapid_menu_sequence_tested']=True
+ result['rapid_menu_taps']=24
+
  result['baseline_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['baseline_runs'])
  result['candidate_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['candidate_runs'])
  result['passed']=True

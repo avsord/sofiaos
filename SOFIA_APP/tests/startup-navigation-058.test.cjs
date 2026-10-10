@@ -33,7 +33,8 @@ test('071 native input moves the selected pager immediately while React owns his
  assert.ok(method.includes('tag != "sofia-menu-blocked"'));
  for(const forbidden of ['.alpha =','.scaleX =','.scaleY ='])assert.ok(!method.includes(forbidden),forbidden);
  const app=fs.readFileSync(path.join(__dirname,'../App.tsx'),'utf8');
- assert.ok(app.includes('pager.current?.goTo(next);setTab(next)'));
+ assert.ok(app.includes('navigation.current.tab=next;setTab(next)'));
+ assert.ok(!app.includes('pager.current?.goTo(next);setTab(next)')); 
 });
 test('058 original Android splash waits for local data without blocking Android 12 layout',()=>{
  const text=fs.readFileSync(path.join(__dirname,'../plugins/native/SofiaLaunchOverlay.kt'),'utf8');

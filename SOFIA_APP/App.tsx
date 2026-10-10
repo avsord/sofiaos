@@ -4,6 +4,7 @@ import type {LocalLaunch} from './src/lib/local-launch';
 import {prepareInitialData} from './src/lib/startup-preparation';
 import {useAfterFirstPaint} from './src/lib/use-after-first-paint';
 import {useLaunchVisible} from './src/lib/use-launch-visible';
+import {monthKey} from './src/lib/agenda-cache';
 import {preloadAgenda} from './src/lib/use-agenda-month';
 import React,{Component,ErrorInfo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {View,Text,StatusBar,ActivityIndicator,AccessibilityInfo,useColorScheme,AppState,Alert,Keyboard,BackHandler,Linking,StyleSheet} from 'react-native';
@@ -55,7 +56,7 @@ function Shell({startup}:{startup:LocalLaunch}){
  // releases hidden screens, notification inventory and optional prefetch.
  // A cached Home needs only the final visibility fence. A second first-paint
  // state update rerenders the entire Shell during the native alpha animation.
- const cachedOpening=!!(api.cached('/home')||api.cached('/tasks'));
+ const cachedOpening=!!(api.cached('/home')&&api.cached('/tasks')&&api.cached('/agenda?month='+monthKey(new Date())));
  const painted=useAfterFirstPaint(ready&&!cachedOpening),visible=useLaunchVisible(ready),servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady,mountedTabs=useStartupMounts(visible&&!!auth,tab);
  useEffect(()=>{if(!auth||initialDataReady)return;let live=true;setPreparationError('');void prepareInitialData(api,()=>preloadAgenda(api)).then(()=>{if(live){setPrepared(api);console.info('SOFIA_STARTUP_CACHE_READY');}}).catch(e=>{if(live)setPreparationError(errorText(e));});return()=>{live=false;};},[api,prepareAttempt]);
  // Do not start network completion renders over the native splash fade
@@ -64,8 +65,8 @@ function Shell({startup}:{startup:LocalLaunch}){
  // duration. With no cached Home, essential requests retain first-paint
  // permission so login and a first run cannot get stuck.
  useEffect(()=>{if(cachedOpening?visible:painted)api.releaseNetwork();},[painted,visible,cachedOpening,api]);
- // All six tab trees are initialized behind the real Android splash.
- // Do not schedule post-launch Metro requires that race the first menu press.
+ // Home waits for essential local data; secondary screens remain mounted after
+ // their first visit and warm independently without extending the splash.
  const launchReady=ready&&(!auth||(!!bootstrap&&servicesReady));
  useEffect(()=>{if(!launchReady)return;return finishLaunchHandoff();},[launchReady,c.bg]);
  const checkingUpdate=useRef(false),lastUpdateCheck=useRef(0),lastUpdatePrompt=useRef('');
@@ -95,8 +96,9 @@ function Shell({startup}:{startup:LocalLaunch}){
  useEffect(()=>{if(auth&&visible)void boot();},[api,visible]);
  useEffect(()=>{if(!auth)return;const sub=AppState.addEventListener('change',state=>{if(state!=='active')void api.persistLaunch().catch(()=>{});});return()=>sub.remove();},[api,auth]);
  useEffect(()=>{if(!auth)return;const sub=AppState.addEventListener('change',state=>{if(state==='active'&&!locked&&visible)void boot();else if(state!=='active')void silenceVoices();});return()=>sub.remove();},[auth,locked,visible,boot]);
- // Issue the native, non-animated jump before React updates the selected menu.
- const switchTab=useCallback((next:Tab)=>{navigation.current.tab=next;pager.current?.goTo(next);setTab(next);},[]);
+ // Commit the selected screen before TabPager dispatches the native jump.
+ // Otherwise the first tap can expose a still-empty lazy slot for one frame.
+ const switchTab=useCallback((next:Tab)=>{navigation.current.tab=next;setTab(next);},[]);
  const navigate=useCallback((next:Tab)=>{
   const current=navigation.current;
   if(next===current.tab){if(next==='apps'&&!current.locked){setWorkspaceReset(v=>v+1);setWorkspaceDepth(false);}return;}

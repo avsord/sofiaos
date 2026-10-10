@@ -341,6 +341,13 @@ jobs:
         run-id: 37838702548
         github-token: ${{ github.token }}
         path: SOFIA_APP/dist/previous-063
+    - name: Restore the APK currently installed by the owner for timing comparison
+      uses: actions/download-artifact@v4
+      with:
+        name: Sofia-build-37977881730-1
+        run-id: 37977881730
+        github-token: ${{ github.token }}
+        path: SOFIA_APP/dist/previous-094
     - name: Verify exact candidate source and bytes
       working-directory: SOFIA_APP
       env:
@@ -362,6 +369,7 @@ jobs:
         arch: x86_64
         target: default
         disable-animations: false
+        emulator-options: -no-window -gpu swangle -no-snapshot -noaudio -no-boot-anim
         script: python3 SOFIA_APP/tools/manual-apk-smoke.py
     - name: Retain manual candidate evidence without publication
       if: always()

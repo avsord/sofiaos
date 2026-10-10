@@ -45,7 +45,7 @@ test('054 offline launch stays responsive; Home exposes its own retry banner',as
 test('074 heavy menu panels no longer block the Home first frame',()=>{
  const callbacks=[];
  const {useStartupMounts}=load('src/lib/startup-mounts.ts',{
-  'react':{useState:init=>[typeof init==='function'?init():init,()=>{}],useEffect:effect=>{callbacks.push(effect);}},
+  'react':{useState:init=>[typeof init==='function'?init():init,()=>{}],useLayoutEffect:()=>{},useEffect:effect=>{callbacks.push(effect);}},
   './idle-task':{scheduleIdleTask:()=>()=>{}}
  });
  assert.deepEqual(Array.from(useStartupMounts(true,'home')),['home']);

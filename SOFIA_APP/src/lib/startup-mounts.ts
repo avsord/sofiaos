@@ -1,4 +1,4 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useLayoutEffect,useState} from 'react';
 import {scheduleIdleTask} from './idle-task';
 import type {Tab} from './types';
 
@@ -11,6 +11,11 @@ const MENU_TABS:Tab[]=['home','chat','agenda','pages','apps','profile'];
  * whichever tab was actually selected. No network dependency for navigation. */
 export function useStartupMounts(enabled:boolean,active:Tab){
  const [warmed,setWarmed]=useState<Set<Tab>>(()=>new Set(['home']));
+ // Persist a user visit before another tap can remove its screen tree.
+ // The current tab is included in this render; the layout effect retains it.
+ useLayoutEffect(()=>{
+  if(MENU_TABS.includes(active))setWarmed(previous=>previous.has(active)?previous:new Set([...previous,active]));
+ },[active]);
  useEffect(()=>{
   if(!enabled){
    setWarmed(previous=>previous.size===1&&previous.has('home')?previous:new Set(['home']));

@@ -81,12 +81,12 @@ test('067 cached Home and Agenda remain primary; catalog, widgets and monitors s
 
 test('086 finite system S does not extend the native Home handoff or restart an animator',()=>{
  const logo=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
- assert.ok(!logo.includes('<animated-vector'));
- assert.ok(logo.includes('android:scaleX="0.88" android:scaleY="0.88"')); 
+ assert.ok(logo.includes('<animated-vector')); 
+ assert.ok(logo.includes('android:scaleX="0.70" android:scaleY="0.70"')); 
  assert.ok(logo.includes('android:windowSplashScreenAnimationDuration')); 
- assert.ok(logo.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_entry</item>'));
+ assert.ok(logo.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_animated</item>'));
  const launch=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
- assert.ok(launch.includes('surface.animate().alpha(0f).setDuration(180L)'));
+ assert.ok(launch.includes('surface.animate().alpha(0f).setDuration(95L)'));
  assert.ok(!launch.includes('Animatable'));
 });
 test('068 photo preloads without blocking Home; menu prewarm yields to navigation',()=>{
@@ -135,9 +135,9 @@ test('086 startup S uses the reference vector and one finite scale and defers op
  assert.ok(code.includes('android:pivotX="96" android:pivotY="96"'));
  assert.ok(!code.includes('sofia_letter_reveal'));
  assert.ok(code.includes('android:scaleX="0.020658489"'));
- assert.ok(!code.includes('<animated-vector'));
+ assert.ok(code.includes('<animated-vector')); 
  assert.ok(!code.includes('repeatCount'));
- assert.ok(code.includes('android:scaleX="0.88" android:scaleY="0.88"')); 
+ assert.ok(code.includes('android:scaleX="0.70" android:scaleY="0.70"')); 
  const bg=fs.readFileSync(path.join(root,'src/components/BackgroundServices.tsx'),'utf8');
  assert.ok(bg.includes('if(!enabled||!preloadWhenIdle'));
  assert.ok(bg.includes('scheduleIdleTask('));
@@ -155,9 +155,9 @@ test('102 early Canvas retains its mark during the single alpha fade',()=>{
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const loader=fs.readFileSync(path.join(root,'src/lib/screen-loader.tsx'),'utf8');
  assert.ok(overlay.indexOf('decor.overlay.add(surface)')<overlay.indexOf('exitSystemSplash = { success ->'));
- assert.ok(overlay.includes('SofiaLaunchMotion.scaleAt(startedAt, now) / 0.88f'));
+ assert.ok(overlay.includes('SofiaLaunchMotion.scaleAt(startedAt, now)'));
  assert.ok(!overlay.includes('.scaleX('));
- assert.ok(overlay.includes('surface.animate().alpha(0f).setDuration(180L)'));
+ assert.ok(overlay.includes('surface.animate().alpha(0f).setDuration(95L)'));
  assert.ok(!app.includes('<LaunchSAnimation'));
  assert.ok(loader.includes('export const DeferredScreen=React.memo('));
  assert.ok(loader.includes('keys.every(key=>Object.is(left[key],right[key]))'));
@@ -166,12 +166,13 @@ test('102 early Canvas retains its mark during the single alpha fade',()=>{
 test('078 Home is allowed to reveal without waiting for server or prefetch',()=>{
  const overlay=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  const logo=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
- assert.ok(overlay.includes('if (login || home) {'));
- assert.ok(!overlay.includes('if (login || (home && (signals and 8) != 0))'));
+ assert.ok(overlay.includes('val home = (signals and 6) == 6'));
+ assert.ok(overlay.includes('if (login || (home && (signals and 8) != 0)) {')); 
+
  assert.ok(overlay.includes('splash.remove()'));
  assert.ok(overlay.includes('record(activity, "FADE_DONE")'));
  assert.ok(logo.includes('android:windowSplashScreenAnimationDuration')); 
- assert.ok(logo.includes('android:scaleX="0.88" android:scaleY="0.88"')); 
+ assert.ok(logo.includes('android:scaleX="0.70" android:scaleY="0.70"')); 
 });
 test('074 hidden tabs mount one idle slice at a time after original splash exits',()=>{
  const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
@@ -192,7 +193,7 @@ test('078 no second OS S persists underneath the single composited image',()=>{
  const native=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  assert.ok(theme.includes('<item name="android:windowBackground">@color/sofiaLaunchBackground</item>'));
  assert.ok(!theme.includes('<item name="android:windowBackground">@drawable/splashscreen_logo</item>'));
- assert.ok(theme.includes('<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_entry</item>'));
+ assert.ok(theme.includes('<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_animated</item>'));
  assert.ok(native.indexOf('decor.overlay.add(surface)')<native.indexOf('exitSystemSplash = { success ->'));
  assert.ok(native.includes('splash.remove()'));
  assert.ok(!native.includes('icon.postDelayed('));
@@ -215,14 +216,14 @@ test('102 early prepared surface leaves within the unchanged startup timing gate
  const smoke=fs.readFileSync(path.join(root,'tools/manual-apk-smoke.py'),'utf8');
  const exit=native.slice(native.indexOf('exitSystemSplash = { success ->'),native.indexOf('when (transition.splashReady())'));
  assert.ok(exit.includes('splash.remove()'));
- assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(180L)'));
- assert.ok(exit.includes('surface.postDelayed({ complete() }, 230L)'));
+ assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(exit.includes('surface.postDelayed({ complete() }, 180L)'));
  assert.ok(exit.includes('record(activity, "FADE_DONE")'));
  assert.ok(!exit.includes('setUpdateListener'));
  assert.ok(!exit.includes('icon?.animate()?.alpha(0f)'));
  assert.ok(!exit.includes('decor.overlay.add('));
  assert.ok(!native.includes('SurfaceControl.Transaction'));
- assert.ok(app.includes("const cachedOpening=!!(api.cached('/home')||api.cached('/tasks'))"));
+ assert.ok(app.includes("const cachedOpening=!!(api.cached('/home')&&api.cached('/tasks')&&api.cached('/agenda?month='+monthKey(new Date())))"));
  assert.ok(smoke.includes("result['fade_to_done_median_ms']<=250"));
  assert.ok(smoke.includes("result['ready_to_splash_remove_median_ms']<=150"));
 });
