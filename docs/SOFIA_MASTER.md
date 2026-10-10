@@ -165,7 +165,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 ## 9. Pendências (atualizar a cada rodada)
 
-1. **Rodada 5: antecipar aquecimento de abas após reveal e eliminar rerender da hidratação; validar no celular os primeiros toques** — mudança mínima na condição de montagem; manter o salto nativo protegido por aba pronta, sem chamar pager.goTo prematuramente. Candidato manual e testes de 5 aberturas frias contra 0.3.106; ausência de travas no celular ainda não demonstrada.
+1. **Rodada 5 (0.3.107) compilada, smoke QA aprovado; confirmar primeiros toques no celular** — aquecimento depois da Home sem aguardar histórico, Shell sem rerender ao concluir hidratação. A/B em emulador: DATA 956 → 975 ms (+19 ms); nos quatro primeiros toques, três eventos nativos registrados, incluindo Páginas ainda não montada (um salto protegido). Portanto, ausência total de delay no aparelho físico **não comprovada**. APK candidato manual, não publicado; [execução 38080609693](https://github.com/avsord/sofiaos/actions/runs/38080609693) e [evidências PR #15](https://github.com/avsord/sofiaos/pull/15#issuecomment-6101539253).
 2. **Rodada 4 implementada; confirmar no celular** — briefing histórico em `docs/briefings/BRIEFING_RODADA4_S_e_abas.md`. Conferir o candidato existente antes de recompilar: S entrando em movimento, Páginas com cache sem falso aviso de primeira página e resposta aos toques nos primeiros segundos. O build e o smoke QA da rodada terminaram com sucesso (registro na seção 10); isso não substitui o aceite físico.
 2. **Validar R8 no celular**: login, conversa, páginas, agenda, notificação de
    cápsula, alarmes, secure store, atualizador.
@@ -193,7 +193,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 | 2026-10-10 | — | — | Instalação do MASTER permanente, prompt fixo e guardião de estrutura | Commit exclusivamente documental/testes; ver resultado no PR de instalação, sem novo APK |
 
 | 2026-10-10 | 0.3.106 | #14 | Protocolo SOFIA_KEY e estado vivo automático em branch independente; guardas de segredo e aprovação | Validado no workflow 38078156195; nenhum APK novo |
-| 2026-10-10 | candidato Rodada 5 | — | Iniciar aquecimento de telas após reveal, sem aguardar arquivo completo de conversas e sem rerender do Shell | Testes/compilação e aceite físico ainda pendentes; não publicar OTA |
+| 2026-10-10 | 0.3.107 | #15 | Aquecer abas após Home sem esperar histórico e sem rerender geral; manter navegação nativa protegida | [CI 38080609693](https://github.com/avsord/sofiaos/actions/runs/38080609693) compilação e smoke QA aprovados; DATA +19 ms vs 0.3.106 no mesmo emulador; primeiros toques ainda com aba não montada; físico pendente, OTA não publicado |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
