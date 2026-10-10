@@ -1,40 +1,53 @@
-import {useEffect,useLayoutEffect,useState} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import type {Tab} from './types';
 
-// Favor the two most-used views; all five use the same post-reveal sequence.
-const MENU_TABS:Tab[]=['home','chat','agenda','pages','apps','profile'];
+const MENU_TABS:Tab[]=['home','chat','pages','agenda','apps','profile'];
 
-/** Render Home alone while Android owns the splash. Only after its native fade
- * reports visible, mount one retained offscreen tab per animation frame.
- * Chaining idle callbacks caused a new two-frame + up-to-1500ms idle wait for
- * EACH tab. The first frame after reveal is left untouched, and subsequent
- * per-frame work yields between heavy mounts rather than blocking one frame
- * with every screen. A user-selected tab always mounts on demand, even if the
- * optional warmup has not reached it. */
-export function useStartupMounts(enabled:boolean,active:Tab){
+/** The Home alone mounts beneath the splash. Only after native reveal AND
+ * encrypted archive hydration do we begin optional per-frame screen mounts.
+ * Any foreground menu change cancels pending warm work, retains visited tabs,
+ * and resumes only after 500ms without another tab change. */
+export function useStartupMounts(enabled:boolean,active:Tab,authenticated=true){
  const [warmed,setWarmed]=useState<Set<Tab>>(()=>new Set(['home']));
- // Persist a user visit before another tap can remove its screen tree.
- // The current tab is included in this render; the layout effect retains it.
+ const lastTab=useRef(active);
+ const cancelPending=useRef<()=>void>(()=>{});
  useLayoutEffect(()=>{
+  if(lastTab.current!==active)cancelPending.current();
   if(MENU_TABS.includes(active))setWarmed(previous=>previous.has(active)?previous:new Set([...previous,active]));
  },[active]);
  useEffect(()=>{
-  if(!enabled){
+  if(!authenticated){
+   lastTab.current=active;
    setWarmed(previous=>previous.size===1&&previous.has('home')?previous:new Set(['home']));
    return;
   }
-  let cancelled=false,frame=0,index=0;
-  const pending=MENU_TABS.filter(tab=>tab!=='home');
-  const next=()=>{
+  // Hydration may still be running while the user can already tap a tab.
+  // Keep that visit mounted instead of erasing it before warmup is enabled.
+  if(!enabled){lastTab.current=active;return;}
+  let cancelled=false,frame=0,timer:ReturnType<typeof setTimeout>|null=null,index=0;
+  const pending=MENU_TABS.filter(tab=>tab!=='home'&&!warmed.has(tab));
+  const advance=()=>{
    if(cancelled||index>=pending.length)return;
    const tab=pending[index++];
    setWarmed(previous=>previous.has(tab)?previous:new Set([...previous,tab]));
-   if(index<pending.length)frame=requestAnimationFrame(next);
+   if(index<pending.length)frame=requestAnimationFrame(advance);
   };
-  // Yield the first newly visible frame to Home. Unlike a chained idle task,
-  // each subsequent tab needs only a frame boundary, not another idle window.
-  frame=requestAnimationFrame(()=>{if(!cancelled)frame=requestAnimationFrame(next);});
-  return()=>{cancelled=true;cancelAnimationFrame(frame);};
- },[enabled]);
+  const start=()=>{
+   if(cancelled||!pending.length)return;
+   // Leave the first committed frame free for foreground interactions.
+   frame=requestAnimationFrame(()=>{if(!cancelled)frame=requestAnimationFrame(advance);});
+  };
+  const switched=lastTab.current!==active;
+  lastTab.current=active;
+  if(switched)timer=setTimeout(start,500);
+  else start();
+  const cancel=()=>{
+   cancelled=true;
+   cancelAnimationFrame(frame);
+   if(timer!==null)clearTimeout(timer);
+  };
+  cancelPending.current=cancel;
+  return cancel;
+ },[enabled,active,authenticated]);
  return new Set<Tab>(['home',...warmed,...(MENU_TABS.includes(active)?[active]:[])]);
 }

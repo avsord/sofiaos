@@ -41,6 +41,8 @@ function Shell({startup}:{startup:LocalLaunch}){
  const system=useColorScheme(),[ready]=useState(true),[auth,setAuth]=useState<Auth|null>(startup.auth),[bootstrap,setBootstrap]=useState<Bootstrap|null>(()=>startup.auth?fastBootstrap(startup.auth):null),[prefs,setPrefs]=useState<Prefs>(startup.prefs||{appearance:'schedule',enterToSend:false,autoSendVoice:true,lightAt:'05:00',darkAt:'19:00'}),[error,setError]=useState(''),[tab,setTab]=useState<Tab>('home'),[locked,setLocked]=useState(false),[booting,setBooting]=useState(false),[keyboard,setKeyboard]=useState(false),[workspaceDepth,setWorkspaceDepth]=useState(false),[workspaceReset,setWorkspaceReset]=useState(0),[capsulesTarget,setCapsulesTarget]=useState(0),[gestureLocked,setGestureLocked]=useState(false),[pagesDepth,setPagesDepth]=useState(false),[chatEpoch,setChatEpoch]=useState(0);
  const [agendaTarget,setAgendaTarget]=useState<{date:string;id?:string;create?:boolean;nonce:number}>({date:'',nonce:0});
  const tabHistory=useRef<Tab[]>([]),pager=useRef<TabPagerHandle>(null),navigation=useRef({tab,locked});
+ const tabTap=useRef<{tab:Tab;at:number;early:boolean}|null>(null);
+ const nativeRevealAt=useRef(0);
  navigation.current={tab,locked};
  const screenTab=tab;
  const menuMotion=useMemo(()=>createMenuMotion('home'),[]);
@@ -57,7 +59,36 @@ function Shell({startup}:{startup:LocalLaunch}){
  // A cached Home needs only the final visibility fence. A second first-paint
  // state update rerenders the entire Shell during the native alpha animation.
  const cachedOpening=!!(api.cached('/home')&&api.cached('/tasks')&&api.cached('/agenda?month='+monthKey(new Date())));
- const painted=useAfterFirstPaint(ready&&!cachedOpening),visible=useLaunchVisible(ready),servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady,mountedTabs=useStartupMounts(visible&&!!auth,tab);
+ const painted=useAfterFirstPaint(ready&&!cachedOpening),visible=useLaunchVisible(ready),servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady;
+ const [hydratedApi,setHydratedApi]=useState<SofiaApi|null>(null);
+ useEffect(()=>{if(visible&&!nativeRevealAt.current)nativeRevealAt.current=Date.now();},[visible]);
+ // Tap-to-next-React-frame is a JS-side estimate, not a physical GPU latency.
+ // Explicitly label 0-3s vs. later; the Android native hop can be faster.
+ useEffect(()=>{
+  if(!tabTap.current||tabTap.current.tab!==tab)return;
+  const frame=requestAnimationFrame(()=>{
+   const tap=tabTap.current;
+   if(!tap||tap.tab!==tab||navigation.current.tab!==tab)return;
+   console.info('SOFIA_TAB_TAP_TO_FRAME_MS tab='+tab+' ms='+Math.max(0,Date.now()-tap.at)+' window='+(tap.early?'first_3s':'after_3s'));
+   tabTap.current=null;
+  });
+  return()=>cancelAnimationFrame(frame);
+ },[tab]);
+ // The full encrypted archive may include years of Page/chat history. Never
+ // parse it during the native splash: prepare it only after the final fade.
+ useEffect(()=>{
+  if(!visible||!auth||!initialDataReady)return;
+  let live=true;const started=Date.now();
+  void api.hydrate().then(()=>{
+   if(live){console.info('SOFIA_HYDRATE_MS='+Math.max(0,Date.now()-started));setHydratedApi(api);}
+  }).catch(error=>{
+   // Cached history is optional; network reads and manual navigation must
+   // remain available when the encrypted archive is temporarily unreadable.
+   if(live){console.warn('SOFIA_HYDRATE_FAILED',errorText(error));setHydratedApi(api);}
+  });
+  return()=>{live=false;};
+ },[visible,auth,initialDataReady,api]);
+ const mountedTabs=useStartupMounts(visible&&!!auth&&hydratedApi===api,tab,!!auth);
  useEffect(()=>{if(!auth||initialDataReady)return;let live=true;setPreparationError('');void prepareInitialData(api,()=>preloadAgenda(api)).then(()=>{if(live){setPrepared(api);console.info('SOFIA_STARTUP_CACHE_READY');}}).catch(e=>{if(live)setPreparationError(errorText(e));});return()=>{live=false;};},[api,prepareAttempt]);
  // Do not start network completion renders over the native splash fade
  // when there is already a cached Home to present. In 0.3.76, React work
@@ -103,7 +134,9 @@ function Shell({startup}:{startup:LocalLaunch}){
   const current=navigation.current;
   if(next===current.tab){if(next==='apps'&&!current.locked){setWorkspaceReset(v=>v+1);setWorkspaceDepth(false);}return;}
   if(current.locked){pager.current?.goTo(current.tab);Alert.alert('Sua conversa','Pare a gravação ou aguarde a resposta antes de trocar de aba.');return;}
-  tabHistory.current=[...tabHistory.current,current.tab].slice(-30);switchTab(next);
+  tabHistory.current=[...tabHistory.current,current.tab].slice(-30);
+  tabTap.current={tab:next,at:Date.now(),early:!!nativeRevealAt.current&&Date.now()-nativeRevealAt.current<=3000};
+  switchTab(next);
   if(next==='apps'){setWorkspaceReset(v=>v+1);setWorkspaceDepth(false);}
  },[switchTab]);
  const [taskContext,setTaskContext]=useState<Task|null>(null);

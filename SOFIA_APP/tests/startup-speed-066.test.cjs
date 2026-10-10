@@ -84,7 +84,7 @@ test('086 finite system S does not extend the native Home handoff or restart an 
  assert.ok(logo.includes('<animated-vector')); 
  assert.ok(logo.includes('android:scaleX="0.70" android:scaleY="0.70"')); 
  assert.ok(logo.includes('android:windowSplashScreenAnimationDuration')); 
- assert.ok(logo.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_entry</item>'));
+ assert.ok(logo.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_empty</item>'));
  const launch=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  assert.ok(launch.includes('surface.animate().alpha(0f).setDuration(95L)'));
  assert.ok(!launch.includes('Animatable'));
@@ -94,8 +94,8 @@ test('068 photo preloads without blocking Home; menu prewarm yields to navigatio
  const local=fs.readFileSync(path.join(root,'src/lib/local-launch.ts'),'utf8');
  const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
  assert.ok(local.includes("void photoReady;\n  await snapshot.hydrateLaunch()"));
- assert.ok(app.includes('useStartupMounts(visible&&!!auth,tab)'));
- assert.ok(mounts.includes('frame=requestAnimationFrame(next)'));
+ assert.ok(app.includes('useStartupMounts(visible&&!!auth&&hydratedApi===api,tab,!!auth)'));
+ assert.ok(mounts.includes('frame=requestAnimationFrame(advance)'));
  assert.ok(fs.readFileSync(path.join(root,'src/components/ProfileAvatar.tsx'),'utf8').includes('primeProfilePhoto(scope,readProfilePhoto)'));
 });
 test('068 bell actions share one horizontal row and capsule reads remain server-backed',()=>{
@@ -125,7 +125,7 @@ test('069 startup restores photo and cached Home together; menus mount only when
  const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
  assert.ok(launch.includes('void photoReady;\n  await snapshot.hydrateLaunch()'));
  assert.ok(!launch.includes('fetch('),'No server calls in initial photo/Home restore');
- assert.ok(mounts.includes('frame=requestAnimationFrame(next)'),'Warm only after reveal, one retained tab per frame');
+ assert.ok(mounts.includes('frame=requestAnimationFrame(advance)'),'Warm only after reveal, one retained tab per frame');
  assert.ok(mounts.includes('setWarmed(previous=>previous.has(tab)'));
 });
 
@@ -144,7 +144,7 @@ test('086 startup S uses the reference vector and one finite scale and defers op
  assert.ok(bg.includes('3400'));
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  assert.ok(!app.includes('timer=setTimeout(next,800)'));
- assert.ok(app.includes('useStartupMounts(visible&&!!auth,tab)'));
+ assert.ok(app.includes('useStartupMounts(visible&&!!auth&&hydratedApi===api,tab,!!auth)'));
  assert.ok(app.includes("preloadWhenIdle:screenTab==='home'"));
 });
 
@@ -179,14 +179,14 @@ test('074 hidden tabs mount one frame at a time after original splash exits',()=
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');
  const apps=fs.readFileSync(path.join(root,'src/screens/Workspace.tsx'),'utf8');
- assert.ok(mounts.includes("if(!enabled){"));
- assert.ok(mounts.includes("frame=requestAnimationFrame(()=>{if(!cancelled)frame=requestAnimationFrame(next);})"));
+ assert.ok(mounts.includes("if(!enabled){lastTab.current=active;return;}"));
+ assert.ok(mounts.includes("frame=requestAnimationFrame(()=>{if(!cancelled)frame=requestAnimationFrame(advance);})"));
  assert.ok(mounts.includes("cancelAnimationFrame(frame)"));
  assert.ok(!mounts.includes("scheduleIdleTask("),"No repeated 1.5s idle waits between menus");
  assert.ok(mounts.includes("setWarmed(previous=>previous.has(tab)?previous:new Set([...previous,tab]))"));
- assert.ok(app.includes('useStartupMounts(visible&&!!auth,tab)'));
+ assert.ok(app.includes('useStartupMounts(visible&&!!auth&&hydratedApi===api,tab,!!auth)'));
  assert.ok(!app.includes('MENU_PRELOADERS'));
- assert.ok(pages.includes("api.cached<{items:Entity[]}>('/workspace/entities?limit=100&kind=user_page&q=&offset=0')"));
+ assert.ok(pages.includes("const PAGE_LIST_KEY='/workspace/entities?limit=100&kind=user_page&q=&offset=0'"));
  assert.ok(apps.includes("api.cached<Catalog>('/workspace/catalog')"));
 });
 
@@ -195,7 +195,7 @@ test('078 no second OS S persists underneath the single composited image',()=>{
  const native=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
  assert.ok(theme.includes('<item name="android:windowBackground">@color/sofiaLaunchBackground</item>'));
  assert.ok(!theme.includes('<item name="android:windowBackground">@drawable/splashscreen_logo</item>'));
- assert.ok(theme.includes('<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_entry</item>'));
+ assert.ok(theme.includes('<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_empty</item>'));
  assert.ok(native.indexOf('decor.overlay.add(surface)')<native.indexOf('exitSystemSplash = { success ->'));
  assert.ok(native.includes('splash.remove()'));
  assert.ok(!native.includes('icon.postDelayed('));
@@ -243,9 +243,10 @@ test('078 Android 12 completed fade reports visible without another costly frame
 test('107 native S handoff starts at matching 70% scale without OEM clock jump',()=>{
  const generator=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
  const overlay=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
- const reference='<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_entry</item>';
+ const reference='<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_empty</item>';
  assert.equal(generator.split(reference).length-1,1,'matching reduced static vector must be active');
- assert.ok(generator.includes('android:scaleX="0.70" android:scaleY="0.70"'));
+ assert.ok(generator.includes('android:width="192dp" android:height="192dp"'));
+ assert.ok(generator.includes("write('drawable/sofia_launch_mark_empty.xml'"));
  assert.ok(generator.includes("write('drawable-v31/sofia_launch_mark_entry.xml'"));
  assert.ok(!generator.includes('<item name="android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_animated</item>'));
  assert.ok(overlay.includes('val motionStart = now'));
@@ -261,6 +262,39 @@ test('107 native S handoff starts at matching 70% scale without OEM clock jump',
  const smoke=fs.readFileSync(path.join(root,'tools/manual-apk-smoke.py'),'utf8');
  assert.ok(smoke.includes("run['icon_is_image_view'] is True"),'R8-proof check must confirm Android ImageView');
  assert.ok(smoke.includes("run['icon_is_surface_view'] is False"),'R8-proof check must exclude animated SurfaceView');
+ assert.ok(overlay.includes('paint.alpha = (255f * fade).toInt()'));
+ assert.ok(fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchMotion.java'),'utf8').includes('S_FADE_IN_MS = 140L;'));
+ assert.ok(overlay.includes('val motionStart = now'));
+ assert.ok(!overlay.includes('splash.iconAnimationStart?.let'));
  assert.ok(overlay.includes('SOFIA_LAUNCH_ICON_IS_IMAGE_VIEW=${icon is android.widget.ImageView}'));
  assert.ok(overlay.includes('SOFIA_LAUNCH_ICON_IS_SURFACE_VIEW=${icon is android.view.SurfaceView}'));
+});
+
+test('108 pages hydrate from the full archive only AFTER reveal and never show false empty',()=>{
+ const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
+ const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');
+ const archive=fs.readFileSync(path.join(root,'src/lib/startup-snapshot.ts'),'utf8');
+ assert.ok(app.includes('if(!visible||!auth||!initialDataReady)return'));
+ assert.ok(app.includes('void api.hydrate().then(()=>'));
+ assert.ok(app.includes('SOFIA_HYDRATE_MS='));
+ assert.ok(app.includes('hydratedApi===api'));
+ assert.ok(!archive.slice(archive.indexOf('export function launchRead('),archive.indexOf('export function cacheableRead(')).includes('user_page'),'Full Pages archive must not decrypt before Home');
+ assert.ok(pages.includes('const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[loaded,setLoaded]'));
+ assert.ok(pages.includes('setPages(prev=>prev.length?prev:local)'));
+ assert.ok(pages.includes("setLoaded(true);setError('')"));
+ assert.ok(pages.includes('ready&&!loaded&&!error&&!pages.length'));
+ assert.ok(pages.includes('ready&&loaded&&!pages.length&&!error'));
+});
+test('108 native splash icon is fully invisible, overlay fades the only S on every new frame',()=>{
+ const logo=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
+ const native=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
+ const motion=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchMotion.java'),'utf8');
+ assert.ok(logo.includes('sofia_launch_mark_empty.xml'));
+ assert.ok(logo.includes('android:fillColor="#00FFFFFF"'));
+ assert.ok(logo.includes('android:strokeColor="#00FFFFFF"'));
+ assert.equal(logo.split('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_empty</item>').length-1,1);
+ assert.ok(native.includes('activity.resources.getDrawable(R.drawable.sofia_launch_mark'));
+ assert.ok(native.includes('paint.alpha = (255f * fade).toInt()'));
+ assert.ok(motion.includes('S_FADE_IN_MS = 140L'));
+ assert.ok(native.includes('surface.animate().alpha(0f).setDuration(95L)'));
 });
