@@ -165,7 +165,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 ## 9. Pendências (atualizar a cada rodada)
 
-1. **Rodada 4 implementada; confirmar no celular** — briefing histórico em `docs/briefings/BRIEFING_RODADA4_S_e_abas.md`. Conferir o candidato existente antes de recompilar: S entrando em movimento, Páginas com cache sem falso aviso de primeira página e resposta aos toques nos primeiros segundos. O build e o smoke QA da rodada terminaram com sucesso (registro na seção 10); isso não substitui o aceite físico.
+1. **Rodada 5: antecipar aquecimento de abas após reveal e eliminar rerender da hidratação; validar no celular os primeiros toques** — mudança mínima na condição de montagem; manter o salto nativo protegido por aba pronta, sem chamar pager.goTo prematuramente. Candidato manual e testes de 5 aberturas frias contra 0.3.106; ausência de travas no celular ainda não demonstrada.
+2. **Rodada 4 implementada; confirmar no celular** — briefing histórico em `docs/briefings/BRIEFING_RODADA4_S_e_abas.md`. Conferir o candidato existente antes de recompilar: S entrando em movimento, Páginas com cache sem falso aviso de primeira página e resposta aos toques nos primeiros segundos. O build e o smoke QA da rodada terminaram com sucesso (registro na seção 10); isso não substitui o aceite físico.
 2. **Validar R8 no celular**: login, conversa, páginas, agenda, notificação de
    cápsula, alarmes, secure store, atualizador.
 3. **Publicar no atualizador** o primeiro candidato aprovado pelo dono.
@@ -191,7 +192,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 | 2026-10-10 | 0.3.106 | — | Rodada 4: S único, restauração de cache e aquecimento que cede aos toques; base `ef3a6f7` | [Execução 38070454563](https://github.com/avsord/sofiaos/actions/runs/38070454563) concluída com sucesso; validação física pendente, sem aprovação OTA |
 | 2026-10-10 | — | — | Instalação do MASTER permanente, prompt fixo e guardião de estrutura | Commit exclusivamente documental/testes; ver resultado no PR de instalação, sem novo APK |
 
-| 2026-10-10 | 0.3.106 | — | Protocolo SOFIA_KEY e estado vivo automático em branch independente; guardas de segredo e aprovação | Implantação documental; GitHub Actions validará a geração; nenhum APK novo |
+| 2026-10-10 | 0.3.106 | #14 | Protocolo SOFIA_KEY e estado vivo automático em branch independente; guardas de segredo e aprovação | Validado no workflow 38078156195; nenhum APK novo |
+| 2026-10-10 | candidato Rodada 5 | — | Iniciar aquecimento de telas após reveal, sem aguardar arquivo completo de conversas e sem rerender do Shell | Testes/compilação e aceite físico ainda pendentes; não publicar OTA |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

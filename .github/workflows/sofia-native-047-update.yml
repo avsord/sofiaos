@@ -373,6 +373,13 @@ jobs:
         run-id: 38066335139
         github-token: ${{ github.token }}
         path: SOFIA_APP/dist/previous-105
+    - name: Restore 0.3.106 QA APK to compare first-open timing in the SAME emulator
+      uses: actions/download-artifact@v4
+      with:
+        name: Sofia-build-38070454563-1
+        run-id: 38070454563
+        github-token: ${{ github.token }}
+        path: SOFIA_APP/dist/previous-106
     - name: Verify exact candidate source and bytes
       working-directory: SOFIA_APP
       env:
@@ -385,6 +392,7 @@ jobs:
         test -s dist/QA-ONLY-manual-universal.apk
         python3 tools/verify-abi-equivalence.py
         test -s dist/previous-105/QA-ONLY-manual-universal.apk
+        test -s dist/previous-106/QA-ONLY-manual-universal.apk
     - name: Enable KVM
       run: |
         echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

@@ -38,7 +38,7 @@ def tap_label(tree,label):
   if n.attrib.get('text')==label or n.attrib.get('content-desc')==label:
    bounds=list(map(int,re.findall(r'\d+',n.attrib['bounds'])));adb('shell','input','tap',str((bounds[0]+bounds[2])//2),str((bounds[1]+bounds[3])//2));return
  raise AssertionError('Missing control '+label)
-result={'passed':False,'production_apk':False,'qa_emulator_twin':True,'exact_owner_apk_executed':False,'synthetic_seed_records':True,'synthetic_transport_in_tested_apk':False,'physical_device':False,'real_user_data_preservation_tested':False,'published':False,'source_sha':(dist/'SOURCE_COMMIT.txt').read_text().strip(),'apk_sha256':hashlib.sha256((dist/'Sofia-OS.apk').read_bytes()).hexdigest(),'qa_apk_sha256':hashlib.sha256((dist/'QA-ONLY-manual-universal.apk').read_bytes()).hexdigest(),'baseline_runs':[],'previous_105_runs':[],'candidate_runs':[]}
+result={'passed':False,'production_apk':False,'qa_emulator_twin':True,'exact_owner_apk_executed':False,'synthetic_seed_records':True,'synthetic_transport_in_tested_apk':False,'physical_device':False,'real_user_data_preservation_tested':False,'published':False,'source_sha':(dist/'SOURCE_COMMIT.txt').read_text().strip(),'apk_sha256':hashlib.sha256((dist/'Sofia-OS.apk').read_bytes()).hexdigest(),'qa_apk_sha256':hashlib.sha256((dist/'QA-ONLY-manual-universal.apk').read_bytes()).hexdigest(),'baseline_runs':[],'previous_105_runs':[],'previous_106_runs':[],'candidate_runs':[]}
 try:
  for name in ['window_animation_scale','transition_animation_scale','animator_duration_scale']:adb('shell','settings','put','global',name,'1')
  adb('install',str(dist/'baseline-Sofia-OS.apk'))
@@ -77,11 +77,36 @@ try:
  adb('install','-r',str(previous105))
  result['previous_105_runs']=[cold('previous105-'+str(i)) for i in range(5)]
  result['previous_105_medians_ms']={stage:statistics.median(x['stages_ms'][stage] for x in result['previous_105_runs']) for stage in ['SYSTEM_CALLBACK','UI','DATA']}
+ previous106=dist/'previous-106/QA-ONLY-manual-universal.apk'
+ result['previous_106_qa_sha256']=hashlib.sha256(previous106.read_bytes()).hexdigest()
+ adb('install','-r',str(previous106))
+ result['previous_106_runs']=[cold('previous106-'+str(i)) for i in range(5)]
+ result['previous_106_medians_ms']={stage:statistics.median(x['stages_ms'][stage] for x in result['previous_106_runs']) for stage in ['SYSTEM_CALLBACK','UI','DATA']}
  adb('install','-r',str(dist/'QA-ONLY-manual-universal.apk'));result['in_place_install']=True
  # Retain the actual production transition for visual inspection.
  recording=subprocess.Popen(['adb','shell','screenrecord','--time-limit','8','/sdcard/sofia-launch-079.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
  time.sleep(.5)
  result['migration_run']=cold('candidate-migration')
+ # First FOUR menu taps happen immediately after the native DATA marker,
+ # before 500ms-interval idle warming could reasonably finish. No UI dump
+ # or 8-second recording wait may precede these early interactions.
+ early_at=time.monotonic()
+ for label in ['Páginas','Conversa','Agenda','Início']:
+  tap_label(before,label)
+ early_elapsed=time.monotonic()-early_at
+ early_logs=adb('logcat','-d','-s','SofiaMenu:I','ReactNativeJS:I').decode(errors='replace')
+ (out/'first-four-menu-taps-logcat.txt').write_text(early_logs)
+ result['early_menu_sequence']=['Páginas','Conversa','Agenda','Início']
+ result['early_menu_first_touch_after_native_DATA']=True
+ result['early_menu_sequence_seconds']=round(early_elapsed,3)
+ result['early_menu_native_touch_count']=early_logs.count('TOUCH_DOWN index=')
+ result['early_menu_native_first_count']=early_logs.count('nativeFirst=true')
+ result['early_menu_react_guarded_count']=early_logs.count('nativeFirst=false')
+ result['early_js_frame_samples']=[
+  {'tab':tab,'ms':int(ms),'window':window}
+  for tab,ms,window in re.findall(r'SOFIA_TAB_TAP_TO_FRAME_MS tab=([a-z]+) ms=(\d+) window=(first_3s|after_3s)',early_logs)
+ ]
+ assert result['early_menu_native_touch_count']>=3,'First taps failed to reach Android native menu after startup'
  recording.wait(timeout=15)
  adb('pull','/sdcard/sofia-launch-079.mp4',str(out/'candidate-launch.mp4'))
  for i in range(5):result['candidate_runs'].append(cold('candidate-'+str(i)))
@@ -94,6 +119,11 @@ try:
  result['candidate_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['candidate_runs'])
  result['candidate_medians_ms']={stage:statistics.median(x['stages_ms'][stage] for x in result['candidate_runs']) for stage in ['SYSTEM_CALLBACK','UI','DATA']}
  result['startup_vs_105_ms']={stage:result['candidate_medians_ms'][stage]-result['previous_105_medians_ms'][stage] for stage in ['SYSTEM_CALLBACK','UI','DATA']}
+ result['startup_vs_106_ms']={stage:result['candidate_medians_ms'][stage]-result['previous_106_medians_ms'][stage] for stage in ['SYSTEM_CALLBACK','UI','DATA']}
+ result['startup_no_worse_than_106']=all(delta<=0 for delta in result['startup_vs_106_ms'].values())
+ # Preserve existing limits and also limit a cold-start regression against
+ # the immediately preceding R4 APK tested on this exact emulator instance.
+ assert result['startup_vs_106_ms']['DATA']<=100,'Startup regression compared with 0.3.106 QA exceeds 100 ms'
  result['startup_no_worse_than_105']=all(diff<=0 for diff in result['startup_vs_105_ms'].values())
  # Preserve all existing timing gates. Compare the immediately previous R8
  # candidate explicitly instead of claiming older baselines represent 0.3.105.

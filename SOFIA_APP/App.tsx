@@ -60,7 +60,9 @@ function Shell({startup}:{startup:LocalLaunch}){
  // state update rerenders the entire Shell during the native alpha animation.
  const cachedOpening=!!(api.cached('/home')&&api.cached('/tasks')&&api.cached('/agenda?month='+monthKey(new Date())));
  const painted=useAfterFirstPaint(ready&&!cachedOpening),visible=useLaunchVisible(ready),servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady;
- const [hydratedApi,setHydratedApi]=useState<SofiaApi|null>(null);
+ // Archive loading remains post-reveal, but is not a prerequisite for lazy tabs.
+ // No hydration-completion setState: re-rendering the entire Shell would
+ // compete with the user's first menu interaction.
  useEffect(()=>{if(visible&&!nativeRevealAt.current)nativeRevealAt.current=Date.now();},[visible]);
  // Tap-to-next-React-frame is a JS-side estimate, not a physical GPU latency.
  // Explicitly label 0-3s vs. later; the Android native hop can be faster.
@@ -80,15 +82,17 @@ function Shell({startup}:{startup:LocalLaunch}){
   if(!visible||!auth||!initialDataReady)return;
   let live=true;const started=Date.now();
   void api.hydrate().then(()=>{
-   if(live){console.info('SOFIA_HYDRATE_MS='+Math.max(0,Date.now()-started));setHydratedApi(api);}
+   if(live)console.info('SOFIA_HYDRATE_MS='+Math.max(0,Date.now()-started));
   }).catch(error=>{
    // Cached history is optional; network reads and manual navigation must
    // remain available when the encrypted archive is temporarily unreadable.
-   if(live){console.warn('SOFIA_HYDRATE_FAILED',errorText(error));setHydratedApi(api);}
+   if(live)console.warn('SOFIA_HYDRATE_FAILED',errorText(error));
   });
   return()=>{live=false;};
  },[visible,auth,initialDataReady,api]);
- const mountedTabs=useStartupMounts(visible&&!!auth&&hydratedApi===api,tab,!!auth);
+ // Warm code/screens after the native fade, concurrently with archive I/O;
+ // Pages owns its loading/empty-state gate and never fabricates a page list.
+ const mountedTabs=useStartupMounts(visible&&!!auth,tab,!!auth);
  useEffect(()=>{if(!auth||initialDataReady)return;let live=true;setPreparationError('');void prepareInitialData(api,()=>preloadAgenda(api)).then(()=>{if(live){setPrepared(api);console.info('SOFIA_STARTUP_CACHE_READY');}}).catch(e=>{if(live)setPreparationError(errorText(e));});return()=>{live=false;};},[api,prepareAttempt]);
  // Do not start network completion renders over the native splash fade
  // when there is already a cached Home to present. In 0.3.76, React work

@@ -27,7 +27,7 @@ test('Home mounts without hidden tabs and logout clears archived account trees',
  f.render('home',false,false);assert.equal(f.render('home',false,false).size,1);
  assert.equal(f.frames.filter(x=>!x.cancelled&&!x.done).length,0);
 });
-test('warmup starts only after hydration and mounts one tab per frame',()=>{
+test('warmup starts after reveal even with encrypted archive still pending',()=>{
  const f=fixture();assert.deepEqual([...f.render('home',false)],['home']);
  assert.equal(f.frames.length,0);
  assert.deepEqual([...f.render('home',true)],['home']);assert.equal(f.frames.length,1);
@@ -53,4 +53,44 @@ test('logout cancels pending frame and timers; stale callbacks cannot resurrect 
  for(const task of f.frames.filter(x=>!x.done))task.run();
  for(const task of f.timers.filter(x=>!x.done))task.run();
  assert.deepEqual([...f.render('home',false,false)],['home']);
+});
+
+test('R5 first taps prewarm independently of the full archived Page/chat history',()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const app=fs.readFileSync(path.join(__dirname,'../App.tsx'),'utf8');
+ const pages=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
+ assert.ok(app.includes('const mountedTabs=useStartupMounts(visible&&!!auth,tab,!!auth);'));
+ assert.ok(!app.includes('hydratedApi===api'),'waiting for whole archive reproduces first-tap delays');
+ assert.ok(!app.includes('setHydratedApi('),'archive completion cannot rerender every mounted screen');
+ assert.ok(app.includes('if(!visible||!auth||!initialDataReady)return;'));
+ assert.ok(app.includes('void api.hydrate().then(()=>'),'archive hydration is still preserved after reveal');
+ assert.ok(pages.includes('void api.hydrate().then(()=>'),'Pages still recovers saved listing when archive finishes');
+ assert.ok(pages.includes('ready&&!loaded&&!error&&!pages.length'),'Pages still has neutral loading state');
+ assert.ok(pages.includes('ready&&loaded&&!pages.length&&!error'),'Pages only shows empty after real load');
+ const f=fixture();
+ assert.equal(f.render('home',false).size,1,'no hidden tabs underneath Android splash');
+ assert.equal(f.render('home',true).size,1,'Home commits alone before first warm frame');
+ f.flush();f.render('home',true);
+ f.flush();assert.ok(f.render('home',true).has('chat'),'post-reveal warmup works while archive is unresolved');
+ assert.ok(f.render('pages',true).has('pages'),'an early touch wins over optional warmup');
+ assert.ok(f.frames.some(x=>x.cancelled),'foreground touch cancels pending background work');
+});
+
+test('R5 manual smoke explicitly exercises first taps and 0.3.106 same-emulator baseline',()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const root=path.join(__dirname,'..','..');
+ const smoke=fs.readFileSync(path.join(root,'SOFIA_APP/tools/manual-apk-smoke.py'),'utf8');
+ const workflow=fs.readFileSync(path.join(root,'.github/workflows/sofia-native-047-update.yml'),'utf8');
+ assert.ok(workflow.includes('Sofia-build-38070454563-1'));
+ assert.ok(workflow.includes('dist/previous-106/QA-ONLY-manual-universal.apk'));
+ assert.ok(smoke.includes("result['previous_106_runs']=[cold('previous106-'"));
+ assert.ok(smoke.includes("result['startup_vs_106_ms']"));
+ assert.ok(smoke.includes("result['startup_vs_106_ms']['DATA']<=100"));
+ assert.ok(smoke.includes("result['early_menu_first_touch_after_native_DATA']=True"));
+ assert.ok(smoke.includes("result['early_menu_native_touch_count']>=3"));
+ assert.ok(smoke.includes("for label in ['Páginas','Conversa','Agenda','Início']"));
+ const code=smoke.slice(smoke.indexOf("result['migration_run']=cold('candidate-migration')"),smoke.indexOf('recording.wait(timeout=15)'));
+ assert.ok(code.includes("tap_label(before,label)"),'early taps must precede the recording wait');
+ assert.ok(smoke.includes("assert result['native_first_taps']>=12"),'retain the existing native responsiveness gate');
+ assert.ok(smoke.includes("assert 'FIM DA RESPOSTA QA' in conversation"),'retain chat persistence gate');
 });
