@@ -53,7 +53,10 @@ test('pager keeps six fixed slots, prioritizes Home and warms hidden screens wit
   const startup=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
   assert.ok(startup.includes("const [warmed,setWarmed]=useState"));assert.ok(startup.includes("frame=requestAnimationFrame(advance)"));assert.ok(startup.includes("MENU_TABS.includes(active)?[active]:[]"));
   assert.ok(startup.includes('timer=setTimeout(start,500)'),'Warming waits after navigation without postponing the tap');
-  assert.ok(source.includes('useStartupMounts(visible&&!!auth&&hydratedApi===api,tab,!!auth)'));
+  assert.ok(source.includes('useStartupMounts(visible&&!!auth,tab,!!auth)'));
+  assert.ok(!source.includes('hydratedApi===api'),'archive I/O must not delay first menu warmup');
+  assert.ok(!source.includes('setHydratedApi('),'archive completion must not render all tab slots again');
+  assert.ok(source.includes('void api.hydrate().then(()=>'),'Pages/chat archive is still hydrated safely');
   assert.ok(pager.includes('removeClippedSubviews={false}'));assert.ok(!source.includes('setBootstrap(null);setTab('));
 });
 test('screen instances stay cached after lazy loading, preserving drafts and scroll positions',()=>{
@@ -110,8 +113,8 @@ test('notifications are outside the swipe sequence without losing the underlying
 test('Android identity, discovery prefix and version stay compatible',()=>{
   const config=JSON.parse(fs.readFileSync(path.join(root,'app.json'))).expo,pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json')));
   const update=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');
-  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,111);
-  assert.equal(config.version,'0.3.106');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
+  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,112);
+  assert.equal(config.version,'0.3.107');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
 });
 test('Pages opens a preloaded entity synchronously without a network wait',()=>{
  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');

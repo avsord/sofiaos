@@ -4,7 +4,7 @@ import type {Tab} from './types';
 const MENU_TABS:Tab[]=['home','chat','pages','agenda','apps','profile'];
 
 /** The Home alone mounts beneath the splash. Only after native reveal AND
- * encrypted archive hydration do we begin optional per-frame screen mounts.
+ * without awaiting full archive hydration, begin optional per-frame mounts.
  * Any foreground menu change cancels pending warm work, retains visited tabs,
  * and resumes only after 500ms without another tab change. */
 export function useStartupMounts(enabled:boolean,active:Tab,authenticated=true){
@@ -21,8 +21,8 @@ export function useStartupMounts(enabled:boolean,active:Tab,authenticated=true){
    setWarmed(previous=>previous.size===1&&previous.has('home')?previous:new Set(['home']));
    return;
   }
-  // Hydration may still be running while the user can already tap a tab.
-  // Keep that visit mounted instead of erasing it before warmup is enabled.
+  // The native splash may still be up while a user action changes the tab.
+  // Keep every visited screen mounted until logout, even before reveal.
   if(!enabled){lastTab.current=active;return;}
   let cancelled=false,frame=0,timer:ReturnType<typeof setTimeout>|null=null,index=0;
   const pending=MENU_TABS.filter(tab=>tab!=='home'&&!warmed.has(tab));
