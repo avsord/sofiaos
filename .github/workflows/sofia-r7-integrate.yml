@@ -1,0 +1,90 @@
+name: Sofia R7 isolated integration and verification
+'on':
+  push:
+    branches: [test/sofia-r7-integrate-20261010]
+    paths: [.github/workflows/sofia-r7-integrate.yml]
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Reconstruct reviewed 55-file delta on exact delivery base
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/r7-evidence
+          cp -r tools/r7-payload /tmp/r7-payload
+          git checkout --detach c9be56a8dbd160373ccf30764e21ab276f36af8f
+          python3 - <<'PY'
+          import base64,gzip,hashlib,json
+          from pathlib import Path
+          raw=gzip.decompress(base64.b64decode(''.join((Path('/tmp/r7-payload')/f'part{i}.txt').read_text() for i in range(7)),validate=True))
+          assert hashlib.sha256(raw).hexdigest()=='e5afde032f1bbf9f54f8780d1a8ad145e173715aac5f9b5f83e226b37a9b2262'
+          rows=json.loads(raw);assert len(rows)==55
+          for row in rows:
+              p=Path(row['p']);assert not p.is_absolute() and '..' not in p.parts
+              assert str(p).startswith(('SOFIA_APP/','docs/')) or str(p)=='.github/workflows/sofia-native-047-update.yml'
+              text=p.read_text(encoding='utf8') if p.exists() else ''
+              assert hashlib.sha256(text.encode()).hexdigest()==row['before'],str(p)+' base hash'
+              for start,end,replacement in reversed(row['ops']):text=text[:start]+replacement+text[end:]
+              assert hashlib.sha256(text.encode()).hexdigest()==row['after'],str(p)+' candidate hash'
+              p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text,encoding='utf8')
+          Path('/tmp/r7-evidence/manifest.json').write_bytes(raw)
+          print('55 candidate files match the locally reviewed source, no helper payload in candidate')
+          PY
+      - name: Install locked existing production dependencies
+        working-directory: SOFIA_APP
+        run: npm ci
+      - name: Full TypeScript and application regression tests
+        working-directory: SOFIA_APP
+        run: |
+          set -euo pipefail
+          npm run check 2>&1 | tee /tmp/r7-evidence/typecheck.txt
+          npm test 2>&1 | tee /tmp/r7-evidence/app-tests.txt
+      - name: Actual React Activity lifecycle and stale-flush regression
+        run: |
+          set -euo pipefail
+          npm install --prefix /tmp/r7-test --no-audit --no-fund --package-lock=false typescript@6.0.3 react@19.2.3 react-test-renderer@19.2.3
+          SOFIA_REACT_TEST_TOOLS=/tmp/r7-test/node_modules node --test SOFIA_APP/tests/activity-react-108.cjs 2>&1 | tee /tmp/r7-evidence/real-activity.txt
+      - name: Preserve delivery, privacy and test syntax contracts
+        run: |
+          set -euo pipefail
+          python3 SOFIA_APP/tools/native-delivery-test.py 2>&1 | tee /tmp/r7-evidence/native-contracts.txt
+          python3 -m py_compile SOFIA_APP/tools/manual-apk-smoke.py SOFIA_APP/tools/fluency-heavy-smoke.py
+          node --test SOFIA_APP/tools/delivery.test.cjs 2>&1 | tee /tmp/r7-evidence/delivery.txt
+          node --test tools/sofia-state.test.cjs SOFIA_APP/tests/master-sync-106.test.cjs 2>&1 | tee /tmp/r7-evidence/continuity.txt
+      - name: Commit verified source to isolated work branch only
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,subprocess
+          from pathlib import Path
+          rows=json.loads(Path('/tmp/r7-evidence/manifest.json').read_text())
+          for r in rows:assert hashlib.sha256(Path(r['p']).read_bytes()).hexdigest()==r['after'],r['p']+' mutated by validation'
+          subprocess.run(['git','add','--']+[r['p'] for r in rows],check=True)
+          actual=subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines()
+          assert sorted(actual)==sorted(r['p'] for r in rows),actual
+          PY
+          test "$(git ls-remote origin refs/heads/work/sofia-r7-fluency-20261010 | cut -f1)" = c9be56a8dbd160373ccf30764e21ab276f36af8f
+          git config user.name 'Sofia R7 verified source'
+          git config user.email 'sofia-r7@users.noreply.github.com'
+          git commit -m 'perf(android): R7 idle scheduler, hidden Activity and measured New/Old mode'
+          git push origin HEAD:refs/heads/work/sofia-r7-fluency-20261010
+          git rev-parse HEAD | tee /tmp/r7-evidence/SOURCE.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sofia-R7-source-validation-${{ github.run_id }}
+          path: /tmp/r7-evidence/
+          retention-days: 14
