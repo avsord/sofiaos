@@ -1,0 +1,115 @@
+name: Sofia R7.1 verify exact patch (no APK)
+'on':
+  push:
+    branches: [test/sofia-r71-verify-20261010]
+    paths: [.github/workflows/sofia-r71-verify.yml]
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 39121fd0bccf9c9f43f41332c70e187550b16faa
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: SOFIA_APP/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Apply only the hash-verified local delta to the exact R7 base
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/r71-evidence
+          python3 - <<'PY'
+          import base64,gzip,hashlib,json,subprocess
+          from pathlib import Path
+          chunks=['3057fad240d938a56e47308c72455f5356391193','722cc5d786d5da8442678383efab1aba237a1dff','37ff28c17f68a0626568a0b561317875710ca244','08808a20c2e25f1ad740b5f1c24feca2c01a4cf0']
+          def blob_sha(data):return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+          text=''
+          for sha in chunks:
+              response=json.loads(subprocess.check_output(['gh','api','repos/avsord/sofiaos/git/blobs/'+sha]))
+              data=base64.b64decode(response['content'])
+              assert blob_sha(data)==sha,'Transport mismatch'
+              text+=data.decode('ascii')
+          raw=gzip.decompress(base64.b64decode(text))
+          assert hashlib.sha256(raw).hexdigest()=='7d61fd68501f9d6eb7f8eb5ab29af045cce2155d821b021b58da9e8418c497bd','Patch digest mismatch'
+          patch=json.loads(raw)
+          assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()==patch['base_sha']=='39121fd0bccf9c9f43f41332c70e187550b16faa'
+          assert len(patch['changes'])==24
+          for change in patch['changes']:
+              path=Path(change['path'])
+              assert not path.is_absolute() and '..' not in path.parts
+              assert str(path).startswith(('SOFIA_APP/','docs/'))
+              before=path.read_bytes() if path.exists() else b''
+              assert (blob_sha(before) if path.exists() else None)==change['before_sha'],str(path)+' unexpected base'
+              value=before.decode('utf-8')
+              for op in reversed(change['ops']):
+                  start=op['start'];end=start+op['remove']
+                  assert 0<=start<=end<=len(value)
+                  value=value[:start]+op['insert']+value[end:]
+              encoded=value.encode('utf-8')
+              assert blob_sha(encoded)==change['after_sha'],str(path)+' changed bytes'
+              path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(encoded)
+              print(change['path'],change['after_sha'])
+          Path('/tmp/r71-evidence/patch.json').write_bytes(raw)
+          PY
+      - name: Install locked application dependencies
+        working-directory: SOFIA_APP
+        run: npm ci
+      - name: Full typecheck and app tests including deadlines and movement
+        working-directory: SOFIA_APP
+        run: |
+          set -euo pipefail
+          npm run check 2>&1 | tee /tmp/r71-evidence/typecheck.txt
+          npm test 2>&1 | tee /tmp/r71-evidence/app-tests.txt
+      - name: Native, delivery, probe syntax and continuity contracts
+        run: |
+          set -euo pipefail
+          python3 SOFIA_APP/tools/native-delivery-test.py 2>&1 | tee /tmp/r71-evidence/native-tests.txt
+          python3 -m py_compile SOFIA_APP/tools/fluency-heavy-smoke.py SOFIA_APP/tools/pages-first-content.py
+          node --test SOFIA_APP/tools/delivery.test.cjs tools/sofia-state.test.cjs 2>&1 | tee /tmp/r71-evidence/delivery-state-tests.txt
+      - name: Verify real Activity draft lifecycle without changing app dependencies
+        run: |
+          set -euo pipefail
+          npm install --prefix /tmp/r71-react --no-save --ignore-scripts react@19.2.3 react-test-renderer@19.2.3
+          SOFIA_REACT_TEST_TOOLS=/tmp/r71-react/node_modules node --test SOFIA_APP/tests/activity-react-108.cjs 2>&1 | tee /tmp/r71-evidence/activity-tests.txt
+      - name: Commit tested files only to the R7.1 work branch
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/work/sofia-r71-deadlines-pages-20261010 | cut -f1)" = 39121fd0bccf9c9f43f41332c70e187550b16faa
+          python3 - <<'PY'
+          import hashlib,json,subprocess
+          from pathlib import Path
+          patch=json.loads(Path('/tmp/r71-evidence/patch.json').read_text())
+          for item in patch['changes']:
+              data=Path(item['path']).read_bytes()
+              assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()==item['after_sha'],item['path']+' changed during tests'
+          subprocess.check_call(['git','add','--']+[c['path'] for c in patch['changes']])
+          actual=set(subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines())
+          assert actual==set(c['path'] for c in patch['changes'])
+          PY
+          git diff --cached --check
+          git config user.name 'Sofia scoped executor'
+          git config user.email 'sofia-executor@users.noreply.github.com'
+          git commit -m 'fix(android): R7.1 deadlines, scroll quiet window and measured Pages readiness'
+          git push origin HEAD:refs/heads/work/sofia-r71-deadlines-pages-20261010
+          git rev-parse HEAD | tee /tmp/r71-evidence/CANDIDATE_SHA.txt
+          git diff --stat HEAD^ HEAD | tee /tmp/r71-evidence/DIFF_STAT.txt
+      - name: Retain exact test outcomes even when a step fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sofia-R71-code-validation
+          path: /tmp/r71-evidence/
+          retention-days: 14
+          if-no-files-found: error
