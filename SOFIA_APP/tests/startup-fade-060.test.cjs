@@ -82,7 +82,7 @@ test('060 unmount or launch failure cannot release stale optional services',asyn
 test('060 old platforms without the visibility bridge keep a cancellable fallback',async()=>{
  const f=visibilityFixture(false);assert.deepEqual(f.states,[false]);f.frames.shift()();f.frames.shift()();assert.deepEqual(f.states,[false,true]);f.dispose();
 });
-test('100 early visible snapshot preserves system pixels through scale and fade',()=>{
+test('101 early visible snapshot preserves system pixels through scale and fade',()=>{
  const native=file('plugins/native/SofiaLaunchOverlay.kt');
  const exit=native.slice(native.indexOf('exitSystemSplash = { success ->'),native.indexOf('when (transition.splashReady())'));
  assert.ok(!native.includes('SofiaLaunchFadeLayer'));
@@ -106,14 +106,16 @@ test('100 early visible snapshot preserves system pixels through scale and fade'
  assert.ok(complete.indexOf('disposeSurface()')<complete.indexOf('record(activity, "FADE_DONE")'));
  assert.ok(native.includes('icon.draw(Canvas(it))'));
  assert.ok(native.includes('alpha = 254f / 255f'));
- assert.ok(native.includes('if (homeProgramStep < 3)'));
- assert.ok(native.includes('warmPaint.style = Paint.Style.FILL'));
- assert.ok(native.includes('color = backgroundColor'));
- assert.ok(native.includes('canvas.clipPath(clip)'));
- assert.ok(native.includes('Path.Direction.CW'));
- assert.ok(native.includes('when (step)'));
- assert.ok(native.includes('canvas.translate(0f, canvas.clipBounds.top + 96f * resources.displayMetrics.density)'));
- assert.ok(native.includes('queueHomePrograms(canvas, homeProgramStep++)'));
+ assert.ok(native.includes('SofiaHomeDrawingWarmup.start(activity.resources.displayMetrics.scaledDensity)'));
+ assert.ok(native.includes('if (scheduled || Build.VERSION.SDK_INT < 31) return'));
+ assert.ok(native.includes('Thread({'));
+ assert.ok(native.includes('setWaitForPresent(true).syncAndDraw()'));
+ assert.ok(native.includes('target.acquireNextImage()?.close()'));
+ assert.ok(native.includes('renderer?.destroy()'));
+ assert.ok(native.includes('reader?.close()'));
+ assert.ok(native.includes('paint.isAntiAlias = false'));
+ assert.ok(!native.includes('homeProgramStep'));
+ assert.ok(!native.includes('setDrawingEnabled'));
  assert.ok(!native.includes('View.INVISIBLE'));
  assert.ok(native.includes('Bitmap.createBitmap(icon.width, icon.height, Bitmap.Config.ARGB_8888)'));
  assert.ok(!native.includes('.recycle()'));
