@@ -4,6 +4,7 @@ import collections
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import tempfile
 import unittest
@@ -107,9 +108,47 @@ class DeliveryTests(unittest.TestCase):
 
     def test_workflow_keeps_parallel_and_publication_gates(self):
         text=(ROOT.parent/'.github/workflows/sofia-native-047-update.yml').read_text()
-        for token in ('max-parallel: 2','fail-fast: false','native-shards.py verify-results',"needs: [build, native_tests]",'cancel-in-progress: false'):
+        for token in ('max-parallel: 2','fail-fast: false','native-shards.py verify-results',"needs: [build, native_tests]"):
             self.assertIn(token,text)
         self.assertNotIn('continue-on-error: true\n      id: native_tests',text)
         self.assertIn('native-delivery-test.py',text)
+
+    def workflow_job(self, name):
+        text = (ROOT.parent/'.github/workflows/sofia-native-047-update.yml').read_text()
+        jobs = text.split('\njobs:\n', 1)[1]
+        match = re.search(r'^  '+re.escape(name)+r':\n(.*?)(?=^  [\w-]+:\n|\Z)',
+                          jobs, re.MULTILINE | re.DOTALL)
+        self.assertIsNotNone(match, 'Missing workflow job: '+name)
+        return match.group(1)
+
+    def test_obsolete_builds_are_cancellable_without_a_global_workflow_lock(self):
+        text = (ROOT.parent/'.github/workflows/sofia-native-047-update.yml').read_text()
+        # A workflow-wide lock would keep the next build waiting on old tests;
+        # workflow-wide cancellation could instead interrupt a release upload.
+        self.assertNotRegex(text, r'(?m)^concurrency:')
+        self.assertIn(
+            '    concurrency:\n'
+            '      group: sofia-android-build-${{ github.ref }}\n'
+            '      cancel-in-progress: true\n', self.workflow_job('build'))
+
+    def test_publication_has_a_separate_non_cancellable_lock_and_approval_gate(self):
+        release = self.workflow_job('release')
+        self.assertIn(
+            '    concurrency:\n'
+            '      group: sofia-android-release\n'
+            '      cancel-in-progress: false\n', release)
+        self.assertIn('needs: [build, native_tests]', release)
+        self.assertIn("contains(github.event.head_commit.message, '[approved-apk]')", release)
+        self.assertIn("!contains(github.event.head_commit.message, '[manual-apk]')", release)
+        self.assertNotIn('sofia-android-build-', release)
+        self.assertNotIn('continue-on-error: true\n      id: publish', release)
+
+    def test_native_jobs_cannot_block_or_cancel_the_build_and_publication_locks(self):
+        for name in ('native_tests', 'manual_apk'):
+            with self.subTest(job=name):
+                job = self.workflow_job(name)
+                self.assertNotRegex(job, r'(?m)^    concurrency:')
+                self.assertNotIn('sofia-android-build-', job)
+                self.assertNotIn('group: sofia-android-release', job)
 
 if __name__ == '__main__': unittest.main()

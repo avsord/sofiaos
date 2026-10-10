@@ -13,9 +13,7 @@ permissions:
   actions: read
   issues: write
   pull-requests: read
-concurrency:
-  group: sofia-android-release
-  cancel-in-progress: false
+# Concurrency is job-scoped: superseded builds are disposable; publication is not.
 env:
   CI: '1'
   PYTHONDONTWRITEBYTECODE: '1'
@@ -25,6 +23,10 @@ env:
   SOFIA_MANUAL_NO_TESTS: ${{ contains(github.event.head_commit.message, '[manual-apk]') && contains(github.event.head_commit.message, '[no-tests]') }}
 jobs:
   build:
+    # A newer build may replace an obsolete build, never a publishing release.
+    concurrency:
+      group: sofia-android-build-${{ github.ref }}
+      cancel-in-progress: true
     if: github.ref == 'refs/heads/sofia-app-android'
     name: Build once and retain checked APKs
     runs-on: ubuntu-22.04
@@ -380,6 +382,10 @@ jobs:
         if-no-files-found: error
         retention-days: 30
   release:
+    # Keep the existing publication lock; never cancel a release mid-upload.
+    concurrency:
+      group: sofia-android-release
+      cancel-in-progress: false
     name: Publish only after owner approves the candidate APK
     needs: [build, native_tests]
     # No public release on normal pushes or pre-approval manual APKs.
