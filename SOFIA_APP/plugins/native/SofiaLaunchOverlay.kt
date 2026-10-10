@@ -64,6 +64,11 @@ object SofiaLaunchOverlay {
           Log.i("SofiaLaunch", "SOFIA_LAUNCH_SYSTEM_CALLBACK_PROCESS_MS=${SystemClock.uptimeMillis() - Process.getStartUptimeMillis()}")
           val icon = splash.iconView
           Log.i("SofiaLaunch", "SOFIA_LAUNCH_ICON_KIND=${icon?.javaClass?.simpleName}")
+          // R8 obfuscates androidx class names. Check native view semantics,
+          // not javaClass.simpleName, to distinguish a static icon from a
+          // SurfaceView used for the system animated vector.
+          Log.i("SofiaLaunch", "SOFIA_LAUNCH_ICON_IS_IMAGE_VIEW=${icon is android.widget.ImageView}")
+          Log.i("SofiaLaunch", "SOFIA_LAUNCH_ICON_IS_SURFACE_VIEW=${icon is android.view.SurfaceView}")
           // Rasterize the SOURCE vector once at its largest displayed size.
           // Android's masked splash foreground occupies 1.5x the icon bounds.
           // Never magnify a capture of its initial, already reduced pixels.

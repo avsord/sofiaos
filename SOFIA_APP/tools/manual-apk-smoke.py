@@ -26,7 +26,11 @@ def cold(label):
  assert 'DATA' in stages,logs
  assert stages['UI']<=stages['LOCAL_READY']<=stages['DATA'],stages
  icon=re.search(r'SOFIA_LAUNCH_ICON_KIND=([A-Za-z0-9_$]+)',logs)
- return {'stages_ms':stages,'activity_manager':manager,'icon_kind':icon.group(1) if icon else None}
+ image=re.search(r'SOFIA_LAUNCH_ICON_IS_IMAGE_VIEW=(true|false)',logs)
+ surface=re.search(r'SOFIA_LAUNCH_ICON_IS_SURFACE_VIEW=(true|false)',logs)
+ return {'stages_ms':stages,'activity_manager':manager,'icon_kind':icon.group(1) if icon else None,
+         'icon_is_image_view':image.group(1)=='true' if image else None,
+         'icon_is_surface_view':surface.group(1)=='true' if surface else None}
 def capture(label):
  tree=xml();(out/(label+'.xml')).write_text(tree);(out/(label+'.png')).write_bytes(adb('exec-out','screencap','-p'));return tree
 def tap_label(tree,label):
@@ -77,7 +81,8 @@ try:
  adb('pull','/sdcard/sofia-launch-079.mp4',str(out/'candidate-launch.mp4'))
  for i in range(5):result['candidate_runs'].append(cold('candidate-'+str(i)))
  result['candidate_icon_kinds']=[run['icon_kind'] for run in result['candidate_runs']]
- assert all(kind=='AppCompatImageView' for kind in result['candidate_icon_kinds']), 'The Android 12+ static system splash drawable was not active'
+ assert all(run['icon_is_image_view'] is True and run['icon_is_surface_view'] is False
+            for run in result['candidate_runs']), 'Native system splash is not a static ImageView or view markers are missing'
  after=capture('candidate');assert 'Olá, Teste.' in after,'Production authenticated Home is not visible';assert 'com compromissos' in after,'Saved agenda records are not available at startup'
  result['authenticated_home_tested']=True
  result['baseline_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['baseline_runs'])
