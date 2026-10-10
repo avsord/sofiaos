@@ -82,7 +82,7 @@ test('060 unmount or launch failure cannot release stale optional services',asyn
 test('060 old platforms without the visibility bridge keep a cancellable fallback',async()=>{
  const f=visibilityFixture(false);assert.deepEqual(f.states,[false]);f.frames.shift()();f.frames.shift()();assert.deepEqual(f.states,[false,true]);f.dispose();
 });
-test('102 early visible snapshot preserves system pixels through scale and fade',()=>{
+test('104 source-resolution surface preserves one animation clock without startup warmup',()=>{
  const native=file('plugins/native/SofiaLaunchOverlay.kt');
  const exit=native.slice(native.indexOf('exitSystemSplash = { success ->'),native.indexOf('when (transition.splashReady())'));
  assert.ok(!native.includes('SofiaLaunchFadeLayer'));
@@ -107,15 +107,12 @@ test('102 early visible snapshot preserves system pixels through scale and fade'
  assert.ok(complete.indexOf('disposeSurface()')<complete.indexOf('record(activity, "FADE_DONE")'));
  assert.ok(native.includes('mark.draw(Canvas(pixels))'));
  assert.ok(!native.includes('icon.draw(Canvas(it))')); 
- assert.ok(native.includes('alpha = 254f / 255f'));
+ assert.ok(!native.includes('alpha = 254f / 255f'));
  assert.ok(!native.includes('HardwareRenderer'));
  assert.ok(!native.includes('SofiaHomeDrawingWarmup'));
- assert.ok(native.includes('preparationStep < 3'));
- assert.ok(native.includes('queueWindowProgram(canvas, preparationStep++)'));
- assert.ok(native.includes('if (!fading) alpha = 254f / 255f'));
- assert.ok(exit.includes('surface.stopPreparation()'));
- assert.ok(native.includes('0 -> canvas.drawCircle'));
- assert.ok(native.includes('1 -> canvas.drawRoundRect'));
+ assert.ok(!native.includes('queueWindowProgram'));
+ assert.ok(!native.includes('warmPaint'));
+ assert.ok(!native.includes('preparationStep'));
  assert.ok(!native.includes('Paint.Style.STROKE'));
  assert.ok(!native.includes('View.INVISIBLE'));
  assert.ok(native.includes('Bitmap.createBitmap(markSize, markSize, Bitmap.Config.ARGB_8888)'));

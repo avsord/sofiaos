@@ -4,8 +4,6 @@ import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.RectF
-import android.graphics.Typeface
 import android.os.Build
 import android.os.Process
 import android.os.SystemClock
@@ -24,8 +22,8 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 
-/** Prepare the original static splash pixels before Home is ready. Fade one
- * cached native surface; optional work waits for visual completion. */
+/** Prepare the source vector at final resolution before Home is ready. Fade
+ * one cached native surface; optional work waits for visual completion. */
 object SofiaLaunchOverlay {
   private var host: WeakReference<Activity>? = null
   private var observer: ViewTreeObserver? = null
@@ -123,7 +121,6 @@ object SofiaLaunchOverlay {
                 }
                 Unit
               }
-              surface.stopPreparation()
               record(activity, "FADE_START")
               surface.animate().alpha(0f).setDuration(95L)
                 .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
@@ -318,7 +315,7 @@ object SofiaLaunchOverlay {
   }
 }
 
-/** Preserve the captured system pixels; one finite Canvas scale, alpha-only exit. */
+/** Continue the system animation clock using sharp source pixels; alpha-only exit. */
 private class SofiaEarlySplashSurface(
   activity: Activity,
   private val pixels: Bitmap?,
@@ -328,27 +325,10 @@ private class SofiaEarlySplashSurface(
 ) : View(activity) {
   private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
   private val backgroundColor = android.graphics.Color.rgb(114, 88, 232)
-  private val warmPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
-    color = backgroundColor
-    textSize = 18f * resources.displayMetrics.scaledDensity
-    typeface = Typeface.DEFAULT
-  }
-  private var preparationStep = 0
-  private var fading = false
-  fun stopPreparation() { fading = true }
   val markCenterX = markLeft + (pixels?.width ?: 0) / 2f
   val markCenterY = markTop + (pixels?.height ?: 0) / 2f
   override fun onDraw(canvas: Canvas) {
     canvas.drawColor(backgroundColor)
-    // First prepare ordinary window programs with alpha=1. Priming inside an
-    // alpha layer compiled different Circle/RRect programs in the 101 trace.
-    // One primitive family per frame avoids stroke/fill batch substitutions.
-    if (!fading && preparationStep < 3) {
-      queueWindowProgram(canvas, preparationStep++)
-      if (preparationStep == 3) postOnAnimation {
-        if (!fading) alpha = 254f / 255f
-      }
-    }
     val now = SystemClock.uptimeMillis()
     val scale = SofiaLaunchMotion.scaleAt(startedAt, now)
     canvas.save()
@@ -358,26 +338,6 @@ private class SofiaEarlySplashSurface(
     if (now - startedAt < SofiaLaunchMotion.DURATION_MS && alpha > 0f)
       postInvalidateOnAnimation()
   }
-  private fun queueWindowProgram(canvas: Canvas, step: Int) {
-    canvas.save()
-    canvas.translate(0f, canvas.clipBounds.top + 96f * resources.displayMetrics.density)
-    when (step) {
-      0 -> canvas.drawCircle(24.25f, 24.25f, 14f, warmPaint)
-      1 -> canvas.drawRoundRect(RectF(52.25f, 8.25f, 118.25f, 40.25f), 10f, 10f, warmPaint)
-      2 -> {
-        canvas.drawText("Olá, Sofia. Agenda", 4f, 74f, warmPaint)
-        warmPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas.drawText("Conversa", 4f, 106f, warmPaint)
-        warmPaint.alpha = 128
-        canvas.drawRect(76.25f, 112.25f, 92.75f, 128.75f, warmPaint)
-        warmPaint.alpha = 255
-      }
-    }
-    canvas.restore()
-  }
-
-
-
 }
 
 class SofiaLaunchModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
