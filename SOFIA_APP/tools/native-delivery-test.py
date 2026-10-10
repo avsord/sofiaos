@@ -121,6 +121,34 @@ class DeliveryTests(unittest.TestCase):
         self.assertIsNotNone(match, 'Missing workflow job: '+name)
         return match.group(1)
 
+    def test_round3_production_r8_and_abi_boundaries_are_explicit(self):
+        """Only the user APK drops x86. A separate, disclosed QA twin feeds x86 smoke."""
+        workflow=(ROOT.parent/'.github/workflows/sofia-native-047-update.yml').read_text()
+        release_build=workflow.split('    - name: Build standalone production APK\n',1)[1].split('    - name: Verify package, increasing version code',1)[0]
+        fixture=workflow.split('    - name: Build full production shell with isolated transport for acceptance\n',1)[1].split('    - name: Seal exact production',1)[0]
+        qa=workflow.split('    - name: Build signed emulator-only QA twin without altering ARM64 owner APK\n',1)[1].split('    - name: Build full production shell',1)[0]
+        manual=self.workflow_job('manual_apk')
+        self.assertIn('-PreactNativeArchitectures=arm64-v8a\n',release_build)
+        self.assertNotIn('-PreactNativeArchitectures=arm64-v8a,x86_64',release_build)
+        self.assertIn('-PreactNativeArchitectures=arm64-v8a,x86_64',fixture)
+        self.assertIn('-PreactNativeArchitectures=arm64-v8a,x86_64',qa)
+        self.assertIn('test -s app/build/outputs/mapping/release/mapping.txt',release_build)
+        for setting in ('android.enableMinifyInReleaseBuilds=true','android.enableShrinkResourcesInReleaseBuilds=true'):
+            self.assertIn(setting,release_build)
+        self.assertIn('tools/verify-abi-equivalence.py',qa)
+        self.assertIn('QA-ONLY-manual-universal.apk',manual)
+        self.assertIn('tools/verify-abi-equivalence.py',manual)
+        self.assertNotIn('[approved-apk]',qa)
+        config=json.loads((ROOT/'app.json').read_text())['expo']
+        plugin=[x for x in config['plugins'] if isinstance(x,list) and x[0]=='expo-build-properties']
+        self.assertEqual(len(plugin),1)
+        self.assertTrue(plugin[0][1]['android']['enableMinifyInReleaseBuilds'])
+        self.assertTrue(plugin[0][1]['android']['enableShrinkResourcesInReleaseBuilds'])
+        package=json.loads((ROOT/'package.json').read_text())
+        lock=json.loads((ROOT/'package-lock.json').read_text())
+        self.assertEqual(package['dependencies']['expo-build-properties'],'~57.0.22')
+        self.assertEqual(lock['packages']['node_modules/expo-build-properties']['version'],'57.0.22')
+
     def test_obsolete_builds_are_cancellable_without_a_global_workflow_lock(self):
         text = (ROOT.parent/'.github/workflows/sofia-native-047-update.yml').read_text()
         # A workflow-wide lock would keep the next build waiting on old tests;

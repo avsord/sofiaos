@@ -95,7 +95,8 @@ test('104 source-resolution surface preserves one animation clock without startu
  assert.ok(native.includes('SofiaLaunchMotion.scaleAt(startedAt, now)'));
  assert.ok(native.includes('canvas.scale(scale, scale, markCenterX, markCenterY)'));
  assert.ok(native.includes('private val startedAt: Long'));
- assert.ok(native.includes('splash.iconAnimationStart?.let')); 
+ assert.ok(native.includes('val motionStart = now'));
+ assert.ok(!native.includes('splash.iconAnimationStart?.let')); 
  assert.ok(!exit.includes('postOnAnimation'));
  assert.ok(!exit.includes('registerFrameCommitCallback'));
  assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
@@ -123,7 +124,7 @@ test('104 source-resolution surface preserves one animation clock without startu
  assert.ok(resources.includes('android:scaleX="0.020658489"'));
  assert.ok(resources.includes('android:strokeColor="#12FFFFFF"'));
  assert.ok(resources.includes('android:scaleX="0.70" android:scaleY="0.70"'));
- assert.ok(resources.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_animated</item>'));
+ assert.ok(resources.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_entry</item>'));
  assert.ok(resources.includes('<animated-vector')); 
  assert.ok(!resources.includes('repeatCount'));
  const smoke=file('tools/manual-apk-smoke.py');

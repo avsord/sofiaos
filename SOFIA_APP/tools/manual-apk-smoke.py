@@ -1,5 +1,7 @@
-"""Exact production APK; authenticated local-start comparison on an isolated emulator.
-Retained QA APK seeds synthetic records only, then is replaced by production.
+"""QA-equivalent universal APK; synthetic local-start smoke on an x86_64 emulator.
+The installed ARM64-only owner APK cannot execute on this x86_64 emulator.
+A QA twin is built from the same commit, with identical DEX, JS and ARM64 libs.
+Retained QA seed first populates synthetic records; no real owner data is used.
 The test never authenticates against the owner's server account or edits its data.
 """
 import hashlib,io,json,re,statistics,subprocess,time,zipfile,xml.etree.ElementTree as ET
@@ -32,7 +34,7 @@ def tap_label(tree,label):
   if n.attrib.get('text')==label or n.attrib.get('content-desc')==label:
    bounds=list(map(int,re.findall(r'\d+',n.attrib['bounds'])));adb('shell','input','tap',str((bounds[0]+bounds[2])//2),str((bounds[1]+bounds[3])//2));return
  raise AssertionError('Missing control '+label)
-result={'passed':False,'production_apk':True,'synthetic_seed_records':True,'synthetic_transport_in_tested_apk':False,'physical_device':False,'real_user_data_preservation_tested':False,'published':False,'source_sha':(dist/'SOURCE_COMMIT.txt').read_text().strip(),'apk_sha256':hashlib.sha256((dist/'Sofia-OS.apk').read_bytes()).hexdigest(),'baseline_runs':[],'candidate_runs':[]}
+result={'passed':False,'production_apk':False,'qa_emulator_twin':True,'exact_owner_apk_executed':False,'synthetic_seed_records':True,'synthetic_transport_in_tested_apk':False,'physical_device':False,'real_user_data_preservation_tested':False,'published':False,'source_sha':(dist/'SOURCE_COMMIT.txt').read_text().strip(),'apk_sha256':hashlib.sha256((dist/'Sofia-OS.apk').read_bytes()).hexdigest(),'qa_apk_sha256':hashlib.sha256((dist/'QA-ONLY-manual-universal.apk').read_bytes()).hexdigest(),'baseline_runs':[],'candidate_runs':[]}
 try:
  for name in ['window_animation_scale','transition_animation_scale','animator_duration_scale']:adb('shell','settings','put','global',name,'1')
  adb('install',str(dist/'baseline-Sofia-OS.apk'))
@@ -66,7 +68,7 @@ try:
  adb('install','-r',str(owner_baseline))
  result['owner_baseline_runs']=[cold('owner-baseline-'+str(i)) for i in range(5)]
  result['owner_baseline_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['owner_baseline_runs'])
- adb('install','-r',str(dist/'Sofia-OS.apk'));result['in_place_install']=True
+ adb('install','-r',str(dist/'QA-ONLY-manual-universal.apk'));result['in_place_install']=True
  # Retain the actual production transition for visual inspection.
  recording=subprocess.Popen(['adb','shell','screenrecord','--time-limit','8','/sdcard/sofia-launch-079.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
  time.sleep(.5)
@@ -75,7 +77,7 @@ try:
  adb('pull','/sdcard/sofia-launch-079.mp4',str(out/'candidate-launch.mp4'))
  for i in range(5):result['candidate_runs'].append(cold('candidate-'+str(i)))
  result['candidate_icon_kinds']=[run['icon_kind'] for run in result['candidate_runs']]
- assert all(kind=='SurfaceView' for kind in result['candidate_icon_kinds']), 'The Android 12+ animated splash icon was not active from system launch'
+ assert all(kind=='AppCompatImageView' for kind in result['candidate_icon_kinds']), 'The Android 12+ static system splash drawable was not active'
  after=capture('candidate');assert 'Olá, Teste.' in after,'Production authenticated Home is not visible';assert 'com compromissos' in after,'Saved agenda records are not available at startup'
  result['authenticated_home_tested']=True
  result['baseline_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['baseline_runs'])
@@ -123,7 +125,7 @@ try:
  capture('older-page-by-scroll');result['automatic_local_pagination_tested']=True
  result['saved_conversation_preserved']=True
  result['first_menu_touch_works']=True
- # Real fast menu taps in the exact production APK. Record every transition
+ # Real fast menu taps in the QA-equivalent x86 emulator APK. Record every transition
  # for frame inspection, then verify Home and retained chat after the sequence.
  menu_tree=xml();menu_points=[]
  for label in ['Início','Conversa','Páginas','Agenda','Apps','Perfil']:

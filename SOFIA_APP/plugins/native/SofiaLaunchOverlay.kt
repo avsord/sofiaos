@@ -80,10 +80,10 @@ object SofiaLaunchOverlay {
           mark.setBounds(0, 0, markSize, markSize)
           mark.draw(Canvas(pixels))
           val now = SystemClock.uptimeMillis()
-          val elapsed = splash.iconAnimationStart?.let {
-            (System.currentTimeMillis() - it.toEpochMilli()).coerceAtLeast(0L)
-          } ?: (now - activityStartedAt).coerceAtLeast(0L)
-          val motionStart = now - elapsed
+          // Device firmware may ignore the system vector animation. Always
+          // begin our own native curve at the first overlay frame; the static
+          // Android drawable is authored at this same 70% start scale.
+          val motionStart = now
           val left = if (icon != null) iconPosition[0] - decorPosition[0] + (icon.width - markSize) / 2f
             else (decor.width - markSize) / 2f
           val top = if (icon != null) iconPosition[1] - decorPosition[1] + (icon.height - markSize) / 2f
@@ -315,7 +315,7 @@ object SofiaLaunchOverlay {
   }
 }
 
-/** Continue the system animation clock using sharp source pixels; alpha-only exit. */
+/** Animate once after the static system splash, using sharp cached vector pixels. */
 private class SofiaEarlySplashSurface(
   activity: Activity,
   private val pixels: Bitmap?,
