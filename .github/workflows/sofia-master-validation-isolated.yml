@@ -1,0 +1,103 @@
+name: Sofia permanent MASTER validation only
+'on':
+  push:
+    branches: [test/sofia-master-permanente-20261010]
+    paths: [.github/workflows/sofia-master-validation-isolated.yml]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 421f85d63b120fb34489ffa2eabea3684eabb6f2
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: SOFIA_APP/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify exact package and documentation-only scope
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/sofia-master-evidence
+          python3 - <<'PY'
+          import json,subprocess
+          from pathlib import Path
+          expected={
+            'AGENTS.md':'6ef86f44ddb0f2573f3f21fd889311d30099cdcd',
+            'docs/SOFIA_MASTER.md':'4195a59c8af50559988d5eadce2ec80bf6efde62',
+            'SOFIA_APP/tests/master-sync-106.test.cjs':'ea04ee5dfe25b2bfe64e666fb280d1daa68f4ee3',
+            'SOFIA_APP/tools/test.cjs':'8d4f86db3d59ada712268bc74e8b336f285ff2ac',
+            'docs/briefings/BRIEFING_RODADA3_abertura.md':'15cb553d61bee77aaf19339430550846eae7b1fe',
+            'docs/briefings/BRIEFING_RODADA4_S_e_abas.md':'5b882c055f97a8d107178bd0615245d077ba4583',
+            'PROMPT_FIXO_NOVO_AGENTE.md':'e53708e999bd3b79387321b741324200ac4da8db',
+            'docs/monitoramento/BRIEFING_MONITORAMENTO.md':'745c26701ed3f778f324d9c38cbb2a60b9696cc5',
+            'docs/monitoramento/extract-price.js':'8c9d8408389e92a0fff2426d28d430cd88b3b34b',
+            'docs/monitoramento/extract-price.test.js':'59f0853faad3d67f646013a118c39f2220cf1038',
+            'docs/monitoramento/find-store-links.js':'ae23f551893183a5bc4ecd26ac91c9d488d8e330',
+            'docs/monitoramento/find-store-links.test.js':'99534ad9db84f67e095b71e372d08a25fcc8c020',
+            'docs/monitoramento/package.json':'c674b3df0c2b54f78fb257baa22cb7d17f7e6845'
+          }
+          changed=subprocess.check_output(['git','diff','--name-only','HEAD^','HEAD'],text=True).splitlines()
+          assert sorted(changed)==sorted(expected),(changed,sorted(expected))
+          for file,sha in expected.items():
+            actual=subprocess.check_output(['git','hash-object',file],text=True).strip()
+            assert actual==sha,(file,actual,sha)
+          data={'source_sha':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'checked_files':expected,'apk_generated':False}
+          Path('/tmp/sofia-master-evidence/package-check.json').write_text(json.dumps(data,indent=2))
+          print('VERIFIED 13 exact package files; no application runtime, package or workflow changes')
+          PY
+      - name: Install locked existing application dependencies
+        working-directory: SOFIA_APP
+        run: npm ci
+      - name: Full application tests including permanent MASTER guardian
+        working-directory: SOFIA_APP
+        run: |
+          set -euo pipefail
+          npm run check 2>&1 | tee /tmp/sofia-master-evidence/typecheck.txt
+          npm test 2>&1 | tee /tmp/sofia-master-evidence/app-tests.txt
+      - name: Preserve existing delivery contracts
+        run: |
+          set -euo pipefail
+          node --test SOFIA_APP/tools/delivery.test.cjs 2>&1 | tee /tmp/sofia-master-evidence/delivery-tests.txt
+          python3 SOFIA_APP/tools/native-delivery-test.py 2>&1 | tee /tmp/sofia-master-evidence/native-contracts.txt
+      - name: Test supplied monitoring prototypes only, without integration
+        working-directory: docs/monitoramento
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts --no-package-lock
+          npm test 2>&1 | tee /tmp/sofia-master-evidence/monitoring-tests.txt
+      - name: Confirm guardian rejects both documentation regressions
+        run: |
+          python3 - <<'PY'
+          import subprocess,json
+          from pathlib import Path
+          outcomes=[]
+          mutations=[('AGENTS.md',lambda s:s+'\nimplemente, valide e publique a atualização aplicável no mesmo trabalho\n'),('docs/SOFIA_MASTER.md',lambda s:s.replace('## 9. Pendências','## 9. REMOVIDO'))]
+          for file,mutate in mutations:
+            p=Path(file);original=p.read_text()
+            try:
+              p.write_text(mutate(original))
+              r=subprocess.run(['node','--test','SOFIA_APP/tests/master-sync-106.test.cjs'],capture_output=True,text=True)
+              assert r.returncode!=0,'Guardian failed to detect regression: '+file
+              outcomes.append({'file':file,'regression_rejected':True})
+            finally:p.write_text(original)
+          subprocess.run(['node','--test','SOFIA_APP/tests/master-sync-106.test.cjs'],check=True)
+          subprocess.run(['git','diff','--exit-code'],check=True)
+          Path('/tmp/sofia-master-evidence/mutation-tests.json').write_text(json.dumps(outcomes,indent=2))
+          print('BOTH MUTATIONS REJECTED; exact files restored; no APK built')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sofia-MASTER-validation-${{ github.run_id }}
+          path: /tmp/sofia-master-evidence/
+          retention-days: 30
+          if-no-files-found: warn
