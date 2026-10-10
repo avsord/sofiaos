@@ -123,7 +123,7 @@ test('104 source-resolution surface preserves one animation clock without startu
  assert.ok(resources.includes('android:scaleX="0.020658489"'));
  assert.ok(resources.includes('android:strokeColor="#12FFFFFF"'));
  assert.ok(resources.includes('android:scaleX="0.70" android:scaleY="0.70"'));
- assert.ok(resources.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark</item>'));
+ assert.ok(resources.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_animated</item>'));
  assert.ok(resources.includes('<animated-vector')); 
  assert.ok(!resources.includes('repeatCount'));
  const smoke=file('tools/manual-apk-smoke.py');

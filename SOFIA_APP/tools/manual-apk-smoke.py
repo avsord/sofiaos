@@ -23,7 +23,8 @@ def cold(label):
  stages={name:int(value) for name,value in re.findall(r'SOFIA_LAUNCH_(UI|LOCAL_READY|FADE_START|FADE_DONE|SPLASH_REMOVED|DATA)_PROCESS_MS=(\d+)',logs)}
  assert 'DATA' in stages,logs
  assert stages['UI']<=stages['LOCAL_READY']<=stages['DATA'],stages
- return {'stages_ms':stages,'activity_manager':manager}
+ icon=re.search(r'SOFIA_LAUNCH_ICON_KIND=([A-Za-z0-9_$]+)',logs)
+ return {'stages_ms':stages,'activity_manager':manager,'icon_kind':icon.group(1) if icon else None}
 def capture(label):
  tree=xml();(out/(label+'.xml')).write_text(tree);(out/(label+'.png')).write_bytes(adb('exec-out','screencap','-p'));return tree
 def tap_label(tree,label):
@@ -73,6 +74,8 @@ try:
  recording.wait(timeout=15)
  adb('pull','/sdcard/sofia-launch-079.mp4',str(out/'candidate-launch.mp4'))
  for i in range(5):result['candidate_runs'].append(cold('candidate-'+str(i)))
+ result['candidate_icon_kinds']=[run['icon_kind'] for run in result['candidate_runs']]
+ assert all(kind=='SurfaceView' for kind in result['candidate_icon_kinds']), 'The Android 12+ animated splash icon was not active from system launch'
  after=capture('candidate');assert 'Olá, Teste.' in after,'Production authenticated Home is not visible';assert 'com compromissos' in after,'Saved agenda records are not available at startup'
  result['authenticated_home_tested']=True
  result['baseline_median_ms']=statistics.median(x['stages_ms']['DATA'] for x in result['baseline_runs'])
