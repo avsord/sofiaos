@@ -1,0 +1,39 @@
+{
+  "name": "sofia-app",
+  "version": "0.3.107",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "check": "tsc --noEmit",
+    "test": "node tools/test.cjs && node --test tests/refinements-043.test.cjs && node --test tests/notification-scheduler.test.cjs tests/capsules.test.cjs tests/navigation.test.cjs tests/navigation-interaction.test.cjs tests/calendar-gesture.test.cjs tests/agenda-cache.test.cjs tests/menu-motion.test.cjs tests/editor.test.cjs tests/chat-sync.test.cjs tests/update.test.cjs tests/page-hints.test.cjs tests/page-hierarchy.test.cjs tests/page-templates.test.cjs tests/md-interactions.test.cjs tests/legacy-md.test.cjs tests/release-024.test.cjs tests/page-touch-crash.test.cjs tests/release-026.test.cjs tests/release-027.test.cjs tests/release-029.test.cjs tests/release-030.test.cjs tests/release-032.test.cjs tests/release-033.test.cjs tests/release-036.test.cjs && node --test tests/calendar-performance.test.cjs && node --test tests/persistent-login-045.test.cjs tests/startup-preload-045.test.cjs && node --test tests/responsiveness-048.test.cjs tests/voice-profile-notifications-051.test.cjs tests/profile-history-startup-054.test.cjs tests/home-profile-areas-history-055.test.cjs tests/local-launch-057.test.cjs tests/startup-navigation-058.test.cjs tests/startup-speed-059.test.cjs tests/startup-fade-060.test.cjs && node --test tests/startup-transition-061.test.cjs && node --test tests/startup-local-062.test.cjs && node --test tests/chat-window-063.test.cjs && node --test tests/startup-speed-066.test.cjs && node --test tests/startup-motion-086.test.cjs tests/menu-retention-103.test.cjs",
+    "prepare-assets": "node tools/assets.cjs"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "~57.0.0",
+    "expo-audio": "~57.0.5",
+    "expo-build-properties": "~57.0.22",
+    "expo-clipboard": "~57.0.2",
+    "expo-crypto": "~57.0.3",
+    "expo-document-picker": "57.0.3",
+    "expo-file-system": "~57.0.7",
+    "expo-image-picker": "57.0.20",
+    "expo-notifications": "57.0.21",
+    "expo-secure-store": "~57.0.4",
+    "expo-sharing": "~57.0.22",
+    "expo-speech": "~57.0.3",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-svg": "15.15.4"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "typescript": "~6.0.3"
+  },
+  "engines": {
+    "node": ">=22.16.0"
+  }
+}
