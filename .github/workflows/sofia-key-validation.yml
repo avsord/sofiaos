@@ -1,0 +1,43 @@
+name: Sofia KEY - isolated validation (no APK)
+'on':
+  push:
+    branches: [test/sofia-key-validation-20261010]
+    paths: [.github/workflows/sofia-key-validation.yml]
+permissions:
+  contents: read
+jobs:
+  key:
+    name: Verificar pacote de continuidade
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Confirm no runtime/Android CI files changed
+        run: |
+          set -euo pipefail
+          files=$(git diff --name-only 0f15acafc618f0387ad16aa0f755033feac4228b HEAD)
+          printf '%s\n' "$files"
+          if printf '%s\n' "$files" | grep -E '^(SOFIA_APP/|src/|server.js$|\.github/workflows/sofia-native-047-update.yml$)'; then
+            echo 'ERROR: runtime or Android CI changes not allowed in KEY install'
+            exit 1
+          fi
+          test "$(printf '%s\n' "$files" | grep -c -E '^(docs/SOFIA_KEY.md|docs/SOFIA_MASTER.md|tools/sofia-state.cjs|tools/sofia-state.test.cjs|PROMPT_FIXO_NOVO_AGENTE.md|\.github/workflows/sofia-state.yml|\.github/workflows/sofia-key-validation.yml)$')" -eq 7
+      - name: Run 14 generator and security tests
+        run: node --test tools/sofia-state.test.cjs
+      - name: Run the unchanged original MASTER guardian
+        run: node --test SOFIA_APP/tests/master-sync-106.test.cjs
+      - name: Run original delivery contract tests
+        run: node --test SOFIA_APP/tools/delivery.test.cjs
+      - name: Generate current branch snapshot without writing repository
+        run: |
+          node tools/sofia-state.cjs --repo-dir . --out /tmp/SOFIA_LIVE_SMOKE.md
+          test -s /tmp/SOFIA_LIVE_SMOKE.md
+          grep -q '## Versões' /tmp/SOFIA_LIVE_SMOKE.md
+          grep -q '## Alertas' /tmp/SOFIA_LIVE_SMOKE.md
+          grep -q '## Frescor do MASTER' /tmp/SOFIA_LIVE_SMOKE.md
+          head -40 /tmp/SOFIA_LIVE_SMOKE.md
