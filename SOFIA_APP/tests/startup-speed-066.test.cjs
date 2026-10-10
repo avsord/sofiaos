@@ -259,5 +259,8 @@ test('107 native S handoff starts at matching 70% scale without OEM clock jump',
  assert.equal(plugin[1].android.enableMinifyInReleaseBuilds,true);
  assert.equal(plugin[1].android.enableShrinkResourcesInReleaseBuilds,true);
  const smoke=fs.readFileSync(path.join(root,'tools/manual-apk-smoke.py'),'utf8');
- assert.ok(smoke.includes("kind=='AppCompatImageView'"),'ensure the system no longer uses animated SurfaceView');
+ assert.ok(smoke.includes("run['icon_is_image_view'] is True"),'R8-proof check must confirm Android ImageView');
+ assert.ok(smoke.includes("run['icon_is_surface_view'] is False"),'R8-proof check must exclude animated SurfaceView');
+ assert.ok(overlay.includes('SOFIA_LAUNCH_ICON_IS_IMAGE_VIEW=${icon is android.widget.ImageView}'));
+ assert.ok(overlay.includes('SOFIA_LAUNCH_ICON_IS_SURFACE_VIEW=${icon is android.view.SurfaceView}'));
 });
