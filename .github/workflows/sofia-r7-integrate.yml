@@ -64,7 +64,9 @@ jobs:
           python3 -m py_compile SOFIA_APP/tools/manual-apk-smoke.py SOFIA_APP/tools/fluency-heavy-smoke.py
           node --test SOFIA_APP/tools/delivery.test.cjs 2>&1 | tee /tmp/r7-evidence/delivery.txt
           node --test tools/sofia-state.test.cjs SOFIA_APP/tests/master-sync-106.test.cjs 2>&1 | tee /tmp/r7-evidence/continuity.txt
-      - name: Commit verified source to isolated work branch only
+      - name: Transfer app source only; workflow is applied by the authorized connector
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -72,14 +74,23 @@ jobs:
           from pathlib import Path
           rows=json.loads(Path('/tmp/r7-evidence/manifest.json').read_text())
           for r in rows:assert hashlib.sha256(Path(r['p']).read_bytes()).hexdigest()==r['after'],r['p']+' mutated by validation'
-          subprocess.run(['git','add','--']+[r['p'] for r in rows],check=True)
+          workflow='.github/workflows/sofia-native-047-update.yml'
+          data=Path(workflow).read_bytes()
+          Path('/tmp/r7-evidence/sofia-native-047-update.yml').write_bytes(data)
+          blob=json.loads(subprocess.check_output(['gh','api','--method','POST','repos/avsord/sofiaos/git/blobs','--input','-'],input=json.dumps({'content':data.decode(),'encoding':'utf-8'}).encode()))
+          assert blob['sha']==subprocess.check_output(['git','hash-object',workflow],text=True).strip()
+          Path('/tmp/r7-evidence/workflow-blob.json').write_text(json.dumps(blob))
+          print('Validated workflow blob retained for connector-only promotion:',blob['sha'])
+          subprocess.run(['git','restore','--source=HEAD','--',workflow],check=True)
+          paths=[r['p'] for r in rows if r['p']!=workflow]
+          subprocess.run(['git','add','--']+paths,check=True)
           actual=subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines()
-          assert sorted(actual)==sorted(r['p'] for r in rows),actual
+          assert sorted(actual)==sorted(paths) and len(paths)==54,actual
           PY
           test "$(git ls-remote origin refs/heads/work/sofia-r7-fluency-20261010 | cut -f1)" = c9be56a8dbd160373ccf30764e21ab276f36af8f
           git config user.name 'Sofia R7 verified source'
           git config user.email 'sofia-r7@users.noreply.github.com'
-          git commit -m 'perf(android): R7 idle scheduler, hidden Activity and measured New/Old mode'
+          git commit -m 'perf(android): R7 verified app source; workflow pending authorized connector'
           git push origin HEAD:refs/heads/work/sofia-r7-fluency-20261010
           git rev-parse HEAD | tee /tmp/r7-evidence/SOURCE.txt
       - uses: actions/upload-artifact@v4
