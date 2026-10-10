@@ -1,0 +1,30 @@
+name: Sofia R7 source export (no APK)
+'on':
+  push:
+    branches: [test/sofia-r7-source-20261010]
+    paths: [.github/workflows/sofia-r7-source.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: c9be56a8dbd160373ccf30764e21ab276f36af8f
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Source snapshot and isolated Node testing tools
+        run: |
+          mkdir -p /tmp/r7-export
+          git archive --format=zip HEAD > /tmp/r7-export/source.zip
+          git rev-parse HEAD > /tmp/r7-export/SOURCE.txt
+          npm install --prefix /tmp/r7-node --no-audit --no-fund --package-lock=false typescript@6.0.3 react@19.2.3 react-test-renderer@19.2.3
+          tar -czf /tmp/r7-export/test-tools.tar.gz -C /tmp/r7-node node_modules
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sofia-r7-base-test-tools
+          path: /tmp/r7-export/
+          retention-days: 7
