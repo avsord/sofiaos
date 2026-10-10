@@ -1,53 +1,17 @@
-import {useEffect,useLayoutEffect,useRef,useState} from 'react';
+import {useEffect,useLayoutEffect,useState} from 'react';
 import type {Tab} from './types';
-
+import {queueOptional,type FluencyMode} from './fluency';
+import {useLegacyStartupMounts} from './startup-mounts-legacy';
 const MENU_TABS:Tab[]=['home','chat','pages','agenda','apps','profile'];
-
-/** The Home alone mounts beneath the splash. Only after native reveal AND
- * without awaiting full archive hydration, begin optional per-frame mounts.
- * Any foreground menu change cancels pending warm work, retains visited tabs,
- * and resumes only after 500ms without another tab change. */
-export function useStartupMounts(enabled:boolean,active:Tab,authenticated=true){
+/** Hidden Activity trees pre-render via the shared input-aware queue. */
+export function useStartupMounts(enabled:boolean,active:Tab,authenticated=true,mode:FluencyMode|'pending'='old',preview:readonly Tab[]=[]){
+ const old=useLegacyStartupMounts(enabled&&mode==='old',active,authenticated);
  const [warmed,setWarmed]=useState<Set<Tab>>(()=>new Set(['home']));
- const lastTab=useRef(active);
- const cancelPending=useRef<()=>void>(()=>{});
- useLayoutEffect(()=>{
-  if(lastTab.current!==active)cancelPending.current();
-  if(MENU_TABS.includes(active))setWarmed(previous=>previous.has(active)?previous:new Set([...previous,active]));
- },[active]);
- useEffect(()=>{
-  if(!authenticated){
-   lastTab.current=active;
-   setWarmed(previous=>previous.size===1&&previous.has('home')?previous:new Set(['home']));
-   return;
-  }
-  // The native splash may still be up while a user action changes the tab.
-  // Keep every visited screen mounted until logout, even before reveal.
-  if(!enabled){lastTab.current=active;return;}
-  let cancelled=false,frame=0,timer:ReturnType<typeof setTimeout>|null=null,index=0;
-  const pending=MENU_TABS.filter(tab=>tab!=='home'&&!warmed.has(tab));
-  const advance=()=>{
-   if(cancelled||index>=pending.length)return;
-   const tab=pending[index++];
-   setWarmed(previous=>previous.has(tab)?previous:new Set([...previous,tab]));
-   if(index<pending.length)frame=requestAnimationFrame(advance);
-  };
-  const start=()=>{
-   if(cancelled||!pending.length)return;
-   // Leave the first committed frame free for foreground interactions.
-   frame=requestAnimationFrame(()=>{if(!cancelled)frame=requestAnimationFrame(advance);});
-  };
-  const switched=lastTab.current!==active;
-  lastTab.current=active;
-  if(switched)timer=setTimeout(start,500);
-  else start();
-  const cancel=()=>{
-   cancelled=true;
-   cancelAnimationFrame(frame);
-   if(timer!==null)clearTimeout(timer);
-  };
-  cancelPending.current=cancel;
-  return cancel;
- },[enabled,active,authenticated]);
- return new Set<Tab>(['home',...warmed,...(MENU_TABS.includes(active)?[active]:[])]);
+ useLayoutEffect(()=>{if(authenticated&&MENU_TABS.includes(active))setWarmed(p=>p.has(active)?p:new Set([...p,active]));},[active,authenticated]);
+ useEffect(()=>{if(!authenticated){setWarmed(new Set(['home']));return;}
+  if(!enabled||mode!=='new')return;
+  const cancel=MENU_TABS.filter(t=>t!=='home'&&!warmed.has(t)).map(tab=>queueOptional('prerender:'+tab,()=>setWarmed(p=>p.has(tab)?p:new Set([...p,tab])),4));
+  return()=>cancel.forEach(fn=>fn());
+ },[enabled,mode,authenticated,active]);
+ return mode==='new'?new Set<Tab>(['home',...warmed,...(MENU_TABS.includes(active)?[active]:[]),...preview]):old;
 }

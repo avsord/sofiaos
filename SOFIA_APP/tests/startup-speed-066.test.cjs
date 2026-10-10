@@ -92,9 +92,9 @@ test('086 finite system S does not extend the native Home handoff or restart an 
 test('068 photo preloads without blocking Home; menu prewarm yields to navigation',()=>{
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const local=fs.readFileSync(path.join(root,'src/lib/local-launch.ts'),'utf8');
- const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
+ const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts-legacy.ts'),'utf8');
  assert.ok(local.includes("void photoReady;\n  await snapshot.hydrateLaunch()"));
- assert.ok(app.includes('useStartupMounts(visible&&!!auth,tab,!!auth)'));
+ assert.ok(app.includes("useStartupMounts(visible&&!!auth,tab,!!auth,fluency,previewTabs)"));
  assert.ok(mounts.includes('frame=requestAnimationFrame(advance)'));
  assert.ok(fs.readFileSync(path.join(root,'src/components/ProfileAvatar.tsx'),'utf8').includes('primeProfilePhoto(scope,readProfilePhoto)'));
 });
@@ -122,7 +122,7 @@ test('069 unread bell actions use identical neutral color, one no-wrap row',()=>
 });
 test('069 startup restores photo and cached Home together; menus mount only when visited',()=>{
  const launch=fs.readFileSync(path.join(root,'src/lib/local-launch.ts'),'utf8');
- const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
+ const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts-legacy.ts'),'utf8');
  assert.ok(launch.includes('void photoReady;\n  await snapshot.hydrateLaunch()'));
  assert.ok(!launch.includes('fetch('),'No server calls in initial photo/Home restore');
  assert.ok(mounts.includes('frame=requestAnimationFrame(advance)'),'Warm only after reveal, one retained tab per frame');
@@ -144,7 +144,7 @@ test('086 startup S uses the reference vector and one finite scale and defers op
  assert.ok(bg.includes('3400'));
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  assert.ok(!app.includes('timer=setTimeout(next,800)'));
- assert.ok(app.includes('useStartupMounts(visible&&!!auth,tab,!!auth)'));
+ assert.ok(app.includes("useStartupMounts(visible&&!!auth,tab,!!auth,fluency,previewTabs)"));
  assert.ok(app.includes("preloadWhenIdle:screenTab==='home'"));
 });
 
@@ -175,7 +175,7 @@ test('078 Home is allowed to reveal without waiting for server or prefetch',()=>
  assert.ok(logo.includes('android:scaleX="0.70" android:scaleY="0.70"')); 
 });
 test('074 hidden tabs mount one frame at a time after original splash exits',()=>{
- const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
+ const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts-legacy.ts'),'utf8');
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');
  const apps=fs.readFileSync(path.join(root,'src/screens/Workspace.tsx'),'utf8');
@@ -184,7 +184,7 @@ test('074 hidden tabs mount one frame at a time after original splash exits',()=
  assert.ok(mounts.includes("cancelAnimationFrame(frame)"));
  assert.ok(!mounts.includes("scheduleIdleTask("),"No repeated 1.5s idle waits between menus");
  assert.ok(mounts.includes("setWarmed(previous=>previous.has(tab)?previous:new Set([...previous,tab]))"));
- assert.ok(app.includes('useStartupMounts(visible&&!!auth,tab,!!auth)'));
+ assert.ok(app.includes("useStartupMounts(visible&&!!auth,tab,!!auth,fluency,previewTabs)"));
  assert.ok(!app.includes('MENU_PRELOADERS'));
  assert.ok(pages.includes("const PAGE_LIST_KEY='/workspace/entities?limit=100&kind=user_page&q=&offset=0'"));
  assert.ok(apps.includes("api.cached<Catalog>('/workspace/catalog')"));
@@ -274,12 +274,12 @@ test('108 pages hydrate from the full archive only AFTER reveal and never show f
  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');
  const archive=fs.readFileSync(path.join(root,'src/lib/startup-snapshot.ts'),'utf8');
- assert.ok(app.includes('if(!visible||!auth||!initialDataReady)return'));
- assert.ok(app.includes('void api.hydrate().then(()=>'));
+ assert.ok(app.includes("if(!visible||!auth||!initialDataReady||fluency==='pending')return"));
+ assert.ok(app.includes("queueOptional('hidratar',()=>api.hydrate().then(()=>"));
  assert.ok(app.includes('SOFIA_HYDRATE_MS='));
  assert.ok(!app.includes('hydratedApi===api'),'Archive completion cannot block optional prewarming');
  assert.ok(!app.includes('setHydratedApi('),'Hydration completion must not cause a full Shell rerender during first taps');
- assert.ok(app.includes('useStartupMounts(visible&&!!auth,tab,!!auth)'));
+ assert.ok(app.includes("useStartupMounts(visible&&!!auth,tab,!!auth,fluency,previewTabs)"));
  assert.ok(!archive.slice(archive.indexOf('export function launchRead('),archive.indexOf('export function cacheableRead(')).includes('user_page'),'Full Pages archive must not decrypt before Home');
  assert.ok(pages.includes('const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[loaded,setLoaded]'));
  assert.ok(pages.includes('setPages(prev=>prev.length?prev:local)'));

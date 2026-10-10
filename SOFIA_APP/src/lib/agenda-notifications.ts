@@ -1,3 +1,4 @@
+import {queueOptional} from './fluency';
 import {enqueueNotifications,reconcileNotificationRequests,NOTIFICATION_CHANNEL_LIMIT,NOTIFICATION_SIGNATURE_VERSION,notificationFailure} from './notification-scheduler';
 import {ensureSystemNotificationPermission} from './system-notification-permission';
 import {useEffect,useRef} from 'react';
@@ -50,9 +51,10 @@ export function useAgendaNotifications(api:SofiaApi,scope:string,enabled:boolean
   const refresh=async()=>{if(stopped||!enabled)return;if(inFlight){rerun=true;return;}inFlight=true;try{const result=await api.agenda();if(stopped)return;await enqueueNotifications(()=>reconcile(result.items,scope,epoch));}catch(error){if(!stopped)notificationWarning=notificationFailure(error);}finally{inFlight=false;if(rerun&&!stopped){rerun=false;void refresh();}}};
   const open=(response:Notifications.NotificationResponse)=>{const d=response.notification.request.content.data;if(enabled&&d?.sofiaAgenda&&d.scope===scopeId(scope)&&typeof d.day==='string'&&typeof d.entityId==='string'){latest.current(d.day,d.entityId);void Notifications.clearLastNotificationResponseAsync();}};
   const response=Notifications.addNotificationResponseReceivedListener(open),state=AppState.addEventListener('change',s=>{if(s==='active')void refresh();}),unsub=subscribeAgenda(owner=>{if(owner===api)void refresh();}),permission=()=>void refresh();permissionListeners.add(permission);
-  if(enabled){void refresh();void Notifications.getLastNotificationResponseAsync().then(r=>{if(r&&!stopped)open(r);});}
+  const cancelInitial=enabled?queueOptional('agenda:inventory',()=>{void refresh();},7,8000):()=>{};
+  if(enabled){void Notifications.getLastNotificationResponseAsync().then(r=>{if(r&&!stopped)open(r);});}
   else void enqueueNotifications(async()=>{for(const n of await Notifications.getAllScheduledNotificationsAsync())if(n.identifier.startsWith(PREFIX))await Notifications.cancelScheduledNotificationAsync(n.identifier);}).catch(()=>{});
   const timer=setInterval(()=>{if(AppState.currentState==='active')void refresh();},60000);
-  return()=>{stopped=true;generation++;clearInterval(timer);response.remove();state.remove();unsub();permissionListeners.delete(permission);};
+  return()=>{cancelInitial();stopped=true;generation++;clearInterval(timer);response.remove();state.remove();unsub();permissionListeners.delete(permission);};
  },[api,scope,enabled]);
 }

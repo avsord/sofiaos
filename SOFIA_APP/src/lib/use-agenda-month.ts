@@ -1,3 +1,4 @@
+import {useVisibleLoad} from './visible-load';
 import {useCallback,useEffect,useState} from 'react';
 import {AppState} from 'react-native';
 import type {SofiaApi} from './api';
@@ -10,6 +11,6 @@ export async function preloadAgenda(api:SofiaApi){const cache=cacheFor(api),key=
 export function useAgendaMonth(api:SofiaApi,month:Date,active=true,warmAdjacent=true){
  const key=monthKey(month),cache=cacheFor(api),[,render]=useState(0);
  const refresh=useCallback(()=>warmAdjacent?cache.warm(key,true):cache.load(key,true),[cache,key,warmAdjacent]);
- useEffect(()=>{const unsubscribe=cache.subscribe(key,()=>render(n=>n+1));void (warmAdjacent?cache.warm(key):cache.load(key));const system=subscribeSystemChanged(owner=>{if(owner===api){cache.invalidate();if(active)void refresh();}});if(!active)return()=>{unsubscribe();system();};const changed=subscribeAgenda(owner=>{if(owner===api){cache.invalidate();void refresh();}});const app=AppState.addEventListener('change',state=>{if(state==='active')void refresh();});return()=>{unsubscribe();changed();system();app.remove();};},[api,cache,key,active,refresh,warmAdjacent]);
+ useVisibleLoad(()=>{const unsubscribe=cache.subscribe(key,()=>render(n=>n+1));void (warmAdjacent?cache.warm(key):cache.load(key));const system=subscribeSystemChanged(owner=>{if(owner===api){cache.invalidate();if(active)void refresh();}});if(!active)return()=>{unsubscribe();system();};const changed=subscribeAgenda(owner=>{if(owner===api){cache.invalidate();void refresh();}});const app=AppState.addEventListener('change',state=>{if(state==='active')void refresh();});return()=>{unsubscribe();changed();system();app.remove();};},[api,cache,key,active,refresh,warmAdjacent]);
  return {...cache.snapshot(key),refresh};
 }

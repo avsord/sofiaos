@@ -148,6 +148,13 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
   19 testes). Briefing de implementação no mesmo diretório.
 - Limite declarado ao dono: a coleta só ocorre com o app aberto.
 
+### 7.3 Arquitetura de fluidez — o toque tem prioridade
+- Rodada 7 substitui a Rodada 6: [plano recebido](PLANO_FLUIDEZ.md) e [briefing](briefings/BRIEFING_RODADA7_fluidez.md). Fila central pós-reveal e Activity nas abas; comparar Novo/Antigo no mesmo APK.
+- O agendador não interrompe JS síncrono que já iniciou nem cancela automaticamente rede em voo. O deadline de 8s pode forçar trabalho. Os nove testes recebidos foram mantidos; foi corrigida uma brecha de cooldown com teste adicional.
+- Activity preserva estado e destrói/recria efeitos, não garante por si só que efeitos arbitrários ou pedidos de rede sejam seguros. Rascunhos de Páginas usam geração de sessão para impedir descarte por cleanup atrasado.
+- Antigo mantém o algoritmo da 0.3.107 (abas montadas, rAF/500ms), com instrumentação e correções de segurança compartilhadas. Não é o binário histórico exato.
+- Benchmark usa dados sintéticos; seu volume não foi comparado ao acervo real do Pedro. Não afirmar margem de 3× nem que emulador é universalmente mais lento que telefone.
+
 ## 8. Regras que não se quebram
 
 - Preservar assinatura, package `com.avsord.sofiaapp`, versionCode crescente,
@@ -163,7 +170,18 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Não mover os documentos históricos: `sofia-mobile-backend.yml` e
   `tools/apply-mobile-v138.cjs` dependem dos nomes deles.
 
+### Regras permanentes de fluidez (adoção em etapas)
+1. Trabalho opcional pós-abertura passa pelo agendador; operações explícitas de usuário e persistência de rascunhos não podem depender de o usuário parar de tocar.
+2. Abas usam Activity; efeitos devem limpar e reativar com segurança. Exceções medidas de pré-visualização durante arrasto precisam ser documentadas.
+3. Listas crescentes devem ser virtualizadas (migração R8, não incluída na R7).
+4. Histórico crescente deve ser fragmentado/limitado (R8); nenhuma remoção de dados para simular velocidade.
+5. Regressões acima do orçamento passarão a reprovar o CI na R9, após validar a semente e calibrar 3× o volume real. Na R7 há relatório de metas; testes funcionais permanecem obrigatórios.
+
 ## 9. Pendências (atualizar a cada rodada)
+
+0. **R7 em implementação/validação:** agendador, Activity e painel Novo/Antigo. Medir cinco aberturas por modo com semente pesada; só declarar correção física após evidência. Resultados e desvios no PR e relatório da execução; candidato 0.3.108, sem aprovação OTA.
+0. **R8:** virtualizar Páginas/Apps e fragmentar o arquivo de histórico por rota sem perda de dados.
+0. **R9:** calibrar carga ≥3× contagens reais do painel, habilitar gates reprovadores de desempenho e remover Antigo. Não iniciar nesta R7.
 
 1. **Rodada 5 (0.3.107) compilada, smoke QA aprovado; confirmar primeiros toques no celular** — aquecimento depois da Home sem aguardar histórico, Shell sem rerender ao concluir hidratação. A/B em emulador: DATA 956 → 975 ms (+19 ms); nos quatro primeiros toques, três eventos nativos registrados, incluindo Páginas ainda não montada (um salto protegido). Portanto, ausência total de delay no aparelho físico **não comprovada**. APK candidato manual, não publicado; [execução 38080609693](https://github.com/avsord/sofiaos/actions/runs/38080609693) e [evidências PR #15](https://github.com/avsord/sofiaos/pull/15#issuecomment-6101539253).
 2. **Rodada 4 implementada; confirmar no celular** — briefing histórico em `docs/briefings/BRIEFING_RODADA4_S_e_abas.md`. Conferir o candidato existente antes de recompilar: S entrando em movimento, Páginas com cache sem falso aviso de primeira página e resposta aos toques nos primeiros segundos. O build e o smoke QA da rodada terminaram com sucesso (registro na seção 10); isso não substitui o aceite físico.
@@ -194,6 +212,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 | 2026-10-10 | 0.3.106 | #14 | Protocolo SOFIA_KEY e estado vivo automático em branch independente; guardas de segredo e aprovação | Validado no workflow 38078156195; nenhum APK novo |
 | 2026-10-10 | 0.3.107 | #15 | Aquecer abas após Home sem esperar histórico e sem rerender geral; manter navegação nativa protegida | [CI 38080609693](https://github.com/avsord/sofiaos/actions/runs/38080609693) compilação e smoke QA aprovados; DATA +19 ms vs 0.3.106 no mesmo emulador; primeiros toques ainda com aba não montada; físico pendente, OTA não publicado |
+
+| 2026-10-10 | 0.3.108 | R7 | Agendador, Activity, proteção de rascunhos, painel e semente pesada Novo/Antigo | Implementação/CI em andamento; nenhum ganho físico alegado; metas numéricas serão registradas após execução |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

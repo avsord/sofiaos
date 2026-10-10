@@ -55,7 +55,7 @@ export class PageEditorStore {
   for(const p of saved){if(!p?.base?.id||p.base.kind!=='user_page'||!p.draft||!Array.isArray(p.draft.blocks)||!p.baseDraft||!p.draft.appearance||this.entries.has(p.base.id))continue;
    const e=this.open(p.base);e.baseDraft=p.baseDraft;e.draft=p.draft;e.version=1;e.state='pending';e.firstChange=this.now();}
  }
- resume(){for(const [id,e] of this.entries)if(e.version>e.acked&&e.state!=='conflict')this.schedule(id);}
+ resume(){this.disposed=false;for(const [id,e] of this.entries)if(e.version>e.acked&&e.state!=='conflict')this.schedule(id);}
  edit(id:string,change:(draft:PageDraft)=>PageDraft,group=''){
   const e=this.entries.get(id);if(!e)return;const next=change(clone(e.draft));if(same(next,e.draft))return;
   const now=this.now();if(!group||group!==e.group||now-e.groupAt>700){e.past.push(clone(e.draft));if(e.past.length>80)e.past.shift();}

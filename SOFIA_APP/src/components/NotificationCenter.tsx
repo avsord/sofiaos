@@ -1,3 +1,4 @@
+import {queueOptional} from '../lib/fluency';
 import {useBellInbox} from '../lib/use-bell-inbox';
 import {mergeBellNotices} from '../lib/bell-inbox';
 import {MOTION_EASE,useReducedMotion} from '../lib/motion';
@@ -22,7 +23,7 @@ export function NotificationProvider({api,enabled,children,scope=''}:{api:SofiaA
  const totalUnread=merged.filter(n=>n.state==='unread').length;
  const generation=useRef(0),request=useRef(false),queued=useRef(false);
  const refresh=useCallback(async()=>{if(!enabled)return;if(request.current){queued.current=true;return;}request.current=true;const current=generation.current;setLoading(true);try{const all:Notice[]=[];let offset:number|null=0,count=0;const seen=new Set<number>();while(offset!==null){if(seen.has(offset))throw Error('Paginação de notificações inválida.');seen.add(offset);const result=await api.allNotifications(offset);all.push(...result.items);offset=result.next_offset;count=result.unread;}if(current===generation.current){setItems([...new Map(all.map(n=>[n.id,n])).values()]);setUnread(count);setError('');}}catch(e){if(current===generation.current)setError(errorText(e));}finally{if(current===generation.current){setLoading(false);request.current=false;if(queued.current){queued.current=false;void refresh();}}}},[api,enabled]);
- useEffect(()=>{generation.current++;request.current=false;setItems([]);setUnread(0);setError('');void refresh();const system=subscribeSystemChanged(owner=>{if(owner===api)void refresh();});const timer=setInterval(()=>{if(AppState.currentState==='active')void refresh();},30000),subscription=AppState.addEventListener('change',state=>{if(state==='active')void refresh();});return()=>{generation.current++;request.current=false;system();clearInterval(timer);subscription.remove();};},[api,refresh]);
+ useEffect(()=>{generation.current++;request.current=false;setItems([]);setUnread(0);setError('');const cancelInitial=queueOptional('notifications:inventory',()=>{void refresh();},7,8000);const system=subscribeSystemChanged(owner=>{if(owner===api)void refresh();});const timer=setInterval(()=>{if(AppState.currentState==='active')void refresh();},30000),subscription=AppState.addEventListener('change',state=>{if(state==='active')void refresh();});return()=>{cancelInitial();generation.current++;request.current=false;system();clearInterval(timer);subscription.remove();};},[api,refresh]);
  async function read(n:Notice){if(n.id.startsWith('local:')){local.read(n.id);return;}try{await api.markRead(n.id);setItems(old=>old.map(x=>x.id===n.id?{...x,state:'read'}:x));if(n.state==='unread')setUnread(v=>Math.max(0,v-1));await refresh();}catch(e){setError(errorText(e));}}
  async function readAll(){
   local.readAll();const pending=items.filter(n=>n.state==='unread');

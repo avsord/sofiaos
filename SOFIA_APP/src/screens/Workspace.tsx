@@ -1,3 +1,4 @@
+import {useVisibleLoad} from '../lib/visible-load';
 import {TaskDescription,TaskDescriptionEditor} from '../components/TaskDescription';
 import {Capsules} from './Capsules';
 import {Routines} from './Routines';
@@ -72,7 +73,7 @@ export function EntityEditor({api,item,definition,areas,onClose,onSaved}:{api:So
  const c=useTheme(),insets=useSafeAreaInsets(),[title,setTitle]=useState(item.title||''),[content,setContent]=useState(item.content||''),[area,setArea]=useState(definition.group==='library'?(item.area&&areas.includes(item.area)?item.area:definition.label):(item.area||'Pessoal')),[privacy,setPrivacy]=useState(item.privacy||'private'),[state,setState]=useState(item.state||(item.kind==='monitor'?'active':definition.states[0])),[tags,setTags]=useState((item.tags||[]).filter(t=>!isAgendaMeta(t)&&!(definition.group==='library'&&(isLibraryMeta(t)||isProperty(t)))).join(', ')),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [property,setProperty]=useState(propertyOf(item)||((definition.group==='library'&&item.area&&!areas.includes(item.area)&&!['Geral','Pessoal'].includes(item.area))?item.area:''));
  const [orgRecords,setOrgRecords]=useState<Entity[]>([]);
- useEffect(()=>{if(definition.group!=='library')return;let alive=true;api.libraryOrganization().then(result=>{if(alive)setOrgRecords(result.items);}).catch(()=>{});return()=>{alive=false;};},[api,definition.group]);
+ useVisibleLoad(()=>{if(definition.group!=='library')return;let alive=true;api.libraryOrganization().then(result=>{if(alive)setOrgRecords(result.items);}).catch(()=>{});return()=>{alive=false;};},[api,definition.group]);
  const [data,setData]=useState<Record<string,any>>(()=>item.kind==='monitor'&&!item.id?{method:'product',currency:'BRL',interval_minutes:360,line_color:'#ac8cff',discover:true,new_low:true,...item.data}:{...item.data});
  const [rating,setRating]=useState(libraryRating(item)),[topic,setTopic]=useState(libraryTopic(item));
  const library=definition.group==='library',presentation=libraryPresentation(item.kind||'');
@@ -90,9 +91,9 @@ function Tasks({api,onBack,active,areas,onDiscussTask}:{onDiscussTask?:(task:Tas
  const requestId=useRef(0);
  async function load(manual=false){const id=++requestId.current;if(manual)setRefreshing(true);try{const result=await api.tasks();if(id!==requestId.current)return;setItems(result.items);setError('');}catch(e){if(id===requestId.current)setError(errorText(e));}finally{if(id===requestId.current){setLoading(false);setRefreshing(false);}}}
  // Prefetch once while Apps is mounted, then keep rows mounted across module visits.
- useEffect(()=>{void load();return()=>{requestId.current++;};},[api]);
- useEffect(()=>subscribeSystemChanged(owner=>{if(owner===api)void load();}),[api]);
- useEffect(()=>{if(active)void load();else setEditing(null);},[active]);
+ useVisibleLoad(()=>{void load();return()=>{requestId.current++;};},[api]);
+ useVisibleLoad(()=>subscribeSystemChanged(owner=>{if(owner===api)void load();}),[api]);
+ useVisibleLoad(()=>{if(active)void load();else setEditing(null);},[active]);
  const merge=(item:Task)=>{requestId.current++;setLoading(false);setRefreshing(false);setItems(previous=>previous.some(t=>t.id===item.id)?previous.map(t=>t.id===item.id?item:t):[item,...previous]);};
  async function save(){if(saving||!editing?.title?.trim())return;setSaving(true);setError('');try{if(!intervalValid(editing.start_at||editing.due_at,editing.end_at))throw Error('O fim precisa ser depois do início.');if(editing.end_at&&!await api.feature('task_intervals'))throw Error('O servidor ainda precisa ser atualizado para salvar início e fim das tarefas. Seus dados foram mantidos.');const result=await api.saveTask({...editing,area:editing.area?.trim()||'Pessoal',due_at:editing.due_at?new Date(editing.due_at.replace(' ','T')).toISOString():''});merge(result.item);setEditing(null);}catch(e){setError(errorText(e));}finally{setSaving(false);}}
  function removeTask(){
@@ -114,11 +115,12 @@ function Tasks({api,onBack,active,areas,onDiscussTask}:{onDiscussTask?:(task:Tas
 export function Workspace({api,navigate,onDepthChange,active,resetKey=0,openCapsulesKey=0,onDiscussTask}:{onDiscussTask?:(task:Task)=>void;openCapsulesKey?:number;resetKey?:number;api:SofiaApi;navigate:(tab:Tab)=>void;onDepthChange:(active:boolean)=>void;active:boolean}){
  const [areaEditing,setAreaEditing]=useState<LibraryArea|'new'|null>(null),[customEditing,setCustomEditing]=useState<{area:LibraryArea;item:Partial<Entity>}|null>(null),[customFilters,setCustomFilters]=useState<Record<string,string>>({});
  const c=useTheme(),[stars,setStars]=useState('all'),[genre,setGenre]=useState(''),[createPicker,setCreatePicker]=useState(false),[filtersOpen,setFiltersOpen]=useState(false),[catalog,setCatalog]=useState<Catalog|null>(()=>api.cached<Catalog>('/workspace/catalog')||null),[module,setModule]=useState(''),[kind,setKind]=useState(''),[editing,setEditing]=useState<Partial<Entity>|null>(null),[query,setQuery]=useState(''),[error,setError]=useState('');
- useLayoutEffect(()=>{setModule('');setKind('');setEditing(null);setFiltersOpen(false);setCreatePicker(false);setAreaEditing(null);setCustomEditing(null);setQuery('');setError('');},[resetKey]);
+ const lastResetKey=useRef(resetKey);
+ useLayoutEffect(()=>{if(lastResetKey.current===resetKey)return;lastResetKey.current=resetKey;setModule('');setKind('');setEditing(null);setFiltersOpen(false);setCreatePicker(false);setAreaEditing(null);setCustomEditing(null);setQuery('');setError('');},[resetKey]);
  const handledCapsulesTarget=useRef(0);
  useLayoutEffect(()=>{if(active&&openCapsulesKey&&openCapsulesKey!==handledCapsulesTarget.current){handledCapsulesTarget.current=openCapsulesKey;setModule('capsules');setKind('');}},[openCapsulesKey,active]);
  useLayoutEffect(()=>{if(!active){setModule('');setKind('');setEditing(null);setFiltersOpen(false);setCreatePicker(false);setAreaEditing(null);setCustomEditing(null);}},[active]);
- useEffect(()=>{let alive=true;const refresh=()=>{void api.catalog().then(value=>{if(alive)setCatalog(value);}).catch(e=>{if(alive)setError(errorText(e));});};refresh();const stop=subscribeSystemChanged(owner=>{if(owner===api)refresh();});return()=>{alive=false;stop();};},[api]);
+ useVisibleLoad(()=>{let alive=true;const refresh=()=>{void api.catalog().then(value=>{if(alive)setCatalog(value);}).catch(e=>{if(alive)setError(errorText(e));});};refresh();const stop=subscribeSystemChanged(owner=>{if(owner===api)refresh();});return()=>{alive=false;stop();};},[api]);
  useEffect(()=>{onDepthChange(Boolean(module));},[module,onDepthChange]);
  useEffect(()=>()=>onDepthChange(false),[onDepthChange]);
  useEffect(()=>{if(!active)return;const sub=BackHandler.addEventListener('hardwareBackPress',()=>{if(editing){setEditing(null);return true;}if(module){setModule('');setKind('');setEditing(null);setFiltersOpen(false);setCreatePicker(false);setAreaEditing(null);setCustomEditing(null);return true;}return false;});return()=>sub.remove();},[active,module,editing]);

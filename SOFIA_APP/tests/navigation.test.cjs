@@ -50,18 +50,19 @@ test('pager keeps six fixed slots, prioritizes Home and warms hidden screens wit
   const markers=['load={loadHome}','load={loadChat}','load={loadPages}','load={loadAgenda}','load={loadWorkspace}','load={loadProfile}'];
   let previous=-1;for(const marker of markers){const index=body.indexOf(marker);assert.ok(index>previous,marker);previous=index;}
   for(const tab of ['chat','pages','agenda','apps','profile'])assert.ok(body.includes("mountedTabs.has('"+tab+"')"));
-  const startup=fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8');
+  const startup=fs.readFileSync(path.join(root,'src/lib/startup-mounts-legacy.ts'),'utf8');
+  assert.ok(fs.readFileSync(path.join(root,'src/lib/startup-mounts.ts'),'utf8').includes("queueOptional('prerender:'+tab"));
   assert.ok(startup.includes("const [warmed,setWarmed]=useState"));assert.ok(startup.includes("frame=requestAnimationFrame(advance)"));assert.ok(startup.includes("MENU_TABS.includes(active)?[active]:[]"));
   assert.ok(startup.includes('timer=setTimeout(start,500)'),'Warming waits after navigation without postponing the tap');
-  assert.ok(source.includes('useStartupMounts(visible&&!!auth,tab,!!auth)'));
+  assert.ok(source.includes('useStartupMounts(visible&&!!auth,tab,!!auth,fluency,previewTabs)'));
   assert.ok(!source.includes('hydratedApi===api'),'archive I/O must not delay first menu warmup');
   assert.ok(!source.includes('setHydratedApi('),'archive completion must not render all tab slots again');
-  assert.ok(source.includes('void api.hydrate().then(()=>'),'Pages/chat archive is still hydrated safely');
+  assert.ok(source.includes('()=>api.hydrate().then(()=>'),'Pages/chat archive is still hydrated safely');
   assert.ok(pager.includes('removeClippedSubviews={false}'));assert.ok(!source.includes('setBootstrap(null);setTab('));
 });
 test('screen instances stay cached after lazy loading, preserving drafts and scroll positions',()=>{
   const loader=fs.readFileSync(path.join(root,'src/lib/screen-loader.tsx'),'utf8');
-  assert.ok(loader.includes('React.memo(load())'));assert.ok(loader.includes('const cache=new Map<string,Screen>()'));
+  assert.ok(loader.includes("React.memo(perfSync('module:'+name,load))"));assert.ok(loader.includes('const cache=new Map<string,Screen>()'));
   for(const name of ['loadHome','loadChat','loadPages','loadAgenda','loadWorkspace','loadProfile','loadNotifications'])assert.ok(source.includes(name),name);
   assert.ok(!source.includes("from './src/screens/Home'"));
   for(const name of ['navigate','goBack','changePrefs','logout','profile','manualUpdate','clearChat','notificationBack'])assert.ok(source.includes('const '+name+'=useCallback('),name);
@@ -78,8 +79,8 @@ test('secure session and decrypted records mount Home before optional services o
   assert.ok(shell.includes('contains no data fetches')||shell.includes('no data fetches'));
 });
 test('automatic update checks and notifications wait until the completed visual handoff',()=>{
-  assert.ok(source.includes("if(!servicesReady)return;"));
-  assert.ok(source.includes("enabled={!!auth&&!!bootstrap&&servicesReady}"));
+  assert.ok(source.includes("if(!servicesReady||fluency==='pending')return;"));
+  assert.ok(source.includes("enabled={!!auth&&!!bootstrap&&servicesReady&&fluency!=='pending'}"));
   assert.ok(source.includes('prepareInitialData(api,()=>preloadAgenda(api))'));
   assert.ok(source.includes('painted=useAfterFirstPaint(ready&&!cachedOpening)')&&source.includes('servicesReady=visible&&!!auth&&!!bootstrap&&initialDataReady')&&source.includes('visible=useLaunchVisible(ready)')&&source.includes('if(cachedOpening?visible:painted)api.releaseNetwork()')&&source.includes("const cachedOpening=!!(api.cached('/home')&&api.cached('/tasks')&&api.cached('/agenda?month='+monthKey(new Date())))"));
 });
@@ -113,8 +114,8 @@ test('notifications are outside the swipe sequence without losing the underlying
 test('Android identity, discovery prefix and version stay compatible',()=>{
   const config=JSON.parse(fs.readFileSync(path.join(root,'app.json'))).expo,pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json')));
   const update=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');
-  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,112);
-  assert.equal(config.version,'0.3.107');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
+  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,113);
+  assert.equal(config.version,'0.3.108');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
 });
 test('Pages opens a preloaded entity synchronously without a network wait',()=>{
  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');

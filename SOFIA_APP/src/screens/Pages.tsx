@@ -1,3 +1,6 @@
+import {pageStoreSession} from '../lib/page-store-session';
+import {afterVisible} from '../lib/fluency';
+import {useVisibleLoad} from '../lib/visible-load';
 import {KeyboardViewport} from '../components/KeyboardViewport';
 import {KeyboardToolbar} from '../components/KeyboardToolbar';
 import {useKeyboardVisible} from '../lib/motion';
@@ -36,6 +39,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  const c=useTheme(),[pages,setPages]=useState<Entity[]>(()=>cachedPageRows(api)||[]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>()),[pageInteraction,setPageInteraction]=useState(false),[pageDragging,setPageDragging]=useState(false);
  const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[loaded,setLoaded]=useState(()=>cachedPageRows(api)!==undefined),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null),[createParent,setCreateParent]=useState<Entity|null|undefined>(undefined);
  const refreshFlight=useRef(false),mutationEpoch=useRef(0),moveBusy=useRef(false),pendingPosition=useRef(new Map<string,Record<string,any>>());
+ const restoredStore=useRef<PageEditorStore|null>(null);
  const history=useRef<string[]>([]),mounted=useRef(true),expandDisk=useRef(Promise.resolve()),inputRefs=useRef(new Map<string,TextInput>());
  const selectedRef=useRef<string|null>(null),paneWidth=useRef(0),backAction=useRef<()=>void>(()=>{});
  const pageInteractionRef=useRef(false),kanbanInteractionRef=useRef(false),refreshGuard=useRef(new PageRefreshGuard());
@@ -54,6 +58,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   persist:items=>items.length?AsyncStorage.setItem(key+':drafts',JSON.stringify(items)):AsyncStorage.removeItem(key+':drafts'),
   onSaved:saved=>{mutationEpoch.current++;if(mounted.current)setPages(prev=>prev.map(p=>p.id===saved.id?{...saved,data:{...saved.data,...pendingPosition.current.get(saved.id)}}:p));}
  }),[api,key]);
+ const storeSession=useMemo(()=>pageStoreSession(store),[store]);
  useEffect(()=>store.subscribe(()=>setTick(v=>v+1)),[store]);
  // A fast tab touch can race Shell's post-reveal archive hydration. Restore the
  // existing page list as soon as that disk read finishes; do not wait for I/O
@@ -86,25 +91,25 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   finally{refreshFlight.current=false;if(manual&&mounted.current)setRefreshing(false);}
  }
  const refreshLatest=useRef(load);refreshLatest.current=load;
- useEffect(()=>{
+ useVisibleLoad(()=>{
   if(!active||!ready)return;
   const refresh=()=>{if(AppState.currentState==='active'&&!pageInteractionRef.current)void refreshLatest.current();};
   refresh();const timer=setInterval(refresh,5000),subscription=AppState.addEventListener('change',state=>{if(state==='active')refresh();});
   return()=>{clearInterval(timer);subscription.remove();};
  },[active,ready,store]);
  useEffect(()=>{
-  mounted.current=true;let alive=true;
+  mounted.current=true;let alive=true,cancelLoad=()=>{};const leaveSession=storeSession.enter();
   // Local drafts/expansion are enough to render saved pages. Waiting for a
   // slow server here used to show an empty screen on the first tab press.
   void Promise.all([AsyncStorage.getItem(key+':drafts'),AsyncStorage.getItem(key+':expanded')]).then(([drafts,branches])=>{
    if(!alive)return;
-   store.restore(safeJson(drafts,[]));setExpanded(expandedIds(safeJson(branches,[])));
-   setReady(true);store.resume();void load();
-  }).catch(e=>{if(alive){setError(errorText(e));setReady(true);void load();}});
+   if(restoredStore.current!==store){store.restore(safeJson(drafts,[]));setExpanded(expandedIds(safeJson(branches,[])));restoredStore.current=store;}
+   setReady(true);store.resume();cancelLoad=afterVisible(()=>{void load();});
+  }).catch(e=>{if(alive){setError(errorText(e));setReady(true);cancelLoad=afterVisible(()=>{void load();});}});
   const state=AppState.addEventListener('change',()=>{void store.flushAll();});
   const keyboard=Keyboard.addListener('keyboardDidHide',()=>setFocus(null));
-  return()=>{alive=false;mounted.current=false;state.remove();keyboard.remove();void store.flushAll().finally(()=>store.dispose());};
- },[store,key]);
+  return()=>{alive=false;cancelLoad();mounted.current=false;state.remove();keyboard.remove();leaveSession();};
+ },[store,key,storeSession]);
  useEffect(()=>{if(!active){kanbanInteractionRef.current=false;endPageTouch();setFocus(null);void store.flushAll();}},[active,store]);
  useEffect(()=>{onDepthChange?.(!!selectedId||pageInteraction);},[selectedId,pageInteraction,onDepthChange]);
  useEffect(()=>()=>onDepthChange?.(false),[onDepthChange]);

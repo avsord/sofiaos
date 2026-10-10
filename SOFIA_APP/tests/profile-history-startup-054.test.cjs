@@ -44,7 +44,7 @@ test('054 offline existing snapshots are usable without waiting for failed netwo
 test('054 offline launch stays responsive; Home exposes its own retry banner',async()=>{const offline=async()=>{throw Error('offline');};await prepareInitialData({hydrate:async()=>{},preload:offline},offline);});
 test('074 heavy menu panels no longer block the Home first frame',()=>{
  const callbacks=[];
- const {useStartupMounts}=load('src/lib/startup-mounts.ts',{
+ const {useLegacyStartupMounts:useStartupMounts}=load('src/lib/startup-mounts-legacy.ts',{
   'react':{useState:init=>[typeof init==='function'?init():init,()=>{}],useRef:value=>({current:value}),useLayoutEffect:()=>{},useEffect:effect=>{callbacks.push(effect);}},
   './idle-task':{scheduleIdleTask:()=>()=>{}}
  });

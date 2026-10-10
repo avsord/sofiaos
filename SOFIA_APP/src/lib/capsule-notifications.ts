@@ -1,3 +1,4 @@
+import {queueOptional} from './fluency';
 import {useEffect,useRef} from 'react';
 import {AppState,NativeModules,Platform} from 'react-native';
 import * as Notifications from 'expo-notifications';
@@ -44,11 +45,11 @@ export function useCapsuleNotifications(api:SofiaApi,scope:string,enabled:boolea
    if(!stopped&&epoch===generation)capsuleNotificationWarning='';
   };
   const changed=()=>enqueueNotifications(reconcile).catch(error=>{if(!stopped&&epoch===generation)capsuleNotificationWarning=notificationFailure(error);});
-  retry=changed;store.listeners.add(changed);if(enabled)void store.load().then(changed);else changed();
+  retry=changed;store.listeners.add(changed);const cancelInitial=enabled?queueOptional('capsules:inventory',()=>{void store.load().then(changed);},7,8000):(()=>{changed();return()=>{};})();
   const open=(r:Notifications.NotificationResponse)=>{const d=r.notification.request.content.data;if(enabled&&d?.sofiaCapsule&&d.scope===scopeId(scope)){latest.current();void Notifications.clearLastNotificationResponseAsync();}};
   const response=Notifications.addNotificationResponseReceivedListener(open);if(enabled)void Notifications.getLastNotificationResponseAsync().then(r=>{if(r&&!stopped)open(r);});
   const state=AppState.addEventListener('change',s=>{if(s==='active'&&enabled)void store.load().then(changed);});
   const timer=setInterval(()=>{if(enabled&&AppState.currentState==='active')void store.load().then(changed);},60000);
-  return()=>{stopped=true;if(retry===changed)retry=undefined;generation++;store.listeners.delete(changed);response.remove();state.remove();clearInterval(timer);};
+  return()=>{cancelInitial();stopped=true;if(retry===changed)retry=undefined;generation++;store.listeners.delete(changed);response.remove();state.remove();clearInterval(timer);};
  },[api,scope,enabled]);
 }

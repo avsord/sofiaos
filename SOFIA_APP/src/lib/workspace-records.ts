@@ -1,3 +1,5 @@
+import {newFluency} from './fluency';
+import {useVisibleLoad} from './visible-load';
 import {useEffect,useMemo,useReducer} from 'react';
 import type {Entity} from './types';
 import type {SofiaApi} from './api';
@@ -35,8 +37,15 @@ export class WorkspaceRecords {
 }
 export function useWorkspaceRecords(api:SofiaApi,kind:string,query:string,complete=false){
  const cache=useMemo(()=>new WorkspaceRecords(),[api]),[,changed]=useReducer(n=>n+1,0);
+ // Seed only a confirmed local response, never fabricate an empty collection.
+ const current=cache.view(kind,query);
+ if(newFluency()&&!current.loaded&&kind&&!kind.startsWith('@records:')&&kind!==LISTS_ALL){
+  const route=kind===LIBRARY_ALL?'/workspace/entities?limit=100&group=library&q='+encodeURIComponent(query)+'&offset=0':'/workspace/entities?limit=100&kind='+encodeURIComponent(kind)+'&q='+encodeURIComponent(query)+'&offset=0';
+  const saved=api.cached<{items:Entity[]}>(route);
+  if(saved&&Array.isArray(saved.items)){current.items=saved.items;current.loaded=true;current.hasMore=saved.items.length>=100;}
+ }
  const load=(more=false,manual=false)=>cache.load(api,kind,query,changed,more,manual,complete);
- useEffect(()=>{if(!kind)return;const timer=setTimeout(()=>void load(),query?250:0);return()=>clearTimeout(timer);},[api,kind,query,cache,complete]);
+ useVisibleLoad(()=>{if(!kind)return;const timer=setTimeout(()=>void load(),query?250:0);return()=>clearTimeout(timer);},[api,kind,query,cache,complete]);
  useEffect(()=>subscribeSystemChanged(owner=>{if(owner===api&&kind)void load();}),[api,kind,query,cache,complete]);
  return {...cache.view(kind,query),load,merge:(record:Entity)=>{cache.upsert(kind,query,record);changed();}};
 }

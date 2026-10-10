@@ -1,10 +1,11 @@
+import {perfSync} from './fluency-metrics';
 import React from 'react';
 
 type Screen=React.ComponentType<any>;
 const cache=new Map<string,Screen>();
 function once(name:string,load:()=>Screen):Screen{
  const existing=cache.get(name);if(existing)return existing;
- const component=React.memo(load()) as unknown as Screen;cache.set(name,component);return component;
+ const component=React.memo(perfSync('module:'+name,load)) as unknown as Screen;cache.set(name,component);return component;
 }
 /** Literal requires stay inside loaders so Metro/Hermes does not execute the
  * heavy screen module before that screen is warmed or selected.

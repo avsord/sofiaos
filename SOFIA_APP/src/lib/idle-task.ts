@@ -1,6 +1,8 @@
+import {newFluency,queueOptional} from './fluency';
 /** Optional work yields two frames and then an idle opportunity. Cancellation
  * fences already queued callbacks, including platforms without idle callbacks. */
 export function scheduleIdleTask(run:()=>void){
+ if(newFluency())return queueOptional('optional-idle',run,6);
  let stopped=false,frame=0,idle=0;
  frame=requestAnimationFrame(()=>{frame=requestAnimationFrame(()=>{
   if(stopped)return;

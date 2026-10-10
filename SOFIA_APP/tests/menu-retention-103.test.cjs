@@ -59,12 +59,12 @@ test('R5 first taps prewarm independently of the full archived Page/chat history
  const fs=require('node:fs'),path=require('node:path');
  const app=fs.readFileSync(path.join(__dirname,'../App.tsx'),'utf8');
  const pages=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
- assert.ok(app.includes('const mountedTabs=useStartupMounts(visible&&!!auth,tab,!!auth);'));
+ assert.ok(app.includes("const mountedTabs=useStartupMounts(visible&&!!auth,tab,!!auth,fluency,previewTabs);"));
  assert.ok(!app.includes('hydratedApi===api'),'waiting for whole archive reproduces first-tap delays');
  assert.ok(!app.includes('setHydratedApi('),'archive completion cannot rerender every mounted screen');
- assert.ok(app.includes('if(!visible||!auth||!initialDataReady)return;'));
- assert.ok(app.includes('void api.hydrate().then(()=>'),'archive hydration is still preserved after reveal');
- assert.ok(pages.includes('void api.hydrate().then(()=>'),'Pages still recovers saved listing when archive finishes');
+ assert.ok(app.includes("if(!visible||!auth||!initialDataReady||fluency==='pending')return;"));
+ assert.ok(app.includes("queueOptional('hidratar',()=>api.hydrate().then(()=>"),'archive hydration is still preserved after reveal');
+ assert.ok(pages.includes("void api.hydrate().then(()=>"),'Pages still recovers saved listing when archive finishes');
  assert.ok(pages.includes('ready&&!loaded&&!error&&!pages.length'),'Pages still has neutral loading state');
  assert.ok(pages.includes('ready&&loaded&&!pages.length&&!error'),'Pages only shows empty after real load');
  const f=fixture();
