@@ -1,15 +1,25 @@
 import * as ImagePicker from 'expo-image-picker';
 import {perfSync} from '../lib/fluency-metrics';
-// Measure only the first native recorder creation (later renders are cheap and would only flood the report).
+/** 0.3.115 on-device report: creating the native AudioRecorder took 148.8 ms (composer:recorder), inside the 224 ms of the Chat
+ * composer, so the first open of Chat cost 741 ms. The hooks created it on mount and polled it every 120 ms for as long as the tab
+ * existed, even if the user never recorded. Now the native recorder exists only after the first tap on the microphone, is polled
+ * only while recording, and has one symmetric lifecycle of its own: expo's hook releases it in an effect cleanup that React also runs
+ * when a tab is hidden, which is the failure that crashed VoicePlayer. */
+type RecorderStatus={durationMillis:number;metering?:number};
+type RecorderLike={prepareToRecordAsync():Promise<void>;record():void;stop():Promise<void>;getStatus():RecorderStatus;readonly uri:string|null;release():void};
 let firstRecorderTimed=false;
 function timeFirst<T>(name:string,run:()=>T):T{if(firstRecorderTimed)return run();firstRecorderTimed=true;return perfSync(name,run);}
+function newRecorder():RecorderLike{
+ return timeFirst('composer:recorder',()=>new AudioModule.AudioRecorder(createRecordingOptions({...RecordingPresets.HIGH_QUALITY,numberOfChannels:1,bitRate:64000,isMeteringEnabled:true})) as unknown as RecorderLike);
+}
 import * as DocumentPicker from 'expo-document-picker';
 import {Sheet} from './Sheet';
 import {attachmentMime,attachmentTypes} from '../lib/chat-attachments';
 import type {AttachmentDraft} from '../lib/types';
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {Animated,View,Text,TextInput,ActivityIndicator,AppState,Alert,Keyboard,PanResponder,Pressable,ScrollView,Image} from 'react-native';
-import {AudioModule,useAudioRecorder,useAudioRecorderState,RecordingPresets,setAudioModeAsync} from 'expo-audio';
+import {AudioModule,RecordingPresets,setAudioModeAsync} from 'expo-audio';
+import {createRecordingOptions} from 'expo-audio/build/utils/options';
 import {File} from 'expo-file-system';
 import {useTheme} from '../lib/theme';
 import {silenceVoices} from '../lib/audio-focus';
@@ -19,10 +29,10 @@ import {IconButton} from './UI';
 import {VoicePlayer} from './VoicePlayer';
 export function deleteVoice(uri:string){try{const file=new File(uri);if(file.exists)file.delete();}catch{}}
 export function Composer({disabled,enterToSend,autoSendVoice,onText,onVoice,onAttachments,onActivity,onDraft}:{disabled:boolean;enterToSend:boolean;autoSendVoice:boolean;onText:(text:string)=>void;onAttachments:(files:AttachmentDraft[],text:string)=>void;onVoice:(draft:VoiceDraft)=>void;onActivity:(active:boolean)=>void;onDraft:(active:boolean)=>void}){
- const c=useTheme(),recorder=timeFirst('composer:recorder',()=>useAudioRecorder({...RecordingPresets.HIGH_QUALITY,numberOfChannels:1,bitRate:64000,isMeteringEnabled:true}));
+ const c=useTheme();
  const [files,setFiles]=useState<AttachmentDraft[]>([]),[attachments,setAttachments]=useState(false);
- const rs=useAudioRecorderState(recorder,120),[text,setText]=useState(''),[busy,setBusy]=useState(false),[recording,setRecording]=useState(false),[draft,setDraft]=useState<VoiceDraft|null>(null),[cancelReady,setCancelReady]=useState(false);
- const recordingRef=useRef(false),busyRef=useRef(false),draftRef=useRef<VoiceDraft|null>(null),mounted=useRef(true),cancelReadyRef=useRef(false);
+ const [rs,setRs]=useState<RecorderStatus>({durationMillis:0}),[text,setText]=useState(''),[busy,setBusy]=useState(false),[recording,setRecording]=useState(false),[draft,setDraft]=useState<VoiceDraft|null>(null),[cancelReady,setCancelReady]=useState(false);
+ const recorderRef=useRef<RecorderLike|null>(null),recordingRef=useRef(false),busyRef=useRef(false),draftRef=useRef<VoiceDraft|null>(null),mounted=useRef(true),cancelReadyRef=useRef(false);
  const cancelX=useRef(new Animated.Value(0)).current;
  const stopRef=useRef<(discard?:boolean,sendImmediately?:boolean)=>Promise<void>>(async()=>{});
  function resetCancel(animated=true){cancelReadyRef.current=false;setCancelReady(false);if(animated)Animated.spring(cancelX,{toValue:0,useNativeDriver:true,speed:28,bounciness:0}).start();else cancelX.setValue(0);}
@@ -37,17 +47,34 @@ export function Composer({disabled,enterToSend,autoSendVoice,onText,onVoice,onAt
  useEffect(()=>{onActivity(recording||busy);},[recording,busy,onActivity]);
  useEffect(()=>{onDraft(!!draft||text.length>0||files.length>0);},[draft,text,files,onDraft]);
  useEffect(()=>{const sub=AppState.addEventListener('change',s=>{if(s!=='active'&&recordingRef.current)void stopRef.current(false,false);});return()=>sub.remove();},[]);
- useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;if(recordingRef.current)void recorder.stop().catch(()=>{});if(draftRef.current)deleteVoice(draftRef.current.uri);void setAudioModeAsync({allowsRecording:false}).catch(()=>{});};},[recorder]);
+ useEffect(()=>{
+  // Setup also runs again after a tab is hidden and shown: start idle, never reuse a recorder or draft the cleanup disposed.
+  mounted.current=true;recordingRef.current=false;setRecording(false);draftRef.current=null;setDraft(null);
+  return()=>{
+   mounted.current=false;const recorder=recorderRef.current,wasRecording=recordingRef.current;recorderRef.current=null;recordingRef.current=false;
+   void (wasRecording&&recorder?Promise.resolve().then(()=>recorder.stop()):Promise.resolve()).catch(()=>{}).finally(()=>{try{recorder?.release();}catch{}});
+   if(draftRef.current)deleteVoice(draftRef.current.uri);void setAudioModeAsync({allowsRecording:false}).catch(()=>{});
+  };
+ },[]);
+ // The recorder is polled only while a recording is in progress (the old hook polled it every 120 ms for the life of the tab).
+ useEffect(()=>{
+  if(!recording)return;setRs({durationMillis:0});
+  const id=setInterval(()=>{const recorder=recorderRef.current;if(!recorder)return;try{const next=recorder.getStatus();
+   setRs(prev=>{const meteringChanged=(prev.metering===undefined)!==(next.metering===undefined)||(prev.metering!==undefined&&next.metering!==undefined&&Math.abs(prev.metering-next.metering)>0.1);
+    return prev.durationMillis===next.durationMillis&&!meteringChanged?prev:{durationMillis:next.durationMillis,metering:next.metering};});}catch{}},120);
+  return()=>clearInterval(id);
+ },[recording]);
+ function ensureRecorder():RecorderLike{if(!recorderRef.current)recorderRef.current=newRecorder();return recorderRef.current;}
  async function start(){
   if(disabled||busyRef.current||recordingRef.current||draft)return;busyRef.current=true;setBusy(true);resetCancel(false);
   try{Keyboard.dismiss();await silenceVoices();const permission=await AudioModule.requestRecordingPermissionsAsync();if(!permission.granted)throw new Error('Permita o microfone nas configurações do celular para gravar áudio.');
-   await setAudioModeAsync({allowsRecording:true,playsInSilentMode:true,shouldPlayInBackground:false});await recorder.prepareToRecordAsync();
+   await setAudioModeAsync({allowsRecording:true,playsInSilentMode:true,shouldPlayInBackground:false});const recorder=ensureRecorder();await recorder.prepareToRecordAsync();
    if(!mounted.current||AppState.currentState!=='active'){await setAudioModeAsync({allowsRecording:false});return;}
    recorder.record();recordingRef.current=true;setRecording(true);
   }catch(e){if(mounted.current)Alert.alert('Microfone',errorText(e));}finally{busyRef.current=false;if(mounted.current)setBusy(false);}
  }
  async function stop(discard=false,sendImmediately=autoSendVoice){
-  if(!recordingRef.current||busyRef.current)return;busyRef.current=true;setBusy(true);const duration=recorder.getStatus().durationMillis;resetCancel(false);
+  if(!recordingRef.current||busyRef.current)return;const recorder=recorderRef.current;if(!recorder){recordingRef.current=false;setRecording(false);return;}busyRef.current=true;setBusy(true);const duration=recorder.getStatus().durationMillis;resetCancel(false);
   try{await recorder.stop();recordingRef.current=false;if(mounted.current)setRecording(false);await setAudioModeAsync({allowsRecording:false});
    const uri=recorder.uri;if(!uri)throw new Error('O áudio não foi salvo. Grave novamente.');
    if(discard||!mounted.current||duration<350){deleteVoice(uri);return;}
