@@ -115,6 +115,18 @@ function makeMobileApi(runtime, deps) {
       ownerAuth.setPassword(next); mobileSessions.revokeAll(); deps.revokeWebSessions?.(); return send({ ok: true });
     }
 
+    // Vigia de e-mails: senha de app só entra (nunca sai) e a verificação manual.
+    if (p.startsWith('/api/mobile/mail/')) {
+      const {PROVIDERS} = require('../services/mail-watch');
+      if (p === '/api/mobile/mail/providers' && m === 'GET') return send({providers: PROVIDERS});
+      rate(session, 'mail', 20);
+      let match = p.match(/^\/api\/mobile\/mail\/accounts\/([\w-]+)\/secret$/);
+      if (match && m === 'POST') { const b = await bodyJson(req, 4096); return send(await runtime.mailWatch.saveSecretAndTest(match[1], b.password)); }
+      match = p.match(/^\/api\/mobile\/mail\/accounts\/([\w-]+)\/forget$/);
+      if (match && m === 'POST') { runtime.mailWatch.dropSecret(match[1]); return send({ok: true}); }
+      if (p === '/api/mobile/mail/check' && m === 'POST') { const b = await bodyJson(req, 1024); return send(await runtime.mailWatch.checkAll(b.account_id ? String(b.account_id) : undefined)); }
+      fail('NOT_FOUND', 'Operação de e-mail desconhecida.', 404);
+    }
     if (p === '/api/mobile/md/capsules/doses') {
       if (m === 'GET') {
         const from=url.searchParams.get('from'),to=url.searchParams.get('to');

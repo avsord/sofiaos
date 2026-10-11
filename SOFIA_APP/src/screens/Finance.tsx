@@ -105,7 +105,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
           <Chips scroll value={tab} onChange={setTab} options={[{value: 'home' as Tab, label: 'Resumo'}, {value: 'txs' as Tab, label: 'Lançamentos'}, {value: 'cards' as Tab, label: 'Cartões'}, {value: 'plan' as Tab, label: 'Planejamento'}, {value: 'reports' as Tab, label: 'Relatórios'}]} />
         </View>
 
-        {!d ? <View style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}>{error ? <Text style={{color: c.danger, padding: 20}}>{error}</Text> : <ActivityIndicator color={c.accent} />}</View> : !d.accounts.length ? (
+        {!d ? <View style={{flex: 1, padding: 16, gap: 14}}>{error ? <Text style={{color: c.danger, padding: 20}}>{error}</Text> : [190, 140, 120].map((h, i) => <View key={i} style={{height: h, borderRadius: 22, backgroundColor: i ? c.surface : c.accentSoft, borderWidth: 1, borderColor: c.line, opacity: 0.75}} />)}</View> : !d.accounts.length ? (
           <Onboarding api={api} onDone={reload} />
         ) : (
           <ScrollView contentContainerStyle={{padding: 16, paddingBottom: insets.bottom + 110, gap: 14}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>

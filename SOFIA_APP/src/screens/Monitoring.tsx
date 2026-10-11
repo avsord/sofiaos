@@ -121,7 +121,7 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
           </Pressable>
 
           {error ? <Text style={{color: c.danger, fontSize: 13}}>{error}</Text> : null}
-          {products === null ? <ActivityIndicator color={c.accent} style={{marginTop: 40}} /> : !products.length ? (
+          {products === null ? <View style={{gap: 14}}>{[230, 120, 120].map((h, i) => <View key={i} style={{height: h, borderRadius: 22, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, opacity: 0.7}} />)}</View> : !products.length ? (
             <View style={{alignItems: 'center', gap: 14, paddingVertical: 40, paddingHorizontal: 10}}>
               <View style={{width: 84, height: 84, borderRadius: 42, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center'}}><Icon name="monitor" size={38} color={c.accent} /></View>
               <Text style={{fontSize: 20, fontWeight: '700', color: c.text, textAlign: 'center'}}>Acompanhe o preço do que você quer comprar</Text>

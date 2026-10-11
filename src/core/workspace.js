@@ -104,6 +104,8 @@ class Workspace {
      if(data.feed_url&&!data.feed_url.startsWith('https://'))throw new AppError('BAD_FEED','O feed precisa usar HTTPS.');
      if(old&&this.db.prepare('SELECT id FROM observations WHERE monitor_id=? LIMIT 1').get(old.id)&&['target_id','variant','currency'].some(k=>data[k]!==old.data[k]))throw new AppError('OBSERVATION_SCOPE','Esse monitor já tem observações. Crie outro para mudar produto, variante ou moeda.');
    }
+   if(kind==='mail_account'){data.provider=data.provider||'gmail';if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.address))throw new AppError('BAD_EMAIL','Informe o e-mail completo.');if(data.provider==='imap'&&!data.host)throw new AppError('MAIL_HOST','Informe o servidor IMAP.');if(data.port!==''&&(!Number.isInteger(data.port)||data.port<1||data.port>65535))throw new AppError('BAD_PORT','Porta inválida.');}
+   if(kind==='mail_rule'){data.field=data.field||'any';if(!String(data.contains||'').trim())throw new AppError('RULE_EMPTY','Diga o que a Sofia deve procurar (nome, e-mail, assunto ou palavra).');}
    if(kind==='fin_account'){data.account_type=data.account_type||'corrente';if(data.initial_balance!==''&&!/^-?\d{1,10}(\.\d{1,2})?$/.test(String(data.initial_balance)))throw new AppError('BAD_BALANCE','Saldo inicial: use um valor como 1500.50 ou -200.');}
    if(kind==='fin_card'){for(const k of ['closing_day','due_day'])if(!Number.isInteger(data[k])||data[k]<1||data[k]>31)throw new AppError('BAD_CARD_DAY','Dias de fechamento e vencimento entre 1 e 31.');if(data.limit===''||data.limit<=0)throw new AppError('BAD_LIMIT','Informe o limite do cartão.');}
    if(kind==='fin_tx'){

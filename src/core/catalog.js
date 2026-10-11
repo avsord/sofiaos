@@ -1761,6 +1761,194 @@ const CATALOG={
       }
     ],
     "description": "Meta de economia com acompanhamento do quanto falta."
+  },
+  "mail_account": {
+    "label": "Conta de e-mail",
+    "group": "mail",
+    "defaultPrivacy": "private",
+    "states": [
+      "active",
+      "paused",
+      "archived"
+    ],
+    "fields": [
+      {
+        "key": "provider",
+        "label": "Provedor",
+        "type": "select",
+        "options": [
+          "gmail",
+          "outlook",
+          "yahoo",
+          "icloud",
+          "imap"
+        ]
+      },
+      {
+        "key": "address",
+        "label": "E-mail",
+        "type": "text",
+        "max": 200
+      },
+      {
+        "key": "host",
+        "label": "Servidor IMAP",
+        "type": "text",
+        "max": 200
+      },
+      {
+        "key": "port",
+        "label": "Porta",
+        "type": "number"
+      },
+      {
+        "key": "secret_set",
+        "label": "Senha de app salva",
+        "type": "checkbox",
+        "developerOnly": true
+      },
+      {
+        "key": "last_uid",
+        "label": "Última mensagem lida",
+        "type": "number",
+        "developerOnly": true
+      },
+      {
+        "key": "uid_validity",
+        "label": "Validade da caixa",
+        "type": "text",
+        "max": 40,
+        "developerOnly": true
+      },
+      {
+        "key": "last_check",
+        "label": "Última verificação",
+        "type": "text",
+        "max": 40,
+        "developerOnly": true
+      },
+      {
+        "key": "last_error",
+        "label": "Último erro",
+        "type": "text",
+        "max": 300,
+        "developerOnly": true
+      }
+    ],
+    "description": "Caixa de entrada vigiada por IMAP com senha de app. A senha fica criptografada fora dos registros."
+  },
+  "mail_rule": {
+    "label": "Regra de e-mail",
+    "group": "mail",
+    "defaultPrivacy": "private",
+    "states": [
+      "active",
+      "paused",
+      "archived"
+    ],
+    "fields": [
+      {
+        "key": "field",
+        "label": "Onde procurar",
+        "type": "select",
+        "options": [
+          "any",
+          "from",
+          "subject",
+          "body"
+        ]
+      },
+      {
+        "key": "contains",
+        "label": "Contém (vírgula separa opções)",
+        "type": "text",
+        "max": 400
+      },
+      {
+        "key": "account_id",
+        "label": "Só nesta conta",
+        "type": "text",
+        "max": 80
+      },
+      {
+        "key": "notify",
+        "label": "Avisar no celular",
+        "type": "checkbox"
+      },
+      {
+        "key": "important",
+        "label": "Marcar como importante",
+        "type": "checkbox"
+      }
+    ],
+    "description": "Quando um e-mail novo bate com a regra, a Sofia guarda e avisa."
+  },
+  "mail_hit": {
+    "label": "E-mail encontrado",
+    "group": "mail",
+    "defaultPrivacy": "private",
+    "states": [
+      "new",
+      "read",
+      "archived"
+    ],
+    "fields": [
+      {
+        "key": "from_name",
+        "label": "De (nome)",
+        "type": "text",
+        "max": 160
+      },
+      {
+        "key": "from_addr",
+        "label": "De (e-mail)",
+        "type": "text",
+        "max": 200
+      },
+      {
+        "key": "snippet",
+        "label": "Trecho",
+        "type": "textarea",
+        "max": 400
+      },
+      {
+        "key": "received_at",
+        "label": "Recebido em",
+        "type": "text",
+        "max": 40
+      },
+      {
+        "key": "account_id",
+        "label": "Conta",
+        "type": "text",
+        "max": 80
+      },
+      {
+        "key": "rule_id",
+        "label": "Regra",
+        "type": "text",
+        "max": 80
+      },
+      {
+        "key": "rule_names",
+        "label": "Regras",
+        "type": "text",
+        "max": 300
+      },
+      {
+        "key": "message_key",
+        "label": "Mensagem",
+        "type": "text",
+        "max": 200,
+        "developerOnly": true
+      },
+      {
+        "key": "important",
+        "label": "Importante",
+        "type": "checkbox"
+      }
+    ],
+    "description": "Mensagem que bateu com uma regra. Só cabeçalho e trecho curto; o e-mail continua no provedor."
   }
 };
 module.exports={CATALOG};

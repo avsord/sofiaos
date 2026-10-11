@@ -33,6 +33,9 @@ export function savePrefs(p: Prefs) { invalidateStartupPrefs(); return AsyncStor
 export class ApiError extends Error {
   constructor(message: string, public code: string, public status: number, public data?: Record<string, unknown>) { super(message); this.name = 'ApiError'; }
 }
+// Organização dos widgets da Início guardada no aparelho enquanto o servidor
+// não sincroniza (antes dava erro e o widget de Cápsulas não entrava).
+const LOCAL_WIDGETS_KEY='sofia.native.dashboard-widgets.v1';
 export function startupSnapshotFor(scope:string){return new StartupSnapshot(encryptedStorage,SITE+'|'+scope.trim().toLowerCase()+'|startup-v1');}
 export class SofiaApi {
   private readonly md:LegacyMdAdapter;
@@ -149,8 +152,8 @@ export class SofiaApi {
   conversations(offset = 0) { return this.request<{items: Conversation[]; has_more: boolean; next_offset: number}>('/conversations?offset=' + offset); }
   capsuleHistory(from:string,to:string){return this.request<{items:Entity[]}>('/md/capsules/doses?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to));}
   capsuleTake(capsule_id:string,day:string,time:string,taken=true){return this.request<{ok:boolean;item:Entity|null}>('/md/capsules/doses',{capsule_id,day,time,taken},'POST');}
-  dashboardWidgets(){return this.request<{widgets:string[]}>('/md/dashboard');}
-  async saveDashboardWidgets(widgets:string[]){if(!await this.feature('dashboard_widgets'))throw new Error('A sincronização dos widgets aguarda a atualização do servidor. A organização anterior foi mantida.');return this.request<{widgets:string[]}>('/md/dashboard',{widgets},'PATCH');}
+  async dashboardWidgets(){if(!await this.feature('dashboard_widgets')){const raw=await AsyncStorage.getItem(LOCAL_WIDGETS_KEY).catch(()=>null);const local=raw?JSON.parse(raw):null;if(Array.isArray(local))return {widgets:local as string[]};}return this.request<{widgets:string[]}>('/md/dashboard');}
+  async saveDashboardWidgets(widgets:string[]){if(!await this.feature('dashboard_widgets')){const clean=widgets.filter(w=>['monitoring','tasks','capsules'].includes(w));await AsyncStorage.setItem(LOCAL_WIDGETS_KEY,JSON.stringify(clean));return {widgets:clean};}return this.request<{widgets:string[]}>('/md/dashboard',{widgets},'PATCH');}
   async deleteConversations(ids:string[]) { if(!await this.feature('conversation_delete'))throw new Error('A exclusão de conversas aguarda a atualização do servidor. Nenhuma conversa foi apagada.');const result=await this.request<{ok:boolean}>('/md/conversations',{ids},'DELETE');this.cacheGeneration++;this.startupReads.invalidate();this.snapshots.forget('/conversations?offset=0');for(const id of ids)this.snapshots.forget('/conversations/'+id);const current=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');if(current?.conversation&&ids.includes(current.conversation.id))this.snapshots.forget('/chat-sync/current');await this.snapshots.flush();return result; }
   newConversation(title = 'Conversa com a Sofia') { return this.request<{conversation: Conversation}>('/conversations', {title}); }
   async deleteMessage(id: string) {const result=await this.request<{ok:boolean;id:string;conversation_id:string}>('/messages/' + encodeURIComponent(id), {}, 'DELETE');this.cacheGeneration++;this.startupReads.invalidate();this.snapshots.forget('/conversations/'+result.conversation_id);const current=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');if(current?.conversation?.id===result.conversation_id&&current)this.snapshots.remember('/chat-sync/current',{...current,messages:current.messages.filter(m=>m.id!==id),deleted_ids:[...current.deleted_ids,id]});await this.snapshots.flush();return result;}
@@ -188,6 +191,9 @@ export class SofiaApi {
   entityAction(id: string, input: object) { return this.request<any>('/workspace/entities/' + encodeURIComponent(id) + '/action', input); }
   async libraryOrganization(){const items:Entity[]=[];for(let offset=0;;offset+=100){const page=await this.request<{items:Entity[]}>('/workspace/entities?group=library&limit=100&offset='+offset);items.push(...page.items);if(page.items.length<100)return {items};}}
   observations(id: string) { return this.request<{items: any[];status?:{last_at:string|null;last_error:string|null;next_at:string|null}}>('/workspace/entities/' + encodeURIComponent(id) + '/observations'); }
+  mailSecret(id: string, password: string) { return this.request<{ok: boolean; messages: number}>('/mail/accounts/' + encodeURIComponent(id) + '/secret', {password}, 'POST', 45000); }
+  mailForget(id: string) { return this.request<{ok: boolean}>('/mail/accounts/' + encodeURIComponent(id) + '/forget', {}); }
+  mailCheck(accountId = '') { return this.request<{accounts: number; scanned: number; hits: number; errors: {account: string; error: string}[]; skipped?: boolean}>('/mail/check', {account_id: accountId}, 'POST', 120000); }
   observe(id: string, input: object) { return this.request<any>('/workspace/entities/' + encodeURIComponent(id) + '/observations', input); }
   integrations() { return this.request<{items: {name:string;key:string;status:string;description:string;connect_url?:string}[]}>('/workspace/integrations'); }
   audioSource(path: string) {

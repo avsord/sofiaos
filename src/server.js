@@ -26,6 +26,7 @@ async function startServer(options={}) {
     server.on('error',()=>console.error('[Sofia] Falha no servidor HTTP.'));
     runtime.backups.daily();
     runtime.scheduler.start();
+    runtime.mailWatch.start();
     timer=setInterval(()=>{if(!runtime.core.busy)runtime.backups.daily();},60000);timer.unref();
     const address=server.address(),port=address&&typeof address==='object'?address.port:PORT;
     console.log('Sofia OS online em http://'+HOST+':'+port);

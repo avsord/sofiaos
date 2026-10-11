@@ -32,6 +32,7 @@ function createRuntime(config,options={}){
  core.contextPrivacy=(conversationId,message,needed)=>originalContextPrivacy(conversationId,contextLookup(message),needed);
  core.buildContext=(user,route,query,settings)=>originalBuildContext(user,route,contextLookup(query||user?.content),settings);
  const scheduler=new Scheduler(workspace,options.schedulerOptions);
- const runtime={store,backups,core,config,workspace,routing,usageService,audioService,vault,scheduler,ownerAuth:options.ownerAuth,accountMailer:options.accountMailer};runtime.handler=createHandler(runtime);return runtime;
+ const {MailWatcher}=require('../services/mail-watch');const mailWatch=options.mailWatch||new MailWatcher(workspace,config,options.mailOptions||{});
+ const runtime={store,backups,core,config,workspace,routing,usageService,audioService,vault,scheduler,mailWatch,ownerAuth:options.ownerAuth,accountMailer:options.accountMailer};runtime.handler=createHandler(runtime);return runtime;
 }
 module.exports={createRuntime,contextLookup};
