@@ -1,0 +1,92 @@
+name: Sofia R12 exact package preflight
+'on':
+  push:
+    branches: [sofia-r12-preflight-20261011]
+permissions:
+  contents: write
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/checkout@v4
+        with:
+          ref: c2a4846e21c6410140077bbcb7540c65984595f2
+          fetch-depth: 1
+          path: source
+      - name: Apply the exact 14 supplied files with before-and-after hashes
+        working-directory: source
+        run: |
+          set -euo pipefail
+          mkdir -p ../r12-evidence
+          test "$(git rev-parse HEAD)" = c2a4846e21c6410140077bbcb7540c65984595f2
+          python3 - <<'PY'
+          import hashlib,json,pathlib,subprocess
+          delta=json.loads(pathlib.Path('../.github/r12-exact-delta.json').read_text())
+          assert len(delta)==14
+          hashes={}
+          for name,(before,after,edits) in delta.items():
+              p=pathlib.Path(name)
+              raw=p.read_bytes() if p.exists() else b''
+              assert hashlib.sha256(raw).hexdigest()==before, 'Unexpected base: '+name
+              text=raw.decode('utf-8')
+              for start,end,replacement in reversed(edits):
+                  assert 0<=start<=end<=len(text)
+                  text=text[:start]+replacement+text[end:]
+              raw=text.encode('utf-8')
+              assert hashlib.sha256(raw).hexdigest()==after, 'Package mismatch: '+name
+              p.parent.mkdir(parents=True,exist_ok=True)
+              p.write_bytes(raw)
+              hashes[name]=after
+          subprocess.run(['git','add','--',*delta],check=True)
+          actual=set(subprocess.check_output(['git','diff','--cached','--name-only']).decode().splitlines())
+          assert actual==set(delta)
+          pathlib.Path('../r12-evidence/files-sha256.json').write_text(json.dumps(hashes,indent=2))
+          print('14/14 supplied files matched byte-for-byte; no extra changes')
+          PY
+          git config user.name 'Sofia R12 delivery'
+          git config user.email 'sofia-r12-delivery@users.noreply.github.com'
+          GIT_AUTHOR_DATE='2026-10-11T14:19:02+00:00' git commit --author='Claude (arquiteto Sofia OS) <claude-architect@users.noreply.github.com>' -m 'fix(android): undo the 0.3.113 pre-mount wait, measure mounts inside Chat and Agenda [manual-apk]' -m 'Exact 14-file user R12 package. Removes fixed pre-mount delay, keeps startTransition and measures chat:list, chat:composer and agenda:month. Version 0.3.114, code 119. No OTA publication. Source patch SHA-256: 667c60893f30804b9f68eac1d8bf7e0081e11090c66aa966af708f68f7a7d15a.'
+          git rev-parse HEAD > ../r12-evidence/SOURCE_COMMIT.txt
+          git rev-parse HEAD^{tree} > ../r12-evidence/SOURCE_TREE.txt
+          git diff HEAD^ HEAD --stat > ../r12-evidence/diff-stat.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: source/SOFIA_APP/package-lock.json
+      - name: Install exact locked dependencies
+        working-directory: source/SOFIA_APP
+        run: npm ci --no-audit --no-fund
+      - name: TypeScript and complete application tests in shallow checkout
+        working-directory: source/SOFIA_APP
+        run: |
+          set -euo pipefail
+          npx tsc --noEmit 2>&1 | tee ../../r12-evidence/typecheck.txt
+          npm test 2>&1 | tee ../../r12-evidence/app-tests.txt
+      - name: Delivery and native contracts without relaxed assertions
+        working-directory: source/SOFIA_APP
+        run: |
+          set -euo pipefail
+          node --test tools/delivery.test.cjs 2>&1 | tee ../../r12-evidence/delivery-tests.txt
+          python3 tools/native-delivery-test.py 2>&1 | tee ../../r12-evidence/native-tests.txt
+      - name: Retain validated commit only; do not update delivery or publish
+        working-directory: source
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          git diff --cached --exit-code
+          git push origin HEAD:refs/heads/sofia-r12-validated-20261011
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sofia-R12-preflight-${{ github.run_id }}
+          path: r12-evidence/
+          retention-days: 7
