@@ -12,3 +12,5 @@ try{require('react-native').NativeModules.SofiaSnapshot?.prepareLaunch?.();}catc
 const entry=require('./App');
 entry.prepareStartup?.();
 registerRootComponent(entry.default);
+// Avisos com o app fechado: a tarefa precisa estar declarada no carregamento.
+try{require('./src/lib/background-notify');}catch{}

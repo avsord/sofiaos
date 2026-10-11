@@ -362,6 +362,23 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
       {text: 'Apagar', style: 'destructive', onPress: () => { api.deleteEntity(monitor.id).then(onDeleted).catch(e => setError(errorText(e))); }},
     ]);
   }
+  // Comprou: vira despesa no Finanças (valor e loja do melhor preço) e o acompanhamento pausa.
+  async function bought() {
+    if (!product.now) return;
+    Alert.alert('Comprou?', `Lançar ${money(product.now.price, product.currency)} na ${product.now.store.name} como despesa em Finanças e pausar este acompanhamento?`, [
+      {text: 'Cancelar', style: 'cancel'},
+      {text: 'Lançar', onPress: async () => {
+        try {
+          const accounts = (await api.entities('fin_account')).items.filter(a => a.state !== 'archived');
+          if (!accounts.length) { setError('Crie primeiro uma conta em Apps → Finanças.'); return; }
+          const d = new Date(), today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+          await api.saveEntity({kind: 'fin_tx', title: monitor.title.slice(0, 200), content: 'Comprado na ' + product.now!.store.name + ' (Monitoramento)', area: 'Pessoal', state: 'active', privacy: 'private', tags: [],
+            data: {kind: 'expense', amount: product.now!.price, date: today, category: 'Compras', account_id: accounts[0].id, paid: true, recurrence: 'none'}});
+          await patch({}, {state: 'paused'}, 'Lançado em Finanças e pausado');
+        } catch (e) { setError(errorText(e)); }
+      }},
+    ]);
+  }
   async function saveTarget(text: string) {
     const v = Number(text.replace(/\./g, '').replace(',', '.'));
     if (!text.trim()) { await patch({target_price: ''}); return; }
@@ -430,6 +447,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
                 <Text style={{color: '#fff', fontWeight: '700'}}>Abrir na {product.now.store.name}</Text>
               </Pressable>
             ) : null}
+            {product.now ? <Pressable accessibilityRole="button" onPress={() => void bought()} style={{alignSelf: 'flex-start', marginTop: 6, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 99, borderWidth: 1, borderColor: product.color}}><Text style={{color: product.color, fontWeight: '700'}}>✓ Comprei — lançar em Finanças</Text></Pressable> : null}
           </View>
           <View style={{backgroundColor: c.bg, paddingHorizontal: 18, paddingVertical: 8}}>
             <Chips value={tab} onChange={setTab} options={[{value: 'summary' as DetailTab, label: 'Análise'}, {value: 'stores' as DetailTab, label: 'Lojas ' + product.stores.length}, {value: 'history' as DetailTab, label: 'Histórico'}, {value: 'settings' as DetailTab, label: 'Avisos'}]} />

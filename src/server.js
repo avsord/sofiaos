@@ -27,6 +27,7 @@ async function startServer(options={}) {
     runtime.backups.daily();
     runtime.scheduler.start();
     runtime.mailWatch.start();
+    runtime.google.start();
     timer=setInterval(()=>{if(!runtime.core.busy)runtime.backups.daily();},60000);timer.unref();
     const address=server.address(),port=address&&typeof address==='object'?address.port:PORT;
     console.log('Sofia OS online em http://'+HOST+':'+port);

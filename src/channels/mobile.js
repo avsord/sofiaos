@@ -127,6 +127,31 @@ function makeMobileApi(runtime, deps) {
       if (p === '/api/mobile/mail/check' && m === 'POST') { const b = await bodyJson(req, 1024); return send(await runtime.mailWatch.checkAll(b.account_id ? String(b.account_id) : undefined)); }
       fail('NOT_FOUND', 'Operação de e-mail desconhecida.', 404);
     }
+    // Capacidades e rotas /md que o app já chamava e o servidor não tinha.
+    if (p === '/api/mobile/md/capabilities' && m === 'GET') return send({ page_order: false, calendar: runtime.google.configured(), google: runtime.google.configured(), drive_backup: runtime.google.configured(), dashboard_widgets: true, mail_watch: true });
+    // Desempenho: todas as leituras de preço numa resposta só (antes era um pedido por produto).
+    if (p === '/api/mobile/md/monitors/observations' && m === 'GET') {
+      const out = {};
+      for (let offset = 0; offset < 5000; offset += 500) { const page = workspace.list({ kind: 'monitor', limit: 500, offset }); for (const mon of page) if (mon.state !== 'archived') out[mon.id] = workspace.observations(mon.id); if (page.length < 500) break; }
+      return send({ items: out });
+    }
+    if (p === '/api/mobile/md/dashboard') {
+      const allowedWidgets = ['monitoring', 'tasks', 'capsules'];
+      if (m === 'GET') return send({ widgets: runtime.google.kvGet('dashboard_widgets') });
+      if (m === 'POST') { const b = await bodyJson(req, 4096); const widgets = Array.isArray(b.widgets) ? [...new Set(b.widgets.filter(w => allowedWidgets.includes(w)))] : null; if (!widgets) fail('BAD_WIDGETS', 'Lista de widgets inválida.'); runtime.google.kvSet('dashboard_widgets', widgets); return send({ widgets }); }
+    }
+    if (p.startsWith('/api/mobile/md/calendar/') || p === '/api/mobile/md/drive/backup') {
+      const g = runtime.google, action = p.split('/').pop();
+      if (action === 'status' && m === 'GET') return send(await g.status());
+      if (m !== 'POST') fail('NOT_FOUND', 'Operação desconhecida.', 404);
+      rate(session, 'google', 20);
+      if (action === 'connect') return send(g.connectUrl());
+      if (action === 'disconnect') return send(await g.disconnect());
+      if (action === 'sync') return send(await g.sync());
+      if (action === 'select') { const b = await bodyJson(req, 2048); return send(g.select(String(b.id || ''))); }
+      if (action === 'backup') return send(await g.backupToDrive(true));
+      fail('NOT_FOUND', 'Operação desconhecida.', 404);
+    }
     if (p === '/api/mobile/md/capsules/doses') {
       if (m === 'GET') {
         const from=url.searchParams.get('from'),to=url.searchParams.get('to');
@@ -251,7 +276,8 @@ function makeMobileApi(runtime, deps) {
       return send({ item: store.saveTask({ ...old, ...b, revision: b.revision }, old.id) });
     }
     if (match && m === 'DELETE') { rate(session, 'write', 40); return send(store.deleteTask(validId(match[1]))); }
-    if (p === '/api/mobile/agenda' && m === 'GET') return send({ items: [...workspace.list({ kind: 'commitment', limit: 500 }), ...workspace.list({ kind: 'reminder', limit: 500 })], provider: 'sofia' });
+    // Sem teto de 500: com o Google conectado a agenda passa fácil disso.
+    if (p === '/api/mobile/agenda' && m === 'GET') { const all = kind => { const out = []; for (let offset = 0; offset < 50000; offset += 500) { const page = workspace.list({ kind, limit: 500, offset }); out.push(...page); if (page.length < 500) break; } return out; }; return send({ items: [...all('commitment'), ...all('reminder')], provider: runtime.google?.link()?.refresh ? 'google' : 'sofia' }); }
     if (p === '/api/mobile/agenda' && m === 'POST') {
       rate(session, 'write', 40); const b = await bodyJson(req, 8192);
       if (!b.start_at || !Number.isFinite(Date.parse(b.start_at))) fail('INVALID_DATE', 'Data e hora inválidas.');

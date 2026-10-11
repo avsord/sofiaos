@@ -11,6 +11,8 @@ import {InternalBackGesture} from '../components/InternalBackGesture';
 import {Icon} from '../components/Icon';
 import {Button, IconButton} from '../components/UI';
 import {relativeTime} from '../components/NotificationCenter';
+import {parseBill, parseMoney, todayISO, toAccount} from '../lib/finance';
+import {money} from '../lib/monitoring';
 
 type Tab = 'hits' | 'rules' | 'accounts';
 const PROVIDERS: Array<{value: string; label: string; help: string; link?: string}> = [
@@ -137,6 +139,7 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
               <Text style={{color: c.muted, fontSize: 12}}>{new Date(String(open.data.received_at)).toLocaleString('pt-BR')} · {accountName(open.data.account_id)}</Text>
               <Text style={{color: c.text, lineHeight: 21}}>{open.data.snippet}</Text>
               <Text style={{color: c.muted, fontSize: 12}}>Encontrado pela regra: {open.data.rule_names}. Abra seu app de e-mail para ler a mensagem inteira.</Text>
+              <BillFromMail api={api} hit={open} onDone={() => setOpen(null)} />
               <Pressable onPress={() => { const id = open.id; setOpen(null); void api.deleteEntity(id).then(load).catch(() => {}); }} style={{paddingVertical: 12}}><Text style={{color: c.danger}}>Tirar da lista</Text></Pressable>
             </View>
           ) : null}
@@ -228,5 +231,35 @@ function RuleSheet({api, rule, accounts, onClose, onDone}: {api: SofiaApi; rule:
         ) : null}
       </ScrollView>
     </Sheet>
+  );
+}
+
+/** E-mail de cobrança → conta a pagar no Finanças, com valor e vencimento já lidos. A pessoa confere antes. */
+function BillFromMail({api, hit, onDone}: {api: SofiaApi; hit: Entity; onDone: () => void}) {
+  const c = useTheme(), guess = parseBill(hit.title + ' ' + hit.data.snippet);
+  const [open, setOpen] = useState(false), [amount, setAmount] = useState(guess.amount ? String(guess.amount).replace('.', ',') : ''), [due, setDue] = useState(guess.due || todayISO());
+  const [busy, setBusy] = useState(false), [msg, setMsg] = useState('');
+  async function create() {
+    const v = parseMoney(amount);
+    if (!v || v <= 0) { setMsg('Digite o valor.'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) { setMsg('Data no formato AAAA-MM-DD.'); return; }
+    setBusy(true); setMsg('');
+    try {
+      const accounts = (await api.entities('fin_account')).items.map(toAccount).filter(a => !a.archived);
+      if (!accounts.length) { setMsg('Crie primeiro uma conta em Apps → Finanças.'); return; }
+      await api.saveEntity({kind: 'fin_tx', title: String(hit.title).slice(0, 200), content: 'Criado a partir do e-mail de ' + (hit.data.from_name || hit.data.from_addr), area: 'Pessoal', state: 'active', privacy: 'private', tags: [],
+        data: {kind: 'expense', amount: v, date: due, category: 'Contas', account_id: accounts[0].id, paid: false, recurrence: 'none'}});
+      setMsg('Conta a pagar criada em Finanças: ' + money(v) + ' para ' + due.split('-').reverse().join('/') + '.'); setTimeout(onDone, 1400);
+    } catch (e) { setMsg(errorText(e)); } finally { setBusy(false); }
+  }
+  if (!open) return <Pressable onPress={() => setOpen(true)} style={{paddingVertical: 12}}><Text style={{color: c.accent, fontWeight: '700'}}>💳 Lançar como conta a pagar{guess.amount ? ' · ' + money(guess.amount) : ''}</Text></Pressable>;
+  return (
+    <View style={{gap: 10, padding: 12, borderRadius: 14, backgroundColor: c.accentSoft}}>
+      <Text style={{color: c.text, fontWeight: '700'}}>Conta a pagar</Text>
+      <Field label="Valor (R$)" value={amount} onChange={setAmount} placeholder="0,00" />
+      <Field label="Vencimento (AAAA-MM-DD)" value={due} onChange={setDue} />
+      {msg ? <Text style={{color: msg.startsWith('Conta a pagar criada') ? '#2fc58b' : c.danger}}>{msg}</Text> : null}
+      <Button title="Criar em Finanças" loading={busy} onPress={() => void create()} />
+    </View>
   );
 }

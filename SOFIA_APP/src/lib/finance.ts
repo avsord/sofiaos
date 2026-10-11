@@ -262,3 +262,21 @@ export function parseMoney(text: string): number | null {
   const v = Number(t);
   return Number.isFinite(v) ? round2(v) : null;
 }
+
+// ---------- Ligações com outros apps ----------
+/** Lê valor e vencimento de um texto de cobrança (assunto + trecho do e-mail).
+ * Só sugere: a pessoa confere antes de salvar. */
+export function parseBill(text: string, today = todayISO()): {amount: number | null; due: string | null} {
+  const t = String(text || '');
+  const money = [...t.matchAll(/R\$\s*([\d.]+,\d{2}|\d+(?:\.\d{2})?)/gi)].map(m => parseMoney(m[1])).filter((v): v is number => v !== null && v > 0);
+  const near = /(vencimento|vence|vencendo|pagar até|pague até|data de pagamento)[^\d]{0,25}(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{2,4}))?/i.exec(t)
+    || /(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/.exec(t);
+  let due: string | null = null;
+  if (near) {
+    const g = near.length === 5 ? [near[2], near[3], near[4]] : [near[1], near[2], near[3]];
+    const d = Number(g[0]), m = Number(g[1]); let y = g[2] ? Number(g[2].length === 2 ? '20' + g[2] : g[2]) : Number(today.slice(0, 4));
+    if (!g[2] && (m < Number(today.slice(5, 7)) - 1)) y++;
+    if (d >= 1 && d <= 31 && m >= 1 && m <= 12) due = y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  }
+  return {amount: money.length ? Math.max(...money) : null, due};
+}

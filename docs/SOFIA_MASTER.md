@@ -157,6 +157,14 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - FlatList é dona da rolagem da lista principal; não aninhar outra FlatList vertical em ScrollView vertical. O editor conserva subpáginas compactas no caminho embutido até migração específica. Estado de expansão/rascunho permanece fora das células virtualizadas.
 - Benchmark usa dados sintéticos; seu volume não foi comparado ao acervo real do Pedro. Não afirmar margem de 3× nem que emulador é universalmente mais lento que telefone.
 
+### 7.3 Rodadas R16–R24 (Claude, 11–12/10/2026)
+- **Monitoramento** é app próprio (Apps → Monitoramento): coleta no aparelho numa WebView única em fila (`src/lib/price-reader.tsx`), leitura ambígua nunca gravada sozinha (`reader_memory` por loja), queda % compara com a leitura anterior **da mesma loja** (app e servidor — regra do dono, não mudar), produtos não se comparam entre si, cor escolhida pelo sistema e alterável nos ajustes. Diagnóstico em Perfil → 5 toques na versão (`monitoring`).
+- **Finanças** (estilo Mobills): kinds `fin_account`, `fin_card`, `fin_tx`, `fin_budget`, `fin_goal`; lógica em `SOFIA_APP/src/lib/finance.ts`.
+- **E-mails**: IMAP com senha de app (`src/services/mail-watch.js`, imapflow 2.0.7), kinds `mail_account`, `mail_rule`, `mail_hit`; senha criptografada (usar `SOFIA_MAIL_KEY` na Railway).
+- **Conta Google** (`src/services/google.js`): um OAuth para Agenda (2 sentidos no calendário escolhido; outros visíveis só leitura; syncToken/410; conflitos não sobrescrevem) e Drive (`drive.file`, backup diário em "Sofia OS/Backups", 14 guardados). Callback público `/google/oauth/callback`. Rotas `/api/mobile/md/{capabilities,dashboard,calendar/*,drive/backup,monitors/observations}`.
+- **Avisos com app fechado**: `expo-background-task` (`src/lib/background-notify.ts`), sem Firebase.
+- Sino: arrastar para apagar, resumo "Pede atenção agora" pré-carregado, tocar leva ao app certo.
+
 ## 8. Regras que não se quebram
 
 - Preservar assinatura, package `com.avsord.sofiaapp`, versionCode crescente,
@@ -210,6 +218,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
    12 h, filtro privado preservado em updates.
 
 ## 10. Diário de rodadas (só acrescentar; uma linha por rodada)
+- 12/10/2026 · R24: Conta Google (Agenda completa + backup no Drive), avisos com app fechado, e-mail → conta a pagar, "Comprei" → despesa, leituras de preço num pedido só, agenda sem teto de 500, chave de e-mail com migração, versão oficial pedida ao CI ([approved-apk]).
 
 | Data | Versão | PR | O quê | Resultado |
 |---|---|---|---|---|

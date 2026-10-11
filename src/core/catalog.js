@@ -79,6 +79,13 @@ const CATALOG={
       "cancelled"
     ],
     "fields": [
+      {"key": "calendar_all_day", "label": "Dia inteiro", "type": "checkbox"},
+      {"key": "calendar_date_start", "label": "Dia inicial", "type": "date"},
+      {"key": "calendar_date_end", "label": "Dia final (exclusivo)", "type": "date"},
+      {"key": "google_etag", "label": "Versão no Google", "type": "text", "max": 120, "developerOnly": true},
+      {"key": "google_rev", "label": "Revisão sincronizada", "type": "number", "developerOnly": true},
+      {"key": "google_recurring_id", "label": "Série no Google", "type": "text", "max": 200, "developerOnly": true},
+      {"key": "google_readonly", "label": "Somente leitura no Google", "type": "checkbox", "developerOnly": true},
       {
         "key": "start_at",
         "label": "Início",

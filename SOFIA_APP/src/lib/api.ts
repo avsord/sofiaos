@@ -1,7 +1,7 @@
 import {AUTH_STORAGE_KEY,PREFS_STORAGE_KEY,takeStartupAuth,takeStartupPrefs,invalidateStartupAuth,invalidateStartupPrefs} from './startup-read-ahead';
 import {StartupSnapshot} from './startup-snapshot';
 import {encryptedStorage} from './encrypted-storage';
-export type CalendarState={configured:boolean;connected:boolean;syncing?:boolean;last_sync?:string;error?:string;calendar_name?:string;calendar_id?:string;warnings?:string[];conflicts?:{id:string;reason:string}[];calendars?:{id:string;summary:string;accessRole:string}[]};
+export type CalendarState={configured:boolean;connected:boolean;syncing?:boolean;last_sync?:string;error?:string;calendar_name?:string;calendar_id?:string;warnings?:string[];conflicts?:{id:string;reason:string}[];calendars?:{id:string;summary:string;accessRole:string;selected?:boolean;primary?:boolean}[];email?:string;redirect_uri?:string;history?:{at:string;imported:number;created:number;updated:number;sent:number;removed:number;skipped:number;conflicts:number;ms:number}[];drive?:{connected:boolean;last_backup?:string;last_backup_error?:string;backups:number;folder:string}};
 import {StartupReads,preloadStartup} from './startup-preload';
 import {themeTimes} from './theme-schedule';
 import {agendaChanged} from './agenda-events';
@@ -152,7 +152,9 @@ export class SofiaApi {
   conversations(offset = 0) { return this.request<{items: Conversation[]; has_more: boolean; next_offset: number}>('/conversations?offset=' + offset); }
   capsuleHistory(from:string,to:string){return this.request<{items:Entity[]}>('/md/capsules/doses?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to));}
   capsuleTake(capsule_id:string,day:string,time:string,taken=true){return this.request<{ok:boolean;item:Entity|null}>('/md/capsules/doses',{capsule_id,day,time,taken},'POST');}
-  async dashboardWidgets(){if(!await this.feature('dashboard_widgets')){const raw=await AsyncStorage.getItem(LOCAL_WIDGETS_KEY).catch(()=>null);const local=raw?JSON.parse(raw):null;if(Array.isArray(local))return {widgets:local as string[]};}return this.request<{widgets:string[]}>('/md/dashboard');}
+  async dashboardWidgets(){const raw=await AsyncStorage.getItem(LOCAL_WIDGETS_KEY).catch(()=>null);const local=raw?JSON.parse(raw):null;if(!await this.feature('dashboard_widgets')){if(Array.isArray(local))return {widgets:local as string[]};return {widgets:['monitoring','tasks']};}const r=await this.request<{widgets:string[]|null}>('/md/dashboard');if(Array.isArray(r.widgets))return {widgets:r.widgets};
+   // Servidor ainda sem organização salva: leva a do aparelho para lá (nada se perde ao trocar de celular).
+   const start=Array.isArray(local)?local as string[]:['monitoring','tasks'];await this.request('/md/dashboard',{widgets:start},'POST').catch(()=>{});return {widgets:start};}
   async saveDashboardWidgets(widgets:string[]){if(!await this.feature('dashboard_widgets')){const clean=widgets.filter(w=>['monitoring','tasks','capsules'].includes(w));await AsyncStorage.setItem(LOCAL_WIDGETS_KEY,JSON.stringify(clean));return {widgets:clean};}return this.request<{widgets:string[]}>('/md/dashboard',{widgets},'PATCH');}
   async deleteConversations(ids:string[]) { if(!await this.feature('conversation_delete'))throw new Error('A exclusão de conversas aguarda a atualização do servidor. Nenhuma conversa foi apagada.');const result=await this.request<{ok:boolean}>('/md/conversations',{ids},'DELETE');this.cacheGeneration++;this.startupReads.invalidate();this.snapshots.forget('/conversations?offset=0');for(const id of ids)this.snapshots.forget('/conversations/'+id);const current=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');if(current?.conversation&&ids.includes(current.conversation.id))this.snapshots.forget('/chat-sync/current');await this.snapshots.flush();return result; }
   newConversation(title = 'Conversa com a Sofia') { return this.request<{conversation: Conversation}>('/conversations', {title}); }
@@ -165,7 +167,9 @@ export class SofiaApi {
   movePage(input:{id:string;revision:number;parentId:string;kind:string;anchorId:string}) { return this.md.move(input); }
   allNotifications(offset=0) { return this.md.notices(offset); }
   clearNotification(id:string) { return this.md.clear(id); }
-  async calendarStatus():Promise<CalendarState> { if(!await this.md.supports())return {configured:false,connected:false}; return this.request<CalendarState>('/md/calendar/status'); }
+  // Não depende mais de page_order: o servidor responde a agenda Google por conta própria.
+  async calendarStatus():Promise<CalendarState> { try{return await this.request<CalendarState>('/md/calendar/status');}catch(e){if((e as ApiError).status===404)return {configured:false,connected:false};throw e;} }
+  driveBackup() { return this.request<{ok?:boolean;skipped?:boolean;bytes?:number}>('/md/drive/backup',{},'POST',120000); }
   calendarConnect() { return this.request<{url:string}>('/md/calendar/connect',{}); }
   calendarDisconnect() { return this.request<{ok:boolean}>('/md/calendar/disconnect',{}); }
   calendarSync() { return this.request<{ok:boolean}>('/md/calendar/sync',{},'POST',90000); }
@@ -190,6 +194,7 @@ export class SofiaApi {
   attachmentSource(id:string) { if(!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('Imagem inválida.');return {uri:SITE+'/api/mobile/workspace/attachments/'+encodeURIComponent(id)+'?inline=1',headers:{Authorization:'Bearer '+this.token}}; }
   entityAction(id: string, input: object) { return this.request<any>('/workspace/entities/' + encodeURIComponent(id) + '/action', input); }
   async libraryOrganization(){const items:Entity[]=[];for(let offset=0;;offset+=100){const page=await this.request<{items:Entity[]}>('/workspace/entities?group=library&limit=100&offset='+offset);items.push(...page.items);if(page.items.length<100)return {items};}}
+  monitorObservations() { return this.request<{items: Record<string, any[]>}>('/md/monitors/observations'); }
   observations(id: string) { return this.request<{items: any[];status?:{last_at:string|null;last_error:string|null;next_at:string|null}}>('/workspace/entities/' + encodeURIComponent(id) + '/observations'); }
   mailSecret(id: string, password: string) { return this.request<{ok: boolean; messages: number}>('/mail/accounts/' + encodeURIComponent(id) + '/secret', {password}, 'POST', 45000); }
   mailForget(id: string) { return this.request<{ok: boolean}>('/mail/accounts/' + encodeURIComponent(id) + '/forget', {}); }

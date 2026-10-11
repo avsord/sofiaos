@@ -72,3 +72,10 @@ test('categorias, orçamentos e objetivos',()=>{
 test('valor digitado em reais vira número sem surpresa',()=>{
  eq(['89,90','R$ 1.234,56','1234.56','1.500','12.5','','abc'].map(f.parseMoney),[89.9,1234.56,1234.56,1500,12.5,null,null]);
 });
+
+test('e-mail de cobrança: lê valor e vencimento, sem inventar quando não há',()=>{
+ eq(f.parseBill('Sua fatura Nubank chegou: R$ 1.234,56 — vencimento 15/10/2026','2026-10-11'),{amount:1234.56,due:'2026-10-15'});
+ eq(f.parseBill('Boleto Enel R$ 189,90 vence em 05/11','2026-10-11'),{amount:189.9,due:'2026-11-05'});
+ eq(f.parseBill('Conta de dezembro: vence 10/01 · total R$ 99,00','2026-12-20'),{amount:99,due:'2027-01-10'});
+ eq(f.parseBill('Seu pedido foi enviado','2026-10-11'),{amount:null,due:null});
+});

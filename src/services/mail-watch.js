@@ -55,13 +55,15 @@ function plainText(source) {
 
 class MailWatcher {
   constructor(workspace, config, options = {}) {
-    this.w = workspace; this.config = config; this.busy = false; this.timer = null;
+    this.w = workspace; this.config = config; this.busy = false; this.timer = null; this.env = options.env || process.env;
     this.client = options.client || (opts => { const {ImapFlow} = require('imapflow'); return new ImapFlow(opts); });
     const dir = config.dataDir || path.join(config.root || '.', 'data');
     this.keyFile = path.join(dir, 'mail-key'); this.secretFile = path.join(dir, 'mail-secrets.json');
   }
+  envKey() { const k = (this.env || process.env).SOFIA_MAIL_KEY; return k && /^[0-9a-f]{64}$/i.test(k) ? Buffer.from(k, 'hex') : null; }
+  fileKey() { return fs.existsSync(this.keyFile) ? Buffer.from(fs.readFileSync(this.keyFile, 'utf8').trim(), 'hex') : null; }
   key() {
-    if (process.env.SOFIA_MAIL_KEY && /^[0-9a-f]{64}$/i.test(process.env.SOFIA_MAIL_KEY)) return Buffer.from(process.env.SOFIA_MAIL_KEY, 'hex');
+    const env = this.envKey(); if (env) return env;
     if (!fs.existsSync(this.keyFile)) { fs.mkdirSync(path.dirname(this.keyFile), {recursive: true, mode: 0o700}); fs.writeFileSync(this.keyFile, crypto.randomBytes(32).toString('hex'), {mode: 0o600}); }
     return Buffer.from(fs.readFileSync(this.keyFile, 'utf8').trim(), 'hex');
   }
@@ -76,8 +78,12 @@ class MailWatcher {
   }
   secret(accountId) {
     const s = this.secrets()[accountId]; if (!s) return null;
-    try { const d = crypto.createDecipheriv('aes-256-gcm', this.key(), Buffer.from(s.iv, 'base64')); d.setAuthTag(Buffer.from(s.tag, 'base64')); return Buffer.concat([d.update(Buffer.from(s.data, 'base64')), d.final()]).toString('utf8'); }
-    catch { return null; }
+    const tryKey = key => { try { const d = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(s.iv, 'base64')); d.setAuthTag(Buffer.from(s.tag, 'base64')); return Buffer.concat([d.update(Buffer.from(s.data, 'base64')), d.final()]).toString('utf8'); } catch { return null; } };
+    const current = tryKey(this.key()); if (current !== null) return current;
+    // Chave nova (SOFIA_MAIL_KEY) configurada depois: abre com a antiga do disco e regrava com a nova.
+    const old = this.envKey() && this.fileKey() ? tryKey(this.fileKey()) : null;
+    if (old !== null) { this.setSecret(accountId, old); return old; }
+    return null;
   }
   dropSecret(accountId) { const all = this.secrets(); delete all[accountId]; atomicWrite(this.secretFile, Buffer.from(JSON.stringify(all))); }
 

@@ -74,7 +74,11 @@ export async function productsFrom(api: SofiaApi, all: Entity[]): Promise<Produc
   const monitors = all.filter(e => e.state !== 'archived' && e.data?.method === 'product')
     .sort((a, b) => String((a as any).created_at || '').localeCompare(String((b as any).created_at || '')));
   const out: ProductSeries[] = [];
+  // Um pedido só para todos os produtos; servidor antigo cai no modo um-por-um.
+  let bundle: Record<string, any[]> | null = null;
+  if (monitors.length > 1) { try { bundle = (await api.monitorObservations()).items; } catch { bundle = null; } }
   for (let i = 0; i < monitors.length; i++) {
+    if (bundle) { out.push(buildProduct(monitors[i], bundle[monitors[i].id] || [], i)); continue; }
     try { const o = await api.observations(monitors[i].id); out.push(buildProduct(monitors[i], o.items, i)); }
     catch { out.push(buildProduct(monitors[i], [], i)); }
   }
