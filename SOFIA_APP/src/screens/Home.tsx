@@ -1,4 +1,5 @@
 import {noteFluencyMovement} from '../lib/fluency';
+import {useRenderCost} from '../lib/render-cost';
 import {readHomeRows} from '../lib/home-rows';
 import {scheduleIdleTask} from '../lib/idle-task';
 import {ProfileAvatar} from '../components/ProfileAvatar';
@@ -24,7 +25,7 @@ import {Icon} from '../components/Icon';
 import {NotificationBell} from '../components/NotificationCenter';
 import {subscribeSystemChanged} from '../lib/system-events';
 import {MiniAgenda,PriceWidget} from '../components/DashboardWidgets';
-export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisible=true,onGestureLock,onOpenCapsules,onDiscussTask}:{onDiscussTask?:(task:Task)=>void;onOpenCapsules?:()=>void;onGestureLock?:(locked:boolean)=>void;api:SofiaApi;bootstrap:Bootstrap;navigate:(tab:Tab)=>void;onOpenAgenda?:(date:string,id?:string,create?:boolean)=>void;active?:boolean;launchVisible?:boolean}){
+export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisible=true,onGestureLock,onOpenCapsules,onDiscussTask}:{onDiscussTask?:(task:Task)=>void;onOpenCapsules?:()=>void;onGestureLock?:(locked:boolean)=>void;api:SofiaApi;bootstrap:Bootstrap;navigate:(tab:Tab)=>void;onOpenAgenda?:(date:string,id?:string,create?:boolean)=>void;active?:boolean;launchVisible?:boolean}){useRenderCost('home');
  const [agendaDraft,setAgendaDraft]=useState<Partial<Entity>|null>(null),[agendaCatalog,setAgendaCatalog]=useState<Catalog|null>(()=>api.cached<Catalog>('/workspace/catalog')||null);
  // Catalog metadata is optional on launch. Keep cached areas synchronously,
  // then refresh after native Home is actually visible and the JS thread yields.

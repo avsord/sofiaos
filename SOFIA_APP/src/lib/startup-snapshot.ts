@@ -1,5 +1,5 @@
 import {newFluency,queueOptional} from './fluency';
-import {perfSync,measureVolume} from './fluency-metrics';
+import {perfSync,perfEvent,perfNow,measureVolume} from './fluency-metrics';
 // historyBytes in the report is now raw.length (UTF-16 units): the exact UTF-8 walk cost ~O(n) on the JS thread at every hydrate.
 import {recentChatPage} from './chat-window';
 /** A disposable encrypted view cache. The server remains authoritative. */
@@ -66,7 +66,7 @@ export class StartupSnapshot {
  }
  async hydrate(){
   if(!this.hydration){const revision=this.revision;this.hydration=(async()=>{
-   try{this.importRaw(await this.storage.read(this.scope),revision);}catch{}finally{this.launchOnly=false;}
+   try{const t=perfNow();const raw=await this.storage.read(this.scope);perfEvent('hidratar:read',t);this.importRaw(raw,revision);}catch{}finally{this.launchOnly=false;}
   })();}return this.hydration;
  }
  private async flushLaunch(){

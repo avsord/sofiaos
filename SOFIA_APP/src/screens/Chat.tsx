@@ -1,4 +1,5 @@
-import {noteFluencyMovement} from '../lib/fluency';
+import {noteFluencyMovement,userIsIdle} from '../lib/fluency';
+import {useRenderCost} from '../lib/render-cost';
 import {useVisibleLoad} from '../lib/visible-load';
 import type {Task,MessagePage} from '../lib/types';
 import {recentChatPage,olderChatPage,ChatHistoryGesture} from '../lib/chat-window';
@@ -44,7 +45,7 @@ function Bubble({message,previous,api,onRetry,selecting,selected,onSelect}:{mess
  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'flex-end',gap:8}}><Text style={{color:c.muted,fontSize:10}}>{new Date(message.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}{mine?' · '+statusLabel(message.status):''}</Text></View></Pressable></View>
  {mine&&message.status==='failed'&&!selecting?<Pressable accessibilityRole="button" onPress={()=>onRetry(message)} style={{alignSelf:'flex-end',padding:10,minHeight:40}}><Text style={{color:c.danger,fontSize:12,fontWeight:'600'}}>Tentar novamente</Text></Pressable>:null}</View>;
 }
-export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRefreshBootstrap,taskContext,onClearTaskContext}:{taskContext?:Task|null;onClearTaskContext?:()=>void;api:SofiaApi;bootstrap:Bootstrap;enterToSend:boolean;autoSendVoice:boolean;onLock:(v:boolean)=>void;active:boolean;onRefreshBootstrap:()=>Promise<void>|void}) {
+export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRefreshBootstrap,taskContext,onClearTaskContext}:{taskContext?:Task|null;onClearTaskContext?:()=>void;api:SofiaApi;bootstrap:Bootstrap;enterToSend:boolean;autoSendVoice:boolean;onLock:(v:boolean)=>void;active:boolean;onRefreshBootstrap:()=>Promise<void>|void}) {useRenderCost('chat');
  const c=useTheme(),list=useRef<FlatList<Message>>(null);
  const {follow:followChat,pause:pauseChat,showJump,...chatScroll}=useChatTail(list,active);
  const cached=useMemo(()=>{const saved=api.cached<ChatSnapshot>('/chat-sync/current');return saved?recentChatPage(saved):undefined;},[api]);
@@ -94,7 +95,7 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
   }catch(e:any){if(e?.status===404&&!latest.current.dirty&&!latest.current.selectedIds.size){await initialize();}else if(!silent&&mounted.current)setError(errorText(e));}
   finally{syncBusy.current=false;if(!silent&&mounted.current)setRefreshing(false);}
  }
- useVisibleLoad(()=>{if(!active||!conversation)return;void refresh(true);const sub=AppState.addEventListener('change',state=>{if(state==='active')void refresh(true);});const timer=setInterval(()=>{if(AppState.currentState==='active')void refresh(true);},2000);return()=>{clearInterval(timer);sub.remove();};},[active,conversation,api]);
+ useVisibleLoad(()=>{if(!active||!conversation)return;void refresh(true);const sub=AppState.addEventListener('change',state=>{if(state==='active')void refresh(true);});const timer=setInterval(()=>{if(AppState.currentState==='active'&&userIsIdle())void refresh(true);},2000);return()=>{clearInterval(timer);sub.remove();};},[active,conversation,api]);
  async function older(){
   if(!conversation||!hasMore||olderBusy.current||refreshing||deleting||sending||!messages.length)return;
   const id=conversation.id,epoch=++syncEpoch.current,oldest=messages[0];olderBusy.current=true;setLoadingOlder(true);pauseChat();historyGesture.current.reset();

@@ -5,7 +5,8 @@ function fixture(){
  const useState=initial=>{const i=cursor++;if(!slots[i])slots[i]={value:typeof initial==='function'?initial():initial};return [slots[i].value,value=>{slots[i].value=typeof value==='function'?value(slots[i].value):value;}];};
  const useRef=initial=>{const i=cursor++;return slots[i]||(slots[i]={current:initial});};
  const effect=(queue)=>(fn,deps)=>{const i=cursor++,old=slots[i];if(!old||deps.some((v,n)=>!Object.is(v,old.deps[n]))){old?.cleanup?.();slots[i]={deps};queue.push(()=>{slots[i].cleanup=fn();});}};
- const react={useRef,useState,useLayoutEffect:(...args)=>effect(layout)(...args),useEffect:(...args)=>effect(effects)(...args)};
+ // startTransition is synchronous in this fixture: these tests cover retention semantics, not scheduling.
+ const react={useRef,useState,useLayoutEffect:(...args)=>effect(layout)(...args),useEffect:(...args)=>effect(effects)(...args),startTransition:fn=>fn()};
  const raf={requestAnimationFrame:run=>{const task={id:++nextId,run,cancelled:false};frames.push(task);return task.id;},cancelAnimationFrame:id=>{const task=frames.find(x=>x.id===id);if(task)task.cancelled=true;},
   setTimeout:(run,delay)=>{const task={id:++nextId,run,at:now+delay,cancelled:false};timers.push(task);return task.id;},
   clearTimeout:id=>{const task=timers.find(x=>x.id===id);if(task)task.cancelled=true;}};

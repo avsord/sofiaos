@@ -90,10 +90,10 @@ test('pré-montagem: cada aba é montada DENTRO de startTransition (fatiada, int
  const m=mountsRig();const seen={current:null};let tree;
  await act(async()=>{tree=create(React.createElement(m.Probe,{active:'home',seen}));});
  await act(async()=>{m.fire();});
- assert.equal(m.transitions.length,0,'enfileirar não monta nada');
+ const before=m.transitions.length; // a aba ativa (home) já entrou por transição ao montar
  const job=m.live().find(j=>j.name==='prerender:agenda');
  await act(async()=>{job.run();});
- assert.equal(m.transitions.length,1,'a montagem passou por startTransition');
+ assert.equal(m.transitions.length,before+1,'a montagem passou por startTransition');
  assert.ok(seen.current.has('agenda'),'e a aba ficou montada');
 });
 
@@ -108,4 +108,29 @@ test('a montagem da Conversa e da Agenda é medida por dentro (lista, campo de d
  assert.ok(chat.includes('<MountTimer tab="chat:composer"><Composer'),'campo de digitação medido');
  assert.ok(agenda.includes('<MountTimer tab="agenda:month"><MonthSwipe'),'mês da Agenda medido');
  assert.ok(chat.includes('</FlatList>')||chat.includes('/></MountTimer>'));
+});
+
+test('toque numa aba não montada: a aba NÃO é montada dentro do gesto; entra por transição (esqueleto primeiro)',async()=>{
+ const m=mountsRig();const seen={current:null};let tree;
+ await act(async()=>{tree=create(React.createElement(m.Probe,{active:'home',seen}));});
+ const before=m.transitions.length;
+ await act(async()=>{tree.update(React.createElement(m.Probe,{active:'agenda',seen}));});
+ assert.equal(m.transitions.length,before+1,'a aba ativa foi marcada como montada dentro de startTransition');
+ assert.ok(seen.current.has('agenda'),'depois da transição a Agenda está montada');
+});
+test('fila ociosa com startQuiet: nada roda na primeira janela de silêncio; toque imediato adia; prazo ainda força',async()=>{
+ const {createIdleWork}=load('src/lib/idle-work.ts');
+ let t=0;const timers=[];const g={setTimeout:(fn,ms)=>{timers.push({fn,at:t+ms});return timers.length;},clearTimeout(){}};
+ const q=createIdleWork({quietMs:800,gapMs:50,startDelayMs:300,startQuiet:true,now:()=>t,setTimer:g.setTimeout,clearTimer:g.clearTimeout});
+ const ran=[];q.enqueue({name:'hidratar',run:()=>{ran.push(t);},priority:5,deadlineMs:8000});q.start();
+ const fire=async()=>{for(const x of timers.splice(0))if(x.at<=t)x.fn();else timers.push(x);await new Promise(r=>setImmediate(r));};
+ t=310;await fire();assert.deepEqual(ran,[],'aos 310 ms nada rodou: o reveal conta como entrada');
+ t=700;q.noteInput();t=900;await fire();assert.deepEqual(ran,[],'toque aos 700 ms adia');
+ t=1600;await fire();assert.deepEqual(ran,[1600],'800 ms depois do último toque, roda');
+});
+test('o App mostra um esqueleto por aba não montada, e a Conversa só sincroniza quando o usuário está parado',()=>{
+ const app=read('App.tsx');for(const tab of ['chat','pages','agenda','apps','profile'])assert.ok(app.includes(`<ScreenSkeleton tab='${tab}'/>`),tab);
+ assert.ok(!app.includes('<View style={{flex:1}}/>}'),'nenhum placeholder vazio sobrou');
+ assert.ok(read('src/screens/Chat.tsx').includes("AppState.currentState==='active'&&userIsIdle())void refresh(true)"));
+ assert.ok(read('src/lib/idle-work.ts').includes('startQuiet:true'));
 });

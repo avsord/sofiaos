@@ -1,4 +1,5 @@
 import {noteFluencyMovement} from '../lib/fluency';
+import {useRenderCost} from '../lib/render-cost';
 import {MountTimer} from '../components/MountTimer';
 import {perfSync} from '../lib/fluency-metrics';
 import {useVisibleLoad} from '../lib/visible-load';
@@ -16,7 +17,7 @@ import type {AgendaItem,Catalog,Entity} from '../lib/types';
 import {Empty,ErrorBanner,IconButton,ScreenTitle} from '../components/UI';
 import {MonthSwipe} from '../components/MonthSwipe';
 import {EntityEditor,Choice} from './Workspace';
-export function Agenda({api,target,active=true,onGestureLock}:{onGestureLock?:(locked:boolean)=>void;api:SofiaApi;target?:{date:string;id?:string;create?:boolean;nonce:number};active?:boolean}){
+export function Agenda({api,target,active=true,onGestureLock}:{onGestureLock?:(locked:boolean)=>void;api:SofiaApi;target?:{date:string;id?:string;create?:boolean;nonce:number};active?:boolean}){useRenderCost('agenda');
  const {month,setMonth,selected:selectedKey,setSelected:setSelectedKey,acceptTarget}=useAgendaView(api,'agenda',active),selected=new Date(selectedKey+'T12:00:00'),setSelected=(value:Date)=>setSelectedKey(localDateKey(value));
  const c=useTheme(),[refreshing,setRefreshing]=useState(false),[actionError,setError]=useState(''),[catalog,setCatalog]=useState<Catalog|null>(()=>api.cached<Catalog>('/workspace/catalog')||null),[editing,setEditing]=useState<Partial<Entity>|null>(null),[kind,setKind]=useState('commitment');
  const {items,loading,pending,loadedAt,error:loadError,refresh}=useAgendaMonth(api,month,active),error=actionError||(loadError?errorText(loadError):'');

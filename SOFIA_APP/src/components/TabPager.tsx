@@ -1,4 +1,5 @@
 import {Activity} from 'react';
+import {useRenderCost} from '../lib/render-cost';
 import {noteFluencyInput,type FluencyMode} from '../lib/fluency';
 import {MountTimer} from './MountTimer';
 import React,{forwardRef,useCallback,useImperativeHandle,useLayoutEffect,useMemo,useRef,useState} from 'react';
@@ -24,7 +25,7 @@ function nativeInitialWidth():number {
 }
 
 /** Native paging with a measured initial offset; taps never wait for an animation. */
-export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({activeTab,enabled,onSelect,children,motion,initialWidth,readyTabs,fluencyMode='old',onPreviewTabs},ref) {
+export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({activeTab,enabled,onSelect,children,motion,initialWidth,readyTabs,fluencyMode='old',onPreviewTabs},ref) {useRenderCost('pager');
   const scroll = useRef<ScrollView>(null);
   const aligned = useRef<{width:number;x:number}|null>(null);
   const dragStart=useRef(0);

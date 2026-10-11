@@ -20,6 +20,8 @@ export type IdleWorkOptions={
  setTimer?:(fn:()=>void,ms:number)=>Timer;
  clearTimer?:(id:Timer)=>void;
  quietMs?:number;
+ /** When true, start() counts as input: the first quiet window must elapse before any task runs. */
+ startQuiet?:boolean;
  gapMs?:number;
  startDelayMs?:number;
  maxRecords?:number;
@@ -30,7 +32,7 @@ export function createIdleWork(options:IdleWorkOptions={}){
  const now=options.now??(()=>((globalThis as any).performance?.now?.()??Date.now()));
  const setTimer=options.setTimer??((fn,ms)=>setTimeout(fn,ms));
  const clearTimer=options.clearTimer??(id=>clearTimeout(id as ReturnType<typeof setTimeout>));
- const quietMs=options.quietMs??800,gapMs=options.gapMs??50,startDelayMs=options.startDelayMs??0,maxRecords=options.maxRecords??100;
+ const quietMs=options.quietMs??800,gapMs=options.gapMs??50,startDelayMs=options.startDelayMs??0,maxRecords=options.maxRecords??100,startQuiet=options.startQuiet??false;
  const queue:Entry[]=[];const records:IdleRecord[]=[];
  let started=false,startedAt=0,lastInput=-Infinity,timer:Timer|null=null,running=false,disposed=false,seq=0,nextAllowedAt=0;
 
@@ -71,7 +73,9 @@ export function createIdleWork(options:IdleWorkOptions={}){
 
  return {
   /** Chamar uma vez quando a Home ficar visível (fim do fade). */
-  start(){if(started||disposed)return;started=true;startedAt=now();arm(startDelayMs);},
+  // The reveal counts as input: heavy work (history hydrate, pre-mounts) never starts in the first quiet window, and
+  // a user who starts tapping right away keeps it waiting until they stop (deadlines still force overdue tasks).
+  start(){if(started||disposed)return;started=true;startedAt=now();if(startQuiet){lastInput=startedAt;arm(Math.max(startDelayMs,quietMs));}else arm(startDelayMs);},
   /** Chamar em todo toque e início de arrasto. Não faz setState. */
   noteInput(){lastInput=now();},
   enqueue(task:IdleTask){
@@ -90,4 +94,4 @@ export function createIdleWork(options:IdleWorkOptions={}){
 }
 
 /** Instância única do app. Testes criam a sua com createIdleWork(). */
-export const idleWork=createIdleWork({quietMs:800,gapMs:50,startDelayMs:300});
+export const idleWork=createIdleWork({quietMs:800,gapMs:50,startDelayMs:300,startQuiet:true});

@@ -1,11 +1,12 @@
 import {newFluency,queueOptional} from '../lib/fluency';
+import {useRenderCost} from '../lib/render-cost';
 import React,{useEffect,useRef} from 'react';
 import {scheduleIdleTask} from '../lib/idle-task';
 import type {SofiaApi} from '../lib/api';
 import {preloadAgenda} from '../lib/use-agenda-month';
 import {useCapsuleNotifications} from '../lib/capsule-notifications';
 import {useAgendaNotifications} from '../lib/agenda-notifications';
-export function BackgroundServices({api,scope,enabled,preloadWhenIdle=true,onCapsules,onAgenda}:{api:SofiaApi;scope:string;enabled:boolean|null;preloadWhenIdle?:boolean;onCapsules:()=>void;onAgenda:(date:string,id?:string,create?:boolean)=>void}){
+export function BackgroundServices({api,scope,enabled,preloadWhenIdle=true,onCapsules,onAgenda}:{api:SofiaApi;scope:string;enabled:boolean|null;preloadWhenIdle?:boolean;onCapsules:()=>void;onAgenda:(date:string,id?:string,create?:boolean)=>void}){useRenderCost('background-services');
  const started=useRef<SofiaApi|null>(null);
  // Large background catalog/chat/network refreshes used to race the first
  // menu taps. Leave Home instantly usable from saved data; begin optional

@@ -12,11 +12,15 @@ const MENU_TABS:Tab[]=['home','chat','pages','agenda','apps','profile'];
 export function useStartupMounts(enabled:boolean,active:Tab,authenticated=true,mode:FluencyMode|'pending'='old',preview:readonly Tab[]=[]){
  const old=useLegacyStartupMounts(enabled&&mode==='old',active,authenticated);
  const [warmed,setWarmed]=useState<Set<Tab>>(()=>new Set(['home']));
- useLayoutEffect(()=>{if(authenticated&&MENU_TABS.includes(active))setWarmed(p=>p.has(active)?p:new Set([...p,active]));},[active,authenticated]);
+// Tapping a tab that is not mounted yet used to mount its whole screen inside the tap (Chat 161-331 ms, Agenda 222-362 ms on the
+ // owner's phone). Now the urgent render shows a skeleton and the screen is rendered in a transition, which yields to input.
+ useLayoutEffect(()=>{if(authenticated&&MENU_TABS.includes(active))startTransition(()=>setWarmed(p=>p.has(active)?p:new Set([...p,active])));},[active,authenticated]);
  useEffect(()=>{if(!authenticated){setWarmed(new Set(['home']));return;}
   if(!enabled||mode!=='new')return;
   const cancel=MENU_TABS.filter(t=>t!=='home'&&t!==active&&!warmed.has(t)).map(tab=>queueOptional('prerender:'+tab,()=>startTransition(()=>setWarmed(p=>p.has(tab)?p:new Set([...p,tab]))),4));
   return()=>cancel.forEach(fn=>fn());
  },[enabled,mode,authenticated,active]);
- return mode==='new'?new Set<Tab>(['home',...warmed,...(MENU_TABS.includes(active)?[active]:[]),...preview]):old;
+// Old mode keeps the legacy behaviour untouched. New mode: a tab is mounted only once warmed (transition) or previewed by a swipe;
+ // until then the pager shows its skeleton, so the tap itself never pays for a screen.
+ return mode==='new'?new Set<Tab>(['home',...warmed,...preview]):old;
 }

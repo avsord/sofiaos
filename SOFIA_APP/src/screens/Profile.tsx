@@ -1,4 +1,5 @@
 import {noteFluencyMovement} from '../lib/fluency';
+import {useRenderCost} from '../lib/render-cost';
 import {FluencyPanel} from '../components/FluencyPanel';
 import {themeTimes,validThemeTime} from '../lib/theme-schedule';
 import {ThemeScheduleSettings} from '../components/ThemeScheduleSettings';
@@ -16,7 +17,7 @@ import {Button,ErrorBanner,ScreenTitle,IconButton,forms} from '../components/UI'
 import {Icon} from '../components/Icon';
 import {APP_VERSION} from '../lib/update';
 import {GoogleCalendarSettings} from '../components/GoogleCalendarSettings';
-export function Profile({api,bootstrap,prefs,onPrefs,onProfile,onLogout,onCheckUpdate,onChatHistoryCleared}:{api:SofiaApi;bootstrap:Bootstrap;prefs:Prefs;onPrefs:(p:Prefs)=>Promise<void>;onProfile:(p:UserProfile)=>void;onLogout:()=>Promise<void>;onCheckUpdate:()=>Promise<void>;onChatHistoryCleared:()=>void}){
+export function Profile({api,bootstrap,prefs,onPrefs,onProfile,onLogout,onCheckUpdate,onChatHistoryCleared}:{api:SofiaApi;bootstrap:Bootstrap;prefs:Prefs;onPrefs:(p:Prefs)=>Promise<void>;onProfile:(p:UserProfile)=>void;onLogout:()=>Promise<void>;onCheckUpdate:()=>Promise<void>;onChatHistoryCleared:()=>void}){useRenderCost('profile');
  const [perfOpen,setPerfOpen]=useState(false);
  const perfTaps=React.useRef({count:0,at:0});
  function versionTap(){const now=Date.now();perfTaps.current.count=now-perfTaps.current.at<1800?perfTaps.current.count+1:1;perfTaps.current.at=now;if(perfTaps.current.count>=5){perfTaps.current.count=0;setPerfOpen(true);}}

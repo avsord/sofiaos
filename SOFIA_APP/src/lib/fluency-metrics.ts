@@ -45,6 +45,15 @@ export function measureVolume(entries:readonly (readonly [string,unknown])[],byt
  }
  perfVolume({pages:pages.size,entities:entities.size,conversations:conversations.size,messages:messages.size,historyBytes:bytes,cachedRoutes:entries.length});
 }
+/** Every commit of an instrumented component: count, total and worst wall time (render start -> layout commit).
+ * Each render is also a perf event ('render:<name>'), so stalls that used to show no event now name the component. */
+type RenderStat={count:number;totalMs:number;maxMs:number;lastAtMs:number};
+const renders=new Map<string,RenderStat>();
+export function perfRender(name:string,start:number){
+ const end=clock(),d=Math.max(0,end-start),s=renders.get(name)||{count:0,totalMs:0,maxMs:0,lastAtMs:0};
+ s.count++;s.totalMs+=d;s.maxMs=Math.max(s.maxMs,d);s.lastAtMs=reveal===null?0:round(end-reveal);renders.set(name,s);
+ perfEvent('render:'+name,start,end);
+}
 export function perfSetMode(value:string){mode=value;}
 export function perfActive(value:boolean){active=value;last=clock();}
 export function perfStart(){if(reveal!==null)return;reveal=clock();last=reveal;
@@ -57,5 +66,5 @@ export function perfStart(){if(reveal!==null)return;reveal=clock();last=reveal;
  // One bounded summary after the initial interaction window, no render loop.
  for(const delay of [6500,12000])setTimeout(()=>{const r=perfReport();emit('SUMMARY',{mode:r.mode,first5s:r.first5s,session:r.session,data:r.data});for(const row of r.idle)emit('IDLE',row);},delay);
 }
-export function perfReport(){return {mode,sinceRevealMs:round(perfSinceReveal()),measurement:'JS event-loop delay and commit-to-rAF estimates; not physical display latency',first5s:first5,session,top5:[...stalls].sort((a,b)=>b.delayMs-a.delayMs).slice(0,5),stalls:[...stalls],taps:[...taps],mounts:[...mounts],operations:events.filter(e=>e.name!=='input').slice(-100).map(e=>({name:e.name,atMs:reveal===null?0:round(e.start-reveal),durationMs:round(e.end-e.start)})),idle:idleWork.records().map(({error,...row})=>({...row,failed:!!error})),errors:[...errors],data:{...volume}};}
+export function perfReport(){return {mode,sinceRevealMs:round(perfSinceReveal()),measurement:'JS event-loop delay and commit-to-rAF estimates; not physical display latency',first5s:first5,session,top5:[...stalls].sort((a,b)=>b.delayMs-a.delayMs).slice(0,5),stalls:[...stalls],taps:[...taps],mounts:[...mounts],operations:events.filter(e=>e.name!=='input').slice(-100).map(e=>({name:e.name,atMs:reveal===null?0:round(e.start-reveal),durationMs:round(e.end-e.start)})),idle:idleWork.records().map(({error,...row})=>({...row,failed:!!error})),errors:[...errors],renders:Object.fromEntries([...renders].map(([k,v])=>[k,{count:v.count,totalMs:round(v.totalMs),maxMs:round(v.maxMs),lastAtMs:v.lastAtMs}])),data:{...volume}};}
 export function perfStop(){if(timer!==null)clearInterval(timer);timer=null;}

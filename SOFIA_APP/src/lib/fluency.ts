@@ -24,3 +24,6 @@ export function afterVisible(run:()=>void,delay=350){
  if(!newFluency()){run();return()=>{};}
  const timer=setTimeout(run,delay);return()=>clearTimeout(timer);
 }
+
+/** True when no touch/drag was noted recently (same window the idle queue uses). */
+export function userIsIdle(){return !newFluency()||idleWork.isIdle();}

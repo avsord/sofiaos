@@ -1,4 +1,5 @@
 import {noteFluencyMovement} from '../lib/fluency';
+import {useRenderCost} from '../lib/render-cost';
 import {pageStoreSession} from '../lib/page-store-session';
 import {afterVisible} from '../lib/fluency';
 import {useVisibleLoad} from '../lib/visible-load';
@@ -35,7 +36,7 @@ const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'
 const PAGE_LIST_KEY='/workspace/entities?limit=100&kind=user_page&q=&offset=0';
 const cachedPageRows=(api:SofiaApi)=>api.cached<{items:Entity[]}>(PAGE_LIST_KEY)?.items.filter(item=>item.state!=='archived');
 
-export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;active:boolean;storageScope:string;onDepthChange?:(open:boolean)=>void}){
+export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;active:boolean;storageScope:string;onDepthChange?:(open:boolean)=>void}){useRenderCost('pages');
  const keyboardVisible=useKeyboardVisible(),scrollPositions=useRef(new Map<string,number>());
  const c=useTheme(),[pages,setPages]=useState<Entity[]>(()=>cachedPageRows(api)||[]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>()),[pageInteraction,setPageInteraction]=useState(false),[pageDragging,setPageDragging]=useState(false);
  const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[loaded,setLoaded]=useState(()=>cachedPageRows(api)!==undefined),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null),[createParent,setCreateParent]=useState<Entity|null|undefined>(undefined);

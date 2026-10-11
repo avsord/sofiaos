@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
 const root=path.resolve(__dirname,'..');
 function load(file,deps={}){
- deps={'../lib/fluency':{noteFluencyInput:()=>{}},'./MountTimer':{MountTimer:'MountTimer'},...deps};
+ deps={'../lib/fluency':{noteFluencyInput:()=>{}},'./MountTimer':{MountTimer:'MountTimer'},'../lib/render-cost':{useRenderCost(){}},...deps};
  const code=ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{fileName:file,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
  const exports={};vm.runInNewContext(code,{exports,require:name=>{assert.ok(name in deps,'Unexpected dependency: '+name);return deps[name];},setTimeout:()=>assert.fail('Navigation must not defer to a timer'),requestAnimationFrame:()=>assert.fail('Navigation must not wait for another frame'),fetch:()=>assert.fail('Navigation must not await the server')});return exports;
 }

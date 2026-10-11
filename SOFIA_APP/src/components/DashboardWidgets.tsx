@@ -1,4 +1,5 @@
 import {agendaPriority,priorityColorsByDay} from '../lib/agenda-priority';
+import {useRenderCost} from '../lib/render-cost';
 import {perfSync} from '../lib/fluency-metrics';
 import {expandAgenda,eventStart,readRepeat} from '../lib/agenda-recurrence';
 import {useAgendaView} from '../lib/agenda-view';
@@ -11,7 +12,7 @@ import {observationPoints,stableProductColor,localDateKey,monthCells,priceGeomet
 import {useTheme} from '../lib/theme';
 import {Button,IconButton} from './UI';
 import {MonthSwipe} from './MonthSwipe';
-export function MiniAgenda({items,onOpen,onItem,onCreate,onGestureLock,viewOwner,active=true,onMonthChange,loading=false,pending=false}:{onCreate?:(day:string)=>void;loading?:boolean;pending?:boolean;onMonthChange?:(month:Date)=>void;active?:boolean;viewOwner:object;onGestureLock?:(locked:boolean)=>void;items:DayRecord[];onOpen:(day:string)=>void;onItem:(item:DayRecord)=>void}){
+export function MiniAgenda({items,onOpen,onItem,onCreate,onGestureLock,viewOwner,active=true,onMonthChange,loading=false,pending=false}:{onCreate?:(day:string)=>void;loading?:boolean;pending?:boolean;onMonthChange?:(month:Date)=>void;active?:boolean;viewOwner:object;onGestureLock?:(locked:boolean)=>void;items:DayRecord[];onOpen:(day:string)=>void;onItem:(item:DayRecord)=>void}){useRenderCost('home:mini-agenda');
  const c=useTheme(),{month,setMonth,selected,setSelected}=useAgendaView(viewOwner,'home',active);
  useEffect(()=>{if(active)onMonthChange?.(month);},[active,month.getTime(),onMonthChange]);
  const expanded=useMemo(()=>perfSync('home:expand',()=>items.flatMap(record=>record.isTask||!record.original||readRepeat(record.original as import('../lib/types').AgendaItem).frequency==='none'?[record]:expandAgenda([record.original as import('../lib/types').AgendaItem],month).map(event=>({...record,id:record.id+eventStart(event),date:eventStart(event),original:event})))),[items,month.getTime()]);
