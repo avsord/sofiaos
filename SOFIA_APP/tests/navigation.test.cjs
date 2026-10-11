@@ -62,7 +62,8 @@ test('pager keeps six fixed slots, prioritizes Home and warms hidden screens wit
 });
 test('screen instances stay cached after lazy loading, preserving drafts and scroll positions',()=>{
   const loader=fs.readFileSync(path.join(root,'src/lib/screen-loader.tsx'),'utf8');
-  assert.ok(loader.includes("React.memo(perfSync('module:'+name,load))"));assert.ok(loader.includes('const cache=new Map<string,Screen>()'));
+  // R8: same guarantees (memoized, cached, module load measured) plus a per-screen error boundary.
+  assert.ok(loader.includes("const Loaded=perfSync('module:'+name,load)"));assert.ok(loader.includes('React.memo(Bounded)'));assert.ok(loader.includes('<ScreenBoundary name={name}><Loaded {...props}/></ScreenBoundary>'));assert.ok(loader.includes('const cache=new Map<string,Screen>()'));
   for(const name of ['loadHome','loadChat','loadPages','loadAgenda','loadWorkspace','loadProfile','loadNotifications'])assert.ok(source.includes(name),name);
   assert.ok(!source.includes("from './src/screens/Home'"));
   for(const name of ['navigate','goBack','changePrefs','logout','profile','manualUpdate','clearChat','notificationBack'])assert.ok(source.includes('const '+name+'=useCallback('),name);

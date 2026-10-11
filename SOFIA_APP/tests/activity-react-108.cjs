@@ -24,7 +24,8 @@ test('real Activity hide/show preserves React text and live PageEditorStore desp
  assert.equal(store.get('page').draft.title,'Rascunho preservado');
  await act(async()=>{setText('Rascunho preservado editado');});
  assert.equal(store.get('page').draft.title,'Rascunho preservado editado');hold=false;
- await act(async()=>{tree.unmount();});await store.flushAll();assert.ok(disposeCalls>=1);assert.equal(disk[0].draft.title,'Rascunho preservado editado');store.dispose();
+ // R8 policy: leaving persists drafts and never disposes (hide and unmount are indistinguishable under Activity).
+ await act(async()=>{tree.unmount();});await store.flushAll();assert.equal(disposeCalls,0);assert.equal(disk[0].draft.title,'Rascunho preservado editado');store.dispose();
 });
 test('actual hidden Activity creates no effects; subscriptions resume once after showing',async()=>{
  let starts=0,ends=0,value=0,set,tree;
@@ -35,4 +36,29 @@ test('actual hidden Activity creates no effects; subscriptions resume once after
  await act(async()=>{set(42);});await act(async()=>{tree.update(view('hidden'));});assert.equal(ends,1);
  await act(async()=>{tree.update(view('visible'));});assert.equal(starts,2);assert.equal(value,42);
  await act(async()=>{tree.unmount();});assert.equal(ends,2);
+});
+
+test('R8: flush that COMPLETES while hidden never disposes; 20 hide/show cycles keep editor and listeners alive',async()=>{
+ let disposeCalls=0,notified=0,tree,setText;
+ const page={id:'page',title:'Original',kind:'user_page',revision:1,data:{blocks_json:'[]'}};
+ const store=new PageEditorStore({persist:async()=>{},save:async()=>{throw Error('offline fixture');},read:async()=>page,delay:300000,maxWait:300000});store.open(page);
+ const originalDispose=store.dispose.bind(store);store.dispose=()=>{disposeCalls++;originalDispose();};
+ const session=pageStoreSession(store);
+ function Editor(){const [value,set]=React.useState('Original');setText=v=>{set(v);store.edit('page',d=>({...d,title:v}));};
+  React.useEffect(()=>store.subscribe(()=>{notified++;}),[]);
+  React.useEffect(()=>session.enter(),[]);return React.createElement('input',{value});}
+ const view=mode=>React.createElement(React.Activity,{mode},React.createElement(Editor));
+ await act(async()=>{tree=create(view('visible'));});
+ for(let i=0;i<20;i++){
+  await act(async()=>{setText('Rascunho '+i);});
+  await act(async()=>{tree.update(view('hidden'));});
+  await act(async()=>{await store.flushAll();await new Promise(r=>setImmediate(r));}); // flush termina COM a aba escondida
+  await act(async()=>{tree.update(view('visible'));});
+ }
+ assert.equal(disposeCalls,0,'hiding must never dispose the store');
+ const before=notified;await act(async()=>{setText('Depois de 20 ciclos');});
+ assert.ok(notified>before,'store listeners must still fire after 20 hide/show cycles');
+ assert.equal(store.get('page').draft.title,'Depois de 20 ciclos');
+ assert.equal(tree.root.findByType('input').props.value,'Depois de 20 ciclos');
+ await act(async()=>{tree.unmount();});store.dispose();
 });

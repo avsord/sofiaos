@@ -1,7 +1,9 @@
 import type {PageEditorStore} from './page-editor';
-/** Activity destroys effects without destroying React state. A stale flush
- * from an earlier hide must never dispose a store that has become visible. */
+/** Activity runs effect cleanups on HIDE as well as on unmount, and React gives
+ * no way to tell them apart. dispose() clears every listener and timer, so
+ * calling it on hide left a store that the visible editor kept using.
+ * Policy: leaving only persists drafts; the store lives as long as the screen
+ * component's memoized instance. resume() re-arms pending saves on return. */
 export function pageStoreSession(store:Pick<PageEditorStore,'resume'|'flushAll'|'dispose'>){
- let generation=0;
- return {enter(){const epoch=++generation;store.resume();return()=>{void store.flushAll().finally(()=>{if(generation===epoch)store.dispose();});};}};
+ return {enter(){store.resume();return()=>{void store.flushAll();};}};
 }

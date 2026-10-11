@@ -180,7 +180,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 ## 9. Pendências (atualizar a cada rodada)
 
 0. **R7 integrada; R7.1 em validação:** a 0.3.108 compilou no commit `39121fd`, smoke normal passou e smoke pesado falhou em Páginas no modo Novo (run 38089508740). A R7.1 corrige prazos de todas as tarefas mantendo folga de 50ms; movimentos contínuos renovam os 800ms sem setState. A medição de Páginas usa partidas separadas por modo/trial, teto 8s, meta 1s reportada e falha obrigatória para falso vazio/timeout. Candidato 0.3.109; aceite físico e resultados do novo CI pendentes. Não implementar virtualização/R8/R9 nem publicar OTA nesta rodada.
-0. **R8:** virtualizar Páginas/Apps e fragmentar o arquivo de histórico por rota sem perda de dados.
+0. **R8 (0.3.110) — aplicada via patch do arquiteto, aguardando CI e celular:** (1) store de Páginas nunca descartado ao esconder a aba (causa provável do "Vamos reabrir" no modo Novo; 20 ciclos reproduzidos); (2) proteção de erro por tela + registro do tipo e da pilha de componentes no relatório (`errors`) e logcat `SOFIA_PERF_ERROR`; (3) `count:history` (221 ms) saiu da abertura para a fila; (4) árvore de Páginas desenha 30 linhas e o resto 15 por quadro, medição completa de posições fora da janela crítica. Ainda não feito: virtualizar Apps, fragmentar o histórico (parse medido em 28 ms, não é o gargalo). Teste de Activity com React real agora roda no `npm test` (antes estava órfão).
 0. **R9:** calibrar carga ≥3× contagens reais do painel, habilitar gates reprovadores de desempenho e remover Antigo. Não iniciar nesta R7.
 
 1. **Rodada 5 (0.3.107) compilada, smoke QA aprovado; confirmar primeiros toques no celular** — aquecimento depois da Home sem aguardar histórico, Shell sem rerender ao concluir hidratação. A/B em emulador: DATA 956 → 975 ms (+19 ms); nos quatro primeiros toques, três eventos nativos registrados, incluindo Páginas ainda não montada (um salto protegido). Portanto, ausência total de delay no aparelho físico **não comprovada**. APK candidato manual, não publicado; [execução 38080609693](https://github.com/avsord/sofiaos/actions/runs/38080609693) e [evidências PR #15](https://github.com/avsord/sofiaos/pull/15#issuecomment-6101539253).
@@ -216,6 +216,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 | 2026-10-10 | 0.3.108 | R7 | Agendador, Activity, proteção de rascunhos, painel e semente pesada Novo/Antigo | Compilação e smoke normal aprovados no run 38089508740; pesado reprovado no modo Novo, lista não apareceu na captura; nenhuma aprovação de desempenho |
 
 | 2026-10-10 | 0.3.109 | R7.1 | Prazos por tarefa, proteção durante movimento e medição de conteúdo de Páginas por modo/trial | Candidato em validação; metas de desempenho não equivalem a corretude; não publicado OTA |
+| 2026-10-10 | 0.3.110 | patch R8 | Store de Páginas sem descarte ao esconder; proteção de erro por tela com registro; contagem do histórico fora da abertura; árvore de Páginas em blocos | Local: tsc 0 erros, npm test 447/447 (8 novos, cada um reprovando com o código antigo). CI e celular pendentes |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
