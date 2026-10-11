@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {startFluency,revealFluency,noteFluencyInput,noteFluencyMovement,queueOptional,FLUENCY_MODE_KEY,type FluencyMode} from './src/lib/fluency';
+import {startFluency,revealFluency,noteFluencyInput,noteFluencyMovement,queueOptional,newFluency,FLUENCY_MODE_KEY,type FluencyMode} from './src/lib/fluency';
 import {perfActive,perfNow,perfTap} from './src/lib/fluency-metrics';
 import {AppBoundary} from './src/components/AppBoundary';
 import {scheduleIdleTask} from './src/lib/idle-task';
@@ -70,7 +70,8 @@ function Shell({startup}:{startup:LocalLaunch}){
   if(!nativeRevealAt.current){nativeRevealAt.current=Date.now();revealFluency();}
   let live=true;
   void AsyncStorage.getItem(FLUENCY_MODE_KEY).then(saved=>{if(live){const mode=saved==='old'?'old':'new';startFluency(mode);setFluency(mode);}}).catch(()=>{if(live){startFluency('new');setFluency('new');}});
-  const sub=AppState.addEventListener('change',state=>perfActive(state==='active'));
+  // Ordinary cache writes are now spaced out; persist what is pending when the app leaves the foreground.
+  const sub=AppState.addEventListener('change',state=>{perfActive(state==='active');if(state==='background'&&newFluency())void api.persistLaunch().catch(()=>{});});
   return()=>{live=false;sub.remove();};
  },[visible]);
  // Tap-to-next-React-frame is a JS-side estimate, not a physical GPU latency.

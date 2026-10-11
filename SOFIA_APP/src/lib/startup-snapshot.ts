@@ -6,6 +6,10 @@ import {recentChatPage} from './chat-window';
 export type SnapshotStorage={read:(scope:string)=>Promise<string|null>;write:(scope:string,value:string)=>Promise<unknown>;remove:(scope:string)=>Promise<unknown>};
 type Entry={at:number;value:unknown};
 const MAX_AGE=14*86400000,MAX_BYTES=4*1024*1024;
+/** Real-device report (0.3.112): 11 full rewrites of the ~4 MB archive in 3 minutes, each a ~200 ms JS stall at its start.
+ * Ordinary refreshes now (a) never rewrite when the response is identical and (b) are spaced at least this far apart.
+ * Erasing data and explicit flushes are never delayed. */
+export const MIN_WRITE_GAP_MS=30000;
 export const chatRead=(path:string)=>path==='/chat-sync/current'||path==='/conversations?offset=0'||/^\/conversations\/[\w-]+$/.test(path);
 // Keep the next launch independent of recently opened history/detail pages.
 export const startupPriority=(path:string)=>path==='/chat-sync/current'?0:
@@ -28,7 +32,7 @@ export class StartupSnapshot {
  private launchEntries=new WeakSet<Entry>();
  private encoded=new WeakMap<Entry,string>();private exposed=new WeakSet<Entry>();
  private entries=new Map<string,Entry>();private timer:ReturnType<typeof setTimeout>|undefined;private closed=false;private revision=0;
- private cancelSave:(()=>void)|null=null;
+ private cancelSave:(()=>void)|null=null;private lazyTimer:ReturnType<typeof setTimeout>|undefined;private lastWriteAt=-Infinity;private valueText=new WeakMap<Entry,string>();
  private hydration:Promise<void>|null=null;private launchOnly=false;private lastLaunch='';
  private forgotten=new Set<string>();private erasedChat=false;private erasedData=false;
  constructor(private storage:SnapshotStorage,private scope:string,private now=Date.now){}
@@ -86,7 +90,12 @@ export class StartupSnapshot {
       prior.conversation?.id===latest.conversation?.id&&!(latest.deleted_ids||[]).length)return;
    if(path==='/conversations?offset=0'&&Array.isArray(prior.items)&&prior.items.length&&Array.isArray(latest.items)&&!latest.items.length)return;
   }
-  try{const text=JSON.stringify(value);if(text.length>1024*1024)return;const entry:Entry={at:this.now(),value:JSON.parse(text)};this.entries.set(path,entry);this.encoded.set(entry,'{"at":'+JSON.stringify(entry.at)+',"value":'+text+'}');this.schedule();}catch{}}
+  try{const text=JSON.stringify(value);if(text.length>1024*1024)return;
+  const previous=this.entries.get(path);
+  // Same bytes as what is already persisted, and nobody could have mutated that object: nothing new to write.
+  const unchanged=newFluency()&&!!previous&&!this.exposed.has(previous)&&this.valueText.get(previous)===text;
+  const entry:Entry={at:this.now(),value:JSON.parse(text)};this.entries.set(path,entry);this.valueText.set(entry,text);this.encoded.set(entry,'{"at":'+JSON.stringify(entry.at)+',"value":'+text+'}');
+  if(!unchanged)this.schedule(false);}catch{}}
  /** Reconcile only a deletion already acknowledged by the server. A failed
   * request must never erase unrelated launch data or retained chat history. */
  deleteRecord(domain:'task'|'entity',id:string){
@@ -123,12 +132,20 @@ export class StartupSnapshot {
  forgetData(){if(this.closed)return;this.erasedData=true;this.revision++;for(const key of this.entries.keys())if(key!=='/bootstrap'&&!chatRead(key))this.entries.delete(key);this.schedule();}
  forgetChat(){if(this.closed)return;this.erasedChat=true;this.revision++;for(const key of this.entries.keys())if(chatRead(key))this.entries.delete(key);this.schedule();}
  forget(path:string){if(this.closed)return;this.forgotten.add(path);this.revision++;this.entries.delete(path);this.schedule();}
- private schedule(){
-  if(newFluency()){if(!this.cancelSave)this.cancelSave=queueOptional('snapshot:write',()=>{this.cancelSave=null;return this.flush();},9,8000);return;}
+ private schedule(urgent=true){
+  if(newFluency()){
+   const enqueue=()=>{if(!this.cancelSave)this.cancelSave=queueOptional('snapshot:write',()=>{this.cancelSave=null;return this.flush();},9,8000);};
+   if(urgent){if(this.lazyTimer){clearTimeout(this.lazyTimer);this.lazyTimer=undefined;}enqueue();return;}
+   const wait=this.lastWriteAt+MIN_WRITE_GAP_MS-this.now();
+   if(wait<=0){enqueue();return;}
+   if(!this.lazyTimer)this.lazyTimer=setTimeout(()=>{this.lazyTimer=undefined;enqueue();},wait);
+   return;
+  }
   if(this.timer)return;this.timer=setTimeout(()=>{this.timer=undefined;void this.flush();},450);
  }
  async flush(){
   if(this.closed)return;
+  this.lastWriteAt=this.now();
   // A write after fast launch must merge the old archive before replacing it.
   // Otherwise the small projection could overwrite retained chat and pages.
   if(this.launchOnly)await this.hydrate();
@@ -149,5 +166,5 @@ export class StartupSnapshot {
   }
   try{await this.storage.write(this.scope,prefix+parts.join(',')+suffix);}catch{/* Confirmed server writes never depend on the optional cache. */}
  }
- async clear(){this.cancelSave?.();this.cancelSave=null;this.closed=true;if(this.timer)clearTimeout(this.timer);this.entries.clear();this.encoded=new WeakMap();this.exposed=new WeakSet();for(const scope of [this.scope,this.scope+'|home-v1'])try{await this.storage.remove(scope);}catch{}}
+ async clear(){this.cancelSave?.();this.cancelSave=null;if(this.lazyTimer){clearTimeout(this.lazyTimer);this.lazyTimer=undefined;}this.closed=true;if(this.timer)clearTimeout(this.timer);this.entries.clear();this.encoded=new WeakMap();this.exposed=new WeakSet();for(const scope of [this.scope,this.scope+'|home-v1'])try{await this.storage.remove(scope);}catch{}}
 }

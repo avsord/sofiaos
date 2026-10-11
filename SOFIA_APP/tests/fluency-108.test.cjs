@@ -9,10 +9,13 @@ test('Activity keeps fixed six page slots and guards native jumps into hidden co
  assert.ok(s.includes('noteFluencyInput()'));
  assert.ok(s.includes('removeClippedSubviews={false}'));
 });
-test('new prewarm uses queue without rAF or 500ms delay, old policy retained for comparison',()=>{
+test('new prewarm uses the queue and sliced rendering, not the legacy rAF chain or its 500ms timer; old policy retained for comparison',()=>{
  const s=read('src/lib/startup-mounts.ts'),legacy=read('src/lib/startup-mounts-legacy.ts');
  assert.ok(s.includes("queueOptional('prerender:'+tab"));assert.ok(!s.includes('requestAnimationFrame('));
- assert.ok(!s.includes('setTimeout('));assert.ok(s.includes('useLegacyStartupMounts'));
+ assert.ok(!s.includes('timer=setTimeout(start,500)'),'the legacy 500 ms policy must not come back');
+ // 0.3.113: sliced rendering + wait for the user to stop changing tabs (see tests/first-seconds-113.test.cjs)
+ assert.ok(s.includes('startTransition(()=>setWarmed'));assert.ok(s.includes('PRERENDER_QUIET_MS'));
+ assert.ok(s.includes('useLegacyStartupMounts'));
  assert.ok(legacy.includes('timer=setTimeout(start,500)'));
 });
 test('post-reveal mode is fixed, no mode storage read in launch preparation',()=>{
