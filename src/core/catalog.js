@@ -556,6 +556,13 @@ const CATALOG={
         "label": "Cor da linha no gráfico",
         "type": "text",
         "max": 20
+      },
+      {
+        "key": "reader_memory",
+        "label": "Origem do preço confirmada por loja",
+        "type": "textarea",
+        "max": 8000,
+        "developerOnly": true
       }
     ],
     "description": "Observações reais e notificações locais. Em 'product', a leitura é feita no aparelho sobre a página da loja, só com o app aberto; sem fonte verificável, coleta manual, nunca fingir monitoramento ativo."

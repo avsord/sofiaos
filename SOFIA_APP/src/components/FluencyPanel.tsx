@@ -7,15 +7,16 @@ import {fluencyMode,FLUENCY_MODE_KEY,type FluencyMode} from '../lib/fluency';
 import {perfReport} from '../lib/fluency-metrics';
 import {idleWork} from '../lib/idle-work';
 import {APP_VERSION} from '../lib/update';
+import {monitorDiagnostics} from '../lib/monitor-collector';
 import {readLastError,clearLastError,errorLine,type StoredError} from '../lib/last-error';
 export function FluencyPanel({onClose}:{onClose:()=>void}){
- const c=useTheme(),[next,setNext]=useState<FluencyMode>(fluencyMode()),[report,setReport]=useState(()=>({...perfReport(),pending:idleWork.pending()}));
+ const c=useTheme(),[next,setNext]=useState<FluencyMode>(fluencyMode()),[report,setReport]=useState(()=>({...perfReport(),pending:idleWork.pending(),monitoring:monitorDiagnostics()}));
  const [lastError,setLastError]=useState<StoredError|null>(null);
  useEffect(()=>{let live=true;void readLastError().then(v=>{if(live)setLastError(v);});return()=>{live=false;};},[]);
  useEffect(()=>{let live=true;void AsyncStorage.getItem(FLUENCY_MODE_KEY).then(v=>{if(live)setNext(v==='old'?'old':'new');});return()=>{live=false;};},[]);
  async function choose(value:FluencyMode){try{await AsyncStorage.setItem(FLUENCY_MODE_KEY,value);setNext(value);}catch{Alert.alert('Diagnóstico','Não foi possível salvar o modo.');}}
- function refresh(){setReport({...perfReport(),pending:idleWork.pending()});}
- async function copy(){try{await Clipboard.setStringAsync(JSON.stringify({version:APP_VERSION,nextMode:next,lastError,...report},null,2));Alert.alert('Relatório copiado','Contém apenas tempos e contagens de cache, sem mensagens, páginas ou credenciais.');}catch{Alert.alert('Diagnóstico','Falha ao copiar.');}}
+ function refresh(){setReport({...perfReport(),pending:idleWork.pending(),monitoring:monitorDiagnostics()});}
+ async function copy(){try{await Clipboard.setStringAsync(JSON.stringify({version:APP_VERSION,nextMode:next,lastError,...report},null,2));Alert.alert('Relatório copiado','Contém tempos, contagens de cache e o estado do Monitoramento (só domínios das lojas, sem links, nomes de produtos, mensagens ou credenciais).');}catch{Alert.alert('Diagnóstico','Falha ao copiar.');}}
  const button=(label:string,onPress:()=>void)=><Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={{padding:14,backgroundColor:c.surface,borderRadius:12}}><Text style={{color:c.text}}>{label}</Text></Pressable>;
  return <Modal visible animationType="none" onRequestClose={onClose}><ScrollView style={{flex:1,backgroundColor:c.bg}} contentContainerStyle={{padding:24,paddingTop:48,gap:14}}>
   <Text style={{fontSize:23,color:c.text,fontWeight:'700'}}>Diagnóstico de fluidez</Text>

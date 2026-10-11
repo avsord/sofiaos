@@ -1,6 +1,9 @@
 import {newFluency,queueOptional} from '../lib/fluency';
 import {useRenderCost} from '../lib/render-cost';
 import React,{useEffect,useRef} from 'react';
+import {AppState} from 'react-native';
+import {PriceReaderHost} from '../lib/price-reader';
+import {runCollection} from '../lib/monitor-collector';
 import {scheduleIdleTask} from '../lib/idle-task';
 import type {SofiaApi} from '../lib/api';
 import {preloadAgenda} from '../lib/use-agenda-month';
@@ -30,5 +33,9 @@ export function BackgroundServices({api,scope,enabled,preloadWhenIdle=true,onCap
  },[api,enabled,preloadWhenIdle]);
  useCapsuleNotifications(api,scope,enabled,onCapsules);
  useAgendaNotifications(api,scope,enabled,onAgenda);
- return null;
+ // Monitoramento: a primeira coleta espera a abertura terminar (45 s) e as
+ // seguintes só leem o que venceu o intervalo de cada produto. Uma página
+ // por vez, numa WebView invisível; nada disso disputa a primeira tela.
+ useEffect(()=>{if(!enabled)return;const tick=()=>{if(AppState.currentState==='active')void runCollection(api,{scope});};const first=setTimeout(tick,45000),every=setInterval(tick,15*60000);return()=>{clearTimeout(first);clearInterval(every);};},[api,scope,enabled]);
+ return enabled?<PriceReaderHost/>:null;
 }

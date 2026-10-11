@@ -201,3 +201,78 @@ export function formatCurrency(amount: number, currency: string | null): string 
     return (currency || '') + ' ' + amount.toFixed(2);
   }
 }
+
+// Busca de links da MESMA loja numa página de resultados (find-store-links.js),
+// copiada sem alteração; teste de equivalência em tests/price-extractor.test.cjs.
+export const FIND_LINKS_SOURCE = `
+const NOISE_PATH = /\\/(login|cadastro|carrinho|ajuda|sobre|institucional|central-de-ajuda|politica|termos|trabalhe-conosco|minha-conta|favoritos|rastreio)(\\/|$)/i;
+
+function hostnameOf(href, baseUrl) {
+  try { return new URL(href, baseUrl).hostname.replace(/^www\\./, ''); }
+  catch (_) { return null; }
+}
+
+/** doc: documento da página de busca já carregada.
+ *  targetHost: domínio da loja que estamos procurando (ex. "kabum.com.br").
+ *  baseUrl: URL da própria página de busca, para resolver links relativos.
+ *  excludeHost: domínio da loja original, nunca ofertada como "outra loja". */
+function findStoreLinks(doc, targetHost, baseUrl, excludeHost) {
+  const anchors = doc.querySelectorAll('a[href]');
+  const seen = new Set(), out = [];
+  for (const a of anchors) {
+    const href = a.getAttribute('href');
+    if (!href) continue;
+    const host = hostnameOf(href, baseUrl);
+    if (!host || host !== targetHost) continue;
+    if (excludeHost && host === excludeHost) continue;
+    let absolute;
+    try { absolute = new URL(href, baseUrl).toString(); } catch (_) { continue; }
+    if (NOISE_PATH.test(absolute)) continue;
+    // Heurística, não garantia: página de produto costuma ter pelo menos
+    // /algo/id/slug (3 barras). Categoria/busca costuma ser mais rasa.
+    // Ajustar por loja se o padrão real divergir — validar com teste manual.
+    const pathDepth = (new URL(absolute).pathname.match(/\\//g) || []).length;
+    if (pathDepth < 3) continue;
+    if (seen.has(absolute)) continue;
+    seen.add(absolute);
+    const title = (a.textContent || '').trim().slice(0, 200) ||
+      (a.querySelector('img[alt]') ? a.querySelector('img[alt]').getAttribute('alt') : '') || '';
+    out.push({ url: absolute, title, host });
+    if (out.length >= 12) break; // teto generoso; a tela mostra só os melhores
+  }
+  return out;
+}
+`.trim();
+
+export type StoreLink = {url: string; title: string; host: string};
+export type LinksReaderMessage = {ok: true; links: StoreLink[]} | {ok: false; error: string};
+
+export function buildLinksScript(targetHost: string, excludeHost: string): string {
+  const args = JSON.stringify([targetHost, excludeHost]);
+  return `
+(function(){
+  try {
+    ${FIND_LINKS_SOURCE}
+    var a = ${args};
+    var links = findStoreLinks(document, a[0], location.href, a[1]);
+    window.ReactNativeWebView.postMessage(JSON.stringify({ok:true,links:links}));
+  } catch (e) {
+    window.ReactNativeWebView.postMessage(JSON.stringify({ok:false,error:String(e && e.message || e)}));
+  }
+})();
+true;
+`.trim();
+}
+
+export function parseLinksMessage(raw: string): LinksReaderMessage {
+  try {
+    const data = JSON.parse(raw);
+    if (data && data.ok === true && Array.isArray(data.links)) {
+      const links = data.links.filter((l: any) => l && typeof l.url === 'string' && /^https:\/\//.test(l.url)).slice(0, 12)
+        .map((l: any) => ({url: String(l.url), title: String(l.title || '').slice(0, 200), host: String(l.host || '')}));
+      return {ok: true, links};
+    }
+    if (data && data.ok === false) return {ok: false, error: String(data.error || 'Busca falhou.')};
+  } catch (_) {}
+  return {ok: false, error: 'A busca devolveu algo que a Sofia não entendeu.'};
+}

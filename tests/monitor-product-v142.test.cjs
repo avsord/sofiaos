@@ -61,3 +61,24 @@ test('monitor antigo sem os campos novos continua salvável', t=>{
   const atualizado=core.workspace.save({revision:recarregado.revision,data:{...recarregado.data,target_price:2500}},antigo.id);
   assert.equal(core.workspace.get(atualizado.id).data.target_price,2500);
 });
+
+test('queda percentual compara com a leitura anterior da MESMA loja, não de outra', t=>{
+  const {core,store}=fixture(t);
+  const m=monitor(core,{...NOVO_DO_APP,variant:'RTX 4070',preferred_url:'https://www.kabum.com.br/p/1',source_urls:'https://www.pichau.com.br/p/2',drop_percent:10});
+  const at=(min)=>new Date(Date.now()-min*60000).toISOString();
+  const obs=(source,price,min)=>core.workspace.observe(m.id,{price,variant:'RTX 4070',currency:'BRL',source,observed_at:at(min)});
+  obs('https://www.kabum.com.br/p/1',3000,30);
+  obs('https://www.pichau.com.br/p/2',2600,20); // outra loja mais barata: NÃO é "queda de 13%"
+  const quedas=()=>store.db.prepare("SELECT body FROM notifications WHERE category='price'").all().filter(n=>/queda/.test(n.body));
+  assert.equal(quedas().length,0);
+  obs('https://www.kabum.com.br/p/1',2650,10); // a própria KaBuM caiu 11,7%
+  assert.equal(quedas().length,1);
+});
+
+test('memória de leitura por loja é aceita e fica fora do formulário genérico', t=>{
+  const {core}=fixture(t);
+  const f=CATALOG.monitor.fields.find(x=>x.key==='reader_memory');
+  assert.ok(f&&f.developerOnly);
+  const m=monitor(core,{...NOVO_DO_APP,variant:'X',preferred_url:'https://www.kabum.com.br/p/1',reader_memory:JSON.stringify({'https://www.kabum.com.br/p/1':['json-ld:offer']})});
+  assert.match(core.workspace.get(m.id).data.reader_memory,/json-ld:offer/);
+});

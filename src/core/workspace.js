@@ -187,7 +187,7 @@ class Workspace {
    const previous=this.observations(key),cents=Math.round(price*100),freight=Math.round(shipping*100),total=cents+freight,sourceKey=b.source_key?cleanText(b.source_key,'ID da observação',160):null;
    const duplicate=sourceKey&&this.db.prepare('SELECT * FROM observations WHERE monitor_id=? AND source_key=?').get(key,sourceKey);if(duplicate)return {...duplicate,replayed:true};
    return this.s.tx(()=>{const oid=id();this.db.prepare('INSERT INTO observations VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(oid,key,cents,freight,total,b.currency,b.variant,source,when,now(),sourceKey);
-     const history=previous.filter(p=>p.observed_at<=when),latest=history.at(-1),min=history.length?Math.min(...history.map(x=>x.total_cents)):null;
+     const history=previous.filter(p=>p.observed_at<=when),latest=history.filter(p=>p.source===source).at(-1),min=history.length?Math.min(...history.map(x=>x.total_cents)):null;
      const reasons=[];if(mon.data.target_price!==''&&total<=Math.round(mon.data.target_price*100))reasons.push('atingiu o preço-alvo');
      if(latest&&mon.data.drop_percent!==''&&total<latest.total_cents&&(latest.total_cents-total)/latest.total_cents*100>=mon.data.drop_percent)reasons.push('atingiu a queda percentual');
      if(mon.data.new_low&&min!==null&&total<min)reasons.push('menor total desde o início das suas observações');

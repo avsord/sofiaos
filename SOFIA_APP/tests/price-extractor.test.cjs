@@ -74,3 +74,21 @@ test('formatCurrency cai para um texto simples se a moeda for inválida', () => 
   assert.equal(formatCurrency(10, 'BRL').includes('10'), true);
   assert.equal(typeof formatCurrency(10, 'XXX_INVALIDA'), 'string');
 });
+
+test('a busca de links embutida no app é o mesmo código de find-store-links.js', () => {
+  const original = fs.readFileSync(path.join(__dirname, '../../docs/monitoramento/find-store-links.js'), 'utf8');
+  const orig = original.slice(original.indexOf('const NOISE_PATH'), original.indexOf('/** Monta o título'));
+  assert.equal(strip(exported.FIND_LINKS_SOURCE), strip(orig));
+});
+
+test('busca de links roda de ponta a ponta e nunca oferece a loja de origem', () => {
+  const d = new JSDOM('<a href="/produto/9/rtx">RTX 4070</a><a href="https://www.kabum.com.br/login">x</a><a href="https://www.pichau.com.br/p/a/b">origem</a>', {url: 'https://www.kabum.com.br/busca/rtx'});
+  let sent = null;
+  const w = {ReactNativeWebView: {postMessage: x => { sent = x; }}, document: d.window.document, location: d.window.location, URL};
+  w.window = w; vm.createContext(w);
+  vm.runInContext(exported.buildLinksScript('kabum.com.br', 'pichau.com.br'), w);
+  const r = exported.parseLinksMessage(sent);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.links.map(l => l.url), ['https://www.kabum.com.br/produto/9/rtx']);
+  assert.equal(exported.parseLinksMessage('{"ok":true,"links":[{"url":"javascript:alert(1)"}]}').links.length, 0, 'só https entra');
+});
