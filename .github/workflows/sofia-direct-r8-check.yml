@@ -1,0 +1,107 @@
+name: Sofia direct R8 - exact source validation
+'on':
+  push:
+    branches: [test/sofia-direct-r8-check-20261010]
+    paths: [.github/workflows/sofia-direct-r8-check.yml, .github/patches/sofia-direct-r8.b64]
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 18
+    env:
+      BASE: 3fb7c7e870627bdc15cdbc4dc9b98008f7b20dcf
+      TARGET: work/sofia-direct-fluency-r8-20261010
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply exact reviewed delta to verified base, never to delivery
+        run: |
+          set -euo pipefail
+          cp .github/patches/sofia-direct-r8.b64 /tmp/sofia-direct-r8.b64
+          git checkout --detach "$BASE"
+          mkdir -p /tmp/sofia-direct-validation
+          python3 - <<'PY'
+          from pathlib import Path, PurePosixPath
+          import base64,gzip,hashlib,json,subprocess
+          raw=gzip.decompress(base64.b64decode(Path('/tmp/sofia-direct-r8.b64').read_text()))
+          assert hashlib.sha256(raw).hexdigest()=='4860fff8d9248c3d35075f77aa6ddfcdee006647ed8555739ca1ecf9d693ae41','Transport digest mismatch'
+          p=json.loads(raw)
+          assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()==p['base_sha']
+          assert len(p['files'])==16
+          def blob(b):return hashlib.sha1(('blob '+str(len(b))+'\0').encode()+b).hexdigest()
+          outputs=[]
+          for f in p['files']:
+              name=PurePosixPath(f['path'])
+              assert not name.is_absolute() and '..' not in name.parts
+              assert f['path'].startswith('SOFIA_APP/') or f['path']=='docs/SOFIA_MASTER.md'
+              path=Path(f['path'])
+              before=path.read_bytes() if path.exists() else None
+              assert (blob(before) if before is not None else None)==f['before'],f['path']
+              text=before.decode('utf8') if before is not None else ''
+              for start,remove,insert in reversed(f['ops']):
+                  assert 0<=start<=len(text) and 0<=remove<=len(text)-start
+                  text=text[:start]+insert+text[start+remove:]
+              after=text.encode('utf8')
+              assert blob(after)==f['after'],f['path']
+              outputs.append((path,after))
+          for path,after in outputs:
+              path.parent.mkdir(parents=True,exist_ok=True)
+              path.write_bytes(after)
+          Path('/tmp/sofia-direct-manifest.json').write_text(raw.decode())
+          print('Applied all 16 files; original and final Git hashes verified.')
+          PY
+          git diff --check
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: SOFIA_APP/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install exact locked dependencies
+        working-directory: SOFIA_APP
+        run: npm ci
+      - name: Typecheck and complete application suite including real React tests
+        working-directory: SOFIA_APP
+        run: |
+          set -euo pipefail
+          npm run check 2>&1 | tee /tmp/sofia-direct-validation/typecheck.txt
+          npm test 2>&1 | tee /tmp/sofia-direct-validation/app-tests.txt
+      - name: Preserve delivery, documentation and syntax contracts
+        run: |
+          set -euo pipefail
+          python3 SOFIA_APP/tools/native-delivery-test.py 2>&1 | tee /tmp/sofia-direct-validation/native-contracts.txt
+          python3 -m py_compile SOFIA_APP/tools/fluency-heavy-smoke.py SOFIA_APP/tools/ui-probes.py
+          node --test SOFIA_APP/tools/delivery.test.cjs tools/sofia-state.test.cjs 2>&1 | tee /tmp/sofia-direct-validation/delivery-continuity.txt
+      - name: Publish tested source atomically to work branch only
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin "refs/heads/$TARGET" | cut -f1)" = "$BASE"
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,subprocess
+          p=json.loads(Path('/tmp/sofia-direct-manifest.json').read_text())
+          for f in p['files']:
+              b=Path(f['path']).read_bytes()
+              assert hashlib.sha1(('blob '+str(len(b))+'\0').encode()+b).hexdigest()==f['after'],f['path']
+          subprocess.run(['git','add','--',*[f['path'] for f in p['files']]],check=True)
+          names=subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines()
+          assert sorted(names)==sorted(f['path'] for f in p['files']),names
+          PY
+          git diff --cached --check
+          git config user.name 'Sofia development'
+          git config user.email 'sofia-development@users.noreply.github.com'
+          git commit -m 'perf(android): bounded virtual lists and correct gesture checks [manual-apk]'
+          git push origin "HEAD:refs/heads/$TARGET"
+          git rev-parse HEAD | tee /tmp/sofia-direct-validation/TESTED_COMMIT.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sofia-direct-R8-source-validation
+          path: /tmp/sofia-direct-validation/
+          if-no-files-found: error
+          retention-days: 14
