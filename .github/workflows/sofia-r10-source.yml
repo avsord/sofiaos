@@ -1,0 +1,115 @@
+name: Sofia R10 - validate exact uploaded audio fix
+'on':
+  push:
+    branches: [test/sofia-r10-source-20261011]
+    paths:
+      - .github/workflows/sofia-r10-source.yml
+      - .github/patches/sofia-r10-input.json.xz
+permissions:
+  contents: write
+concurrency:
+  group: sofia-r10-source-validation
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    env:
+      BASE: f3b2685e01c69f6591f600ab332dabd957a0116f
+      TARGET: work/sofia-r10-audio-20261011
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply exact supplied files to verified base only
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/patches/sofia-r10-input.json.xz /tmp/sofia-r10-input.json.xz
+          git checkout --detach "$BASE"
+          mkdir -p /tmp/sofia-r10-evidence
+          python3 - <<'PY'
+          from pathlib import Path, PurePosixPath
+          import hashlib,json,lzma,subprocess
+          raw=lzma.decompress(Path('/tmp/sofia-r10-input.json.xz').read_bytes())
+          assert hashlib.sha256(raw).hexdigest()=='6dd41a2b958de2f97b9b5c82996b958768b35fabb3b1e6f9754798e672c9e910','Transport digest mismatch'
+          manifest=json.loads(raw)
+          assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()==manifest['base']
+          assert len(manifest['files'])==23
+          def blob(data):return hashlib.sha1(('blob '+str(len(data))+'\0').encode()+data).hexdigest()
+          outputs=[]
+          for entry in manifest['files']:
+              name=PurePosixPath(entry['path'])
+              assert not name.is_absolute() and '..' not in name.parts
+              assert entry['path'].startswith('SOFIA_APP/') or entry['path'] in ['docs/SOFIA_MASTER.md','docs/evidencias/logcat-0.3.109-erro-audio.txt']
+              path=Path(entry['path']);before=path.read_bytes() if path.exists() else None
+              assert (blob(before) if before is not None else None)==entry['before'],entry['path']+' base mismatch'
+              lines=before.decode('utf8').splitlines(keepends=True) if before is not None else []
+              for start,remove,insert in reversed(entry['ops']):
+                  assert 0<=start<=len(lines) and 0<=remove<=len(lines)-start
+                  lines[start:start+remove]=insert
+              after=''.join(lines).encode('utf8')
+              assert blob(after)==entry['after'],entry['path']+' output mismatch'
+              outputs.append((path,after))
+          for path,data in outputs:
+              path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(data)
+          Path('/tmp/sofia-r10-manifest.json').write_bytes(raw)
+          Path('/tmp/sofia-r10-evidence/input-verified.json').write_text(json.dumps({'base':manifest['base'],'files':[{k:f[k] for k in ['path','before','after']} for f in manifest['files']]},indent=2))
+          print('All 23 original and final file hashes match the supplied R10 package.')
+          PY
+          git diff --check
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: SOFIA_APP/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install exact locked app dependencies
+        working-directory: SOFIA_APP
+        run: npm ci
+      - name: Typecheck and complete suite including real audio hooks
+        shell: bash
+        working-directory: SOFIA_APP
+        run: |
+          set -euo pipefail
+          npx tsc --noEmit 2>&1 | tee /tmp/sofia-r10-evidence/typecheck.txt
+          npm test 2>&1 | tee /tmp/sofia-r10-evidence/app-tests.txt
+      - name: Delivery and native contracts
+        shell: bash
+        working-directory: SOFIA_APP
+        run: |
+          set -euo pipefail
+          node --test tools/delivery.test.cjs 2>&1 | tee /tmp/sofia-r10-evidence/delivery-tests.txt
+          python3 tools/native-delivery-test.py 2>&1 | tee /tmp/sofia-r10-evidence/native-tests.txt
+      - name: Publish one tested commit to work branch only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,subprocess
+          manifest=json.loads(Path('/tmp/sofia-r10-manifest.json').read_text())
+          paths=[f['path'] for f in manifest['files']]
+          for entry in manifest['files']:
+              data=Path(entry['path']).read_bytes()
+              assert hashlib.sha1(('blob '+str(len(data))+'\0').encode()+data).hexdigest()==entry['after'],entry['path']+' changed during tests'
+          subprocess.run(['git','add','--',*paths],check=True)
+          changed=subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines()
+          assert sorted(changed)==sorted(paths),changed
+          PY
+          git config user.name 'Sofia R10 delivery'
+          git config user.email 'sofia-r10-delivery@users.noreply.github.com'
+          git commit -m 'fix(android): voice player no longer crashes on tab hide; app never dead-ends [manual-apk]'
+          git push origin "HEAD:refs/heads/$TARGET"
+          git rev-parse HEAD > /tmp/sofia-r10-evidence/SOURCE_COMMIT.txt
+          git diff --stat "$BASE" HEAD > /tmp/sofia-r10-evidence/changes.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sofia-R10-source-validation
+          path: /tmp/sofia-r10-evidence/
+          if-no-files-found: error
+          retention-days: 14
