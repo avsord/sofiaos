@@ -77,16 +77,13 @@ function mountsRig(){
  return {exports,jobs,transitions,timers,Probe,live:()=>jobs.filter(j=>j.live),fire:()=>{for(const x of timers.splice(0))if(x.live)x.fn();}};
 }
 
-test('pré-montagem: nada entra na fila antes do silêncio de 2,5 s; trocar de aba REINICIA a espera',async()=>{
+test('pré-montagem: as abas ainda não vistas entram na fila SEM espera fixa, e a aba ativa nunca entra',async()=>{
  const m=mountsRig();const seen={current:null};let tree;
  await act(async()=>{tree=create(React.createElement(m.Probe,{active:'home',seen}));});
- assert.equal(m.live().length,0,'nenhuma aba é montada em segundo plano de imediato');
- assert.ok(m.timers.some(t=>t.live&&t.ms===m.exports.PRERENDER_QUIET_MS),'existe a espera de silêncio');
- await act(async()=>{tree.update(React.createElement(m.Probe,{active:'chat',seen}));});   // o usuário trocou de aba
- const alive=m.timers.filter(t=>t.live&&t.ms===m.exports.PRERENDER_QUIET_MS);
- assert.equal(alive.length,1,'a espera anterior foi cancelada e uma nova começou');
- await act(async()=>{m.fire();});
- assert.deepEqual(m.live().map(j=>j.name).sort(),['prerender:agenda','prerender:apps','prerender:pages','prerender:profile'],'só depois do silêncio as abas ainda não vistas entram na fila');
+ assert.deepEqual(m.live().map(j=>j.name).sort(),['prerender:agenda','prerender:apps','prerender:chat','prerender:pages','prerender:profile'],'todas entram de imediato (a fila decide quando roda)');
+ assert.equal(m.timers.filter(t=>t.live).length,0,'nenhuma espera fixa: a de 2,5 s da 0.3.113 deixou toda montagem para o gesto do usuário');
+ await act(async()=>{tree.update(React.createElement(m.Probe,{active:'chat',seen}));});    // o usuário foi para a Conversa
+ assert.ok(!m.live().some(j=>j.name==='prerender:chat'),'a aba ativa não é pré-montada de novo');
 });
 
 test('pré-montagem: cada aba é montada DENTRO de startTransition (fatiada, interrompível pelo toque)',async()=>{
@@ -100,13 +97,15 @@ test('pré-montagem: cada aba é montada DENTRO de startTransition (fatiada, int
  assert.ok(seen.current.has('agenda'),'e a aba ficou montada');
 });
 
-test('o ANTIGO falha nestes testes: sem espera de silêncio e sem transição (o teste reproduz o problema)',async()=>{
- const oldSrc=require('child_process').execFileSync('git',['show','98a4069:SOFIA_APP/src/lib/startup-mounts.ts'],{cwd:root,encoding:'utf8'});
- assert.ok(!oldSrc.includes('startTransition'),'a versão 0.3.112 monta em passada única');
- assert.ok(!oldSrc.includes('PRERENDER_QUIET_MS'));
-});
-
 test('o app grava o que está pendente ao ir para segundo plano (só no modo Novo)',()=>{
  const app=read('App.tsx');
  assert.ok(app.includes("state==='background'&&newFluency())void api.persistLaunch()"));
+});
+
+test('a montagem da Conversa e da Agenda é medida por dentro (lista, campo de digitação, mês), sem mudar o que é renderizado',()=>{
+ const chat=read('src/screens/Chat.tsx'),agenda=read('src/screens/Agenda.tsx');
+ assert.ok(chat.includes('<MountTimer tab="chat:list"><FlatList'),'lista da Conversa medida');
+ assert.ok(chat.includes('<MountTimer tab="chat:composer"><Composer'),'campo de digitação medido');
+ assert.ok(agenda.includes('<MountTimer tab="agenda:month"><MonthSwipe'),'mês da Agenda medido');
+ assert.ok(chat.includes('</FlatList>')||chat.includes('/></MountTimer>'));
 });

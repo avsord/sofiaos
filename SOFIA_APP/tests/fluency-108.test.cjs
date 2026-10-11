@@ -13,8 +13,8 @@ test('new prewarm uses the queue and sliced rendering, not the legacy rAF chain 
  const s=read('src/lib/startup-mounts.ts'),legacy=read('src/lib/startup-mounts-legacy.ts');
  assert.ok(s.includes("queueOptional('prerender:'+tab"));assert.ok(!s.includes('requestAnimationFrame('));
  assert.ok(!s.includes('timer=setTimeout(start,500)'),'the legacy 500 ms policy must not come back');
- // 0.3.113: sliced rendering + wait for the user to stop changing tabs (see tests/first-seconds-113.test.cjs)
- assert.ok(s.includes('startTransition(()=>setWarmed'));assert.ok(s.includes('PRERENDER_QUIET_MS'));
+ // 0.3.113/114: sliced rendering, no fixed wait (see tests/first-seconds-113.test.cjs)
+ assert.ok(s.includes('startTransition(()=>setWarmed'));assert.ok(!s.includes('PRERENDER_QUIET_MS'),'a espera fixa de 0.3.113 foi um erro e não volta');assert.ok(!s.includes('setTimeout('));
  assert.ok(s.includes('useLegacyStartupMounts'));
  assert.ok(legacy.includes('timer=setTimeout(start,500)'));
 });
