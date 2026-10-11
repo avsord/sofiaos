@@ -1,0 +1,74 @@
+name: Sofia R11 exact patch preflight
+'on':
+  push:
+    branches: [sofia-r11-preflight-20261011]
+permissions:
+  contents: write
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Preserve exact user supplied patch
+        run: |
+          set -euo pipefail
+          gzip -dc .delivery/R11.patch.gz > /tmp/R11.patch
+          echo 'c1b35334ef3cb1c65d7dd6242217f0cfcffb374f408e9977af8f53fc66b0edba  /tmp/R11.patch' | sha256sum -c -
+          mkdir -p /tmp/r11-preflight
+      - uses: actions/checkout@v4
+        with:
+          ref: 98a4069298abf3ca41337ed4214d4e6136edd690
+          fetch-depth: 1
+      - name: Apply only the supplied R11 commit
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '98a4069298abf3ca41337ed4214d4e6136edd690'
+          git config user.name 'Sofia R11 delivery'
+          git config user.email 'sofia-r11-delivery@users.noreply.github.com'
+          git am --3way /tmp/R11.patch
+          test "$(git rev-parse HEAD^{tree})" = '92e75b51efe2271347b52d4d0fcba4236c484af2'
+          git diff --quiet HEAD^ HEAD -- SOFIA_APP/src/components/VoicePlayer.tsx .github/workflows src public
+          git show --stat HEAD > /tmp/r11-preflight/commit.txt
+          git rev-parse HEAD > /tmp/r11-preflight/SOURCE_COMMIT.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: SOFIA_APP/package-lock.json
+      - name: Install exact locked dependencies
+        working-directory: SOFIA_APP
+        run: npm ci
+      - name: Typecheck and all app tests without relaxing assertions
+        working-directory: SOFIA_APP
+        run: |
+          set -euo pipefail
+          npx tsc --noEmit 2>&1 | tee /tmp/r11-preflight/typecheck.txt
+          npm test 2>&1 | tee /tmp/r11-preflight/app-tests.txt
+      - name: Delivery and native contract tests
+        working-directory: SOFIA_APP
+        run: |
+          set -euo pipefail
+          node --test tools/delivery.test.cjs 2>&1 | tee /tmp/r11-preflight/delivery-tests.txt
+          python3 tools/native-delivery-test.py 2>&1 | tee /tmp/r11-preflight/native-tests.txt
+      - name: Retain validated commit without updating delivery or publishing
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test "$(git rev-parse HEAD^{tree})" = '92e75b51efe2271347b52d4d0fcba4236c484af2'
+          test "$(git ls-remote origin refs/heads/sofia-app-android | cut -f1)" = '98a4069298abf3ca41337ed4214d4e6136edd690'
+          git push origin HEAD:refs/heads/sofia-r11-validated-20261011
+          printf 'Validated code commit: %s\nOfficial delivery branch unchanged; no APK published.\n' "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sofia-R11-preflight-${{ github.run_id }}
+          path: /tmp/r11-preflight/
+          if-no-files-found: error
+          retention-days: 7
