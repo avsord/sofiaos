@@ -1,4 +1,8 @@
 import * as ImagePicker from 'expo-image-picker';
+import {perfSync} from '../lib/fluency-metrics';
+// Measure only the first native recorder creation (later renders are cheap and would only flood the report).
+let firstRecorderTimed=false;
+function timeFirst<T>(name:string,run:()=>T):T{if(firstRecorderTimed)return run();firstRecorderTimed=true;return perfSync(name,run);}
 import * as DocumentPicker from 'expo-document-picker';
 import {Sheet} from './Sheet';
 import {attachmentMime,attachmentTypes} from '../lib/chat-attachments';
@@ -15,7 +19,7 @@ import {IconButton} from './UI';
 import {VoicePlayer} from './VoicePlayer';
 export function deleteVoice(uri:string){try{const file=new File(uri);if(file.exists)file.delete();}catch{}}
 export function Composer({disabled,enterToSend,autoSendVoice,onText,onVoice,onAttachments,onActivity,onDraft}:{disabled:boolean;enterToSend:boolean;autoSendVoice:boolean;onText:(text:string)=>void;onAttachments:(files:AttachmentDraft[],text:string)=>void;onVoice:(draft:VoiceDraft)=>void;onActivity:(active:boolean)=>void;onDraft:(active:boolean)=>void}){
- const c=useTheme(),recorder=useAudioRecorder({...RecordingPresets.HIGH_QUALITY,numberOfChannels:1,bitRate:64000,isMeteringEnabled:true});
+ const c=useTheme(),recorder=timeFirst('composer:recorder',()=>useAudioRecorder({...RecordingPresets.HIGH_QUALITY,numberOfChannels:1,bitRate:64000,isMeteringEnabled:true}));
  const [files,setFiles]=useState<AttachmentDraft[]>([]),[attachments,setAttachments]=useState(false);
  const rs=useAudioRecorderState(recorder,120),[text,setText]=useState(''),[busy,setBusy]=useState(false),[recording,setRecording]=useState(false),[draft,setDraft]=useState<VoiceDraft|null>(null),[cancelReady,setCancelReady]=useState(false);
  const recordingRef=useRef(false),busyRef=useRef(false),draftRef=useRef<VoiceDraft|null>(null),mounted=useRef(true),cancelReadyRef=useRef(false);

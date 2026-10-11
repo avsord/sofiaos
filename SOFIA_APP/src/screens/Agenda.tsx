@@ -1,5 +1,6 @@
 import {noteFluencyMovement} from '../lib/fluency';
 import {MountTimer} from '../components/MountTimer';
+import {perfSync} from '../lib/fluency-metrics';
 import {useVisibleLoad} from '../lib/visible-load';
 import {agendaPriority,priorityColorsByDay} from '../lib/agenda-priority';
 import {expandAgenda,eventStart,readRepeat,REPEATS} from '../lib/agenda-recurrence';
@@ -22,8 +23,8 @@ export function Agenda({api,target,active=true,onGestureLock}:{onGestureLock?:(l
  async function load(manual=false){if(manual)setRefreshing(true);try{await refresh();}finally{if(manual)setRefreshing(false);}}
  useVisibleLoad(()=>{let alive=true;if(!catalog)api.catalog().then(cat=>{if(alive)setCatalog(cat);}).catch(e=>{if(alive)setError(errorText(e));});return()=>{alive=false;};},[api,active,catalog]);
  useEffect(()=>{if(!target?.date||!active||!catalog)return;if(!acceptTarget(target.date,target.nonce))return;if(target.create)create(new Date(target.date+'T12:00:00'));else if(target.id)api.entity(target.id).then(setEditing).catch(e=>setError(errorText(e)));},[target?.nonce,api,active,catalog]);
- const start=(item:AgendaItem)=>item.data.calendar_all_day?item.data.calendar_date_start||'':item.data.start_at||item.data.remind_at||item.data.due_at||'',activeItems=useMemo(()=>expandAgenda(items,month),[items,month.getTime()]);
- const priorityDays=useMemo(()=>priorityColorsByDay(activeItems.map(i=>({date:localDateKey(eventStart(i)),priority_level:i.data.priority_level})),c.accent),[activeItems,c.accent]);
+ const start=(item:AgendaItem)=>item.data.calendar_all_day?item.data.calendar_date_start||'':item.data.start_at||item.data.remind_at||item.data.due_at||'',activeItems=useMemo(()=>perfSync('agenda:expand',()=>expandAgenda(items,month)),[items,month.getTime()]);
+ const priorityDays=useMemo(()=>perfSync('agenda:priority',()=>priorityColorsByDay(activeItems.map(i=>({date:localDateKey(eventStart(i)),priority_level:i.data.priority_level})),c.accent)),[activeItems,c.accent]);
  const chosen=activeItems.filter(i=>start(i)&&localDateKey(start(i))===dayKey(selected)).sort((a,b)=>Date.parse(start(a))-Date.parse(start(b)));
  const cells:(Date|null)[]=Array.from({length:month.getDay()},()=>null);for(let d=1;d<=new Date(month.getFullYear(),month.getMonth()+1,0).getDate();d++)cells.push(new Date(month.getFullYear(),month.getMonth(),d));while(cells.length%7)cells.push(null);
  function create(day=selected){const d=new Date(day);d.setHours(9,0,0,0);setEditing({kind,title:'',data:{[kind==='reminder'?'remind_at':'start_at']:d.toISOString()}});}

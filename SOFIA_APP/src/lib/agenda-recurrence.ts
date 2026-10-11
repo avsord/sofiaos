@@ -18,8 +18,23 @@ export function readRepeat(item:{tags?:string[]}){
 export function agendaTags(tags:string[],frequency:Repeat,timeZone=Intl.DateTimeFormat().resolvedOptions().timeZone,notify=true){return [...tags.filter(t=>!isAgendaMeta(t)),...(frequency==='none'?[]:[prefix+frequency+':'+timeZone]),...(notify?[]:['sofia-notify-v1:off'])];}
 export function eventStart(item:AgendaItem){return item.data.calendar_all_day?item.data.calendar_date_start||'':item.data.start_at||item.data.remind_at||item.data.due_at||'';}
 const formatters=new Map<string,Intl.DateTimeFormat>();
-function parts(stamp:Date,zone:string){let formatter=formatters.get(zone);if(!formatter){formatter=new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});formatters.set(zone,formatter);}const p=formatter.formatToParts(stamp);const get=(key:string)=>Number(p.find(x=>x.type===key)?.value||0);return {y:get('year'),m:get('month'),d:get('day'),h:get('hour'),i:get('minute'),s:get('second')};}
-function zoned(y:number,m:number,d:number,h:number,i:number,s:number,zone:string){const wall=Date.UTC(y,m-1,d,h,i,s);let stamp=wall;for(let n=0;n<3;n++){const p=parts(new Date(stamp),zone),delta=wall-Date.UTC(p.y,p.m-1,p.d,p.h,p.i,p.s);stamp+=delta;if(!delta)break;}return new Date(stamp);}
+// Both conversions below are pure functions of (zone, instant). The 0.3.114 on-device report showed ~154 ms of Agenda JS before the
+// calendar was reached; on a 150-event calendar this module made ~1900 Intl.formatToParts calls per expansion, and the same expansion
+// is repeated for Home and Agenda. Memoising changes no result, only how often Intl is asked. Bounded, cleared when full.
+type Parts={y:number;m:number;d:number;h:number;i:number;s:number};
+const MEMO_LIMIT=8192;
+const partsMemo=new Map<string,Parts>(),zonedMemo=new Map<string,number>();
+function parts(stamp:Date,zone:string):Parts{
+ const key=zone+'|'+stamp.getTime(),hit=partsMemo.get(key);if(hit)return hit;
+ const value=partsUncached(stamp,zone);
+ if(partsMemo.size>=MEMO_LIMIT)partsMemo.clear();partsMemo.set(key,value);return value;
+}
+function partsUncached(stamp:Date,zone:string):Parts{let formatter=formatters.get(zone);if(!formatter){formatter=new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});formatters.set(zone,formatter);}const p=formatter.formatToParts(stamp);const get=(key:string)=>Number(p.find(x=>x.type===key)?.value||0);return {y:get('year'),m:get('month'),d:get('day'),h:get('hour'),i:get('minute'),s:get('second')};}
+function zoned(y:number,m:number,d:number,h:number,i:number,s:number,zone:string){
+ const wall=Date.UTC(y,m-1,d,h,i,s),key=zone+'|'+wall,hit=zonedMemo.get(key);if(hit!==undefined)return new Date(hit);
+ let stamp=wall;for(let n=0;n<3;n++){const p=parts(new Date(stamp),zone),delta=wall-Date.UTC(p.y,p.m-1,p.d,p.h,p.i,p.s);stamp+=delta;if(!delta)break;}
+ if(zonedMemo.size>=MEMO_LIMIT)zonedMemo.clear();zonedMemo.set(key,stamp);return new Date(stamp);
+}
 /** Recurrence stays on one server record. Versioned tags are supported by the existing API. */
 export function occurrences(item:AgendaItem,from:Date,to:Date):AgendaItem[]{
  if(['done','cancelled','completed','archived'].includes(item.state))return [];
