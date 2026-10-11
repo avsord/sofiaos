@@ -2,7 +2,7 @@ name: Sofia direct R8 - exact source validation
 'on':
   push:
     branches: [test/sofia-direct-r8-check-20261010]
-    paths: [.github/workflows/sofia-direct-r8-check.yml, .github/patches/sofia-direct-r8.b64]
+    paths: [.github/workflows/sofia-direct-r8-check.yml, .github/patches/sofia-direct-r8.b64, .github/patches/sofia-direct-test-contract.json]
 permissions:
   contents: write
 jobs:
@@ -20,6 +20,7 @@ jobs:
         run: |
           set -euo pipefail
           cp .github/patches/sofia-direct-r8.b64 /tmp/sofia-direct-r8.b64
+          cp .github/patches/sofia-direct-test-contract.json /tmp/sofia-direct-test-contract.json
           git checkout --detach "$BASE"
           mkdir -p /tmp/sofia-direct-validation
           python3 - <<'PY'
@@ -28,8 +29,11 @@ jobs:
           raw=gzip.decompress(base64.b64decode(Path('/tmp/sofia-direct-r8.b64').read_text()))
           assert hashlib.sha256(raw).hexdigest()=='4860fff8d9248c3d35075f77aa6ddfcdee006647ed8555739ca1ecf9d693ae41','Transport digest mismatch'
           p=json.loads(raw)
+          extension=Path('/tmp/sofia-direct-test-contract.json').read_bytes()
+          assert hashlib.sha256(extension).hexdigest()=='133e40929a92db1911dc7e38fd8f68324a7d280f0d8a2d7b6ea5eaaf3f59bc7a','Test contract transport mismatch'
+          p['files'].extend(json.loads(extension)['files'])
           assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()==p['base_sha']
-          assert len(p['files'])==16
+          assert len(p['files'])==17 and len({f['path'] for f in p['files']})==17
           def blob(b):return hashlib.sha1(('blob '+str(len(b))+'\0').encode()+b).hexdigest()
           outputs=[]
           for f in p['files']:
@@ -49,8 +53,8 @@ jobs:
           for path,after in outputs:
               path.parent.mkdir(parents=True,exist_ok=True)
               path.write_bytes(after)
-          Path('/tmp/sofia-direct-manifest.json').write_text(raw.decode())
-          print('Applied all 16 files; original and final Git hashes verified.')
+          Path('/tmp/sofia-direct-manifest.json').write_text(json.dumps(p))
+          print('Applied all 17 files; original and final Git hashes verified.')
           PY
           git diff --check
       - uses: actions/setup-node@v4
