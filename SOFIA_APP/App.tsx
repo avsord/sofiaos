@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {startFluency,revealFluency,noteFluencyInput,noteFluencyMovement,queueOptional,FLUENCY_MODE_KEY,type FluencyMode} from './src/lib/fluency';
-import {perfActive,perfError,perfNow,perfTap} from './src/lib/fluency-metrics';
+import {perfActive,perfNow,perfTap} from './src/lib/fluency-metrics';
+import {AppBoundary} from './src/components/AppBoundary';
 import {scheduleIdleTask} from './src/lib/idle-task';
 import {prepareLocalLaunch,createLaunchPreparation} from './src/lib/local-launch';
 import type {LocalLaunch} from './src/lib/local-launch';
@@ -35,11 +36,6 @@ import {APP_VERSION,checkForUpdate} from './src/lib/update';
 import {finishLaunchHandoff} from './src/lib/launch-handoff';
 
 const tabs:{id:Tab;label:string;icon:IconName}[]=[{id:'home',label:'Início',icon:'home'},{id:'chat',label:'Conversa',icon:'chat'},{id:'pages',label:'Páginas',icon:'book'},{id:'agenda',label:'Agenda',icon:'calendar'},{id:'apps',label:'Apps',icon:'grid'},{id:'profile',label:'Perfil',icon:'user'}];
-class AppBoundary extends Component<{children:React.ReactNode},{failed:boolean}>{
- state={failed:false};static getDerivedStateFromError(){return {failed:true};}
- componentDidCatch(e:Error,info:ErrorInfo){perfError('app',e,info?.componentStack);/* type + component names only; no personal data */}
- render(){return this.state.failed?<View nativeID="sofia-launch-error" style={{flex:1,backgroundColor:'#F7F6FA',padding:30,justifyContent:'center'}}><Text style={{fontSize:25,fontWeight:'700',color:'#272334'}}>Vamos reabrir a Sofia.</Text><Text style={{marginTop:16,lineHeight:23,color:'#7F7A8D'}}>O aplicativo encontrou um problema. Feche e abra novamente. Mensagens ainda não enviadas podem precisar ser refeitas.</Text></View>:this.props.children;}
-}
 function Shell({startup}:{startup:LocalLaunch}){
  const system=useColorScheme(),[ready]=useState(true),[auth,setAuth]=useState<Auth|null>(startup.auth),[bootstrap,setBootstrap]=useState<Bootstrap|null>(()=>startup.auth?fastBootstrap(startup.auth):null),[prefs,setPrefs]=useState<Prefs>(startup.prefs||{appearance:'schedule',enterToSend:false,autoSendVoice:true,lightAt:'05:00',darkAt:'19:00'}),[error,setError]=useState(''),[tab,setTab]=useState<Tab>('home'),[locked,setLocked]=useState(false),[booting,setBooting]=useState(false),[keyboard,setKeyboard]=useState(false),[workspaceDepth,setWorkspaceDepth]=useState(false),[workspaceReset,setWorkspaceReset]=useState(0),[capsulesTarget,setCapsulesTarget]=useState(0),[gestureLocked,setGestureLocked]=useState(false),[pagesDepth,setPagesDepth]=useState(false),[chatEpoch,setChatEpoch]=useState(0);
  const [agendaTarget,setAgendaTarget]=useState<{date:string;id?:string;create?:boolean;nonce:number}>({date:'',nonce:0});

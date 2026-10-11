@@ -31,7 +31,7 @@ test('registro de erro: tipo e componentes sim; texto de erro não-motor nunca',
 test('proteção por tela: erro numa tela mostra "Recarregar esta tela" e recarregar remonta só ela',async()=>{
  const code=ts.transpileModule(read('src/components/ScreenBoundary.tsx'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
  const errors=[];const exports={};
- const deps={'react':React,'react/jsx-runtime':require('react/jsx-runtime'),'react-native':{View:'View',Text:'Text',Pressable:'Pressable'},'../lib/theme':{useTheme:()=>({bg:'#fff',text:'#000',muted:'#777',accent:'#70f'})},'../lib/fluency-metrics':{perfError:(scope,e)=>errors.push([scope,e.name])}};
+ const deps={'react':React,'react/jsx-runtime':require('react/jsx-runtime'),'react-native':{View:'View',Text:'Text',Pressable:'Pressable'},'../lib/theme':{useTheme:()=>({bg:'#fff',text:'#000',muted:'#777',accent:'#70f'})},'../lib/fluency-metrics':{perfError:(scope,e)=>{errors.push([scope,e.name]);return {scope,name:e.name,detail:'',components:[],atMs:0};}},'../lib/last-error':{rememberError(){},errorLine:r=>r?r.name:''}};
  vm.runInNewContext(code,{exports,require:n=>{assert.ok(n in deps,'Unexpected '+n);return deps[n];},console});
  let explode=true,mounts=0;
  function Pages(){React.useEffect(()=>{mounts++;},[]);if(explode)throw new TypeError('boom');return React.createElement('Text',null,'ok');}

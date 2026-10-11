@@ -30,7 +30,13 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
   const dragStart=useRef(0);
   const [preview,setPreview]=useState<readonly Tab[]>([]);
   const clearPreview=()=>{setPreview([]);onPreviewTabs?.([]);};
-  const visibleTab=(id:Tab)=>fluencyMode==='old'||id===activeTab||preview.includes(id);
+  // A tab that has been shown once is never hidden again. Hiding a LIVE screen
+  // runs every effect cleanup and re-runs the setups on return; that cycle is the
+  // one thing the failing flow (edit a page, go to Chat, come back) has and the
+  // old mode never had. Unseen tabs stay hidden: they cost nothing until first use.
+  const seen=useRef<Set<Tab>>(new Set<Tab>(['home']));
+  seen.current.add(activeTab);for(const id of preview)seen.current.add(id);
+  const visibleTab=(id:Tab)=>fluencyMode==='old'||seen.current.has(id);
   // The native root frame is a render seed, never proof of measured geometry.
   // Avoid mounting an empty pager, waiting for JS onLayout, then mounting Home.
   const supplied=initialWidth??nativeInitialWidth();

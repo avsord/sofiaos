@@ -11,14 +11,14 @@ export type PerfError={scope:string;name:string;detail:string;components:string[
 let errors:PerfError[]=[];
 /** Engine errors (TypeError etc.) describe code, not user content, so their text is kept.
  * Any other error keeps only its name. Component stack keeps component names only. */
-export function perfError(scope:string,error:unknown,componentStack?:string|null){
+export function perfError(scope:string,error:unknown,componentStack?:string|null):PerfError{
  const e=error as {name?:unknown;message?:unknown}|null;
  const name=typeof e?.name==='string'?e.name.slice(0,40):'Error';
  const engine=['TypeError','ReferenceError','RangeError','SyntaxError'].includes(name);
  const detail=engine&&typeof e?.message==='string'?e.message.slice(0,200):'';
  const components=String(componentStack||'').split('\n').map(l=>l.trim().match(/^(?:in|at)\s+([A-Za-z0-9_$.]+)/)?.[1]).filter((c):c is string=>!!c).slice(0,8);
  const row={scope,name,detail,components,atMs:reveal===null?0:round(clock()-reveal)};
- errors.push(row);if(errors.length>20)errors.shift();emit('ERROR',row);
+ errors.push(row);if(errors.length>20)errors.shift();emit('ERROR',row);return row;
 }
 let volume:DataVolume={pages:0,entities:0,conversations:0,messages:0,historyBytes:0,cachedRoutes:0};
 const totals=()=>({over50:0,over100:0,over250:0,maxMs:0});

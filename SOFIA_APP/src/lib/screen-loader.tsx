@@ -31,8 +31,13 @@ export const MENU_PRELOADERS=[loadChat,loadAgenda,loadPages,loadWorkspace,loadPr
 /** Skip unchanged hidden screens when the active tab changes.
  * Creating new JSX/props objects must not rerender chat history, workspaces,
  * calendar grids, or Page trees on each bottom-menu press. */
-export const DeferredScreen=React.memo(function DeferredScreen({load,screenProps}:{load:()=>Screen;screenProps:Record<string,unknown>}){
+function DeferredBody({load,screenProps}:{load:()=>Screen;screenProps:Record<string,unknown>}){
+ // load() evaluates the screen module during render; an error there used to skip
+ // every screen boundary and reach the global one.
  const Component=load();return <Component {...screenProps}/>;
+}
+export const DeferredScreen=React.memo(function DeferredScreen({load,screenProps}:{load:()=>Screen;screenProps:Record<string,unknown>}){
+ return <ScreenBoundary name="deferred"><DeferredBody load={load} screenProps={screenProps}/></ScreenBoundary>;
 },(a,b)=>{
  if(a.load!==b.load)return false;
  const left=a.screenProps,right=b.screenProps;
