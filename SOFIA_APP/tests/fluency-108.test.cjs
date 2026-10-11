@@ -71,5 +71,14 @@ test('new isolated heavy job reuses signed binaries and timing goals are reporte
  const heavy=read('tools/fluency-heavy-smoke.py'),manual=read('tools/manual-apk-smoke.py');
  assert.ok(heavy.includes("'performance_gate_enforced':False"));assert.ok(heavy.includes('seed(mode,scale)'));
  assert.ok(manual.includes("result['policy_mode']='old'"));assert.ok(manual.includes("result['native_first_taps']>=12"));
- assert.ok(heavy.includes("'_R7_KEEP' in tree"));assert.ok(!heavy.includes("'pm','clear'"));
+ // The R8 observer strengthens the single marker check to twenty real edits
+ // in each policy; keep the exact typed suffix and screen-error guards.
+ assert.ok(heavy.includes("expected='_R8_KEEP'"));
+ assert.ok(heavy.includes('for cycle in range(20):'));
+ assert.ok(heavy.includes('assert expected in tree'));
+ assert.ok(heavy.includes("RESULT.setdefault('draft_cycles',{})[mode]=20"));
+ assert.ok(heavy.includes("for mode in ['old','new']:"));
+ assert.ok(heavy.includes("'Algo deu errado nesta tela' not in tree"));
+ assert.ok(heavy.includes("'Vamos reabrir' not in tree"));
+ assert.ok(!heavy.includes("'pm','clear'"));
 });

@@ -22,8 +22,9 @@ test('R7.1 scrolling hooks retain native pager, page scroll position and chat pa
  const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
  const app=read('App.tsx'),pager=read('src/components/TabPager.tsx'),motion=read('src/lib/menu-motion.ts');
  assert.ok(app.includes("createMenuMotion('home',noteFluencyMovement)"));assert.ok(pager.includes('onScroll={motion.onScroll}'));assert.ok(motion.includes('useNativeDriver:true,listener:onMovement'));
- for(const name of ['Pages','Workspace','Home','Agenda','Profile','Chat'])assert.ok(read('src/screens/'+name+'.tsx').includes('onScroll={noteFluencyMovement} scrollEventThrottle={100}'),name+' scroll must renew idle window');
+ for(const name of ['Workspace','Home','Agenda','Profile','Chat'])assert.ok(read('src/screens/'+name+'.tsx').includes('onScroll={noteFluencyMovement} scrollEventThrottle={100}'),name+' scroll must renew idle window');
  assert.ok(read('src/screens/Pages.tsx').includes('noteFluencyMovement();onScrollY(e.nativeEvent.contentOffset.y)'));
  assert.ok(read('src/screens/Chat.tsx').includes('noteFluencyMovement();chatScroll.onScroll(e);'));
+ assert.ok(read('src/components/PageTreeList.tsx').includes('onScroll={noteFluencyMovement} scrollEventThrottle={100}'));
  const f=read('src/lib/fluency.ts');assert.ok(f.includes('noteFluencyMovement(){if(newFluency())idleWork.noteInput();}'));
 });

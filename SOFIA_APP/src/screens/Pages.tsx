@@ -204,14 +204,18 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
    </View>
   </PageDocumentScroll>;
  }
- const listView=<ScrollView onScroll={noteFluencyMovement} scrollEventThrottle={100} scrollEnabled={!pageDragging} style={{flex:1,backgroundColor:c.bg}} contentContainerStyle={{paddingBottom:34}} refreshControl={<RefreshControl enabled={!pageInteraction&&!selectedId} refreshing={refreshing} onRefresh={refreshPages} tintColor={c.accent}/>}>
+ const listView=<PageTreeList roots={children.get('')||[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={changePageInteraction} onDragChange={setPageDragging}
+  virtualized scrollEnabled={!pageDragging}
+  refreshControl={<RefreshControl enabled={!pageInteraction&&!selectedId} refreshing={refreshing} onRefresh={refreshPages} tintColor={c.accent}/>}
+  header={<>
   <ScreenTitle title="Páginas" eyebrow="IDEIAS · NOTAS · SEUS ESPAÇOS" right={<IconButton name="plus" label="Criar página" filled disabled={!ready} onPress={()=>setCreateParent(null)}/>}/>
   {api.mdLocalOnly?<Text style={{paddingHorizontal:20,paddingBottom:8,color:c.muted,fontSize:10}}>Ordem salva neste aparelho. A hierarquia e o conteúdo continuam sincronizados.</Text>:null}
   {error?<ErrorBanner text={error} onRetry={()=>void load()}/>:null}
-  <View style={{paddingHorizontal:10}}><PageTreeList roots={children.get('')||[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={changePageInteraction} onDragChange={setPageDragging}/></View>
+  </>}
+  footer={<>
   {ready&&!loaded&&!error&&!pages.length?<View testID="pages-loading-placeholder" accessibilityLabel="Carregando páginas" style={{minHeight:80}}/>:null}
   {ready&&loaded&&!pages.length&&!error?<Empty icon="book" title="Sua primeira página" body="Toque em + para criar uma página."/>:null}
- </ScrollView>;
+  </>}/>;
  const createPicker=<PageCreateMenu visible={createParent!==undefined} parentTitle={createParent?.title} onClose={()=>setCreateParent(undefined)}
   onBlank={()=>void create(createParent||undefined)} onTemplate={template=>selectedId?applyTemplate(template):void create(undefined,template)}/>;
  if(!entry)return <View style={{flex:1}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{listView}{createPicker}</View>;

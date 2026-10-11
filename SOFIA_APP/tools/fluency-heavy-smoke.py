@@ -76,6 +76,9 @@ def cold_trial(mode,index,points,scale=1,video=False):
 # probing does not delay the original 0.5/1/1.5/2s stress-tap sequence.
 _spec=importlib.util.spec_from_file_location('pages_probe',Path(__file__).with_name('pages-first-content.py'))
 _probe=importlib.util.module_from_spec(_spec);_spec.loader.exec_module(_probe)
+_geom_spec=importlib.util.spec_from_file_location('ui_geometry',Path(__file__).with_name('ui-probes.py'))
+_geom=importlib.util.module_from_spec(_geom_spec);_geom_spec.loader.exec_module(_geom)
+
 def xml_bounded(remaining):
  before=time.monotonic()
  try:
@@ -114,19 +117,29 @@ def correctness(points,mode):
  tree=(OUT/('correctness-'+mode+'-pages-content.xml')).read_text()
  (OUT/'pages-heavy.xml').write_text(tree)
  tap(point(tree,'Abrir página principal Página QA 0000'));time.sleep(.4);tree=xml()
- tap(point(tree,'Título da página'));adb('shell','input','keyevent','KEYCODE_MOVE_END');adb('shell','input','text','_R7_KEEP')
- adb('shell','input','keyevent','BACK');time.sleep(.3)
- tap(points['Conversa']);time.sleep(.4);tap(points['Páginas']);time.sleep(.4)
- tree=xml();(OUT/'draft-after-return.xml').write_text(tree);assert '_R7_KEEP' in tree,'Actual Page draft lost across Activity hide/show'
+ expected='_R8_KEEP'
+ for cycle in range(20):
+  tap(point(tree,'Título da página'));adb('shell','input','keyevent','KEYCODE_MOVE_END')
+  addition=expected if cycle==0 else str(cycle%10)
+  if cycle:expected+=addition
+  adb('shell','input','text',addition);adb('shell','input','keyevent','BACK');time.sleep(.15)
+  tap(points['Conversa']);time.sleep(.25);tap(points['Páginas']);time.sleep(.25)
+  tree=xml();(OUT/(f'draft-{mode}-{cycle:02d}.xml')).write_text(tree)
+  assert expected in tree,'Actual Page draft lost across Activity hide/show; mode='+mode+' cycle='+str(cycle)
+  assert 'Algo deu errado nesta tela' not in tree and 'Vamos reabrir' not in tree,'Screen error while preserving Page draft'
+ RESULT.setdefault('draft_cycles',{})[mode]=20
  RESULT['page_draft_preserved']=True
  # Page is open and blocks horizontal gestures; use Home, then swipe to Chat.
  tap(points['Início']);time.sleep(.5);tree=xml();(OUT/'home-before-swipe.xml').write_text(tree)
- size=adb('shell','wm','size');w,h=map(int,re.findall(r'(\d+)x(\d+)',size)[-1]);
+ swipe=_geom.home_pager_swipe(tree)
+ RESULT.setdefault('pager_swipe_targets',{})[mode]=swipe
  rec=subprocess.Popen(['adb','shell','screenrecord','--time-limit','6','/sdcard/r7-swipe.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);time.sleep(.3)
- adb('shell','input','swipe',str(int(w*.8)),str(int(h*.55)),str(int(w*.15)),str(int(h*.55)),'450');time.sleep(.8)
- tree=xml();(OUT/'after-swipe.xml').write_text(tree)
- assert 'Mensagem para a Sofia' in tree,'Swipe did not reach neighboring content'
- rec.wait(timeout=10);adb('pull','/sdcard/r7-swipe.mp4',str(OUT/'swipe-neighbor.mp4'))
+ try:
+  adb('shell','input','swipe',*[str(v) for v in swipe],'450');time.sleep(.8)
+  tree=xml();(OUT/('after-swipe-'+mode+'.xml')).write_text(tree)
+  assert 'Mensagem para a Sofia' in tree,'Swipe did not reach neighboring content; mode='+mode
+ finally:
+  rec.wait(timeout=10);adb('pull','/sdcard/r7-swipe.mp4',str(OUT/('swipe-neighbor-'+mode+'.mp4')))
  RESULT['swipe_video_retained']=True;RESULT['audio_behavior_observed']=False
 
 def percentile(values,p=.95):
@@ -160,7 +173,16 @@ try:
  RESULT['pages_failed_modes']=sorted({r['mode'] for r in RESULT['pages_trials'] if not r['correctness_passed']})
  RESULT['pages_all_targets_met']=all(r['goal_met'] for r in RESULT['pages_trials'])
  assert not RESULT['pages_failed_modes'],'First page content correctness failed; modes='+','.join(RESULT['pages_failed_modes'])+'; inspect per-trial JSON (goal is reported separately)'
- correctness(points,RESULT['trials'][-1]['mode']);RESULT['correctness_passed']=True
+ for mode in ['old','new']:
+  seed(mode);stop();adb('logcat','-c');start();wait_data()
+  correctness(points,mode)
+  logs=collect_logs();(OUT/('correctness-'+mode+'-logcat.txt')).write_text(logs)
+  assert not events(logs).get('ERROR') and 'FATAL EXCEPTION' not in logs,'Runtime exception during editor/pager correctness; mode='+mode
+ RESULT['correctness_passed']=True
 finally:
+ try:
+  logs=collect_logs();(OUT/'final-logcat.txt').write_text(logs)
+  RESULT['runtime_errors']=events(logs).get('ERROR',[])
+ except Exception as diagnostic_error:RESULT['log_collection_error']=str(diagnostic_error)
  (OUT/'result.json').write_text(json.dumps(RESULT,indent=2,ensure_ascii=False)+'\n')
 print(json.dumps({k:v for k,v in RESULT.items() if k!='trials'},ensure_ascii=False))

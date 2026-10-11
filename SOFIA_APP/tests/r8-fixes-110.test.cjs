@@ -44,22 +44,40 @@ test('proteção por tela: erro numa tela mostra "Recarregar esta tela" e recarr
  assert.ok(tree.root.findAll(n=>n.type==='Text'&&n.props.children==='ok').length,'a tela remontou');assert.equal(mounts,1);
 });
 
-test('árvore de Páginas: 600 linhas desenham 30 na hora e o resto em blocos, por quadro',async()=>{
+test('árvore principal delega 600 linhas à janela virtual, sem montá-las por timers',async()=>{
  const code=ts.transpileModule(read('src/components/PageTreeList.tsx'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
- const frames=[];let queued=[];const exports={};
+ const frames=[];const exports={};let offset=0;
  class Value{constructor(v){this.v=v;}setValue(v){this.v=v;}stopAnimation(){}getTranslateTransform(){return [];}}
- const native={View:'View',Text:'Text',Pressable:'Pressable',Animated:{Value,ValueXY:class extends Value{},View:'AnimatedView',timing:()=>({start(){},stop(){}})}};
- const deps={'react':React,'react/jsx-runtime':require('react/jsx-runtime'),'react-native':native,'../lib/theme':{useTheme:()=>({text:'t',muted:'m',accent:'a',accentSoft:'s',surface:'f',input:'i',danger:'d'})},'./Icon':{Icon:'Icon'},'../lib/motion':{MOTION_EASE:null,useReducedMotion:()=>false},'../lib/page-order':{PAGE_INDENT:16,dropLineY:()=>null,projectPageDrop:()=>null},'../lib/fluency':{queueOptional:(name,run)=>{queued.push(name);return()=>{};}}};
+ function List(props){return React.createElement('Window',props,props.data.slice(offset,offset+props.initialNumToRender).map((item,index)=>React.createElement(React.Fragment,{key:props.keyExtractor(item)},props.renderItem({item,index}))));}
+ const native={View:'View',Text:'Text',Pressable:'Pressable',FlatList:List,Animated:{Value,ValueXY:class extends Value{},View:'AnimatedView',timing:()=>({start(){},stop(){}})}};
+ const deps={'react':React,'react/jsx-runtime':require('react/jsx-runtime'),'react-native':native,'../lib/theme':{useTheme:()=>({text:'t',muted:'m',accent:'a',accentSoft:'s',surface:'f',input:'i',danger:'d'})},'./Icon':{Icon:'Icon'},'../lib/motion':{MOTION_EASE:null,useReducedMotion:()=>false},'../lib/page-order':{PAGE_INDENT:18,dropLineY:()=>null,projectPageDrop:()=>null},'../lib/fluency':{noteFluencyMovement(){}}};
  vm.runInNewContext(code,{exports,require:n=>{assert.ok(n in deps,'Unexpected '+n);return deps[n];},requestAnimationFrame:fn=>{frames.push(fn);return frames.length;},cancelAnimationFrame:()=>{},setTimeout,clearTimeout,Map,Set,Math,console});
  const roots=Array.from({length:600},(_,i)=>({id:'p'+i,title:'Página QA '+String(i).padStart(4,'0'),data:{}}));
  const props={roots,children:new Map(),expanded:new Set(),toggle(){},onOpen(){},onMove(){},canParent:()=>true};
- const rows=t=>t.root.findAll(n=>typeof n.props?.accessibilityLabel==='string'&&n.props.accessibilityLabel.startsWith('Abrir página principal')&&n.type==='View').length;
+ const rows=t=>t.root.findAll(n=>n.type==='View'&&n.props?.accessibilityLabel?.startsWith('Abrir página principal'));
  let tree;await act(async()=>{tree=create(React.createElement(exports.PageTreeList,props));});
- assert.equal(rows(tree),exports.INITIAL_ROWS,'primeiro desenho limitado');
- assert.ok(queued.includes('pages:measure'),'medição completa vai para a fila, fora da janela crítica');
- let steps=0;while(frames.length&&steps<100){const f=frames.shift();await act(async()=>{f();});steps++;}
- assert.equal(rows(tree),600,'todas as linhas chegam');
- assert.equal(steps,Math.ceil((600-exports.INITIAL_ROWS)/exports.ROWS_PER_FRAME),'um bloco por quadro');
+ const list=tree.root.findByType('Window').props;
+ assert.equal(list.data.length,600,'the entire hierarchy remains in data, not in mounted views');
+ assert.equal(list.initialNumToRender,16);assert.equal(list.windowSize,5);
+ assert.equal(list.maxToRenderPerBatch,8);assert.equal(list.removeClippedSubviews,false);
+ assert.equal(rows(tree).length,16);assert.equal(frames.length,0,'no RAF loop mounts all remaining rows');
+ offset=584;await act(async()=>{tree.update(React.createElement(exports.PageTreeList,{...props,expanded:new Set()}));});
+ assert.equal(rows(tree).length,16);assert.ok(rows(tree)[0].props.accessibilityLabel.endsWith('0584'));
+ assert.equal(frames.length,0,'scrolling does not start a mount-everything loop');
+ await act(async()=>tree.unmount());
+});
+
+test('root Pages and records own virtual viewports; editor subpages keep non-nested scroll path',()=>{
+ const pages=read('src/screens/Pages.tsx'),workspace=read('src/screens/Workspace.tsx'),tree=read('src/components/PageTreeList.tsx');
+ assert.ok(pages.includes('const listView=<PageTreeList'));
+ assert.ok(pages.includes('virtualized scrollEnabled={!pageDragging}'));
+ assert.ok(pages.includes('<PageTreeList roots={subpages}')&&pages.includes(' compact/>'));
+ assert.ok(!workspace.includes('visibleItems.map(e=>'));
+ assert.ok(workspace.includes('testID="workspace-records-list" data={visibleItems}'));
+ assert.ok(workspace.includes('testID="task-list" data={visible}'));
+ assert.ok(tree.includes('const current=[...nodes.current]'),'measure only actual mounted cells');
+ assert.ok(!tree.includes("queueOptional('pages:measure'"));
+ assert.ok(tree.includes('drag.current!==owner'),'a stale measurement cannot revive a drag');
 });
 
 test('contagem do histórico sai da abertura e vai para a fila',()=>{
