@@ -3,6 +3,26 @@
 // The owner cursor never points at WhatsApp contacts, simulations or protected chat.
 const {AppError,validId}=require('../core/util');
 const OWNER='owner-local';
+/** Recover only the legacy automatic shutdown pause, never a user pause,
+ * deletion, archive, contact history or another owner. No message row changes. */
+function recoverShutdownConversations(store,beforeRecovery){
+ const eligible=`owner=? AND state='paused' AND channel IN ('web','mobile') AND
+   (SELECT reason FROM checkpoints WHERE conversation_id=conversations.id AND owner=conversations.owner ORDER BY rowid DESC LIMIT 1)='shutdown'`;
+ const candidates=store.db.prepare('SELECT id FROM conversations WHERE '+eligible).all(OWNER);
+ if(!candidates.length)return {conversations:0,messages:0};
+ if(typeof beforeRecovery!=='function')throw new Error('A verified backup is required before history recovery');
+ beforeRecovery();
+ return store.tx(()=>{
+  let conversations=0,messages=0;
+  const update=store.db.prepare("UPDATE conversations SET state='active' WHERE id=? AND "+eligible);
+  for(const row of candidates){
+   if(!update.run(row.id,OWNER).changes)continue;
+   conversations++;messages+=store.db.prepare("SELECT COUNT(*) AS count FROM messages WHERE conversation_id=? AND owner=? AND status<>'deleted'").get(row.id,OWNER).count;
+   store.audit('conversation.recovered-after-shutdown',row.id);
+  }
+  return {conversations,messages};
+ });
+}
 function createChatSync(store){
  store.db.exec(`CREATE TABLE IF NOT EXISTS owner_chat_cursor(owner TEXT PRIMARY KEY,conversation_id TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 1) STRICT;`);
  function eligible(id){const c=store.conversation(validId(id));if(c.owner!==OWNER||c.state!=='active'||!['web','mobile'].includes(c.channel))throw new AppError('NOT_FOUND','Conversa pessoal não encontrada.',404);return c;}
@@ -43,4 +63,4 @@ function makeChatSyncApi(store,{bodyJson,json,client='web',decorateRows=null}){
   return false;
  };
 }
-module.exports={createChatSync,makeChatSyncApi};
+module.exports={createChatSync,makeChatSyncApi,recoverShutdownConversations};

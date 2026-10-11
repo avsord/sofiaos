@@ -1,0 +1,6 @@
+const test=require('node:test'),assert=require('node:assert/strict'),load=require('./load-ts.cjs');
+const {pageBackTarget,shouldBeginPageBack}=load('src/lib/page-navigation.ts');
+const tree=new Map([['root',{id:'root',data:{}}],['child',{id:'child',data:{parent_id:'root'}}],['grandchild',{id:'grandchild',data:{parent_id:'child'}}]]);
+test('opening a nested page directly returns one ancestor at a time',()=>{assert.equal(pageBackTarget(tree,'grandchild'),'child');assert.equal(pageBackTarget(tree,'child'),'root');assert.equal(pageBackTarget(tree,'root'),null);});
+test('missing or self-referential parents cannot trap back navigation',()=>{assert.equal(pageBackTarget(tree,'missing'),null);assert.equal(pageBackTarget(new Map([['x',{id:'x',data:{parent_id:'x'}}]]),'x'),null);});
+test('back respects edge, text editing, drag, vertical scroll, and centered tablet pane',()=>{const g={x0:10,dx:90,dy:5};assert.equal(shouldBeginPageBack(g,360,360,false,false),true);for(const [gesture,edit,drag] of [[{...g,x0:150},false,false],[g,true,false],[g,false,true],[{...g,dy:150},false,false]])assert.equal(shouldBeginPageBack(gesture,360,360,edit,drag),false);assert.equal(shouldBeginPageBack({...g,x0:230},760,1200,false,false),true);assert.equal(shouldBeginPageBack({...g,x0:10},760,1200,false,false),false);});

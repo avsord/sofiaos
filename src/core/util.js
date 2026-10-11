@@ -15,6 +15,13 @@ function cleanText(value, field = 'Texto', max = 12000, optional = false) {
   }
   return value.trim();
 }
+function cleanMessage(value, field = 'Mensagem', optional = false) {
+  if (optional && (value === undefined || value === null || value === '')) return '';
+  if (typeof value !== 'string' || !value.trim() || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(value)) {
+    throw new AppError('INVALID_INPUT', `${field}: informe um texto válido.`);
+  }
+  return value.trim();
+}
 function validId(value) {
   if (typeof value !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(value)) throw new AppError('INVALID_ID', 'Identificador inválido.');
   return value;
@@ -40,4 +47,4 @@ function publicError(error) {
   if (error instanceof AppError) return { status: error.status, code: error.code, error: error.message };
   return { status: 500, code: 'INTERNAL_ERROR', error: 'Não consegui concluir esta operação. O servidor preservou o que já estava salvo; consulte o diagnóstico local.' };
 }
-module.exports = { AppError, now, id, hash, cleanText, validId, rejectSecrets, atomicWrite, normalize, searchTerms, publicError };
+module.exports = { AppError, now, id, hash, cleanText, cleanMessage, validId, rejectSecrets, atomicWrite, normalize, searchTerms, publicError };

@@ -1,0 +1,12 @@
+// SOFIA_PAGE_TOUCH_FIXTURE_ONLY: synthetic data, compiled only into the CI test APK.
+import React from 'react';
+import {View,Text,Pressable} from 'react-native';
+import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
+import {Pages} from './src/screens/Pages';
+import type {SofiaApi} from './src/lib/api';
+import type {Entity} from './src/lib/types';
+const make=(id:string,title:string,parent=''):Entity=>({id,title,kind:'user_page',content:'',area:'Pessoal',state:'active',privacy:'private',tags:[],revision:1,data:{parent_id:parent,icon:'📄',blocks:[]}});
+let items=[make('parent','Teste principal'),make('other','Outra pagina'),make('child','Teste filha','parent')];
+let loads=0,moves=0,deletes=0;
+const api={mdLocalOnly:false,entities:async()=>{loads++;return {items};},entity:async(id:string)=>items.find(x=>x.id===id),saveEntity:async(p:any)=>{const e=items.find(x=>x.id===p.id);return {...e,...p,revision:(e?.revision||0)+1};},movePage:async(p:any)=>{moves++;items=items.map(x=>x.id===p.id?{...x,data:{...x.data,parent_id:p.parentId},revision:x.revision+1}:x);return {items};},deleteEntity:async()=>{deletes++;throw new Error('Deletion is not permitted in gesture test');}} as unknown as SofiaApi;
+export default function App(){const [tick,setTick]=React.useState(0);React.useEffect(()=>{const id=setInterval(()=>setTick(x=>x+1),200);return()=>clearInterval(id);},[]);return <SafeAreaProvider><SafeAreaView style={{flex:1}}><Text accessibilityLabel={'QA moves '+moves+' deletes '+deletes}>SOFIA_PAGE_TOUCH_FIXTURE_ONLY</Text><Pressable accessibilityLabel="QA atualizar remoto" onPress={()=>{items=items.map(x=>x.id==='other'?{...x,title:'Nome remoto',revision:x.revision+1}:x);}}><Text>Atualizar remoto</Text></Pressable><View style={{flex:1}}><Pages api={api} active storageScope="page-touch-ci"/></View></SafeAreaView></SafeAreaProvider>;}

@@ -1,0 +1,67 @@
+import * as QA_Notifications from 'expo-notifications';
+import {notificationWarning} from './src/lib/agenda-notifications';
+// SOFIA_FULL_APP_FIXTURE_ONLY: actual production App and screens; synthetic transport only.
+import React,{useEffect,useState} from 'react';
+import {View,Text,Pressable} from 'react-native';
+import ProductionApp from './ProductionApp';
+import {saveAuth} from './src/lib/api';
+import type {Entity} from './src/lib/types';
+import {legacyMovePlan} from './src/lib/legacy-md';
+const profile={name:'Teste Sofia',email:'qa@example.test',role:'owner' as const};
+const expires_at='2050-01-01T00:00:00Z';
+const make=(id:string,title:string,parent=''):Entity=>({id,title,kind:'user_page',content:'',area:'Pessoal',state:'active',privacy:'private',tags:[],revision:1,data:{parent_id:parent,icon:'📄',blocks_json:'[]'}});
+let pages=[make('parent','Teste principal'),make('other','Outra pagina'),make('child','Teste filha','parent'),make('grandchild','Teste neta','child')];
+const longParent=make('long-parent','Pagina longa');longParent.data={...longParent.data,cover_type:'color',cover_value:'#DAD2FF',blocks_json:JSON.stringify([{id:'long-body',type:'text',text:Array.from({length:28},(_,i)=>'Linha '+(i+1)+' da pagina longa.').join('\n')}])};pages.push(longParent,make('long-child','Filha da pagina longa','long-parent'));
+let qaNotificationState:any={},moves=0,deletes=0,uploads=0,taskDelay=1600;
+setInterval(()=>{void Promise.all([QA_Notifications.getPermissionsAsync(),QA_Notifications.getAllScheduledNotificationsAsync()]).then(([permission,alarms])=>{qaNotificationState={permission,alarms,warning:notificationWarning};}).catch(e=>{qaNotificationState={error:String(e)};});},700);
+const today=new Date();today.setHours(10,0,0,0);const tomorrow=new Date(today);tomorrow.setDate(tomorrow.getDate()+1);
+const events:Entity[]=[{...make('native-notice','Notificacao nativa Sofia'),kind:'commitment',state:'planned',data:{start_at:new Date(Date.now()+20000).toISOString()}},{...make('event1','Consulta de hoje'),kind:'commitment',data:{start_at:today.toISOString()}},{...make('event2','Compromisso de amanha'),kind:'commitment',data:{start_at:tomorrow.toISOString()}}];
+let notices=[{id:'notice1',title:'Lembrete da agenda',body:'Seu compromisso está confirmado.',state:'unread',category:'agenda',created_at:new Date().toISOString()},{id:'notice2',title:'Preço acompanhado',body:'O histórico de preço foi atualizado.',state:'unread',category:'price',created_at:new Date(Date.now()-86400000).toISOString()}];
+const tasks:import('./src/lib/types').Task[]=['important','medium','light','none'].map((priority_level,i)=>({id:'filter'+i,title:['Projeto urgente','Estudar curso','Organizar casa','Ler livro'][i],area:i<2?'Trabalho':'Pessoal',priority_level,state:'todo',revision:1}));
+const conversation={id:'chatqa',title:'Conversa de teste',channel:'mobile',created_at:today.toISOString(),updated_at:today.toISOString()};
+const messages:import('./src/lib/types').Message[]=[{id:'msg1',role:'user',content:'Mensagem preservada',status:'sent',created_at:today.toISOString()},{id:'msg2',role:'assistant',content:'Resposta preservada',status:'sent',created_at:today.toISOString()}];
+const libraryRows:Entity[]=[{...make('bookqa','Livro preservado'),kind:'book',state:'reading',data:{}},{...make('documentqa','Documento preservado'),kind:'document',state:'saved',data:{}}];
+const filmRows:Entity[]=[{...make('film-action','Filme de Acao'),kind:'film',tags:['Cinema','sofia-film-rating-v1:2'],data:{genre:'Ação',raw_review:'Opinião preservada'}},{...make('film-drama','Filme de Drama'),kind:'film',tags:['sofia-film-rating-v1:5'],data:{genre:'Drama'}},{...make('film-comedy','Filme de Comedia'),kind:'film',tags:[],data:{genre:'Comédia'}}];
+const catalog={catalog:{asset:{label:'Referência',group:'library',states:['saved','archived'],fields:[{key:'type',label:'Tipo',type:'select',options:['reference','other']},{key:'url',label:'Link',type:'url'},{key:'description',label:'Descrição informada',type:'textarea'}]},film:{label:'Filme',group:'library',states:['to_watch','watched','archived'],fields:[{key:'genre',label:'Gênero informado',type:'text'},{key:'raw_review',label:'Sua opinião original',type:'textarea'}]},document:{label:'Documento',group:'library',states:['saved'],fields:[]},book:{label:'Livro',group:'library',states:['reading'],fields:[]},list_collection:{label:'Lista',group:'flow',states:['active'],fields:[]},commitment:{label:'Compromisso',group:'flow',states:['planned','confirmed'],fields:[{key:'start_at',label:'Início',type:'datetime'}]},user_page:{label:'Página',group:'knowledge',states:['active'],fields:[]},monitor:{label:'Monitoramento',group:'flow',states:['active'],fields:[]}},areas:['Pessoal']};
+const response=(data:unknown,status=200)=>Promise.resolve(new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}}));
+globalThis.fetch=(async(input:any,init:any={})=>{
+ const u=new URL(String(input)),p=u.pathname.replace('/api/mobile',''),method=init.method||'GET',body=init.body?JSON.parse(init.body):{};
+ if(u.hostname==='api.github.com')return response([],200);
+ if(u.hostname!=='sofiaos.up.railway.app')throw Error('Unexpected network host in isolated fixture');
+ if(p==='/bootstrap')return response({version:'142',profile,expires_at,ai:{ready:true,reason:null},limits:{audio_bytes:1000000,audio_seconds:120,text_chars:12000},capabilities:{text:true,voice_notes:true,notifications_push:false,multi_user:false,e2ee:false,workspace:true}});
+ if(p==='/home')return response({tasks,notifications:notices,today_tasks:tasks,profile});
+ if(p==='/tasks'){if(method==='POST'){const item={id:'task'+Date.now(),state:'todo',revision:1,...body};tasks.push(item);return response({item});}const snapshot=JSON.parse(JSON.stringify(tasks));if(taskDelay)await new Promise(r=>setTimeout(r,taskDelay));return response({items:snapshot});}
+ if(p.startsWith('/tasks/')){const item=tasks.find(t=>t.id===p.split('/')[2]);if(!item)return response({error:'Missing task'},404);Object.assign(item,body,{revision:item.revision+1});return response({item});}
+ if(p==='/agenda')return response({items:events});
+ if(p==='/workspace/catalog')return response(catalog);
+ if(p==='/workspace/integrations')return response({items:[{key:'whatsapp',name:'WhatsApp Business',status:'Não conectado',description:'Conexão de teste',connect_url:'https://sofiaos.up.railway.app/site'}]});
+ if(p==='/md/capabilities')return response({page_order:true});
+ if(p==='/md/calendar/status')return response({configured:false,connected:false});
+ if(p==='/md/notifications'||p==='/notifications')return response({items:notices,next_offset:null,unread:notices.filter(x=>x.state==='unread').length});
+ if(p.startsWith('/notifications/')&&p.endsWith('/read')){notices=notices.map(n=>n.id===p.split('/')[2]?{...n,state:'read'}:n);return response({ok:true});}
+ if(p.startsWith('/md/notifications/')){notices=p.endsWith('/all')?[]:notices.filter(n=>n.id!==p.split('/').at(-1));return response({ok:true});}
+ if(p==='/md/pages/move'){const plan=legacyMovePlan(pages,body);moves++;const changed=plan.siblings.map((x,i)=>({...x,revision:x.revision+1,data:{...x.data,sort_order:(i+1)*1024,...(x.id===body.id?{parent_id:body.parentId}:{})}}));pages=pages.map(x=>changed.find(c=>c.id===x.id)||x);return response({items:changed});}
+ if(p.endsWith('/observations'))return response({items:[{id:'o1',total_cents:19900,observed_at:new Date(Date.now()-86400000).toISOString()},{id:'o2',total_cents:17900,observed_at:new Date().toISOString()}]});
+ if(p==='/workspace/entities'){
+  if(method==='POST'){const item={...make('created'+Date.now(),body.title),...body};(item.kind==='user_page'?pages:item.kind==='asset'?libraryRows:events).push(item);return response(item);}
+  const kind=u.searchParams.get('kind');if(u.searchParams.get('group')==='library'){await new Promise(r=>setTimeout(r,1600));return response({items:[...libraryRows,...filmRows]});}if(kind==='film'){await new Promise(r=>setTimeout(r,1600));return response({items:filmRows.slice(Number(u.searchParams.get('offset')||0),Number(u.searchParams.get('offset')||0)+100)});}if(kind==='book'||kind==='asset'||kind==='list_collection'){await new Promise(r=>setTimeout(r,1600));return response({items:kind==='book'||kind==='asset'?libraryRows.filter(row=>row.kind===kind):[]});}return response({items:kind==='user_page'?pages.slice(Number(u.searchParams.get('offset')||0),Number(u.searchParams.get('offset')||0)+100):kind==='monitor'?[{...make('monitorqa','Produto acompanhado'),kind:'monitor',data:{currency:'BRL'}}]:[]});
+ }
+ if(p.startsWith('/workspace/entities/')&&p.endsWith('/attachments')&&method==='POST'){if(!body.name||!body.base64)throw Error('Empty attachment');uploads++;return response({id:'attachment-qa-'+uploads});}
+ if(p.startsWith('/workspace/entities/')){
+  const id=p.split('/')[3],item=pages.find(x=>x.id===id)||events.find(x=>x.id===id)||filmRows.find(x=>x.id===id)||libraryRows.find(x=>x.id===id);
+  if(!item)return response({error:'Missing synthetic entity'},404);
+  if(method==='DELETE'){deletes++;pages=pages.filter(x=>x.id!==id);const eventIndex=events.findIndex(x=>x.id===id);if(eventIndex>=0)events.splice(eventIndex,1);return response({ok:true});}
+  if(method==='PATCH'){if(body.revision!==item.revision)return response({error:'Revision conflict'},409);Object.assign(item,{...body,data:{...item.data,...body.data},revision:item.revision+1});}
+  return response(item);
+ }
+ if(p==='/messages'&&method==='POST'){messages.push({id:body.client_message_id,client_id:body.client_message_id,role:'user',content:body.message,status:'sent',created_at:new Date().toISOString()});if(body.message==='Teste rolagem'){
+ for(let i=0;i<30;i++)messages.push({id:'scroll-'+i,role:'assistant',content:'Trecho '+i+' da resposta longa. A conversa deve acompanhar o crescimento.',status:'sent',created_at:new Date().toISOString()});
+ messages.push({id:'scroll-tail',role:'assistant',content:'FIM DA RESPOSTA QA',status:'sent',created_at:new Date().toISOString()});
+ setTimeout(()=>{const preceding=messages.find(m=>m.id==='scroll-29');if(preceding)preceding.content+='\n'+Array.from({length:24},(_,i)=>'Continuacao '+i+' recebida da Sofia.').join('\n');},1800);
+ }return response({conversation_id:conversation.id,messages,has_more:false,reply:''});}
+ if(p.startsWith('/chat-sync'))return response({conversation,messages,has_more:false,deleted_ids:[],current_id:conversation.id,cursor_revision:1});
+ if(p==='/conversations')return response({items:[conversation],has_more:false});
+ if(p==='/profile')return response({profile:{...profile,...body}});
+ return response({error:'Unmapped synthetic route '+p},404);
+}) as typeof fetch;
+export default function App(){const [ready,setReady]=useState(false),[tick,setTick]=useState(0);useEffect(()=>{void saveAuth({token:'q'.repeat(43),token_type:'Bearer',expires_at,profile}).then(()=>setReady(true));const id=setInterval(()=>setTick(x=>x+1),200);return()=>clearInterval(id);},[]);return <View style={{flex:1}}><Text accessibilityLabel={'QA moves '+moves+' deletes '+deletes}>SOFIA_FULL_APP_FIXTURE_ONLY</Text><Text style={{fontSize:8}} accessibilityLabel={'QA notifications '+JSON.stringify(qaNotificationState)}>QA alertas</Text><Pressable accessibilityLabel="QA atualizar remoto" onPress={()=>{pages=pages.map(x=>x.id==='other'?{...x,title:'Nome remoto',revision:x.revision+1}:x);}}><Text accessibilityLabel={'QA uploads '+uploads}>Atualizar remoto</Text></Pressable><View style={{flex:1}}>{ready?<ProductionApp/>:null}</View></View>;}

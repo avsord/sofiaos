@@ -1,0 +1,22 @@
+import React,{useRef,useState} from 'react';
+import {Alert,View,Text,TextInput,KeyboardAvoidingView,Platform,ScrollView} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import type {Definition,Entity} from '../lib/types';
+import type {SofiaApi} from '../lib/api';
+import type {Leaf} from '../lib/leaf-document';
+import {applyLeafPatch} from '../lib/leaf-document';
+import {noteLeaf,notePayload} from '../lib/note-document';
+import {errorText} from '../lib/chat-model';
+import {useTheme} from '../lib/theme';
+import {LeafEditor} from './LeafEditor';
+import {MotionModal} from './MotionModal';
+import {Sheet} from './Sheet';
+import {Choice} from './Choice';
+import {Button,ErrorBanner,IconButton,forms} from './UI';
+export function NoteEditor({api,item,definition,onClose,onSaved}:{api:SofiaApi;item:Partial<Entity>;definition:Definition;onClose:()=>void;onSaved:()=>void}){
+ const c=useTheme(),titleRef=useRef<TextInput>(null),[initial]=useState(()=>{try{return {leaf:noteLeaf(item),error:''};}catch(e){return {leaf:{id:item.id||'new-note',title:item.title||'',content:item.content||''} as Leaf,error:errorText(e)};}}),[leaf,setLeaf]=useState(initial.leaf),[record,setRecord]=useState(item),[dirty,setDirty]=useState(false),[settings,setSettings]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(initial.error);
+ function close(){if(busy)return;if(dirty)Alert.alert('Salvar a nota?','Você tem alterações nesta nota.',[{text:'Continuar escrevendo',style:'cancel'},{text:'Descartar alterações',style:'destructive',onPress:onClose},{text:'Salvar',onPress:()=>void save()}]);else onClose();}
+ async function save(){if(busy||initial.error)return;setBusy(true);try{await api.saveEntity(notePayload(record,leaf));setDirty(false);onSaved();}catch(e){setError(errorText(e));}finally{setBusy(false);}}
+ function update(patch:Partial<Entity>){setRecord(old=>({...old,...patch}));setDirty(true);}
+ return <MotionModal visible animationType="none" onRequestClose={close}><SafeAreaView style={{flex:1,backgroundColor:c.bg}}><KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}><View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:12,paddingVertical:8}}><IconButton name="back" label="Voltar das notas" onPress={close} disabled={busy}/><Text style={{flex:1,color:c.muted}}>📄 {definition.label}</Text><IconButton name="more" label="Opções da nota" onPress={()=>setSettings(true)} disabled={busy}/><Button title="Salvar" onPress={()=>void save()} loading={busy} disabled={!!initial.error}/></View>{error?<ErrorBanner text={error}/>:null}<LeafEditor leaf={leaf} titleRef={titleRef} onChange={patch=>{if(initial.error)return;setLeaf(old=>applyLeafPatch(old,patch));setDirty(true);}}/></KeyboardAvoidingView><Sheet visible={settings} onClose={()=>setSettings(false)}><ScrollView contentContainerStyle={{gap:14}}><Text style={{color:c.text,fontWeight:'600',fontSize:20}}>Opções da nota</Text><TextInput accessibilityLabel="Área da nota" value={record.area||''} placeholder="Área" placeholderTextColor={c.muted} onChangeText={area=>update({area})} style={[forms.input,{color:c.text,borderColor:c.line}]}/><Choice label="Estado da nota" value={record.state||definition.states[0]} options={definition.states.map(value=>({value,label:value==='saved'?'Salva':value==='archived'?'Arquivada':value==='idea'?'Ideia':value}))} onChange={state=>update({state})}/><Choice label="Privacidade da nota" value={record.privacy||'private'} options={[{value:'private',label:'Privada'},{value:'local',label:'Somente local'},{value:'shared',label:'Compartilhada'}]} onChange={privacy=>update({privacy})}/>{definition.fields.filter(f=>!f.developerOnly&&f.key!=='leaf_document').map(f=><View key={f.key}><Text style={{color:c.muted}}>{f.label}</Text><TextInput accessibilityLabel={f.label} value={String(record.data?.[f.key]||'')} onChangeText={value=>update({data:{...record.data,[f.key]:value}})} style={[forms.input,{color:c.text,borderColor:c.line}]}/></View>)}{item.id?<Button secondary title="Excluir nota" onPress={()=>Alert.alert('Excluir nota?','A nota será excluída do aplicativo e do site.',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{setBusy(true);api.deleteEntity(item.id!).then(onSaved).catch(e=>setError(errorText(e))).finally(()=>setBusy(false));}}])}/>:null}</ScrollView></Sheet></SafeAreaView></MotionModal>;
+}

@@ -76,9 +76,27 @@ class Workspace {
    if(kind==='commitment'&&data.end_at&&data.start_at&&data.end_at<=data.start_at)throw new AppError('BAD_DATE','O fim precisa ser posterior ao início.');
    if(kind==='course'&&data.progress!==''&&data.progress>100)throw new AppError('BAD_PROGRESS','Progresso deve ficar entre 0 e 100.');
    if(kind==='monitor'){
-     if(!data.target_id||!['purchase','course'].includes(this.get(data.target_id).kind))throw new AppError('TARGET_REQUIRED','O monitor deve referenciar um item de Comprar ou um curso existente.');
-     if(!data.variant)throw new AppError('VARIANT_REQUIRED','Defina a variante exata para não comparar produtos diferentes.');
      data.currency=data.currency||'BRL';data.method=data.method||'manual';data.interval_minutes=data.interval_minutes||360;
+     if(data.method==='product'){
+       if(data.target_id&&!['purchase','course'].includes(this.get(data.target_id).kind))throw new AppError('TARGET_REQUIRED','O item vinculado precisa ser de Comprar ou um curso existente.');
+       if(!data.preferred_url)throw new AppError('STORE_REQUIRED','Cole o link da página do produto na loja principal.');
+     }
+     else if(!data.target_id||!['purchase','course'].includes(this.get(data.target_id).kind))throw new AppError('TARGET_REQUIRED','O monitor deve referenciar um item de Comprar ou um curso existente.');
+     if(!data.variant)throw new AppError('VARIANT_REQUIRED','Defina a variante exata para não comparar produtos diferentes.');
+     if(data.preferred_url&&!data.preferred_url.startsWith('https://'))throw new AppError('BAD_STORE_URL','O link da loja principal precisa usar HTTPS.');
+     if(data.source_urls){
+       const lines=data.source_urls.split('\n').map(l=>l.trim()).filter(Boolean);
+       if(lines.length>10)throw new AppError('TOO_MANY_SOURCES','Use até 10 lojas por produto.');
+       const seen=new Set();
+       for(const line of lines){
+         let u;try{u=new URL(line);}catch{throw new AppError('BAD_STORE_URL','"'+line.slice(0,60)+'" não é um link completo. Use um link por linha.');}
+         if(u.protocol!=='https:'||u.username||u.password)throw new AppError('BAD_STORE_URL','Cada loja precisa de um link HTTPS, sem credenciais.');
+         if(seen.has(u.toString()))throw new AppError('BAD_STORE_URL','Esse link aparece duas vezes: '+u.hostname+'.');
+         seen.add(u.toString());
+       }
+       data.source_urls=lines.join('\n');
+     }
+     if(data.line_color&&!/^#[0-9a-fA-F]{6}$/.test(data.line_color))throw new AppError('BAD_COLOR','Escolha uma cor válida para a linha do gráfico.');
      if(!Number.isInteger(data.interval_minutes)||data.interval_minutes<15||data.interval_minutes>43200)throw new AppError('BAD_INTERVAL','Intervalo entre 15 e 43200 minutos.');
      if(data.drop_percent!==''&&data.drop_percent>100)throw new AppError('BAD_PERCENT','Queda deve ficar entre 0 e 100%.');
      if(data.method==='json'&&(!data.feed_url||!data.price_path||!data.variant_path||!data.currency_path||!data.consent))throw new AppError('FEED_REQUIRED','Informe feed HTTPS autorizado, campos de preço/variante/moeda e consentimento.');
@@ -86,6 +104,21 @@ class Workspace {
      if(data.feed_url&&!data.feed_url.startsWith('https://'))throw new AppError('BAD_FEED','O feed precisa usar HTTPS.');
      if(old&&this.db.prepare('SELECT id FROM observations WHERE monitor_id=? LIMIT 1').get(old.id)&&['target_id','variant','currency'].some(k=>data[k]!==old.data[k]))throw new AppError('OBSERVATION_SCOPE','Esse monitor já tem observações. Crie outro para mudar produto, variante ou moeda.');
    }
+   if(kind==='fin_account'){data.account_type=data.account_type||'corrente';if(data.initial_balance!==''&&!/^-?\d{1,10}(\.\d{1,2})?$/.test(String(data.initial_balance)))throw new AppError('BAD_BALANCE','Saldo inicial: use um valor como 1500.50 ou -200.');}
+   if(kind==='fin_card'){for(const k of ['closing_day','due_day'])if(!Number.isInteger(data[k])||data[k]<1||data[k]>31)throw new AppError('BAD_CARD_DAY','Dias de fechamento e vencimento entre 1 e 31.');if(data.limit===''||data.limit<=0)throw new AppError('BAD_LIMIT','Informe o limite do cartão.');}
+   if(kind==='fin_tx'){
+     data.kind=data.kind||'expense';data.recurrence=data.recurrence||'none';
+     if(data.amount===''||!(data.amount>0))throw new AppError('BAD_AMOUNT','Informe um valor maior que zero.');
+     if(!data.date)throw new AppError('DATE_REQUIRED','Informe a data do lançamento.');
+     if(data.kind==='transfer'&&(!data.account_id||!data.to_account_id||data.account_id===data.to_account_id))throw new AppError('BAD_TRANSFER','Escolha duas contas diferentes para a transferência.');
+     if(data.kind==='card_payment'&&(!data.card_id||!/^\d{4}-\d{2}$/.test(data.invoice_month)))throw new AppError('BAD_INVOICE','Pagamento de fatura precisa do cartão e do mês da fatura.');
+     if(data.kind==='expense'&&!data.account_id&&!data.card_id)throw new AppError('SOURCE_REQUIRED','Escolha a conta ou o cartão.');
+     if(data.kind==='income'&&!data.account_id)throw new AppError('SOURCE_REQUIRED','Escolha a conta que recebe.');
+     if(data.invoice_month&&!/^\d{4}-\d{2}$/.test(data.invoice_month))throw new AppError('BAD_INVOICE','Mês da fatura inválido.');
+     if(data.installments!==''&&(!Number.isInteger(data.installments)||data.installments<1||data.installments>72))throw new AppError('BAD_INSTALLMENTS','Parcelas entre 1 e 72.');
+   }
+   if(kind==='fin_budget'&&(!data.category||data.limit===''||data.limit<=0))throw new AppError('BAD_BUDGET','Escolha a categoria e o limite mensal.');
+   if(kind==='fin_goal'&&(data.target===''||data.target<=0))throw new AppError('BAD_GOAL','Informe o valor do objetivo.');
    if(kind==='routine'&&state==='active'){
      if(!data.frequency||!data.time||!data.starts_on||!data.delivery)throw new AppError('ROUTINE_INCOMPLETE','Defina frequência, horário, início e entrega antes de ativar.');
      if(data.frequency==='weekly'&&(!Number.isInteger(data.weekday)||data.weekday>6))throw new AppError('BAD_WEEKDAY','Dia da semana: 0 a 6.');
@@ -169,7 +202,7 @@ class Workspace {
    const previous=this.observations(key),cents=Math.round(price*100),freight=Math.round(shipping*100),total=cents+freight,sourceKey=b.source_key?cleanText(b.source_key,'ID da observação',160):null;
    const duplicate=sourceKey&&this.db.prepare('SELECT * FROM observations WHERE monitor_id=? AND source_key=?').get(key,sourceKey);if(duplicate)return {...duplicate,replayed:true};
    return this.s.tx(()=>{const oid=id();this.db.prepare('INSERT INTO observations VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(oid,key,cents,freight,total,b.currency,b.variant,source,when,now(),sourceKey);
-     const history=previous.filter(p=>p.observed_at<=when),latest=history.at(-1),min=history.length?Math.min(...history.map(x=>x.total_cents)):null;
+     const history=previous.filter(p=>p.observed_at<=when),latest=history.filter(p=>p.source===source).at(-1),min=history.length?Math.min(...history.map(x=>x.total_cents)):null;
      const reasons=[];if(mon.data.target_price!==''&&total<=Math.round(mon.data.target_price*100))reasons.push('atingiu o preço-alvo');
      if(latest&&mon.data.drop_percent!==''&&total<latest.total_cents&&(latest.total_cents-total)/latest.total_cents*100>=mon.data.drop_percent)reasons.push('atingiu a queda percentual');
      if(mon.data.new_low&&min!==null&&total<min)reasons.push('menor total desde o início das suas observações');
@@ -220,7 +253,7 @@ class Workspace {
    return {scope:resolved,deleted};
  }
  removePurchaseGroup(groupId){const group=this.get(groupId);if(group.kind!=='purchase_group')throw new AppError('BAD_KIND','Selecione um grupo de compras.');return this.s.tx(()=>{const items=this.list({kind:'purchase',limit:500}).filter(e=>e.data.purchase_group_id===groupId);for(const e of items)this.save({...e,revision:e.revision,data:{...e.data,purchase_group_id:''}},e.id);const deleted=this.deleteEntity(groupId);return {deleted,detached:items.length};});}
- panorama(){const all=this.list({limit:500}),tasks=this.s.tasks(),today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());const activeTasks=tasks.filter(t=>!['done','cancelled'].includes(t.state));return {today,stats:this.s.stats(),tasks:activeTasks.slice(0,12),priorities:activeTasks.filter(t=>t.priority),today_tasks:activeTasks.filter(t=>t.due_at&&require('../services/scheduler').localISO(new Date(t.due_at))===today),active_flows:all.filter(e=>!['completed','archived','cancelled','purchased','watched','paid_reported','uploaded_reported'].includes(e.state)&&CATALOG[e.kind].group==='flow'),lessons:all.filter(e=>e.kind==='lesson'&&['active','paused'].includes(e.state)),notifications:this.notifications().filter(n=>n.state==='unread'),timeline:this.timeline({limit:12}),truncated:all.length===500};}
+ panorama(){const all=this.list({limit:500}),tasks=this.s.tasks(),today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());const activeTasks=tasks.filter(t=>!['done','cancelled'].includes(t.state));return {today,stats:this.s.stats(),tasks:activeTasks.slice(0,12),priorities:activeTasks.filter(t=>t.priority),today_tasks:activeTasks.filter(t=>t.due_at&&require('../services/scheduler').localISO(new Date(t.due_at))===today),active_flows:all.filter(e=>!['completed','archived','cancelled','purchased','watched','paid_reported','uploaded_reported'].includes(e.state)&&CATALOG[e.kind]?.group==='flow'),lessons:all.filter(e=>e.kind==='lesson'&&['active','paused'].includes(e.state)),notifications:this.notifications().filter(n=>n.state==='unread'),timeline:this.timeline({limit:12}),truncated:all.length===500};}
  context(query,limit=5,{route='private'}={}){const allowed=e=>route==='shared'?e.privacy==='shared':e.privacy!=='local';return this.list({limit:500}).filter(e=>allowed(e)&&!['contact','payment','invoice','approval','recipe_session'].includes(e.kind)&&e.state!=='archived').map(e=>({...e,rank:normalize(query).split(/\W+/).filter(t=>t.length>2&&normalize(e.title+' '+e.content+' '+e.tags.join(' ')+' '+JSON.stringify(e.data)).includes(t)).length})).filter(e=>e.rank>0).sort((a,b)=>b.rank-a.rank).slice(0,limit).map(e=>({id:e.id,kind:e.kind,title:e.title,content:e.content,data:e.data,tags:e.tags,area:e.area,privacy:e.privacy}));}
  contextSensitivity(query){const hits=this.context(query,8,{route:'private'});if(hits.some(e=>e.privacy==='private'))return 'private';if(hits.some(e=>e.privacy==='shared'))return 'shared';return 'none';}
 }

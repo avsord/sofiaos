@@ -1,0 +1,10 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
+const defaults={'./system-notification-permission':{ensureSystemNotificationPermission:async()=>true},
+ // 0.3.117: every screen measures its renders; in tests the hook is a no-op unless a test provides its own.
+ '../lib/render-cost':{useRenderCost(){}},'./render-cost':{useRenderCost(){}}};
+module.exports=function load(file,deps={},globals={}){const exports={},available={...defaults,...deps};const code=ts.transpileModule(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),{fileName:file,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;vm.runInNewContext(code,{exports,require:name=>{if(name==='./idle-task'&&!(name in available))return module.exports('src/lib/idle-task.ts',{},globals);if(name==='./chat-window'&&!(name in available))return module.exports('src/lib/chat-window.ts');if(name==='./startup-read-ahead'&&!(name in available))return module.exports('src/lib/startup-read-ahead.ts');if(!(name in available)){
+ const files={'./fluency':'src/lib/fluency.ts','../lib/fluency':'src/lib/fluency.ts','./idle-work':'src/lib/idle-work.ts','./fluency-metrics':'src/lib/fluency-metrics.ts','../lib/fluency-metrics':'src/lib/fluency-metrics.ts','./visible-load':'src/lib/visible-load.ts','../lib/visible-load':'src/lib/visible-load.ts','./startup-mounts-legacy':'src/lib/startup-mounts-legacy.ts','./MountTimer':'src/components/MountTimer.tsx'};
+ if(files[name])return module.exports(files[name],available,globals);
+ throw Error('Unexpected dependency '+name);
+ }return available[name];},setTimeout,clearTimeout,Date,URL,console,Error,Promise,Set,Map,...globals});return exports;};

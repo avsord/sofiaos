@@ -1,0 +1,12 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict');const {durationLabel,initials,dayKey,mergeMessages,statusLabel,errorText}=require(process.env.SOFIA_MODEL_FILE);
+const user=(extra={})=>({id:'optimistic-1',client_id:'same-id',role:'user',created_at:'2026-10-01T10:00:00Z',content:'Olá',status:'sending',...extra});
+test('duration',()=>{assert.equal(durationLabel(0),'0:00');assert.equal(durationLabel(61500),'1:01');assert.equal(durationLabel(-1),'0:00');});
+test('initials',()=>{assert.equal(initials('Pedro Silva'),'PS');assert.equal(initials('   '),'S');});
+test('server reconciliation without duplicate',()=>{const r=mergeMessages([user()],[user({id:'server-id',status:'done'})]);assert.equal(r.length,1);assert.equal(r[0].id,'server-id');});
+test('separate assistant replies',()=>{const r=mergeMessages([user()],[{id:'r1',role:'assistant',created_at:'2026-10-01T10:01:00Z',content:'Oi',status:'saved'},{id:'r2',role:'assistant',created_at:'2026-10-01T10:02:00Z',content:'Sim',status:'saved'}]);assert.equal(r.length,3);});
+test('sequence order',()=>{assert.equal(mergeMessages([user({id:'a',client_id:'a',sequence:2})],[user({id:'b',client_id:'b',sequence:1})])[0].id,'b');});
+test('late success clears local error',()=>{assert.equal(mergeMessages([user({status:'failed',error:'Network'})],[user({status:'done'})])[0].error,undefined);});
+test('status has no fake human-read indicator',()=>{assert.equal(statusLabel('pending'),'Processando');assert.equal(statusLabel('sending'),'Enviando');});
+test('error visibility',()=>{assert.equal(errorText(new Error('Sem internet')),'Sem internet');assert.match(errorText(null),/Não foi possível/);});
+test('local calendar day',()=>{assert.equal(dayKey(new Date(2026,9,1,23,59)),'2026-10-01');});
