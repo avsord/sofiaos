@@ -1523,6 +1523,244 @@ const CATALOG={
       }
     ],
     "description": "Aprendizado revisável: um caso não vira regra universal."
+  },
+  "fin_account": {
+    "label": "Conta (Finanças)",
+    "group": "finance",
+    "defaultPrivacy": "private",
+    "states": [
+      "active",
+      "archived"
+    ],
+    "fields": [
+      {
+        "key": "account_type",
+        "label": "Tipo",
+        "type": "select",
+        "options": [
+          "corrente",
+          "poupanca",
+          "carteira",
+          "investimento",
+          "outro"
+        ]
+      },
+      {
+        "key": "initial_balance",
+        "label": "Saldo inicial",
+        "type": "text",
+        "max": 20
+      },
+      {
+        "key": "color",
+        "label": "Cor",
+        "type": "text",
+        "max": 20
+      },
+      {
+        "key": "include_total",
+        "label": "Somar no saldo geral",
+        "type": "checkbox"
+      }
+    ],
+    "description": "Conta bancária, carteira ou investimento. O saldo é calculado a partir dos lançamentos pagos; nada é estimado."
+  },
+  "fin_card": {
+    "label": "Cartão de crédito",
+    "group": "finance",
+    "defaultPrivacy": "private",
+    "states": [
+      "active",
+      "archived"
+    ],
+    "fields": [
+      {
+        "key": "limit",
+        "label": "Limite",
+        "type": "number"
+      },
+      {
+        "key": "closing_day",
+        "label": "Dia de fechamento",
+        "type": "number"
+      },
+      {
+        "key": "due_day",
+        "label": "Dia de vencimento",
+        "type": "number"
+      },
+      {
+        "key": "color",
+        "label": "Cor",
+        "type": "text",
+        "max": 20
+      },
+      {
+        "key": "account_id",
+        "label": "Conta que paga a fatura",
+        "type": "text",
+        "max": 80
+      }
+    ],
+    "description": "Fatura calculada pelas compras e pelo dia de fechamento."
+  },
+  "fin_tx": {
+    "label": "Lançamento",
+    "group": "finance",
+    "defaultPrivacy": "private",
+    "states": [
+      "active",
+      "archived"
+    ],
+    "fields": [
+      {
+        "key": "kind",
+        "label": "Tipo",
+        "type": "select",
+        "options": [
+          "expense",
+          "income",
+          "transfer",
+          "card_payment"
+        ]
+      },
+      {
+        "key": "amount",
+        "label": "Valor",
+        "type": "number"
+      },
+      {
+        "key": "date",
+        "label": "Data",
+        "type": "date"
+      },
+      {
+        "key": "category",
+        "label": "Categoria",
+        "type": "text",
+        "max": 60
+      },
+      {
+        "key": "account_id",
+        "label": "Conta",
+        "type": "text",
+        "max": 80
+      },
+      {
+        "key": "to_account_id",
+        "label": "Conta de destino",
+        "type": "text",
+        "max": 80
+      },
+      {
+        "key": "card_id",
+        "label": "Cartão",
+        "type": "text",
+        "max": 80
+      },
+      {
+        "key": "invoice_month",
+        "label": "Fatura (AAAA-MM)",
+        "type": "text",
+        "max": 7
+      },
+      {
+        "key": "paid",
+        "label": "Pago / recebido",
+        "type": "checkbox"
+      },
+      {
+        "key": "series_id",
+        "label": "Série",
+        "type": "text",
+        "max": 80
+      },
+      {
+        "key": "installment",
+        "label": "Parcela",
+        "type": "number"
+      },
+      {
+        "key": "installments",
+        "label": "Total de parcelas",
+        "type": "number"
+      },
+      {
+        "key": "recurrence",
+        "label": "Repetir",
+        "type": "select",
+        "options": [
+          "none",
+          "monthly",
+          "weekly",
+          "yearly"
+        ]
+      },
+      {
+        "key": "recurrence_end",
+        "label": "Repetir até (AAAA-MM)",
+        "type": "text",
+        "max": 7
+      }
+    ],
+    "description": "Despesa, receita, transferência ou pagamento de fatura."
+  },
+  "fin_budget": {
+    "label": "Orçamento",
+    "group": "finance",
+    "defaultPrivacy": "private",
+    "states": [
+      "active",
+      "archived"
+    ],
+    "fields": [
+      {
+        "key": "category",
+        "label": "Categoria",
+        "type": "text",
+        "max": 60
+      },
+      {
+        "key": "limit",
+        "label": "Limite mensal",
+        "type": "number"
+      }
+    ],
+    "description": "Limite mensal de gastos por categoria."
+  },
+  "fin_goal": {
+    "label": "Objetivo",
+    "group": "finance",
+    "defaultPrivacy": "private",
+    "states": [
+      "active",
+      "completed",
+      "archived"
+    ],
+    "fields": [
+      {
+        "key": "target",
+        "label": "Valor do objetivo",
+        "type": "number"
+      },
+      {
+        "key": "saved",
+        "label": "Já guardado",
+        "type": "number"
+      },
+      {
+        "key": "deadline",
+        "label": "Prazo",
+        "type": "date"
+      },
+      {
+        "key": "color",
+        "label": "Cor",
+        "type": "text",
+        "max": 20
+      }
+    ],
+    "description": "Meta de economia com acompanhamento do quanto falta."
   }
 };
 module.exports={CATALOG};

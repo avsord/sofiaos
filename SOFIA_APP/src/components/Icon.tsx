@@ -23,7 +23,8 @@ const paths = {
  book:'M3 4h7l2 2 2-2h7v16h-7l-2 1-2-1H3V4zm9 2v15',
  list:'M9 6h12M9 12h12M9 18h12M3 6h1M3 12h1M3 18h1',
  edit:'M15 4l5 5M4 15L16 3l5 5L9 20l-6 1 1-6z',
- monitor:'M3 4h18v13H3V4zm5 17h8m-4-4v4M6 13l4-4 4 2 4-5'
+ monitor:'M3 4h18v13H3V4zm5 17h8m-4-4v4M6 13l4-4 4 2 4-5',
+ wallet:'M3 7h15a3 3 0 0 1 3 3v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7zm0 0V6a2 2 0 0 1 2-2h11v3M16 14h2'
 } as const;
 export type IconName = keyof typeof paths;
 export function Icon({ name, size=22, color='#7258E8' }: { name: IconName; size?: number; color?: string }) {

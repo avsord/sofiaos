@@ -104,6 +104,21 @@ class Workspace {
      if(data.feed_url&&!data.feed_url.startsWith('https://'))throw new AppError('BAD_FEED','O feed precisa usar HTTPS.');
      if(old&&this.db.prepare('SELECT id FROM observations WHERE monitor_id=? LIMIT 1').get(old.id)&&['target_id','variant','currency'].some(k=>data[k]!==old.data[k]))throw new AppError('OBSERVATION_SCOPE','Esse monitor já tem observações. Crie outro para mudar produto, variante ou moeda.');
    }
+   if(kind==='fin_account'){data.account_type=data.account_type||'corrente';if(data.initial_balance!==''&&!/^-?\d{1,10}(\.\d{1,2})?$/.test(String(data.initial_balance)))throw new AppError('BAD_BALANCE','Saldo inicial: use um valor como 1500.50 ou -200.');}
+   if(kind==='fin_card'){for(const k of ['closing_day','due_day'])if(!Number.isInteger(data[k])||data[k]<1||data[k]>31)throw new AppError('BAD_CARD_DAY','Dias de fechamento e vencimento entre 1 e 31.');if(data.limit===''||data.limit<=0)throw new AppError('BAD_LIMIT','Informe o limite do cartão.');}
+   if(kind==='fin_tx'){
+     data.kind=data.kind||'expense';data.recurrence=data.recurrence||'none';
+     if(data.amount===''||!(data.amount>0))throw new AppError('BAD_AMOUNT','Informe um valor maior que zero.');
+     if(!data.date)throw new AppError('DATE_REQUIRED','Informe a data do lançamento.');
+     if(data.kind==='transfer'&&(!data.account_id||!data.to_account_id||data.account_id===data.to_account_id))throw new AppError('BAD_TRANSFER','Escolha duas contas diferentes para a transferência.');
+     if(data.kind==='card_payment'&&(!data.card_id||!/^\d{4}-\d{2}$/.test(data.invoice_month)))throw new AppError('BAD_INVOICE','Pagamento de fatura precisa do cartão e do mês da fatura.');
+     if(data.kind==='expense'&&!data.account_id&&!data.card_id)throw new AppError('SOURCE_REQUIRED','Escolha a conta ou o cartão.');
+     if(data.kind==='income'&&!data.account_id)throw new AppError('SOURCE_REQUIRED','Escolha a conta que recebe.');
+     if(data.invoice_month&&!/^\d{4}-\d{2}$/.test(data.invoice_month))throw new AppError('BAD_INVOICE','Mês da fatura inválido.');
+     if(data.installments!==''&&(!Number.isInteger(data.installments)||data.installments<1||data.installments>72))throw new AppError('BAD_INSTALLMENTS','Parcelas entre 1 e 72.');
+   }
+   if(kind==='fin_budget'&&(!data.category||data.limit===''||data.limit<=0))throw new AppError('BAD_BUDGET','Escolha a categoria e o limite mensal.');
+   if(kind==='fin_goal'&&(data.target===''||data.target<=0))throw new AppError('BAD_GOAL','Informe o valor do objetivo.');
    if(kind==='routine'&&state==='active'){
      if(!data.frequency||!data.time||!data.starts_on||!data.delivery)throw new AppError('ROUTINE_INCOMPLETE','Defina frequência, horário, início e entrega antes de ativar.');
      if(data.frequency==='weekly'&&(!Number.isInteger(data.weekday)||data.weekday>6))throw new AppError('BAD_WEEKDAY','Dia da semana: 0 a 6.');

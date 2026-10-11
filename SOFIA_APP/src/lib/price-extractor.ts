@@ -172,9 +172,15 @@ export function buildInjectedScript(): string {
 (function(){
   try {
     ${EXTRACT_PRICE_SOURCE}
-    var result = extractPrice(document);
-    var title = productTitle(document);
-    window.ReactNativeWebView.postMessage(JSON.stringify({ok:true,title:title,result:result}));
+    var tries = 0;
+    var run = function(){
+      try {
+        var result = extractPrice(document);
+        if (!result.found && tries < 7) { tries++; setTimeout(run, 800); return; }
+        window.ReactNativeWebView.postMessage(JSON.stringify({ok:true,title:productTitle(document),result:result}));
+      } catch (e) { window.ReactNativeWebView.postMessage(JSON.stringify({ok:false,error:String(e && e.message || e)})); }
+    };
+    run();
   } catch (e) {
     window.ReactNativeWebView.postMessage(JSON.stringify({ok:false,error:String(e && e.message || e)}));
   }
@@ -202,63 +208,88 @@ export function formatCurrency(amount: number, currency: string | null): string 
   }
 }
 
-// Busca de links da MESMA loja numa página de resultados (find-store-links.js),
-// copiada sem alteração; teste de equivalência em tests/price-extractor.test.cjs.
+// Busca do mesmo produto em outra loja. A primeira versão só aceitava links
+// com 3 barras e o domínio exato, e lia a página assim que ela carregava —
+// por isso Mercado Livre (produto.mercadolivre.com.br/MLB-…), Pichau
+// (/nome-do-produto) e lojas que montam a lista por JavaScript voltavam
+// vazias. Agora: regra de link de produto por loja, subdomínios aceitos,
+// links de buscadores decodificados, espera a lista aparecer e ordena pela
+// semelhança com o nome procurado.
 export const FIND_LINKS_SOURCE = `
-const NOISE_PATH = /\\/(login|cadastro|carrinho|ajuda|sobre|institucional|central-de-ajuda|politica|termos|trabalhe-conosco|minha-conta|favoritos|rastreio)(\\/|$)/i;
-
-function hostnameOf(href, baseUrl) {
-  try { return new URL(href, baseUrl).hostname.replace(/^www\\./, ''); }
-  catch (_) { return null; }
+function norm(t){return String(t||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();}
+function tokens(t){return norm(t).split(/[^a-z0-9]+/).filter(function(w){return w.length>1;});}
+var RULES={
+  'kabum.com.br':/\\/produto\\/\\d+/,
+  'mercadolivre.com.br':/MLB-?\\d{6,}/i,
+  'pichau.com.br':/^\\/[a-z0-9]+(?:-[a-z0-9]+){3,}\\/?$/,
+  'amazon.com.br':/\\/(?:dp|gp\\/product)\\/[A-Z0-9]{10}/,
+  'magazineluiza.com.br':/\\/p\\/[a-z0-9]{6,}/i,
+  'terabyteshop.com.br':/\\/produto\\/\\d+/,
+  'casasbahia.com.br':/\\/p\\/\\d+/
+};
+var NOISE=/\\/(login|entrar|cadastro|carrinho|cart|checkout|ajuda|help|sobre|institucional|politica|termos|minha-conta|favoritos|rastreio|busca|search|categoria|departamento|ofertas|cupons|lojas|blog)(\\/|$)/i;
+function realUrl(href){
+  try{var u=new URL(href,location.href);
+    if(/duckduckgo\\.com$/.test(u.hostname)&&u.searchParams.get('uddg'))u=new URL(u.searchParams.get('uddg'));
+    if(/(^|\\.)google\\./.test(u.hostname)&&u.pathname==='/url'&&u.searchParams.get('q'))u=new URL(u.searchParams.get('q'));
+    if(/(^|\\.)bing\\.com$/.test(u.hostname)&&u.searchParams.get('u'))return null;
+    return u;}catch(e){return null;}
 }
-
-/** doc: documento da página de busca já carregada.
- *  targetHost: domínio da loja que estamos procurando (ex. "kabum.com.br").
- *  baseUrl: URL da própria página de busca, para resolver links relativos.
- *  excludeHost: domínio da loja original, nunca ofertada como "outra loja". */
-function findStoreLinks(doc, targetHost, baseUrl, excludeHost) {
-  const anchors = doc.querySelectorAll('a[href]');
-  const seen = new Set(), out = [];
-  for (const a of anchors) {
-    const href = a.getAttribute('href');
-    if (!href) continue;
-    const host = hostnameOf(href, baseUrl);
-    if (!host || host !== targetHost) continue;
-    if (excludeHost && host === excludeHost) continue;
-    let absolute;
-    try { absolute = new URL(href, baseUrl).toString(); } catch (_) { continue; }
-    if (NOISE_PATH.test(absolute)) continue;
-    // Heurística, não garantia: página de produto costuma ter pelo menos
-    // /algo/id/slug (3 barras). Categoria/busca costuma ser mais rasa.
-    // Ajustar por loja se o padrão real divergir — validar com teste manual.
-    const pathDepth = (new URL(absolute).pathname.match(/\\//g) || []).length;
-    if (pathDepth < 3) continue;
-    if (seen.has(absolute)) continue;
-    seen.add(absolute);
-    const title = (a.textContent || '').trim().slice(0, 200) ||
-      (a.querySelector('img[alt]') ? a.querySelector('img[alt]').getAttribute('alt') : '') || '';
-    out.push({ url: absolute, title, host });
-    if (out.length >= 12) break; // teto generoso; a tela mostra só os melhores
+function hostMatch(h,t){h=String(h||'').replace(/^www\\./,'');return h===t||h.slice(-(t.length+1))==='.'+t;}
+function cleanUrl(u,t){
+  if(t==='amazon.com.br'){var m=u.pathname.match(/\\/(?:dp|gp\\/product)\\/([A-Z0-9]{10})/);if(m)return 'https://www.amazon.com.br/dp/'+m[1];}
+  if(t==='mercadolivre.com.br'){var ml=u.href.match(/MLB-?(\\d{6,})/i);if(ml&&/click\\d*\\.|mclics/.test(u.href))return null;}
+  u.hash='';u.search='';u.protocol='https:';return u.toString();
+}
+function labelOf(a){
+  var t=(a.getAttribute('title')||a.getAttribute('aria-label')||a.textContent||'').replace(/\\s+/g,' ').trim();
+  if(t.length<8){var img=a.querySelector('img[alt]');if(img&&img.getAttribute('alt'))t=img.getAttribute('alt');}
+  if(t.length<8){var card=a.closest('article,li,[class*="card" i],[class*="product" i],[class*="item" i]');
+    if(card){var h=card.querySelector('h2,h3,[class*="title" i],[class*="name" i],[class*="nome" i]');if(h)t=h.textContent.replace(/\\s+/g,' ').trim();}}
+  return String(t).slice(0,200);
+}
+function findStoreLinks(doc,target,exclude,terms){
+  var rule=RULES[target]||null,want=tokens(terms),out={},anchors=doc.querySelectorAll('a[href]');
+  for(var i=0;i<anchors.length;i++){
+    var a=anchors[i],u=realUrl(a.getAttribute('href'));
+    if(!u||(u.protocol!=='https:'&&u.protocol!=='http:'))continue;
+    if(!hostMatch(u.hostname,target)||(exclude&&hostMatch(u.hostname,exclude)))continue;
+    if(NOISE.test(u.pathname))continue;
+    if(rule){if(!rule.test(target==='mercadolivre.com.br'?u.href:u.pathname))continue;}
+    else if((u.pathname.match(/\\//g)||[]).length<2)continue;
+    var url=cleanUrl(u,target);if(!url)continue;
+    var title=labelOf(a),have=tokens(title),hit=0;
+    for(var k=0;k<want.length;k++)if(have.indexOf(want[k])>=0)hit++;
+    var score=want.length?hit/want.length:0,prev=out[url];
+    if(!prev||title.length>prev.title.length)out[url]={url:url,title:title,host:target,score:Math.max(score,prev?prev.score:0)};
   }
-  return out;
+  var list=Object.keys(out).map(function(k){return out[k];}).filter(function(x){return x.title.length>=6;});
+  list.sort(function(a,b){return b.score-a.score;});
+  return list.slice(0,8);
 }
 `.trim();
 
-export type StoreLink = {url: string; title: string; host: string};
-export type LinksReaderMessage = {ok: true; links: StoreLink[]} | {ok: false; error: string};
+export type StoreLink = {url: string; title: string; host: string; score?: number};
+export type LinksReaderMessage = {ok: true; links: StoreLink[]; anchors?: number; blocked?: boolean; tries?: number} | {ok: false; error: string};
 
-export function buildLinksScript(targetHost: string, excludeHost: string): string {
-  const args = JSON.stringify([targetHost, excludeHost]);
+/** Roda dentro da página de busca. Se ainda não há link de produto, rola a
+ * página e tenta de novo (até ~9 s): muitas lojas montam a lista depois. */
+export function buildLinksScript(targetHost: string, excludeHost: string, terms = ''): string {
+  const args = JSON.stringify([targetHost, excludeHost, terms]);
   return `
 (function(){
-  try {
-    ${FIND_LINKS_SOURCE}
-    var a = ${args};
-    var links = findStoreLinks(document, a[0], location.href, a[1]);
-    window.ReactNativeWebView.postMessage(JSON.stringify({ok:true,links:links}));
-  } catch (e) {
-    window.ReactNativeWebView.postMessage(JSON.stringify({ok:false,error:String(e && e.message || e)}));
+  var a = ${args}, tries = 0;
+  function post(m){ window.ReactNativeWebView.postMessage(JSON.stringify(m)); }
+  ${FIND_LINKS_SOURCE}
+  function run(){
+    try {
+      var links = findStoreLinks(document, a[0], a[1], a[2]);
+      if (!links.length && tries < 11) { tries++; try { window.scrollTo(0, document.body.scrollHeight * Math.min(1, tries / 4)); } catch (e) {} setTimeout(run, 800); return; }
+      var text = (document.title + ' ' + ((document.body && document.body.innerText) || '').slice(0, 600)).toLowerCase();
+      post({ok:true, links:links, anchors:document.querySelectorAll('a[href]').length, tries:tries, blocked:/captcha|robot|rob[oô]|access denied|acesso negado|verifica[cç][aã]o de seguran[cç]a/.test(text)});
+    } catch (e) { post({ok:false, error:String(e && e.message || e)}); }
   }
+  run();
 })();
 true;
 `.trim();
@@ -269,10 +300,16 @@ export function parseLinksMessage(raw: string): LinksReaderMessage {
     const data = JSON.parse(raw);
     if (data && data.ok === true && Array.isArray(data.links)) {
       const links = data.links.filter((l: any) => l && typeof l.url === 'string' && /^https:\/\//.test(l.url)).slice(0, 12)
-        .map((l: any) => ({url: String(l.url), title: String(l.title || '').slice(0, 200), host: String(l.host || '')}));
-      return {ok: true, links};
+        .map((l: any) => ({url: String(l.url), title: String(l.title || '').slice(0, 200), host: String(l.host || ''), score: Number(l.score) || 0}));
+      return {ok: true, links, anchors: Number(data.anchors) || 0, blocked: !!data.blocked, tries: Number(data.tries) || 0};
     }
     if (data && data.ok === false) return {ok: false, error: String(data.error || 'Busca falhou.')};
   } catch (_) {}
   return {ok: false, error: 'A busca devolveu algo que a Sofia não entendeu.'};
+}
+
+/** Busca alternativa quando a loja não devolve nada: buscador em HTML
+ * simples, restrito ao domínio da loja. */
+export function fallbackSearchUrl(host: string, terms: string): string {
+  return 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent('site:' + host + ' ' + terms);
 }

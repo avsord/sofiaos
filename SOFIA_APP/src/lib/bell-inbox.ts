@@ -16,7 +16,7 @@ export function dueNotices(plans:Entity[],history:Entity[],routines:Entity[],tas
 export function presentedNotice(request:{identifier:string;content:{title?:string|null;body?:string|null;data?:Record<string,any>}},scope:string,date=Date.now()):BellNotice|null{
  const d=request.content.data||{};if(d.scope!==notificationScope(scope)||!(d.sofiaCapsule||d.sofiaAgenda||d.sofiaRoutine||d.sofiaMonitor))return null;
  const id=d.sofiaCapsule?'local:capsule:'+d.planId+':'+d.day+':'+d.time+(d.early?':early':''):'local:delivered:'+request.identifier;
- return {id,title:request.content.title||'Sofia',body:request.content.body||'',state:'unread',category:d.sofiaCapsule?'capsule':d.sofiaRoutine?'routine':d.sofiaMonitor?'monitor':'agenda',created_at:new Date(date).toISOString(),entity_id:d.planId||d.entityId,local:true};
+ return {id,title:request.content.title||'Sofia',body:request.content.body||'',state:'unread',category:d.sofiaCapsule?'capsule':d.sofiaRoutine?'routine':d.sofiaMonitor?'monitor':'agenda',created_at:new Date(date).toISOString(),entity_id:d.planId||d.entityId||d.monitorId,local:true};
 }
 export function mergeBellNotices(remote:BellNotice[],local:BellNotice[]){const remoteKeys=new Set(remote.map(n=>n.dedup).filter(Boolean));return [...remote,...local.filter(n=>!n.dedup||!remoteKeys.has(n.dedup))].sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at));}
 /** Local delivered/due reminders augment, never overwrite, server notifications. */

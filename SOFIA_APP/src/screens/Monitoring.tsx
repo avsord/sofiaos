@@ -15,6 +15,7 @@ import {Button, IconButton} from '../components/UI';
 import {PriceChart} from '../components/PriceChart';
 import {readPrice, readLinks} from '../lib/price-reader';
 import type {StoreLink} from '../lib/price-extractor';
+import {fallbackSearchUrl} from '../lib/price-extractor';
 import {collectorState, onCollector, runCollection, loadProducts, recordPrice, clearIssue, issueKey} from '../lib/monitor-collector';
 import type {StoreIssue} from '../lib/monitor-collector';
 import {
@@ -71,13 +72,15 @@ function issuesFor(product: ProductSeries, issues: Record<string, StoreIssue>) {
 }
 
 // ======================= TELA PRINCIPAL =======================
-export function Monitoring({api, active, onBack}: {api: SofiaApi; active: boolean; onBack: () => void}) {
+export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; active: boolean; onBack: () => void; focusId?: string}) {
   useRenderCost('apps:monitoring');
   const c = useTheme(), insets = useSafeAreaInsets(), col = useCollector();
   const [products, setProducts] = useState<ProductSeries[] | null>(null), [error, setError] = useState('');
   const [win, setWin] = useState<Window>('30d'), [hidden, setHidden] = useState<string[]>([]);
   const [adding, setAdding] = useState(false), [openId, setOpenId] = useState<string | null>(null);
   const scope = api.owner;
+  // Vindo de um aviso: abre direto o produto.
+  useEffect(() => { if (focusId && products?.some(p => p.monitor.id === focusId)) setOpenId(focusId); }, [focusId, products]);
 
   const load = useCallback(async () => {
     try { setProducts(await loadProducts(api)); setError(''); } catch (e) { setError(errorText(e)); setProducts(p => p || []); }
@@ -755,8 +758,14 @@ function AddStores({api, monitor, onClose, onAdded}: {api: SofiaApi; monitor: En
     setSelected([]); setFound(Object.fromEntries(targets.map(t => [t.key, {status: 'idle', links: []} as Found])));
     for (const t of targets) {
       setFound(f => ({...f, [t.key]: {status: 'searching', links: []}}));
-      const r = await readLinks(t.url(terms), t.host, primaryHost);
-      setFound(f => ({...f, [t.key]: r.ok ? {status: r.links.length ? 'done' : 'none', links: r.links.slice(0, 5)} : {status: 'error', links: [], error: r.error}}));
+      let r = await readLinks(t.url(terms), t.host, primaryHost, terms);
+      // A busca da loja não trouxe nada (ou bloqueou): tenta pelo buscador, só no domínio dela.
+      if (!r.ok || !r.links.length) {
+        const alt = await readLinks(fallbackSearchUrl(t.host, terms), t.host, primaryHost, terms);
+        if (alt.ok && alt.links.length) r = alt;
+      }
+      const good = r.ok ? (r.links.some(l => (l.score || 0) >= 0.3) ? r.links.filter(l => (l.score || 0) >= 0.3) : r.links) : [];
+      setFound(f => ({...f, [t.key]: r.ok ? {status: good.length ? 'done' : 'none', links: good.slice(0, 6), error: r.blocked ? 'A loja pediu verificação de segurança.' : undefined} : {status: 'error', links: [], error: r.error}}));
     }
   }
   async function add(urls: string[]) {
@@ -788,7 +797,7 @@ function AddStores({api, monitor, onClose, onAdded}: {api: SofiaApi; monitor: En
                       <Text style={{flex: 1, fontWeight: '700', color: c.text}}>{t.name}</Text>
                       {f.status === 'searching' ? <ActivityIndicator size="small" color={c.accent} /> : f.status === 'idle' ? <Text style={{fontSize: 12, color: c.muted}}>na fila</Text> : null}
                     </View>
-                    {f.status === 'none' ? <Text style={{fontSize: 12, color: c.muted}}>Nada parecido encontrado.</Text> : null}
+                    {f.status === 'none' ? <Text style={{fontSize: 12, color: c.muted}}>{f.error || 'Nada parecido encontrado.'} Tente encurtar o termo (marca + modelo).</Text> : null}
                     {f.status === 'error' ? <Text style={{fontSize: 12, color: BAD}}>{f.error}</Text> : null}
                     {f.links.map(l => {
                       const on = selected.includes(l.url);
@@ -798,7 +807,7 @@ function AddStores({api, monitor, onClose, onAdded}: {api: SofiaApi; monitor: En
                           <View style={{width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: on ? c.accent : c.muted, backgroundColor: on ? c.accent : 'transparent', alignItems: 'center', justifyContent: 'center'}}>
                             {on ? <Icon name="check" size={14} color="#fff" /> : null}
                           </View>
-                          <Text style={{flex: 1, fontSize: 13, color: c.text}} numberOfLines={3}>{l.title || l.url}</Text>
+                          <View style={{flex: 1}}><Text style={{fontSize: 13, color: c.text}} numberOfLines={3}>{l.title || l.url}</Text>{l.score ? <Text style={{fontSize: 10, color: l.score >= 0.7 ? GOOD : c.muted}}>{Math.round(l.score * 100)}% parecido com o que você procurou</Text> : null}</View>
                         </Pressable>
                       );
                     })}
