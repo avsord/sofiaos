@@ -466,6 +466,22 @@ const CATALOG={
         "type": "text"
       },
       {
+        "key": "preferred_url",
+        "label": "Link da loja principal",
+        "type": "url"
+      },
+      {
+        "key": "source_urls",
+        "label": "Outras lojas do mesmo produto (um link por linha)",
+        "type": "textarea",
+        "max": 4000
+      },
+      {
+        "key": "discover",
+        "label": "Procurar este produto em outras lojas",
+        "type": "checkbox"
+      },
+      {
         "key": "currency",
         "label": "Moeda",
         "type": "select",
@@ -496,7 +512,8 @@ const CATALOG={
         "type": "select",
         "options": [
           "manual",
-          "json"
+          "json",
+          "product"
         ]
       },
       {
@@ -533,9 +550,15 @@ const CATALOG={
         "key": "consent",
         "label": "Tenho autorização para consultar esse feed",
         "type": "checkbox"
+      },
+      {
+        "key": "line_color",
+        "label": "Cor da linha no gráfico",
+        "type": "text",
+        "max": 20
       }
     ],
-    "description": "Observações reais e notificações locais. Sem feed autorizado: coleta manual, nunca fingir monitoramento ativo."
+    "description": "Observações reais e notificações locais. Em 'product', a leitura é feita no aparelho sobre a página da loja, só com o app aberto; sem fonte verificável, coleta manual, nunca fingir monitoramento ativo."
   },
   "plan_review": {
     "label": "Revisão de Plano",

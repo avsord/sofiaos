@@ -76,9 +76,27 @@ class Workspace {
    if(kind==='commitment'&&data.end_at&&data.start_at&&data.end_at<=data.start_at)throw new AppError('BAD_DATE','O fim precisa ser posterior ao início.');
    if(kind==='course'&&data.progress!==''&&data.progress>100)throw new AppError('BAD_PROGRESS','Progresso deve ficar entre 0 e 100.');
    if(kind==='monitor'){
-     if(!data.target_id||!['purchase','course'].includes(this.get(data.target_id).kind))throw new AppError('TARGET_REQUIRED','O monitor deve referenciar um item de Comprar ou um curso existente.');
-     if(!data.variant)throw new AppError('VARIANT_REQUIRED','Defina a variante exata para não comparar produtos diferentes.');
      data.currency=data.currency||'BRL';data.method=data.method||'manual';data.interval_minutes=data.interval_minutes||360;
+     if(data.method==='product'){
+       if(data.target_id&&!['purchase','course'].includes(this.get(data.target_id).kind))throw new AppError('TARGET_REQUIRED','O item vinculado precisa ser de Comprar ou um curso existente.');
+       if(!data.preferred_url)throw new AppError('STORE_REQUIRED','Cole o link da página do produto na loja principal.');
+     }
+     else if(!data.target_id||!['purchase','course'].includes(this.get(data.target_id).kind))throw new AppError('TARGET_REQUIRED','O monitor deve referenciar um item de Comprar ou um curso existente.');
+     if(!data.variant)throw new AppError('VARIANT_REQUIRED','Defina a variante exata para não comparar produtos diferentes.');
+     if(data.preferred_url&&!data.preferred_url.startsWith('https://'))throw new AppError('BAD_STORE_URL','O link da loja principal precisa usar HTTPS.');
+     if(data.source_urls){
+       const lines=data.source_urls.split('\n').map(l=>l.trim()).filter(Boolean);
+       if(lines.length>10)throw new AppError('TOO_MANY_SOURCES','Use até 10 lojas por produto.');
+       const seen=new Set();
+       for(const line of lines){
+         let u;try{u=new URL(line);}catch{throw new AppError('BAD_STORE_URL','"'+line.slice(0,60)+'" não é um link completo. Use um link por linha.');}
+         if(u.protocol!=='https:'||u.username||u.password)throw new AppError('BAD_STORE_URL','Cada loja precisa de um link HTTPS, sem credenciais.');
+         if(seen.has(u.toString()))throw new AppError('BAD_STORE_URL','Esse link aparece duas vezes: '+u.hostname+'.');
+         seen.add(u.toString());
+       }
+       data.source_urls=lines.join('\n');
+     }
+     if(data.line_color&&!/^#[0-9a-fA-F]{6}$/.test(data.line_color))throw new AppError('BAD_COLOR','Escolha uma cor válida para a linha do gráfico.');
      if(!Number.isInteger(data.interval_minutes)||data.interval_minutes<15||data.interval_minutes>43200)throw new AppError('BAD_INTERVAL','Intervalo entre 15 e 43200 minutos.');
      if(data.drop_percent!==''&&data.drop_percent>100)throw new AppError('BAD_PERCENT','Queda deve ficar entre 0 e 100%.');
      if(data.method==='json'&&(!data.feed_url||!data.price_path||!data.variant_path||!data.currency_path||!data.consent))throw new AppError('FEED_REQUIRED','Informe feed HTTPS autorizado, campos de preço/variante/moeda e consentimento.');
