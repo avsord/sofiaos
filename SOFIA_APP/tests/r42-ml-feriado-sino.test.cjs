@@ -9,9 +9,10 @@ test('app do Mercado Livre não abre: nenhum link passa pelo Linking.openURL da 
  const toRegex=w=>new RegExp('^'+w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\\\*/g,'.*'));
  for(const url of ['meli://item/MLB123','intent://item#Intent;scheme=meli;end','aliexpress://product/1'])assert.ok(toRegex('*').test(url.match(/^[A-Za-z][A-Za-z0-9+\-.]+:(\/\/)?[^/]*/)[0]),url);
 });
-test('feriado: cartão inteiro verde e etiqueta "Feriado" na Agenda e na Início',()=>{
- const a=read('src/screens/Agenda.tsx');assert.ok(a.includes("backgroundColor:isHoliday(item)?HOLIDAY_COLOR+'1f':c.surface"));assert.ok(a.includes("isHoliday(item)?'Feriado'"));
- assert.ok(read('src/components/DashboardWidgets.tsx').includes("backgroundColor:holiday?HOLIDAY_COLOR+'26':c.accentSoft"));
+test('feriado igual na Agenda e na Início: barrinha verde no item e ponto verde no dia',()=>{
+ const a=read('src/screens/Agenda.tsx');assert.ok(a.includes('backgroundColor:agendaPriority(item).color||c.accent'),'Agenda como era: barrinha pela cor da prioridade (verde no feriado)');
+ assert.ok(!a.includes("isHoliday(item)?'Feriado'"),'Agenda sem o cartão todo verde');
+ const w=read('src/components/DashboardWidgets.tsx');assert.ok(w.includes('borderLeftColor:holiday?HOLIDAY_COLOR:'),'Início: barrinha verde no feriado');assert.ok(w.includes('calendar_id:i.original&&!i.isTask'),'Início: ponto do dia verde');
 });
 test('sino: arrastar para apagar não perde para a rolagem, e rolagem menos solta',()=>{
  const s=read('src/components/NotificationCenter.tsx');assert.ok(s.includes('onPanResponderTerminationRequest:()=>false'));assert.ok(s.includes('decelerationRate="fast"'));
