@@ -31,7 +31,12 @@ function existing(base){
  const marker=path.join(base,'restore-complete.json'),dbpath=path.join(base,'data','sofia.sqlite');
  if(!fs.existsSync(marker))return false;
  if(!JSON.parse(fs.readFileSync(marker,'utf8')).verified||!fs.existsSync(dbpath)||!fs.existsSync(path.join(base,'secure','backup-master-v1.key')))throw Error('Persistent restore incomplete');
- const db=new DatabaseSync(dbpath,{readOnly:true});try{if(db.prepare('PRAGMA integrity_check').all().some(r=>Object.values(r)[0]!=='ok'))throw Error('Persistent database integrity failed');}finally{db.close();}return true;
+ // Sem readOnly: se o disco encheu no meio de uma escrita, o proprio SQLite
+ // termina (ou desfaz) essa transacao sozinho ao abrir com permissao de
+ // escrita — e exatamente o que ele e feito para fazer depois de uma queda.
+ // Uma conexao so-leitura nao tem essa permissao e fica presa reportando
+ // 'corrompido' para sempre, mesmo quando so falta essa etapa automatica.
+ const db=new DatabaseSync(dbpath);try{db.exec('PRAGMA wal_checkpoint(TRUNCATE)');if(db.prepare('PRAGMA integrity_check').all().some(r=>Object.values(r)[0]!=='ok'))throw Error('Persistent database integrity failed');}finally{db.close();}return true;
 }
 async function run(options={}){
  const base=options.base||process.env.SOFIA_PERSISTENT_DIR;
@@ -58,5 +63,5 @@ async function run(options={}){
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(options.port??Number(process.env.PORT||8080),'0.0.0.0',resolve);});
  console.log('[Sofia] Empty persistent volume: authenticated restore required before application starts.');return server;
 }
-if(require.main===module)run().catch(()=>{console.error('[Sofia] Persistent startup verification failed. Data not overwritten.');process.exitCode=1;});
+if(require.main===module)run().catch(e=>{console.error('[Sofia] Persistent startup verification failed. Data not overwritten. Motivo: '+String(e&&e.message||e));process.exitCode=1;});
 module.exports={restore,existing,authorized,run};
