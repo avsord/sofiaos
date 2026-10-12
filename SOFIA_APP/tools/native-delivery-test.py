@@ -121,6 +121,23 @@ class DeliveryTests(unittest.TestCase):
         self.assertIsNotNone(match, 'Missing workflow job: '+name)
         return match.group(1)
 
+    def test_native_tests_never_installs_an_arm64_only_apk_on_the_x86_64_emulator(self):
+        """R24 bug: the QA twin was only built for [manual-apk], but native_tests only
+        runs WITHOUT [manual-apk] — so the x86_64 emulator always got baseline-Sofia-OS.apk
+        and Sofia-OS.apk, both ARM64-only, and every run failed at the first adb install."""
+        build = self.workflow_job('build')
+        qa = build.split('    - name: Build signed emulator-only QA twin without altering ARM64 owner APK\n', 1)[1] \
+            .split('    - name: Build QA-only heavy data seeder', 1)[0]
+        self.assertIn("if: steps.plan.outputs.release == 'true' && env.SOFIA_MANUAL_NO_TESTS != 'true'\n", qa,
+            'the QA twin must build whenever tests will run, not only for [manual-apk]')
+        self.assertNotIn('[manual-apk]', qa)
+        native = self.workflow_job('native_tests')
+        self.assertIn('QA-ONLY-manual-universal.apk', native)
+        self.assertNotIn('baseline-Sofia-OS.apk', native)
+        install_block = native.split('script: |\n', 1)[1]
+        self.assertNotRegex(install_block, r'adb install[^\n]*\bSofia-OS\.apk\b',
+            'the real owner APK is ARM64-only and cannot install on the CI x86_64 emulator')
+
     def test_round3_production_r8_and_abi_boundaries_are_explicit(self):
         """Only the user APK drops x86. A separate, disclosed QA twin feeds x86 smoke."""
         workflow=(ROOT.parent/'.github/workflows/sofia-native-047-update.yml').read_text()
