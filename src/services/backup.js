@@ -56,6 +56,20 @@ function openBackup(bytes,{key,passphrase}={}) {
     return JSON.parse(zlib.gunzipSync(plain,{maxOutputLength:128*1024*1024}).toString('utf8'));
   }catch{throw new AppError('BAD_BACKUP','Não foi possível abrir o backup. Verifique a senha, o usuário do Windows e a integridade do arquivo.');}
 }
+/** Mesma limpeza de backups.prune(), mas sem precisar de um Store aberto —
+ * só mexe com arquivos no disco. Existe para rodar ANTES de tentar abrir o
+ * banco: se o disco estiver cheio demais até para o SQLite abrir (ENOSPC
+ * logo na inicialização), isto ainda consegue liberar espaço primeiro,
+ * porque apagar arquivo nunca precisa de espaço livre. */
+function pruneBackupsSync(directory, keep = 7) {
+  try {
+    if (!fs.existsSync(directory)) return 0;
+    const files = fs.readdirSync(directory).filter(n => /^sofia-.*\.sofia-backup$/.test(n)).sort().reverse();
+    const extra = files.slice(keep);
+    for (const name of extra) { try { fs.unlinkSync(path.join(directory, name)); } catch { /* um arquivo preso não impede os outros */ } }
+    return extra.length;
+  } catch { return 0; }
+}
 class BackupService {
   constructor(store,directory,keyStore=new KeyStore()) {this.store=store;this.directory=directory;this.keyStore=keyStore;this.lastError=null;fs.mkdirSync(directory,{recursive:true,mode:0o700});}
   snapshot(){const snapshot=this.store.export();if(this.vault)snapshot.vault_key=this.vault.exportKey();return snapshot;}
@@ -73,4 +87,4 @@ class BackupService {
   prune(keep=7) {const extra=this.list().slice(keep);for(const b of extra){try{fs.unlinkSync(path.join(this.directory,b.name));}catch{/* um arquivo preso não impede os outros */}}return extra.length;}
   portable(passphrase) {return seal(this.snapshot(),{passphrase});}
 }
-module.exports={KeyStore,BackupService,seal,openBackup};
+module.exports={KeyStore,BackupService,seal,openBackup,pruneBackupsSync};

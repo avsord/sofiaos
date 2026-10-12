@@ -6,6 +6,7 @@ const {makeConfig}=require('./config/runtime');
 const {createRuntime}=require('./core/runtime');
 const {acquireLock}=require('./core/lock');
 const {AppError}=require('./core/util');
+const {pruneBackupsSync}=require('./services/backup');
 async function startServer(options={}) {
   const root=options.root || path.resolve(__dirname,'..');
   const envFile=path.join(root,'.env');
@@ -15,6 +16,11 @@ async function startServer(options={}) {
   }
   const config=makeConfig({root,...options.config});
   const release=acquireLock(config.dataDir);
+  // Antes de abrir o banco: se o disco estiver cheio demais até para o SQLite
+  // abrir (ENOSPC logo na inicialização), apagar backup antigo não precisa de
+  // espaço livre nenhum, então consegue liberar espaço primeiro.
+  const freedAtBoot=pruneBackupsSync(config.backupDir);
+  if(freedAtBoot)console.log('[Sofia] '+freedAtBoot+' backup(s) antigo(s) removido(s) antes de abrir o banco.');
   let runtime,server,timer,stopped=false;
   try {
     runtime=createRuntime(config,options.runtimeOptions);

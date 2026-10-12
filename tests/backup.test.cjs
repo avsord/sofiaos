@@ -30,3 +30,14 @@ test('backup diário na subida do servidor nunca ultrapassa o limite, mesmo roda
  for(let i=0;i<40;i++){b.create('daily');b.prune();}
  assert.equal(b.list().length,7);
 });
+
+test('limpeza antecipada (sem Store nenhum aberto) funciona mesmo antes do banco existir',t=>{
+ const {pruneBackupsSync}=require('../src/services/backup');
+ const dir=path.join(f(t).dir,'sofia-backups-precoce');
+ assert.equal(pruneBackupsSync(dir),0,'pasta inexistente: não quebra, não acha nada pra apagar');
+ fs.mkdirSync(dir,{recursive:true});
+ for(let i=0;i<10;i++)fs.writeFileSync(path.join(dir,'sofia-2026-01-0'+(i<10?'0'+i:i)+'-x.sofia-backup'),'x');
+ assert.equal(pruneBackupsSync(dir,7),3);
+ assert.equal(fs.readdirSync(dir).filter(n=>n.endsWith('.sofia-backup')).length,7);
+});
+function f(t){return fixture(t);}
