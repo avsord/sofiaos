@@ -68,6 +68,9 @@ class BackupService {
   }
   tryCreate(reason) {try{return this.create(reason);}catch{this.lastError='O backup não foi criado. Sua memória continua no banco local. Use Diagnóstico e gere um backup portátil.';return null;}}
   daily() {if(!this.list().some(b=>b.name.startsWith('sofia-'+now().slice(0,10))))return this.tryCreate('daily');return null;}
+  /** Cada backup é uma cópia inteira do banco, com fotos e áudios dentro:
+   * sem isso, um por dia nunca apagado enche o disco sozinho, só com o tempo. */
+  prune(keep=7) {const extra=this.list().slice(keep);for(const b of extra){try{fs.unlinkSync(path.join(this.directory,b.name));}catch{/* um arquivo preso não impede os outros */}}return extra.length;}
   portable(passphrase) {return seal(this.snapshot(),{passphrase});}
 }
 module.exports={KeyStore,BackupService,seal,openBackup};

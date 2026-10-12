@@ -14,3 +14,19 @@ test('Backup diário não cria cópias repetidas no mesmo dia',t=>{const f=fixtu
 test('Trava impede duas instâncias e pode ser liberada',t=>{const f=fixture(t);const release=acquireLock(path.join(f.dir,'locks'));assert.throws(()=>acquireLock(path.join(f.dir,'locks')),e=>e.code==='ALREADY_RUNNING');release();const again=acquireLock(path.join(f.dir,'locks'));again();});
 test('ZIP independente possui assinaturas e CRC corretos',()=>{const b=Buffer.from('Teste com acentos: criação');const zip=zipFiles([{name:'src/test.js',data:b}]);assert.equal(zip.readUInt32LE(0),0x04034b50);assert.equal(zip.readUInt32LE(zip.length-22),0x06054b50);assert.equal(zip.readUInt32LE(14),crc32(b));assert.throws(()=>zipFiles([{name:'../x',data:b}]));});
 test('Exportação de código não inclui .env, variantes, memória nem binários',t=>{const f=fixture(t);fs.mkdirSync(path.join(f.dir,'src'),{recursive:true});fs.writeFileSync(path.join(f.dir,'src','ok.js'),'module.exports=1;');fs.writeFileSync(path.join(f.dir,'.env'),'OPENAI_API_KEY=fake-secret');fs.writeFileSync(path.join(f.dir,'..env'),'fake-secret');fs.writeFileSync(path.join(f.dir,'src','bad.js'),'const secret="sk-'+'x'.repeat(50)+'"');const out=path.join(f.dir,'out.zip');const r=exportCode(f.dir,out);const bytes=fs.readFileSync(out);assert.equal(bytes.includes('module.exports=1'),true);assert.equal(bytes.includes('fake-secret'),false);assert.equal(bytes.includes('x'.repeat(50)),false);assert.ok(r.skipped.includes('src/bad.js'));});
+
+test('backup sem limite acumulava para sempre: prune mantém só os mais recentes e nunca apaga tudo',t=>{
+ const f=fixture(t);const b=new BackupService(f.store,f.config.backupDir,new KeyStore(path.join(f.dir,'secure2')));
+ for(let i=0;i<12;i++){b.create('daily');}
+ assert.equal(b.list().length,12);
+ const removed=b.prune(7);
+ assert.equal(removed,5);assert.equal(b.list().length,7);
+ const names=b.list().map(x=>x.name);
+ assert.deepEqual(names,[...names].sort().reverse(),'mantém os 7 mais recentes, não os mais antigos');
+ assert.equal(b.prune(7),0,'já está dentro do limite: não apaga nada');
+});
+test('backup diário na subida do servidor nunca ultrapassa o limite, mesmo rodando todo dia por meses',t=>{
+ const f=fixture(t);const b=new BackupService(f.store,f.config.backupDir,new KeyStore(path.join(f.dir,'secure3')));
+ for(let i=0;i<40;i++){b.create('daily');b.prune();}
+ assert.equal(b.list().length,7);
+});

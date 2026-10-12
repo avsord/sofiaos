@@ -214,7 +214,12 @@ function createHandler(runtime) {
       if(m==='GET' && p==='/api/backups')return json(res,200,{items:backups.list(),warning:backups.lastError});
       if(m==='POST' && p==='/api/backups/create') {await bodyJson(req);return json(res,201,backups.create('manual'));}
       if(m==='POST' && p==='/api/backups/export') {const b=await bodyJson(req);const bytes=backups.portable(b.passphrase);res.setHeader('Content-Type','application/octet-stream');res.setHeader('Content-Disposition','attachment; filename="Sofia_backup_portatil.sofia-backup"');res.end(bytes);return;}
-      if(m==='GET' && p==='/api/diagnostics')return json(res,200,{version:VERSION,node:process.version,model:config.model,key_present:Boolean(config.apiKey),busy:core.busy,storage:'data/sofia.sqlite',stats:store.stats(),usage:store.usage(),settings:store.settings(),backup_warning:backups.lastError,whatsapp:'simulador; não conectado',google:'não conectado',cofre:runtime.vault.status().initialized?'criptografado, configurado':'criptografado, aguarda configuração',database_encrypted:false,backups_encrypted:true});
+      if(m==='GET' && p==='/api/diagnostics'){
+        let disk=null;try{const fsStat=require('node:fs').statfsSync(config.dataDir);disk={free_mb:Math.round(fsStat.bavail*fsStat.bsize/1048576),total_mb:Math.round(fsStat.blocks*fsStat.bsize/1048576),used_pct:Math.round((1-fsStat.bavail/fsStat.blocks)*100)};}catch{/* statfs indisponível nesta plataforma */}
+        const list=backups.list();
+        return json(res,200,{version:VERSION,node:process.version,model:config.model,key_present:Boolean(config.apiKey),busy:core.busy,storage:'data/sofia.sqlite',stats:store.stats(),usage:store.usage(),settings:store.settings(),backup_warning:backups.lastError,backups:{count:list.length,total_mb:Math.round(list.reduce((s,b)=>s+b.bytes,0)/1048576)},disk,whatsapp:'simulador; não conectado',google:runtime.google&&runtime.google.link()?.refresh?'conectado':'não conectado',cofre:runtime.vault.status().initialized?'criptografado, configurado':'criptografado, aguarda configuração',database_encrypted:false,backups_encrypted:true});
+      }
+      if(m==='POST' && p==='/api/backups/prune'){await bodyJson(req).catch(()=>({}));const keep=Number(url.searchParams.get('keep'))||7;return json(res,200,{removed:backups.prune(keep),remaining:backups.list().length});}
       match=p.match(/^\/api\/export\/conversation\/([\w-]+)$/);
       if(m==='GET' && match) {
         const c=store.conversation(validId(match[1]));const messages=store.db.prepare('SELECT role,content,created_at FROM messages WHERE conversation_id=? ORDER BY rowid').all(c.id);

@@ -24,12 +24,12 @@ async function startServer(options={}) {
     server=http.createServer(app);server.requestTimeout=120000;server.headersTimeout=15000;
     await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(PORT,HOST,resolve);});
     server.on('error',()=>console.error('[Sofia] Falha no servidor HTTP.'));
-    runtime.backups.daily();
+    runtime.backups.daily();runtime.backups.prune();
     process.on('unhandledRejection', error => console.error('[Sofia] Falha assíncrona ignorada para não derrubar o servidor:', String(error && error.message || error).slice(0, 200)));
     runtime.scheduler.start();
     runtime.mailWatch.start();
     runtime.google.start();
-    timer=setInterval(()=>{if(!runtime.core.busy)runtime.backups.daily();},60000);timer.unref();
+    timer=setInterval(()=>{if(!runtime.core.busy){runtime.backups.daily();runtime.backups.prune();}},60000);timer.unref();
     const address=server.address(),port=address&&typeof address==='object'?address.port:PORT;
     console.log('Sofia OS online em http://'+HOST+':'+port);
     console.log('Core v138 | Memória em data/sofia.sqlite | painel online protegido por login + endpoints públicos controlados.');
