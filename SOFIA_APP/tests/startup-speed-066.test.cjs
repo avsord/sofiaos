@@ -284,7 +284,7 @@ test('108 pages hydrate from the full archive only AFTER reveal and never show f
  assert.ok(pages.includes('const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[loaded,setLoaded]'));
  assert.ok(pages.includes('setPages(prev=>prev.length?prev:local)'));
  assert.ok(pages.includes("setLoaded(true);setError('')"));
- assert.ok(pages.includes('ready&&!loaded&&!error&&!pages.length'));
+ assert.ok(pages.includes('(!ready||!loaded)&&!error&&!pages.length'));
  assert.ok(pages.includes('ready&&loaded&&!pages.length&&!error'));
 });
 test('108 native splash icon is fully invisible, overlay fades the only S on every new frame',()=>{

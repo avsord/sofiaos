@@ -215,7 +215,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   {error?<ErrorBanner text={error} onRetry={()=>void load()}/>:null}
   </>}
   footer={<>
-  {ready&&!loaded&&!error&&!pages.length?<View testID="pages-loading-placeholder" accessibilityLabel="Carregando páginas" style={{minHeight:80,paddingHorizontal:4,gap:4}}><View style={{flexDirection:'row',alignItems:'center',gap:10,paddingTop:6}}><Spinner size={16} stroke={1.8}/><Text style={{color:c.muted,fontSize:13}}>Carregando páginas</Text></View><LoadingLines rows={4}/></View>:null}
+  {/* Também antes do 'ready' (enquanto as páginas guardadas no aparelho são lidas): antes ficava em branco. */}{(!ready||!loaded)&&!error&&!pages.length?<View testID="pages-loading-placeholder" accessibilityLabel="Carregando páginas" style={{minHeight:80,paddingHorizontal:4,gap:4}}><View style={{flexDirection:'row',alignItems:'center',gap:10,paddingTop:6}}><Spinner size={16} stroke={1.8}/><Text style={{color:c.muted,fontSize:13}}>Carregando páginas</Text></View><LoadingLines rows={4}/></View>:null}
   {ready&&loaded&&!pages.length&&!error?<Empty icon="book" title="Sua primeira página" body="Toque em + para criar uma página."/>:null}
   </>}/>;
  const createPicker=<PageCreateMenu visible={createParent!==undefined} parentTitle={createParent?.title} onClose={()=>setCreateParent(undefined)}

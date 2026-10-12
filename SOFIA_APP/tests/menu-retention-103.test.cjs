@@ -66,7 +66,7 @@ test('R5 first taps prewarm independently of the full archived Page/chat history
  assert.ok(app.includes("if(!visible||!auth||!initialDataReady||fluency==='pending')return;"));
  assert.ok(app.includes("queueOptional('hidratar',()=>api.hydrate().then(()=>"),'archive hydration is still preserved after reveal');
  assert.ok(pages.includes("void api.hydrate().then(()=>"),'Pages still recovers saved listing when archive finishes');
- assert.ok(pages.includes('ready&&!loaded&&!error&&!pages.length'),'Pages still has neutral loading state');
+ assert.ok(pages.includes('(!ready||!loaded)&&!error&&!pages.length'),'Pages still has neutral loading state');
  assert.ok(pages.includes('ready&&loaded&&!pages.length&&!error'),'Pages only shows empty after real load');
  const f=fixture();
  assert.equal(f.render('home',false).size,1,'no hidden tabs underneath Android splash');
