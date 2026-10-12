@@ -137,7 +137,7 @@ function makeMobileApi(runtime, deps) {
     }
     if (p === '/api/mobile/md/dashboard') {
       const allowedWidgets = ['monitoring', 'tasks', 'capsules'];
-      if (m === 'GET') return send({ widgets: runtime.google.kvGet('dashboard_widgets') });
+      if (m === 'GET') { const saved = runtime.google.kvGet('dashboard_widgets'); return send({ widgets: Array.isArray(saved) ? saved : ['monitoring', 'tasks'], saved: Array.isArray(saved) }); }
       if (m === 'POST') { const b = await bodyJson(req, 4096); const widgets = Array.isArray(b.widgets) ? [...new Set(b.widgets.filter(w => allowedWidgets.includes(w)))] : null; if (!widgets) fail('BAD_WIDGETS', 'Lista de widgets inválida.'); runtime.google.kvSet('dashboard_widgets', widgets); return send({ widgets }); }
     }
     if (p.startsWith('/api/mobile/md/calendar/') || p === '/api/mobile/md/drive/backup') {

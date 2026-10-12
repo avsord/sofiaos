@@ -42,7 +42,7 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  const [detail,setDetail]=useState<Task|null>(null),[detailOpen,setDetailOpen]=useState(false);
  const openTask=(task:Task)=>{setDetail(task);setDetailOpen(true);};
  const [priority,setPriority]=useState(''),[areaFilter,setAreaFilter]=useState(''),[filterOpen,setFilterOpen]=useState(false),[areaFilterOpen,setAreaFilterOpen]=useState(false);
- const [widgets,setWidgets]=useState(()=>api.cached<{widgets:string[]}>('/md/dashboard')?.widgets.filter(x=>['monitoring','tasks','capsules'].includes(x))||['monitoring','tasks']),[dragging,setDragging]=useState(false);
+ const [widgets,setWidgets]=useState(()=>(()=>{const w=api.cached<{widgets:string[]|null}>('/md/dashboard')?.widgets;return Array.isArray(w)?w.filter(x=>['monitoring','tasks','capsules'].includes(x)):null;})()||['monitoring','tasks']),[dragging,setDragging]=useState(false);
  const c=useTheme(),[data,setData]=useState<HomeData|null>(()=>api.cached<HomeData>('/home')||null),[tasks,setTasks]=useState<Task[]>(()=>api.cached<{items:Task[]}>('/tasks')?.items||[]),[tasksReady,setTasksReady]=useState(()=>!!api.cached('/tasks')),[series,setSeries]=useState<ProductSeries[]|null>(null),[refreshing,setRefreshing]=useState(false),[error,setError]=useState(''),[saving,setSaving]=useState(''),[refreshEpoch,setRefreshEpoch]=useState(0);
  useEffect(()=>subscribeSystemChanged(owner=>{if(owner===api)setRefreshEpoch(x=>x+1);}),[api]);
  useEffect(()=>{if(!refreshEpoch)return;let alive=true;void api.catalog().then(value=>{if(alive)setAgendaCatalog(value);}).catch(()=>{});return()=>{alive=false;};},[api,refreshEpoch]);
@@ -60,7 +60,7 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  useEffect(()=>{
   if(!launchVisible||!active)return;
   let alive=true;
-  const cancel=scheduleIdleTask(()=>{void api.dashboardWidgets().then(r=>{if(alive)setWidgets(r.widgets.filter(x=>['monitoring','tasks','capsules'].includes(x)));}).catch(()=>{});});
+  const cancel=scheduleIdleTask(()=>{void api.dashboardWidgets().then(r=>{if(alive)setWidgets((Array.isArray(r.widgets)?r.widgets:['monitoring','tasks']).filter(x=>['monitoring','tasks','capsules'].includes(x)));}).catch(()=>{});});
   return()=>{alive=false;cancel();};
  },[api,refreshEpoch,launchVisible,active]);
  // Monitoring may involve many reads; it must not compete with the first usable frame.
