@@ -32,10 +32,11 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 
 async function loadAll(api: SofiaApi): Promise<Data> {
   const all: Record<string, Entity[]> = {};
-  for (const kind of KINDS) {
-    all[kind] = [];
-    for (let offset = 0; ; offset += 100) { const r = await api.entities(kind, '', offset); all[kind].push(...r.items); if (r.items.length < 100) break; }
-  }
+  await Promise.all(KINDS.map(async kind => {
+    const list: Entity[] = [];
+    for (let offset = 0; ; offset += 100) { const r = await api.entities(kind, '', offset); list.push(...r.items); if (r.items.length < 100) break; }
+    all[kind] = list;
+  }));
   return {accounts: all.fin_account.map(toAccount), cards: all.fin_card.map(toCard), txs: all.fin_tx.filter(e => e.state !== 'archived').map(toTx),
     budgets: all.fin_budget.filter(e => e.state !== 'archived').map(toBudget), goals: all.fin_goal.filter(e => e.state !== 'archived').map(toGoal)};
 }
@@ -105,7 +106,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
           <Chips scroll value={tab} onChange={setTab} options={[{value: 'home' as Tab, label: 'Resumo'}, {value: 'txs' as Tab, label: 'Lançamentos'}, {value: 'cards' as Tab, label: 'Cartões'}, {value: 'plan' as Tab, label: 'Planejamento'}, {value: 'reports' as Tab, label: 'Relatórios'}]} />
         </View>
 
-        {!d ? <View style={{flex: 1, padding: 16, gap: 14}}>{error ? <Text style={{color: c.danger, padding: 20}}>{error}</Text> : [190, 140, 120].map((h, i) => <View key={i} style={{height: h, borderRadius: 22, backgroundColor: i ? c.surface : c.accentSoft, borderWidth: 1, borderColor: c.line, opacity: 0.75}} />)}</View> : !d.accounts.length ? (
+        {!d ? <View style={{flex: 1, padding: 16, gap: 14}}>{error ? <View style={{padding: 20, gap: 12}}><Text style={{color: c.danger}}>{error}</Text><Button title="Tentar de novo" secondary onPress={() => void reload()} /></View> : [190, 140, 120].map((h, i) => <View key={i} style={{height: h, borderRadius: 22, backgroundColor: i ? c.surface : c.accentSoft, borderWidth: 1, borderColor: c.line, opacity: 0.75}} />)}</View> : !d.accounts.length ? (
           <Onboarding api={api} onDone={reload} />
         ) : (
           <ScrollView contentContainerStyle={{padding: 16, paddingBottom: insets.bottom + 110, gap: 14}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>

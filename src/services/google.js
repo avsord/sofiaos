@@ -13,7 +13,14 @@ const {AppError, now, id} = require('../core/util');
 const SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/drive.file'];
 const AUTH = 'https://accounts.google.com/o/oauth2/v2/auth', TOKEN = 'https://oauth2.googleapis.com/token', REVOKE = 'https://oauth2.googleapis.com/revoke';
 const CAL = 'https://www.googleapis.com/calendar/v3', DRIVE = 'https://www.googleapis.com/drive/v3', UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
-const TZ = 'America/Sao_Paulo', MAX_PAGES = 60, KEEP_BACKUPS = 14, CALLBACK = '/google/oauth/callback';
+const TZ = 'America/Sao_Paulo', MAX_PAGES = 20, KEEP_BACKUPS = 14, CALLBACK = '/google/oauth/callback';
+// Janela fixa e leitura em lotes: a primeira versão pedia TODOS os eventos
+// (recorrências expandidas sem fim) e gravava milhares de uma vez, travando o
+// servidor inteiro enquanto isso. Agora: 60 dias para trás, 1 ano para frente,
+// no máximo 3000 eventos por rodada, e uma pausa a cada 20 para o servidor
+// continuar respondendo o app.
+const PAST_DAYS = 60, FUTURE_DAYS = 365, MAX_EVENTS_PER_RUN = 3000, YIELD_EVERY = 20, FULL_EVERY_MS = 24 * 3600000;
+const breathe = () => new Promise(r => setImmediate(r));
 
 const iso = v => { const t = Date.parse(v); return Number.isFinite(t) ? new Date(t).toISOString() : ''; };
 const plusDays = (date, n) => { const d = new Date(date + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
@@ -188,33 +195,39 @@ class GoogleService {
     return saved;
   }
   async importCalendar(cal, readonly, map, report, link) {
-    const syncTokens = link.sync || {};
-    let token = syncTokens[cal.id], pageToken = '', full = !token;
+    const state = (link.sync || {})[cal.id] || {};
+    const full = !state.at || !state.full_at || Date.now() - Date.parse(state.full_at) > FULL_EVERY_MS;
+    const started = new Date().toISOString();
+    let pageToken = '';
     for (let page = 0; page < MAX_PAGES; page++) {
-      const q = new URLSearchParams({maxResults: '2500', singleEvents: 'true', showDeleted: 'true'});
-      if (token) q.set('syncToken', token);
-      else q.set('timeMin', new Date(Date.now() - 365 * 864e5).toISOString());
+      const q = new URLSearchParams({maxResults: '250', singleEvents: 'true', showDeleted: 'true',
+        timeMin: new Date(Date.now() - PAST_DAYS * 864e5).toISOString(), timeMax: new Date(Date.now() + FUTURE_DAYS * 864e5).toISOString()});
+      if (!full) q.set('updatedMin', new Date(Date.parse(state.at) - 120000).toISOString());
       if (pageToken) q.set('pageToken', pageToken);
-      let r;
-      try { r = await this.call('GET', CAL + '/calendars/' + encodeURIComponent(cal.id) + '/events?' + q.toString()); }
-      catch (e) { if (e.googleStatus === 410 && token) { token = ''; pageToken = ''; full = true; delete syncTokens[cal.id]; page = -1; continue; } throw e; }
+      const r = await this.call('GET', CAL + '/calendars/' + encodeURIComponent(cal.id) + '/events?' + q.toString());
       for (const ev of r.items || []) {
         report.imported++;
+        if (report.imported % YIELD_EVERY === 0) await breathe();
         const key = cal.id + '|' + ev.id, existing = map.get(key);
+        // Nada mudou no Google e nada mudou na Sofia: não regrava.
+        if (existing && ev.etag && ev.etag === existing.data.google_etag && existing.revision <= (Number(existing.data.google_rev) || 0)) continue;
         if (existing && !readonly) {
           const localChanged = existing.revision > (Number(existing.data.google_rev) || 0);
           if (localChanged && ev.etag && ev.etag !== existing.data.google_etag) { report.conflicts.push({id: existing.id, reason: 'Alterado no Google e na Sofia: "' + existing.title.slice(0, 60) + '"'}); continue; }
-          if (localChanged) continue; // a Sofia envia a versão dela em seguida
+          if (localChanged) continue;
         }
+        if (!existing && (ev.status === 'cancelled')) continue; // cancelado que a Sofia nunca teve: nada a fazer
         const saved = this.saveFromGoogle(ev, cal.id, readonly, existing, report);
         if (saved) map.set(key, saved);
+        if (report.imported >= MAX_EVENTS_PER_RUN) { report.partial = true; break; }
       }
-      if (r.nextPageToken) { pageToken = r.nextPageToken; continue; }
-      if (r.nextSyncToken) syncTokens[cal.id] = r.nextSyncToken;
-      break;
+      if (report.partial || !r.nextPageToken) break;
+      pageToken = r.nextPageToken;
     }
     report.full = report.full || full;
-    return syncTokens;
+    const next = {...(link.sync || {})};
+    if (!report.partial) next[cal.id] = {at: started, full_at: full ? started : state.full_at};
+    return next;
   }
   eventBody(e) {
     const d = e.data, allDay = !!d.calendar_all_day && d.calendar_date_start;
@@ -236,6 +249,7 @@ class GoogleService {
         if (d.calendar_provider !== 'google' || d.google_readonly || (!d.start_at && !d.calendar_date_start) || e.state === 'cancelled') continue;
         const target = d.calendar_id || calId, isNew = !d.external_event_id;
         if (!isNew && e.revision <= (Number(d.google_rev) || 0)) continue;
+        await breathe();
         try {
           const ev = isNew ? await this.call('POST', CAL + '/calendars/' + encodeURIComponent(target) + '/events', this.eventBody(e))
             : await this.call('PATCH', CAL + '/calendars/' + encodeURIComponent(target) + '/events/' + encodeURIComponent(d.external_event_id), this.eventBody(e));
@@ -304,9 +318,9 @@ class GoogleService {
     }
   }
 
-  start(intervalMs = 10 * 60000) {
+  start(intervalMs = 15 * 60000) {
     if (this.timer) return;
-    const tick = () => { const l = this.link(); if (!l?.refresh) return; this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); };
+    const tick = () => { const l = this.link(); if (!l?.refresh || this.busy) return; this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); };
     this.timer = setInterval(tick, intervalMs); this.timer.unref?.();
     setTimeout(tick, 30000).unref?.();
   }

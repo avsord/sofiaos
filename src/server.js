@@ -25,6 +25,7 @@ async function startServer(options={}) {
     await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(PORT,HOST,resolve);});
     server.on('error',()=>console.error('[Sofia] Falha no servidor HTTP.'));
     runtime.backups.daily();
+    process.on('unhandledRejection', error => console.error('[Sofia] Falha assíncrona ignorada para não derrubar o servidor:', String(error && error.message || error).slice(0, 200)));
     runtime.scheduler.start();
     runtime.mailWatch.start();
     runtime.google.start();

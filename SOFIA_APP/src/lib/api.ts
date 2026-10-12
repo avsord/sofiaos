@@ -36,6 +36,10 @@ export class ApiError extends Error {
 // Organização dos widgets da Início guardada no aparelho enquanto o servidor
 // não sincroniza (antes dava erro e o widget de Cápsulas não entrava).
 const LOCAL_WIDGETS_KEY='sofia.native.dashboard-widgets.v1';
+// Diagnóstico: últimas falhas de rede (rota, código, tempo). Sem corpo, token ou dados.
+const apiFailures:Array<{at:string;path:string;method:string;status:number;code:string;ms:number}>=[];
+function noteApiFailure(path:string,method:string,e:ApiError,ms:number){apiFailures.push({at:new Date().toISOString(),path:path.split('?')[0].slice(0,80),method,status:Number(e?.status)||0,code:String(e?.code||'?'),ms});if(apiFailures.length>40)apiFailures.shift();}
+export function apiDiagnostics(){return {recentFailures:apiFailures.slice(-25)};}
 export function startupSnapshotFor(scope:string){return new StartupSnapshot(encryptedStorage,SITE+'|'+scope.trim().toLowerCase()+'|startup-v1');}
 export class SofiaApi {
   private readonly md:LegacyMdAdapter;
@@ -102,6 +106,19 @@ export class SofiaApi {
     return this.warming&&path!=='/bootstrap' ? this.startupReads.prime(path,read) : this.startupReads.read(path,read);
   }
   private async fetchRequest<T>(path:string,body:unknown,method:string,timeout:number):Promise<T>{
+    const started=Date.now();
+    try{return await this.fetchOnce<T>(path,body,method,timeout);}
+    catch(error){
+      const e=error as ApiError;
+      // Leitura que caiu porque o servidor estava reiniciando ou ocupado: tenta de novo uma vez, em silêncio.
+      if(method==='GET'&&(e.status===502||e.status===503||e.status===504||e.code==='TIMEOUT')&&Date.now()-started<timeout){
+        await new Promise(r=>setTimeout(r,1200));
+        try{return await this.fetchOnce<T>(path,body,method,timeout);}catch(again){noteApiFailure(path,method,again as ApiError,Date.now()-started);throw again;}
+      }
+      noteApiFailure(path,method,e,Date.now()-started);throw error;
+    }
+  }
+  private async fetchOnce<T>(path:string,body:unknown,method:string,timeout:number):Promise<T>{
     await this.networkGate;
     const generation=this.cacheGeneration,controller = new AbortController(), timer = setTimeout(() => controller.abort(), timeout);
     try {
@@ -111,7 +128,7 @@ export class SofiaApi {
       let data: Record<string, any>;
       try { data = await response.json(); } catch { throw new ApiError('O servidor não retornou dados válidos. A API móvel da Sofia precisa estar publicada.', 'INVALID_RESPONSE', response.status); }
       if (!response.ok && path === '/auth/login' && (response.status === 404 || response.status === 405 || data.code === 'AUTH_REQUIRED')) throw new ApiError('O servidor ainda precisa receber a API móvel da Sofia. Não é um erro da sua senha.', 'MOBILE_API_NOT_PUBLISHED', response.status);
-      if (!response.ok) { if (response.status === 401 && path !== '/auth/login') {this.onExpired();} throw new ApiError(data.error || 'Não foi possível concluir.', data.code || 'HTTP_ERROR', response.status, data); }
+      if (!response.ok) { if (response.status === 401 && path !== '/auth/login') {this.onExpired();} throw new ApiError(data.error || (response.status>=502&&response.status<=504?'O servidor da Sofia está reiniciando ou ocupado ('+response.status+'). Tente de novo em alguns segundos.':'Não foi possível concluir ('+response.status+').'), data.code || (response.status>=502&&response.status<=504?'SERVER_UNAVAILABLE':'HTTP_ERROR'), response.status, data); }
       if(method==='GET'&&generation===this.cacheGeneration)this.snapshots.remember(path,data);
       if(generation===this.cacheGeneration&&path.startsWith('/chat-sync')&&data.conversation&&Array.isArray(data.messages)){this.snapshots.remember('/chat-sync/current',{...data,messages:data.messages.slice(-100)});this.snapshots.remember('/conversations/'+data.conversation.id,{...data,messages:data.messages.slice(-100)});}
       return data as T;

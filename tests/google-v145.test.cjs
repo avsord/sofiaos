@@ -5,7 +5,7 @@ const {GoogleService}=require('../src/services/google');
 const {BackupService}=require('../src/services/backup');
 const ENV={GOOGLE_CALENDAR_CLIENT_ID:'cid',GOOGLE_CALENDAR_CLIENT_SECRET:'csecret',SOFIA_CALENDAR_TOKEN_KEY:'chave-de-teste'};
 
-// Google falso: guarda eventos por calendário, pagina de 2 em 2, devolve syncToken e respeita 410.
+// Google falso: guarda eventos por calendário, pagina de 2 em 2, exige a janela de datas e devolve só o alterado com updatedMin.
 function fakeGoogle(){
  const g={calendars:[{id:'primary',summary:'Pedro',accessRole:'owner',primary:true},{id:'feriados',summary:'Feriados',accessRole:'reader',selected:true},{id:'oculto',summary:'Oculto',accessRole:'reader',selected:false}],
   events:{primary:[],feriados:[],oculto:[]},changes:{primary:[],feriados:[]},expired:new Set(),calls:[],uploads:[],driveFiles:[],seq:1};
@@ -15,9 +15,9 @@ function fakeGoogle(){
   if(u.pathname==='/calendar/v3/users/me/calendarList')return res(200,{items:g.calendars});
   let mm=u.pathname.match(/^\/calendar\/v3\/calendars\/([^/]+)\/events(?:\/([^/]+))?$/);
   if(mm){const cal=decodeURIComponent(mm[1]),evId=mm[2]&&decodeURIComponent(mm[2]);
-   if(m==='GET'){const st=u.searchParams.get('syncToken');if(st&&g.expired.has(cal)){g.expired.delete(cal);return res(410,{error:{message:'gone'}});}
-    const list=st?g.changes[cal]:g.events[cal];const start=Number(u.searchParams.get('pageToken')||0),page=list.slice(start,start+2);
-    return res(200,{items:page,...(start+2<list.length?{nextPageToken:String(start+2)}:{nextSyncToken:'tok-'+cal+'-'+(g.seq++)})});}
+   if(m==='GET'){if(!u.searchParams.get('timeMin')||!u.searchParams.get('timeMax'))return res(400,{error:{message:'janela obrigatória'}});
+    const inc=u.searchParams.get('updatedMin');const list=inc?g.changes[cal]:g.events[cal];const size=Math.max(2,Math.ceil(list.length/10)),start=Number(u.searchParams.get('pageToken')||0),page=list.slice(start,start+size);
+    return res(200,{items:page,...(start+size<list.length?{nextPageToken:String(start+size)}:{})});}
    const body=opts.body?JSON.parse(opts.body):null;
    if(m==='POST'){const ev={id:'new'+(g.seq++),etag:'"e1"',...body};g.events[cal].push(ev);return res(200,ev);}
    if(m==='PATCH'){const ev=g.events[cal].find(e=>e.id===evId);Object.assign(ev,body,{etag:'"e'+(g.seq++)+'"'});return res(200,ev);}
@@ -66,13 +66,25 @@ test('importa tudo, paginado: principal (2 sentidos) + outros visíveis (só lei
  const st=await svc.status();assert.match(st.warnings[0],/7 recebidos do Google, 5 novos/);
 });
 
-test('incremental com syncToken; 410 refaz do zero sem duplicar; cancelado depois vira cancelado na Sofia',async t=>{
+test('janela fixa, incremental por data de alteração, não regrava o que não mudou; cancelado vira cancelado',async t=>{
  const {svc,core,g}=await connected(t);const w=core.workspace;
  g.events.primary=[ev('a','Reunião','2026-10-12T10:00:00-03:00','2026-10-12T11:00:00-03:00')];await svc.sync();
- g.changes.primary=[{...g.events.primary[0],summary:'Reunião (sala 2)',etag:'"a2"'}];await svc.sync();
- assert.equal(google(w)[0].title,'Reunião (sala 2)');assert.ok(g.calls.some(c=>c.includes('syncToken=tok-primary')));
- g.expired.add('primary');g.changes.primary=[];await svc.sync();assert.equal(google(w).length,1,'410 não duplica');
- g.changes.primary=[{id:'a',status:'cancelled'}];g.expired.clear();await svc.sync();assert.equal(google(w)[0].state,'cancelled');
+ const call=g.calls.find(c=>c.includes('/calendars/primary/events'));assert.match(call,/timeMin=/);assert.match(call,/timeMax=/);assert.ok(!/updatedMin/.test(call),'primeira vez: completa');
+ const rev=google(w)[0].revision;
+ g.changes.primary=[];await svc.sync();assert.ok(g.calls.some(c=>c.includes('updatedMin=')),'depois: só o que mudou');
+ assert.equal(google(w)[0].revision,rev,'nada mudou: não regravou');
+ g.changes.primary=[{...g.events.primary[0],summary:'Reunião (sala 2)',etag:'"a2"'}];await svc.sync();assert.equal(google(w)[0].title,'Reunião (sala 2)');
+ g.changes.primary=[{id:'a',status:'cancelled',etag:'"a3"'}];await svc.sync();assert.equal(google(w)[0].state,'cancelled');
+ g.changes.primary=[{id:'nunca',status:'cancelled',etag:'"x"'}];await svc.sync();assert.equal(google(w).length,1,'cancelado que nunca existiu não vira registro');
+});
+
+test('lote grande não trava: o servidor continua respondendo durante a sincronização',async t=>{
+ const {svc,core,g}=await connected(t);
+ g.events.primary=Array.from({length:120},(_,i)=>ev('e'+i,'Evento '+i,'2026-11-01T10:00:00-03:00','2026-11-01T11:00:00-03:00'));
+ let ticks=0;const timer=setInterval(()=>ticks++,0);
+ await svc.sync();clearInterval(timer);
+ assert.equal(core.workspace.list({kind:'commitment',limit:500}).length,120);
+ assert.ok(ticks>=3,'o event loop rodou outras tarefas no meio ('+ticks+')');
 });
 
 test('Sofia → Google: novo, editado e apagado; conflito não sobrescreve nada',async t=>{
