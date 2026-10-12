@@ -3,6 +3,7 @@ import {ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, Ref
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Svg, {Path, Rect, Line} from 'react-native-svg';
 import {useTheme} from '../lib/theme';
+import {encryptedStorage} from '../lib/encrypted-storage';
 import type {SofiaApi} from '../lib/api';
 import type {Entity} from '../lib/types';
 import {errorText} from '../lib/chat-model';
@@ -31,16 +32,30 @@ const dateBR = (d: string) => d ? d.slice(8, 10) + '/' + d.slice(5, 7) : '';
 const weekday = (d: string) => new Date(d + 'T12:00:00Z').toLocaleDateString('pt-BR', {weekday: 'long', day: '2-digit', month: 'long', timeZone: 'UTC'});
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
-async function loadAll(api: SofiaApi): Promise<Data> {
+function toData(all: Record<string, Entity[]>): Data {
+  const g = (k: string) => all[k] || [];
+  return {accounts: g('fin_account').map(toAccount), cards: g('fin_card').map(toCard), txs: g('fin_tx').filter(e => e.state !== 'archived').map(toTx),
+    budgets: g('fin_budget').filter(e => e.state !== 'archived').map(toBudget), goals: g('fin_goal').filter(e => e.state !== 'archived').map(toGoal)};
+}
+/** Um pedido só ao servidor; servidor antigo cai nos pedidos por tipo, em paralelo. */
+async function loadAll(api: SofiaApi): Promise<Record<string, Entity[]>> {
+  try { return (await api.financeBundle()).items; }
+  catch (e) { if ((e as any)?.status !== 404) throw e; }
   const all: Record<string, Entity[]> = {};
   await Promise.all(KINDS.map(async kind => {
     const list: Entity[] = [];
     for (let offset = 0; ; offset += 100) { const r = await api.entities(kind, '', offset); list.push(...r.items); if (r.items.length < 100) break; }
     all[kind] = list;
   }));
-  return {accounts: all.fin_account.map(toAccount), cards: all.fin_card.map(toCard), txs: all.fin_tx.filter(e => e.state !== 'archived').map(toTx),
-    budgets: all.fin_budget.filter(e => e.state !== 'archived').map(toBudget), goals: all.fin_goal.filter(e => e.state !== 'archived').map(toGoal)};
+  return all;
 }
+// Última versão guardada no aparelho, CRIPTOGRAFADA (Keystore do Android):
+// o Finanças abre na hora com ela e se atualiza por trás.
+const cacheScope = (api: SofiaApi) => 'sofia-finance-v1|' + api.owner.trim().toLowerCase();
+async function readCache(api: SofiaApi): Promise<Record<string, Entity[]> | null> {
+  try { const raw = await encryptedStorage.read(cacheScope(api)); const v = raw ? JSON.parse(raw) : null; return v && typeof v === 'object' ? v : null; } catch { return null; }
+}
+function writeCache(api: SofiaApi, all: Record<string, Entity[]>) { void encryptedStorage.write(cacheScope(api), JSON.stringify(all)).catch(() => undefined); }
 function saveEntity(api: SofiaApi, kind: string, title: string, data: Record<string, any>, existing?: Entity, state?: string) {
   return existing ? api.saveEntity({...existing, title, ...(state ? {state} : {}), data: {...existing.data, ...data}})
     : api.saveEntity({kind, title, content: '', area: 'Pessoal', state: state || 'active', privacy: 'private', tags: [], data});
@@ -81,8 +96,20 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
   const [tab, setTab] = useState<Tab>('home'), [month, setMonth] = useState(monthOf(todayISO()));
   const [editing, setEditing] = useState<Partial<Tx> | null>(null), [manage, setManage] = useState(false);
   const [accountFilter, setAccountFilter] = useState<string>('');
-  const reload = useCallback(async () => { setLoading(true); try { setData(await loadAll(api)); setError(''); } catch (e) { setError(errorText(e)); } finally { setLoading(false); } }, [api]);
-  useEffect(() => { if (active) void reload(); }, [active, reload]);
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try { const all = await loadAll(api); setData(toData(all)); setError(''); writeCache(api, all); }
+    catch (e) { setError(errorText(e)); }
+    finally { setLoading(false); }
+  }, [api]);
+  // Abre na hora com a última versão guardada; a atualização chega por trás.
+  useEffect(() => {
+    if (!active) return;
+    let live = true;
+    void readCache(api).then(all => { if (live && all) setData(d => d || toData(all)); });
+    void reload();
+    return () => { live = false; };
+  }, [active, reload, api]);
 
   const d = data;
   const newTx = (kind: TxKind = 'expense') => setEditing({kind, date: todayISO(), paid: true});
@@ -173,8 +200,9 @@ function Field({label, value, onChange, placeholder, numeric = false, big = fals
 // ============================ RESUMO ============================
 function HomeTab({d, month, api, reload, onTx, onTab, onAccount, onManage}: {d: Data; month: string; api: SofiaApi; reload: () => Promise<void>; onTx: (t: Partial<Tx>) => void; onTab: (t: Tab) => void; onAccount: (id: string) => void; onManage: () => void}) {
   const c = useTheme(), today = todayISO();
-  const s = monthSummary(d.txs, month), total = totalBalance(d.accounts, d.txs), forecast = forecastBalance(d.accounts, d.txs, month, d.cards);
-  const dues = upcoming(d.txs, d.cards, today, 10), budgets = budgetProgress(d.budgets, d.txs, month).slice(0, 3);
+  // Contas pesadas só quando os dados ou o mês mudam (não a cada toque, como esconder valores).
+  const {s, total, forecast, dues, budgets} = useMemo(() => ({s: monthSummary(d.txs, month), total: totalBalance(d.accounts, d.txs), forecast: forecastBalance(d.accounts, d.txs, month, d.cards),
+    dues: upcoming(d.txs, d.cards, today, 10), budgets: budgetProgress(d.budgets, d.txs, month).slice(0, 3)}), [d, month, today]);
   const [hide, setHide] = useState(false);
   const show = (v: number) => hide ? 'R$ •••••' : money(v);
   return (
@@ -626,9 +654,9 @@ function Donut({slices, size = 170}: {slices: Array<{value: number; color: strin
 }
 function ReportsTab({d, month}: {d: Data; month: string}) {
   const c = useTheme(), [kind, setKind] = useState<'expense' | 'income'>('expense');
-  const cats = byCategory(d.txs, month, kind), total = cats.reduce((s, x) => s + x.total, 0), t6 = trend(d.txs, month, 6);
-  const max = Math.max(1, ...t6.flatMap(x => [x.income, x.expense])), s = monthSummary(d.txs, month), prev = monthSummary(d.txs, addMonths(month, -1));
-  const bal = balanceSeries(d.accounts, d.txs, month);
+  const cats = useMemo(() => byCategory(d.txs, month, kind), [d, month, kind]), total = cats.reduce((s, x) => s + x.total, 0);
+  const {t6, s, prev, bal} = useMemo(() => ({t6: trend(d.txs, month, 6), s: monthSummary(d.txs, month), prev: monthSummary(d.txs, addMonths(month, -1)), bal: balanceSeries(d.accounts, d.txs, month)}), [d, month]);
+  const max = Math.max(1, ...t6.flatMap(x => [x.income, x.expense]));
   const [w, setW] = useState(0);
   return (
     <>

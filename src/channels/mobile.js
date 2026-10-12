@@ -135,6 +135,16 @@ function makeMobileApi(runtime, deps) {
       for (let offset = 0; offset < 5000; offset += 500) { const page = workspace.list({ kind: 'monitor', limit: 500, offset }); for (const mon of page) if (mon.state !== 'archived') out[mon.id] = workspace.observations(mon.id); if (page.length < 500) break; }
       return send({ items: out });
     }
+    // Finanças: os 5 tipos numa resposta só (antes: 5+ pedidos paginados de 100).
+    if (p === '/api/mobile/md/finance' && m === 'GET') {
+      const out = {};
+      for (const kind of ['fin_account', 'fin_card', 'fin_tx', 'fin_budget', 'fin_goal']) {
+        const list = [];
+        for (let offset = 0; offset < 50000; offset += 500) { const page = workspace.list({ kind, limit: 500, offset }); list.push(...page); if (page.length < 500) break; }
+        out[kind] = list;
+      }
+      return send({ items: out, at: new Date().toISOString() });
+    }
     if (p === '/api/mobile/md/dashboard') {
       const allowedWidgets = ['monitoring', 'tasks', 'capsules'];
       if (m === 'GET') { const saved = runtime.google.kvGet('dashboard_widgets'); return send({ widgets: Array.isArray(saved) ? saved : ['monitoring', 'tasks'], saved: Array.isArray(saved) }); }
