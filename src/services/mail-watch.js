@@ -14,6 +14,7 @@ const PROVIDERS = {
   yahoo: {host: 'imap.mail.yahoo.com', port: 993, label: 'Yahoo'},
   icloud: {host: 'imap.mail.me.com', port: 993, label: 'iCloud'},
   imap: {host: '', port: 993, label: 'Outro (IMAP)'},
+  gmail_google: {host: '', port: 0, label: 'Gmail (pela Conta Google)'},
 };
 const FIRST_LOOKBACK_DAYS = 2, MAX_PER_CHECK = 80, SNIPPET = 240;
 
@@ -138,7 +139,39 @@ class MailWatcher {
     return report;
   }
 
+  /** Gmail pela conexão Google que já existe (OAuth, escopo gmail.readonly):
+   * nenhuma senha de app. Lê só remetente, assunto e o trecho que o próprio
+   * Gmail fornece (snippet) das mensagens novas da Caixa de Entrada. */
+  async checkGmailApi(account, rules) {
+    const g = this.google;
+    const link = g && g.link && g.link();
+    if (!link || !link.refresh) throw new AppError('GOOGLE_NOT_CONNECTED', 'Conecte a Conta Google em Perfil → Conta Google.');
+    if (!/gmail\.readonly/.test(link.scopes || '')) throw new AppError('GMAIL_SCOPE', 'Desconecte e conecte a Conta Google de novo para liberar a leitura do Gmail.');
+    const API = 'https://gmail.googleapis.com/gmail/v1/users/me/messages';
+    // last_uid guarda, para o Gmail, o horário (em SEGUNDOS) da última mensagem lida: o limite de número do servidor é 1e10.
+    const since = (Number(account.data.last_uid) || 0) * 1000;
+    const q = since ? 'in:inbox after:' + Math.floor(since / 1000) : 'in:inbox newer_than:2d';
+    const list = await g.call('GET', API + '?maxResults=80&q=' + encodeURIComponent(q));
+    let scanned = 0, hits = 0, newest = since;
+    for (const ref of (list.messages || []).slice(0, 80)) {
+      const m = await g.call('GET', API + '/' + encodeURIComponent(ref.id) + '?format=metadata&metadataHeaders=From&metadataHeaders=Subject');
+      const at = Number(m.internalDate) || Date.now();
+      if (since && at <= since) continue;
+      scanned++; newest = Math.max(newest, at);
+      const head = name => ((m.payload && m.payload.headers) || []).find(h => String(h.name).toLowerCase() === name)?.value || '';
+      const from = head('from'), match = /^\s*"?([^"<]*?)"?\s*<([^>]+)>/.exec(from);
+      const mail = {accountId: account.id, fromName: clean(match ? match[1] : '', 160), fromAddr: clean(match ? match[2] : from, 200), subject: clean(head('subject') || '(sem assunto)', 300),
+        text: clean(String(m.snippet || '').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&'), 4000), date: new Date(at).toISOString(), key: account.id + ':gmail:' + m.id};
+      const matched = rules.filter(r => ruleMatches(r, mail));
+      if (matched.length) { hits++; this.record(account, mail, matched); }
+    }
+    const a = this.w.get(account.id);
+    this.w.save({revision: a.revision, data: {...a.data, last_uid: Math.floor((newest || Date.now()) / 1000), last_check: now(), last_error: '', secret_set: true}}, account.id);
+    return {scanned, hits};
+  }
+
   async checkAccount(account, rules) {
+    if (account.data.provider === 'gmail_google') return this.checkGmailApi(account, rules);
     const pass = this.secret(account.id);
     if (!pass) throw new AppError('MAIL_SECRET', 'Falta a senha de app desta conta.');
     const opts = this.server(account); opts.auth.pass = pass;

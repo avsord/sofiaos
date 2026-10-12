@@ -1788,7 +1788,8 @@ const CATALOG={
           "outlook",
           "yahoo",
           "icloud",
-          "imap"
+          "imap",
+          "gmail_google"
         ]
       },
       {

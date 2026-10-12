@@ -71,3 +71,30 @@ test('conta e regra: validação',t=>{
  assert.throws(()=>core.workspace.save({kind:'mail_account',title:'x',area:'Pessoal',data:{provider:'imap',address:'a@b.com'}}),/servidor IMAP/);
  assert.throws(()=>core.workspace.save({kind:'mail_rule',title:'x',area:'Pessoal',data:{field:'from'}}),/procurar/);
 });
+
+test('Gmail pela Conta Google: sem senha de app, lê só cabeçalho e trecho, continua de onde parou',async t=>{
+ const {core,store,config}=fixture(t);const w=core.workspace;
+ const msgs=[{id:'m1',internalDate:String(Date.parse('2026-10-12T10:00:00Z')),snippet:'Segue o contrato para assinar',payload:{headers:[{name:'From',value:'"Ana Souza" <ana@empresa.com>'},{name:'Subject',value:'Contrato'}]}},
+  {id:'m2',internalDate:String(Date.parse('2026-10-12T11:00:00Z')),snippet:'Promoção',payload:{headers:[{name:'From',value:'loja@x.com'},{name:'Subject',value:'Oferta'}]}}];
+ const calls=[];
+ const google={link:()=>({refresh:'x',scopes:'openid https://www.googleapis.com/auth/gmail.readonly'}),call:async(m,url)=>{calls.push(url);const u=new URL(url);
+  if(u.pathname.endsWith('/messages'))return {messages:msgs.filter(x=>{const q=u.searchParams.get('q');const a=/after:(\d+)/.exec(q);return !a||Number(x.internalDate)/1000>Number(a[1]);}).map(x=>({id:x.id}))};
+  return msgs.find(x=>u.pathname.endsWith('/'+x.id));}};
+ const mw=new MailWatcher(w,config,{client:()=>{throw Error('não deve usar IMAP');}});mw.google=google;
+ w.save({kind:'mail_account',title:'Gmail',area:'Pessoal',data:{provider:'gmail_google',address:'pedro@gmail.com'}});
+ w.save({kind:'mail_rule',title:'Ana',area:'Pessoal',data:{field:'from',contains:'ana@empresa.com',notify:true}});
+ const r=await mw.checkAll();assert.equal(r.errors.length,0);assert.equal(r.scanned,2);assert.equal(r.hits,1);
+ assert.ok(calls[0].includes(encodeURIComponent('newer_than:2d')),'primeira vez: últimos 2 dias');
+ const hit=w.list({kind:'mail_hit'})[0];assert.equal(hit.data.from_name,'Ana Souza');assert.equal(hit.data.snippet,'Segue o contrato para assinar');
+ assert.equal(store.db.prepare("SELECT COUNT(*) n FROM notifications WHERE category='email'").get().n,1);
+ msgs.push({id:'m3',internalDate:String(Date.parse('2026-10-12T12:00:00Z')),snippet:'Assinado',payload:{headers:[{name:'From',value:'Ana Souza <ana@empresa.com>'},{name:'Subject',value:'Re: Contrato'}]}});
+ const r2=await mw.checkAll();assert.equal(r2.scanned,1,'só a nova');assert.equal(w.list({kind:'mail_hit'}).length,2);
+ assert.ok(calls.some(c=>c.includes('after%3A')),'depois: só o que chegou desde a última');
+});
+
+test('Gmail pela Conta Google sem a permissão do Gmail: erro claro pedindo para reconectar',async t=>{
+ const {core,config}=fixture(t);const w=core.workspace;
+ const mw=new MailWatcher(w,config,{});mw.google={link:()=>({refresh:'x',scopes:'openid email'}),call:async()=>({})};
+ const acc=w.save({kind:'mail_account',title:'Gmail',area:'Pessoal',data:{provider:'gmail_google',address:'pedro@gmail.com'}});
+ await mw.checkAll();assert.match(w.get(acc.id).data.last_error,/conecte a Conta Google de novo/);
+});

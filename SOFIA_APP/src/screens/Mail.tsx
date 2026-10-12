@@ -17,7 +17,8 @@ import {money} from '../lib/monitoring';
 
 type Tab = 'hits' | 'rules' | 'accounts';
 const PROVIDERS: Array<{value: string; label: string; help: string; link?: string}> = [
-  {value: 'gmail', label: 'Gmail', help: 'No Google: ative a verificação em duas etapas e crie uma "senha de app" (16 letras). Cole aqui essa senha, não a sua senha normal.', link: 'https://myaccount.google.com/apppasswords'},
+  {value: 'gmail_google', label: 'Gmail · Conta Google (mais fácil)', help: 'Sem senha nenhuma: usa a mesma Conta Google da Agenda e do Drive (Perfil → Conta Google). A Sofia só lê remetente, assunto e o trecho que o Gmail mostra.'},
+  {value: 'gmail', label: 'Gmail (senha de app)', help: 'No Google: ative a verificação em duas etapas e crie uma "senha de app" (16 letras). Cole aqui essa senha, não a sua senha normal.', link: 'https://myaccount.google.com/apppasswords'},
   {value: 'outlook', label: 'Outlook / Hotmail', help: 'Crie uma senha de app na conta Microsoft (Segurança → Opções avançadas). Algumas contas pessoais da Microsoft não permitem mais IMAP; se recusar, o app avisa.', link: 'https://account.live.com/proofs/AppPassword'},
   {value: 'yahoo', label: 'Yahoo', help: 'Em Segurança da conta, gere uma senha de app e cole aqui.', link: 'https://login.yahoo.com/myaccount/security/'},
   {value: 'icloud', label: 'iCloud', help: 'Em appleid.apple.com → Senhas de app, gere uma e cole aqui.', link: 'https://appleid.apple.com/'},
@@ -152,7 +153,10 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
 
 function AccountSheet({api, account, onClose, onDone}: {api: SofiaApi; account: Entity | null; onClose: () => void; onDone: () => void}) {
   const c = useTheme();
-  const [provider, setProvider] = useState(String(account?.data.provider || 'gmail')), [address, setAddress] = useState(String(account?.data.address || ''));
+  const [provider, setProvider] = useState(String(account?.data.provider || 'gmail_google')), [address, setAddress] = useState(String(account?.data.address || ''));
+  const [google, setGoogle] = useState<{connected: boolean; gmail: boolean; email: string} | null>(null);
+  useEffect(() => { let live = true; void api.calendarStatus().then(s => { if (live) { setGoogle({connected: !!s.connected, gmail: !!s.gmail?.connected, email: String(s.email || '')}); if (!account && s.email) setAddress(a => a || String(s.email)); } }).catch(() => { if (live) setGoogle({connected: false, gmail: false, email: ''}); }); return () => { live = false; }; }, [api, account]);
+  const viaGoogle = provider === 'gmail_google';
   const [host, setHost] = useState(String(account?.data.host || '')), [port, setPort] = useState(account?.data.port ? String(account.data.port) : '993');
   const [password, setPassword] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [ok, setOk] = useState('');
   const p = PROVIDERS.find(x => x.value === provider)!;
@@ -161,6 +165,11 @@ function AccountSheet({api, account, onClose, onDone}: {api: SofiaApi; account: 
     try {
       const data = {provider, address: address.trim().toLowerCase(), host: provider === 'imap' ? host.trim() : '', port: provider === 'imap' ? Number(port) || 993 : ''};
       const saved = account ? await api.saveEntity({...account, title: data.address, data: {...account.data, ...data}}) : await api.saveEntity({kind: 'mail_account', title: data.address, content: '', area: 'Pessoal', state: 'active', privacy: 'private', tags: [], data});
+      if (viaGoogle) {
+        if (!google?.connected || !google.gmail) { setError(!google?.connected ? 'Conecte primeiro a Conta Google em Perfil → Conta Google. Depois volte aqui.' : 'Em Perfil → Conta Google, desconecte e conecte de novo para liberar o Gmail. Depois volte aqui.'); return; }
+        const r = await api.mailCheck(saved.id);
+        setOk('Conectado pela Conta Google! ' + (r.scanned ? r.scanned + ' e-mails dos últimos 2 dias conferidos.' : 'A Sofia passa a ler os e-mails novos.')); setTimeout(onDone, 1400); return;
+      }
       if (password.trim()) {
         const r = await api.mailSecret(saved.id, password.replace(/\s+/g, provider === 'gmail' ? '' : ' ').trim());
         setOk('Conectado! Caixa de entrada com ' + r.messages + ' mensagens. A Sofia passa a ler só as novas.');
@@ -176,12 +185,14 @@ function AccountSheet({api, account, onClose, onDone}: {api: SofiaApi; account: 
           <Text style={{fontSize: 18, fontWeight: '800', color: c.text}}>{account ? 'Conta de e-mail' : 'Conectar e-mail'}</Text>
           <Chips value={provider} onChange={setProvider} options={PROVIDERS.map(x => ({value: x.value, label: x.label}))} />
           <Field label="Seu e-mail" value={address} onChange={setAddress} placeholder="voce@gmail.com" email />
-          {provider === 'imap' ? <View style={{flexDirection: 'row', gap: 10}}><View style={{flex: 3}}><Field label="Servidor IMAP" value={host} onChange={setHost} placeholder="imap.seudominio.com" /></View><View style={{flex: 1}}><Field label="Porta" value={port} onChange={setPort} /></View></View> : null}
+          {viaGoogle ? null : provider === 'imap' ? <View style={{flexDirection: 'row', gap: 10}}><View style={{flex: 3}}><Field label="Servidor IMAP" value={host} onChange={setHost} placeholder="imap.seudominio.com" /></View><View style={{flex: 1}}><Field label="Porta" value={port} onChange={setPort} /></View></View> : null}
           <View style={{padding: 12, borderRadius: 14, backgroundColor: c.accentSoft, gap: 6}}>
             <Text style={{color: c.text, fontSize: 13, lineHeight: 19}}>{p.help}</Text>
             {p.link ? <Pressable onPress={() => void Linking.openURL(p.link!)}><Text style={{color: c.accent, fontWeight: '700'}}>Abrir página da senha de app →</Text></Pressable> : null}
           </View>
-          <Field label={account?.data.secret_set ? 'Nova senha de app (deixe vazio para manter)' : 'Senha de app'} value={password} onChange={setPassword} placeholder="xxxx xxxx xxxx xxxx" secure />
+          {viaGoogle ? (
+            <Text style={{fontSize: 13, color: google?.gmail ? '#2fc58b' : c.muted}}>{google === null ? 'Conferindo a Conta Google…' : google.gmail ? '✓ Conta Google conectada com acesso ao Gmail' + (google.email ? ' (' + google.email + ')' : '') + '.' : google.connected ? 'A Conta Google está conectada, mas sem o Gmail. Em Perfil → Conta Google, desconecte e conecte de novo.' : 'Conecte a Conta Google em Perfil → Conta Google (a mesma da Agenda e do Drive).'}</Text>
+          ) : <Field label={account?.data.secret_set ? 'Nova senha de app (deixe vazio para manter)' : 'Senha de app'} value={password} onChange={setPassword} placeholder="xxxx xxxx xxxx xxxx" secure />}
           {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
           {ok ? <Text style={{color: '#2fc58b', fontWeight: '600'}}>{ok}</Text> : null}
           <Button title={account ? 'Salvar e testar' : 'Conectar e testar'} loading={busy} disabled={!address.includes('@')} onPress={() => void connect()} />
