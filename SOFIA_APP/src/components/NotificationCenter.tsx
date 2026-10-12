@@ -140,16 +140,15 @@ function Appear({animate,children}:{animate:boolean;children:React.ReactNode}){
 }
 function BellDigest(){const c=useTheme(),n=useNotifications(),shown=useDigest(),initial=useRef<Set<string>|null>(null);
  if(initial.current===null)initial.current=new Set(shown.map(d=>d.id));
- useEffect(()=>{void refreshDigest(n.api);},[n.api]);
  if(!shown.length)return null;
  const sectionNew=initial.current.size===0;
- return <Appear animate={sectionNew}><View style={{gap:2,marginBottom:6}}><Text style={{fontSize:13,color:c.muted,fontWeight:'700',paddingTop:6,paddingBottom:4}}>Pede atenção agora</Text>
-  {shown.map(d=><Appear key={d.id} animate={!sectionNew&&!initial.current!.has(d.id)}><Swipeable label={d.title} onDismiss={()=>hideDigest(d.id)}>{dismiss=><Pressable accessibilityRole="button" accessibilityLabel={d.title} onPress={()=>n.open({id:d.id,title:d.title,body:d.text,state:'read',created_at:new Date().toISOString(),category:d.category,entity_id:d.entity_id})}
+ return <View style={{gap:2,marginBottom:6}}><Text style={{fontSize:13,color:c.muted,fontWeight:'700',paddingTop:6,paddingBottom:4}}>Pede atenção agora</Text>
+  {shown.map(d=><Swipeable key={d.id} label={d.title} onDismiss={()=>hideDigest(d.id)}>{dismiss=><Pressable accessibilityRole="button" accessibilityLabel={d.title} onPress={()=>n.open({id:d.id,title:d.title,body:d.text,state:'read',created_at:new Date().toISOString(),category:d.category,entity_id:d.entity_id})}
    style={{flexDirection:'row',gap:12,paddingVertical:12,paddingHorizontal:10,borderRadius:16,backgroundColor:d.color+'14',borderWidth:1,borderColor:d.color+'44'}}>
    <View style={{width:38,height:38,borderRadius:19,backgroundColor:d.color+'26',alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:18}}>{d.icon}</Text></View>
    <View style={{flex:1,gap:3}}><Text numberOfLines={2} style={{color:c.text,fontWeight:'700',fontSize:14}}>{d.title}</Text><Text numberOfLines={3} style={{color:c.muted,fontSize:12,lineHeight:18}}>{d.text}</Text></View>
    <Pressable accessibilityLabel={'Dispensar: '+d.title} onPress={dismiss} style={{padding:6,alignSelf:'flex-start'}}><Icon name="close" size={16} color={c.muted}/></Pressable>
-  </Pressable>}</Swipeable></Appear>)}</View></Appear>;}
+  </Pressable>}</Swipeable>)}</View>;}
 export function NotificationList({grouped=false,firstPaint=false}:{grouped?:boolean;firstPaint?:boolean}){const n=useNotifications(),c=useTheme(),[filter,setFilter]=useState('all'),[limits,setLimits]=useState<Record<string,number>>({});
  const areas=useMemo(()=>{const m=new Map<string,number>();for(const i of n.items){const a=noticeArea(i);m.set(a,(m.get(a)||0)+1);}return [...m.entries()].sort((a,b)=>b[1]-a[1]);},[n.items]);
  const shown=useMemo(()=>n.items.filter(i=>filter==='all'||(filter==='unread'?i.state==='unread':noticeArea(i)===filter)),[n.items,filter]);

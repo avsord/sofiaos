@@ -299,6 +299,11 @@ export function removeSource(monitor: Entity, url: string): {preferred_url: stri
   const list = storesOf(monitor).map(s => s.url).filter(u => u !== url);
   return {preferred_url: list[0] || '', source_urls: list.slice(1).join('\n')};
 }
+/** Troca o link de uma loja mantendo a ordem (a principal continua principal). */
+export function replaceSource(monitor: Entity, oldUrl: string, newUrl: string): {preferred_url: string; source_urls: string} {
+  const list = storesOf(monitor).map(s => s.url).map(u => u === oldUrl ? newUrl : u).filter((u, i, all) => all.indexOf(u) === i);
+  return {preferred_url: list[0] || '', source_urls: list.slice(1).join('\n')};
+}
 export function makePrimary(monitor: Entity, url: string): {preferred_url: string; source_urls: string} {
   const list = storesOf(monitor).map(s => s.url).filter(u => u !== url);
   return {preferred_url: url, source_urls: list.join('\n')};

@@ -21,7 +21,7 @@ import {collectorState, onCollector, runCollection, loadProducts, recordPrice, c
 import type {StoreIssue} from '../lib/monitor-collector';
 import {
   PRODUCT_COLORS, WINDOWS, DROP_CHOICES, INTERVALS, money, percent, since, storeName, hostOf, nextColor,
-  alertsOf, alertSummary, analyzeProduct, allReadings, searchTerms, extractProductUrl, searchTargetsFor, addSource, removeSource, makePrimary, withMemory, storesOf,
+  alertsOf, alertSummary, analyzeProduct, allReadings, searchTerms, extractProductUrl, replaceSource, searchTargetsFor, addSource, removeSource, makePrimary, withMemory, storesOf,
 } from '../lib/monitoring';
 import type {ProductSeries, Window, Candidate, StoreSeries} from '../lib/monitoring';
 
@@ -333,6 +333,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
   const [saving, setSaving] = useState(''), [error, setError] = useState(''), [storeSheet, setStoreSheet] = useState(false);
   const [confirm, setConfirm] = useState<{store: StoreSeries; issue: Extract<StoreIssue, {kind: 'confirm'}>} | null>(null);
   const [menu, setMenu] = useState<StoreSeries | null>(null), [rename, setRename] = useState(product.monitor.title), [target, setTarget] = useState('');
+  const [relink, setRelink] = useState<{store: StoreSeries; text: string; error: string} | null>(null);
   const [showAll, setShowAll] = useState(false), [storeFocus, setStoreFocus] = useState<string | null>(null);
   useEffect(() => { setMonitor(product.monitor); }, [product.monitor]);
   const alerts = alertsOf(monitor);
@@ -627,6 +628,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
             <Text style={{fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 6}}>{menu.name}</Text>
             <SheetItem label="Abrir na loja" onPress={() => { const u = menu.url; setMenu(null); void Linking.openURL(u); }} />
             <SheetItem label="Ler o preço agora" onPress={() => { setMenu(null); readNow(); }} />
+            <SheetItem label="Trocar o link" onPress={() => { const s = menu; setMenu(null); setRelink({store: s, text: s.url, error: ''}); }} />
             {!menu.primary ? <SheetItem label="Tornar loja principal" onPress={() => { const u = menu.url; setMenu(null); void patch(makePrimary(monitor, u)); }} /> : null}
             {product.stores.length > 1 ? <SheetItem danger label="Remover esta loja" onPress={() => { const u = menu.url; setMenu(null); void patch(removeSource(monitor, u)); }} />
               : <Text style={{fontSize: 12, color: c.muted, paddingVertical: 8}}>Esta é a única loja. Para parar, use “Parar de acompanhar” nos ajustes.</Text>}
@@ -641,6 +643,29 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
         setStoreSheet(false);
         if (saved) void runCollection(api, {only: saved.id, scope: api.owner});
       }} /> : null}
+
+      <Sheet visible={!!relink} onClose={() => setRelink(null)} label="Fechar troca de link">
+        {relink ? (
+          <View style={{gap: 12}}>
+            <Text style={{fontSize: 18, fontWeight: '700', color: c.text}}>Trocar o link · {relink.store.name}</Text>
+            <Text style={{fontSize: 12, color: c.muted}}>Cole o link novo do mesmo produto (pode ser o texto inteiro do "Compartilhar"). O histórico do link antigo deixa de aparecer no gráfico.</Text>
+            <TextInput accessibilityLabel="Link novo" value={relink.text} onChangeText={text => setRelink(r => r && {...r, text, error: ''})} autoCapitalize="none" autoCorrect={false} keyboardType="url"
+              style={{borderWidth: 1, borderColor: c.line, borderRadius: 12, padding: 12, color: c.text, backgroundColor: c.input}} />
+            <Pressable onPress={async () => { const t = await Clipboard.getStringAsync().catch(() => ''); const u = extractProductUrl(t); if (u) setRelink(r => r && {...r, text: u, error: ''}); }} style={{alignSelf: 'flex-start'}}><Text style={{color: c.accent, fontWeight: '700'}}>Colar da área de transferência</Text></Pressable>
+            {relink.error ? <Text style={{color: c.danger}}>{relink.error}</Text> : null}
+            <Button title="Salvar link" onPress={async () => {
+              const u = extractProductUrl(relink.text);
+              if (!u) { setRelink(r => r && {...r, error: 'Não achei um link aí.'}); return; }
+              if (u !== relink.store.url && product.stores.some(s => s.url === u)) { setRelink(r => r && {...r, error: 'Esse link já está em outra loja deste produto.'}); return; }
+              const old = relink.store.url; setRelink(null);
+              if (u === old) return;
+              const memo = (() => { try { const m = JSON.parse(String(monitor.data.reader_memory || '{}')); delete m[old]; return JSON.stringify(m); } catch { return '{}'; } })();
+              const saved = await patch({...replaceSource(monitor, old, u), reader_memory: memo}, {}, 'Link trocado');
+              if (saved) void runCollection(api, {force: true, only: saved.id, scope: api.owner});
+            }} />
+          </View>
+        ) : null}
+      </Sheet>
 
       <Sheet visible={!!confirm} onClose={() => setConfirm(null)} label="Fechar confirmação de preço">
         {confirm ? (
