@@ -31,6 +31,7 @@ import {PageCreateMenu} from '../components/PageTemplatePicker';
 import {NativeCollectionBlock} from '../components/NativeCollectionBlock';
 import {freshTemplate,insertTemplateBlocks} from '../lib/page-templates';
 import {subscribeSystemChanged} from '../lib/system-events';
+import {Spinner,LoadingLines} from '../components/Loading';
 import type {PageTemplate} from '../lib/page-templates';
 const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'null')??fallback;}catch{return fallback;}};
 const PAGE_LIST_KEY='/workspace/entities?limit=100&kind=user_page&q=&offset=0';
@@ -214,7 +215,7 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
   {error?<ErrorBanner text={error} onRetry={()=>void load()}/>:null}
   </>}
   footer={<>
-  {ready&&!loaded&&!error&&!pages.length?<View testID="pages-loading-placeholder" accessibilityLabel="Carregando páginas" style={{minHeight:80}}/>:null}
+  {ready&&!loaded&&!error&&!pages.length?<View testID="pages-loading-placeholder" accessibilityLabel="Carregando páginas" style={{minHeight:80,paddingHorizontal:4,gap:4}}><View style={{flexDirection:'row',alignItems:'center',gap:10,paddingTop:6}}><Spinner size={16} stroke={1.8}/><Text style={{color:c.muted,fontSize:13}}>Carregando páginas</Text></View><LoadingLines rows={4}/></View>:null}
   {ready&&loaded&&!pages.length&&!error?<Empty icon="book" title="Sua primeira página" body="Toque em + para criar uma página."/>:null}
   </>}/>;
  const createPicker=<PageCreateMenu visible={createParent!==undefined} parentTitle={createParent?.title} onClose={()=>setCreateParent(undefined)}

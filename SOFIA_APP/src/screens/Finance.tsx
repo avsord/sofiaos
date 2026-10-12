@@ -14,6 +14,7 @@ import {DateTimeField} from '../components/DateTimeField';
 import {Icon} from '../components/Icon';
 import {Button, IconButton} from '../components/UI';
 import {PriceChart} from '../components/PriceChart';
+import {Spinner, LoadingLines} from '../components/Loading';
 import {money} from '../lib/monitoring';
 import {
   EXPENSE_CATEGORIES, INCOME_CATEGORIES, ACCOUNT_TYPES, FIN_COLORS, categoryOf, toAccount, toCard, toTx, toBudget, toGoal, monthOf, addMonths, monthLabel, todayISO,
@@ -106,7 +107,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
           <Chips scroll value={tab} onChange={setTab} options={[{value: 'home' as Tab, label: 'Resumo'}, {value: 'txs' as Tab, label: 'Lançamentos'}, {value: 'cards' as Tab, label: 'Cartões'}, {value: 'plan' as Tab, label: 'Planejamento'}, {value: 'reports' as Tab, label: 'Relatórios'}]} />
         </View>
 
-        {!d ? <View style={{flex: 1, padding: 16, gap: 14}}>{error ? <View style={{padding: 20, gap: 12}}><Text style={{color: c.danger}}>{error}</Text><Button title="Tentar de novo" secondary onPress={() => void reload()} /></View> : [190, 140, 120].map((h, i) => <View key={i} style={{height: h, borderRadius: 22, backgroundColor: i ? c.surface : c.accentSoft, borderWidth: 1, borderColor: c.line, opacity: 0.75}} />)}</View> : !d.accounts.length ? (
+        {!d ? <View style={{flex: 1, padding: 16, gap: 14}}>{error ? <View style={{padding: 20, gap: 12}}><Text style={{color: c.danger}}>{error}</Text><Button title="Tentar de novo" secondary onPress={() => void reload()} /></View> : <View style={{gap: 6}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Spinner size={16} stroke={1.8} /><Text style={{color: c.muted, fontSize: 13}}>Carregando suas finanças</Text></View><LoadingLines rows={5} /></View>}</View> : !d.accounts.length ? (
           <Onboarding api={api} onDone={reload} />
         ) : (
           <ScrollView contentContainerStyle={{padding: 16, paddingBottom: insets.bottom + 110, gap: 14}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>

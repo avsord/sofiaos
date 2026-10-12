@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {File} from 'expo-file-system';
 import {SofiaApi} from '../lib/api';
 import {useTheme} from '../lib/theme';
+import {Spinner} from './Loading';
 import {Button,ErrorBanner,IconButton} from './UI';
 import {Icon} from './Icon';
 import {coverMime,coverName} from '../lib/page-cover-upload';
@@ -37,7 +38,7 @@ export function PageCover({data,api}:{data:Record<string,any>;api:SofiaApi}){
  },[attachment,preview,api]);
  if(data.cover_type==='attachment'&&attachment){
   if(failed)return <View style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center',backgroundColor:c.input,padding:16}]}><Text style={{fontSize:12,color:c.muted,textAlign:'center'}}>Não foi possível abrir esta capa. Toque na capa para escolher novamente.</Text></View>;
-  if(!uri)return <View style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center',backgroundColor:c.input}]}><ActivityIndicator color={c.accent}/></View>;
+  if(!uri)return <View style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center',backgroundColor:c.input}]}><Spinner size={20}/></View>;
   return <Image key={attachment+':'+attempt+':'+uri} source={{uri}} resizeMode="cover" style={StyleSheet.absoluteFill} onError={()=>{if(attempt<3){setUri('');retry.current();}else setFailed(true);}}/>;
  }
  const colors=String(data.cover_value||'').match(/#[0-9a-fA-F]{6}\b/g)||[c.accentSoft,c.accentSoft];

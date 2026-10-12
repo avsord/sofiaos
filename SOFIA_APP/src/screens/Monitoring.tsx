@@ -13,6 +13,7 @@ import {InternalBackGesture} from '../components/InternalBackGesture';
 import {Icon} from '../components/Icon';
 import {Button, IconButton} from '../components/UI';
 import {PriceChart} from '../components/PriceChart';
+import {Spinner, LoadingLines} from '../components/Loading';
 import {readPrice, readLinks} from '../lib/price-reader';
 import type {StoreLink} from '../lib/price-extractor';
 import {fallbackSearchUrl} from '../lib/price-extractor';
@@ -121,7 +122,7 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
           </Pressable>
 
           {error ? <Text style={{color: c.danger, fontSize: 13}}>{error}</Text> : null}
-          {products === null ? <View style={{gap: 14}}>{[230, 120, 120].map((h, i) => <View key={i} style={{height: h, borderRadius: 22, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, opacity: 0.7}} />)}</View> : !products.length ? (
+          {products === null ? <View style={{gap: 6}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Spinner size={16} stroke={1.8} /><Text style={{color: c.muted, fontSize: 13}}>Carregando produtos</Text></View><LoadingLines rows={4} /></View> : !products.length ? (
             <View style={{alignItems: 'center', gap: 14, paddingVertical: 40, paddingHorizontal: 10}}>
               <View style={{width: 84, height: 84, borderRadius: 42, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center'}}><Icon name="monitor" size={38} color={c.accent} /></View>
               <Text style={{fontSize: 20, fontWeight: '700', color: c.text, textAlign: 'center'}}>Acompanhe o preço do que você quer comprar</Text>
