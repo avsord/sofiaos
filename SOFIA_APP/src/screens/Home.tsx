@@ -12,7 +12,7 @@ import {TASK_PRIORITIES,taskPriority} from '../lib/task-filters';
 import {Sheet} from '../components/Sheet';
 import {TaskPriority} from '../components/TaskPriority';
 import {SortableWidgets} from '../components/SortableWidgets';
-import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import React,{startTransition,useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Alert,AppState,Pressable,RefreshControl,ScrollView,Text,View} from 'react-native';
 import {SofiaApi} from '../lib/api';
 import {useTheme} from '../lib/theme';
@@ -35,7 +35,7 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  useEffect(()=>{
   if(!active||!launchVisible||agendaCatalog)return;
   let alive=true;
-  const cancel=scheduleIdleTask(()=>{void api.catalog().then(cat=>{if(alive)setAgendaCatalog(cat);}).catch(()=>{});});
+  const cancel=scheduleIdleTask(()=>{void api.catalog().then(cat=>{if(alive)startTransition(()=>setAgendaCatalog(cat));}).catch(()=>{});});
   return()=>{alive=false;cancel();};
  },[api,active,launchVisible,agendaCatalog]);
  function createHomeCommitment(day:string){setAgendaDraft({kind:'commitment',title:'',data:{home_day:day}});}
@@ -60,11 +60,11 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  useEffect(()=>{
   if(!launchVisible||!active)return;
   let alive=true;
-  const cancel=scheduleIdleTask(()=>{void api.dashboardWidgets().then(r=>{if(alive)setWidgets((Array.isArray(r.widgets)?r.widgets:['monitoring','tasks']).filter(x=>['monitoring','tasks','capsules'].includes(x)));}).catch(()=>{});});
+  const cancel=scheduleIdleTask(()=>{void api.dashboardWidgets().then(r=>{if(alive)startTransition(()=>setWidgets((Array.isArray(r.widgets)?r.widgets:['monitoring','tasks']).filter(x=>['monitoring','tasks','capsules'].includes(x))));}).catch(()=>{});});
   return()=>{alive=false;cancel();};
  },[api,refreshEpoch,launchVisible,active]);
  // Monitoring may involve many reads; it must not compete with the first usable frame.
- useEffect(()=>{if(!launchVisible)return;let alive=true;async function load(){try{const monitors:Entity[]=[];for(let offset=0;;offset+=100){const r=await api.entities('monitor','',offset);monitors.push(...r.items);if(r.items.length<100)break;}const result=await productsFrom(api,monitors);/* One broken monitor must not turn the whole Home into an error. */if(alive)setSeries(result);}catch{/* Monitoring is secondary; Home, Agenda and Tasks stay usable. */}}const cancel=scheduleIdleTask(()=>{void load();});const timer=setInterval(()=>{if(homeActive.current&&AppState.currentState==='active')void load();},60000);const foreground=AppState.addEventListener('change',state=>{if(state==='active'&&homeActive.current)void load();});const stop=onCollector(()=>{if(!collectorState().running&&homeActive.current)void load();});return()=>{alive=false;cancel();clearInterval(timer);foreground.remove();stop();};},[api,refreshEpoch,launchVisible]);
+ useEffect(()=>{if(!launchVisible)return;let alive=true;async function load(){try{const monitors:Entity[]=[];for(let offset=0;;offset+=100){const r=await api.entities('monitor','',offset);monitors.push(...r.items);if(r.items.length<100)break;}const result=await productsFrom(api,monitors);/* One broken monitor must not turn the whole Home into an error. */if(alive)startTransition(()=>setSeries(result));}catch{/* Monitoring is secondary; Home, Agenda and Tasks stay usable. */}}const cancel=scheduleIdleTask(()=>{void load();});const timer=setInterval(()=>{if(homeActive.current&&AppState.currentState==='active')void load();},60000);const foreground=AppState.addEventListener('change',state=>{if(state==='active'&&homeActive.current)void load();});const stop=onCollector(()=>{if(!collectorState().running&&homeActive.current)void load();});return()=>{alive=false;cancel();clearInterval(timer);foreground.remove();stop();};},[api,refreshEpoch,launchVisible]);
  const [calendarDate,setCalendarDate]=useState(()=>new Date());
  const calendar=useAgendaMonth(api,calendarDate,active,launchVisible),events=calendar.items;
  const calendarMonth=useCallback((month:Date)=>setCalendarDate(month),[]);
