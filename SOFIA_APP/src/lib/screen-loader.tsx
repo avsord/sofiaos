@@ -34,7 +34,16 @@ export const MENU_PRELOADERS=[loadChat,loadAgenda,loadPages,loadWorkspace,loadPr
 function DeferredBody({load,screenProps}:{load:()=>Screen;screenProps:Record<string,unknown>}){
  // load() evaluates the screen module during render; an error there used to skip
  // every screen boundary and reach the global one.
- const Component=load();return <Component {...screenProps}/>;
+ const Component=load();
+ // Toque no menu: a troca de aba (o salto do paginador) precisa só de um
+ // commit leve. A tela inteira que entra/sai redesenhar com o novo `active`
+ // custava 100–230 ms ANTES do salto. Com o valor adiado, o primeiro commit
+ // reaproveita a tela memorizada (mesmas props) e o redesenho com o `active`
+ // novo vem logo depois, em prioridade baixa, sem segurar o toque.
+ const active=screenProps.active;
+ const deferredActive=React.useDeferredValue(active);
+ const props=active===undefined||Object.is(deferredActive,active)?screenProps:{...screenProps,active:deferredActive};
+ return <Component {...props}/>;
 }
 export const DeferredScreen=React.memo(function DeferredScreen({load,screenProps}:{load:()=>Screen;screenProps:Record<string,unknown>}){
  return <ScreenBoundary name="deferred"><DeferredBody load={load} screenProps={screenProps}/></ScreenBoundary>;
