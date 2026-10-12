@@ -30,6 +30,16 @@ const KNOWN: Array<[RegExp, string, string]> = [
   [/(^|\.)casasbahia\.com\.br$/, 'Casas Bahia', 'casasbahia'],
 ];
 
+/** Acha o link num texto de compartilhamento ("Olha isso no Mercado Livre! https://...")
+ * e devolve sempre https. Aceita link sem protocolo (mercadolivre.com.br/...). */
+export function extractProductUrl(text: string): string {
+  const t = String(text || '').trim();
+  const m = t.match(/https?:\/\/[^\s<>"']+/i) || t.match(/\b(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+\.[a-z]{2,}(?:\/[^\s<>"']*)?/i);
+  if (!m) return '';
+  let url = m[0].replace(/[),.;!?]+$/, '');
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  return url.replace(/^http:\/\//i, 'https://');
+}
 export function hostOf(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, '').toLowerCase(); } catch { return ''; }
 }

@@ -123,3 +123,15 @@ test('sem configuração não conecta e o desconectar revoga e apaga o token',as
  assert.throws(()=>svc.connectUrl(),/configurada/);assert.equal((await svc.status()).configured,false);
  const c=await connected(t);await c.svc.disconnect();assert.equal((await c.svc.status()).connected,false);assert.ok(c.g.calls.some(x=>x.startsWith('POST /revoke')));
 });
+
+test('conexão pelo app: a janela do Google volta sozinha para o app (sofiaapp://google)',async t=>{
+ const g=fakeGoogle();const f=fixture(t);f.config.publicBaseUrl='https://sofia.example';
+ const svc=new GoogleService(f.store,f.core.workspace,f.config,{fetchImpl:g.fetch,env:ENV});
+ svc.sync=async()=>({});svc.backupToDrive=async()=>({});
+ const {url}=svc.connectUrl({app:true});const state=new URL(url).searchParams.get('state');assert.ok(state.startsWith('a.'));
+ const r=await svc.callbackResponse(new URLSearchParams({code:'abc',state}));
+ assert.match(r.redirect,/^sofiaapp:\/\/google\?ok=1&message=/);
+ const web=svc.connectUrl().url;const r2=await svc.callbackResponse(new URLSearchParams({code:'abc',state:new URL(web).searchParams.get('state')}));
+ assert.ok(r2.html&&r2.html.includes('Pronto'),'pelo navegador continua mostrando a página');
+ const bad=await svc.callbackResponse(new URLSearchParams({state:'a.invalido',code:'x'}));assert.match(bad.redirect,/ok=0/);
+});

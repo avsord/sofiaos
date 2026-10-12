@@ -56,9 +56,10 @@ class GoogleService {
   redirectUri() { return String(this.config.publicBaseUrl || '').replace(/\/$/, '') + CALLBACK; }
 
   // ---------- OAuth ----------
-  connectUrl() {
+  connectUrl(options = {}) {
     if (!this.configured()) throw new AppError('GOOGLE_NOT_CONFIGURED', 'A conexão Google ainda não foi configurada no servidor.', 503);
-    const state = crypto.randomBytes(24).toString('base64url');
+    // 'a.' no começo marca que o pedido veio do app: no fim, volta direto para ele.
+    const state = (options.app ? 'a.' : '') + crypto.randomBytes(24).toString('base64url');
     this.db.prepare('DELETE FROM google_oauth_state WHERE created_at<?').run(new Date(Date.now() - 15 * 60000).toISOString());
     this.db.prepare('INSERT INTO google_oauth_state VALUES(?,?)').run(state, now());
     const q = new URLSearchParams({client_id: this.env.GOOGLE_CALENDAR_CLIENT_ID, redirect_uri: this.redirectUri(), response_type: 'code', scope: SCOPES.join(' '), access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true', state});
@@ -80,8 +81,19 @@ class GoogleService {
     setTimeout(() => { this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); }, 50).unref?.();
     return {ok: true, message: 'Conta Google conectada' + (email ? ' (' + email + ')' : '') + '. Pode voltar para a Sofia.'};
   }
+  /** Do app (janela do Google aberta pela própria Sofia): devolve um redirecionamento
+   * para sofiaapp://google, que fecha a janela e volta ao app sozinho. */
+  async callbackResponse(params) {
+    const fromApp = String(params.get('state') || '').startsWith('a.');
+    let r; try { r = await this.callback(params); } catch (e) { r = {ok: false, message: 'Não consegui concluir: ' + String(e.message || e).slice(0, 160)}; }
+    if (fromApp) return {redirect: 'sofiaapp://google?ok=' + (r.ok ? '1' : '0') + '&message=' + encodeURIComponent(r.message)};
+    return {html: this.page(r)};
+  }
   async callbackPage(params) {
     let r; try { r = await this.callback(params); } catch (e) { r = {ok: false, message: 'Não consegui concluir: ' + String(e.message || e).slice(0, 160)}; }
+    return this.page(r);
+  }
+  page(r) {
     const color = r.ok ? '#2fc58b' : '#ff6b7a';
     return `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sofia OS · Google</title><body style="font-family:system-ui;background:#17151e;color:#f5f0ff;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0"><div style="max-width:420px;padding:28px;text-align:center"><div style="font-size:48px">${r.ok ? '✅' : '⚠️'}</div><h2 style="color:${color}">${r.ok ? 'Pronto!' : 'Não deu certo'}</h2><p style="line-height:1.5">${r.message.replace(/[<>&]/g, '')}</p><p style="opacity:.7;font-size:13px">Pode fechar esta aba.</p></div></body></html>`;
   }

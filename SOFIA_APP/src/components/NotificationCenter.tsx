@@ -47,23 +47,29 @@ const AREA_SHORT:Record<string,string>={'Monitoramento de produtos':'Preços'};
 export function relativeTime(iso:string,now=Date.now()){const t=Date.parse(iso);if(!Number.isFinite(t))return '';const m=Math.round((now-t)/60000);if(m<1)return 'agora';if(m<60)return 'há '+m+' min';const h=Math.round(m/60);if(h<24)return 'há '+h+' h';const d=Math.round(h/24);return d===1?'ontem':d<7?'há '+d+' dias':new Date(t).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}).replace('.','');}
 const SWIPE_OUT=90;
 /** Arrastar para a esquerda e soltar apaga o aviso (igual à gaveta do Android). Toque continua abrindo. */
-function Swipeable({children,onDismiss,label}:{children:React.ReactNode;onDismiss:()=>void;label:string}){
- const c=useTheme(),x=useRef(new Animated.Value(0)).current,[gone,setGone]=useState(false),width=useRef(360);
+function Swipeable({children,onDismiss,label}:{children:React.ReactNode|((dismiss:()=>void)=>React.ReactNode);onDismiss:()=>void;label:string}){
+ const c=useTheme(),x=useRef(new Animated.Value(0)).current,collapse=useRef(new Animated.Value(1)).current,[gone,setGone]=useState(false),[closing,setClosing]=useState(false),width=useRef(360),height=useRef(0);
+ // Sai pela esquerda e DEPOIS a altura fecha suave: os avisos de baixo sobem
+ // acompanhando, como no iPhone, em vez de pularem de uma vez (corte seco).
+ const dismiss=useCallback(()=>{setClosing(true);Animated.timing(x,{toValue:-width.current,duration:180,easing:MOTION_EASE,useNativeDriver:true}).start(()=>{
+  Animated.timing(collapse,{toValue:0,duration:220,easing:MOTION_EASE,useNativeDriver:false}).start(()=>{setGone(true);onDismiss();});});},[x,collapse,onDismiss]);
  const pan=useMemo(()=>PanResponder.create({
   onMoveShouldSetPanResponder:(_,g)=>Math.abs(g.dx)>12&&Math.abs(g.dx)>Math.abs(g.dy)*1.6,
   onMoveShouldSetPanResponderCapture:(_,g)=>Math.abs(g.dx)>18&&Math.abs(g.dx)>Math.abs(g.dy)*2,
   onPanResponderMove:(_,g)=>x.setValue(Math.min(0,g.dx)),
-  onPanResponderRelease:(_,g)=>{if(g.dx<-SWIPE_OUT||g.vx<-0.8)Animated.timing(x,{toValue:-width.current,duration:180,easing:MOTION_EASE,useNativeDriver:true}).start(()=>{setGone(true);onDismiss();});else Animated.spring(x,{toValue:0,useNativeDriver:true,bounciness:6}).start();},
+  onPanResponderRelease:(_,g)=>{if(g.dx<-SWIPE_OUT||g.vx<-0.8)dismiss();else Animated.spring(x,{toValue:0,useNativeDriver:true,bounciness:6}).start();},
   onPanResponderTerminate:()=>Animated.spring(x,{toValue:0,useNativeDriver:true}).start(),
- }),[x,onDismiss]);
+ }),[x,dismiss]);
  if(gone)return null;
- return <View onLayout={e=>{width.current=e.nativeEvent.layout.width;}} style={{marginBottom:4}} accessibilityActions={[{name:'delete',label:'Apagar '+label}]} onAccessibilityAction={e=>{if(e.nativeEvent.actionName==='delete')onDismiss();}}>
+ return <Animated.View onLayout={e=>{width.current=e.nativeEvent.layout.width;if(!closing)height.current=e.nativeEvent.layout.height;}}
+  style={closing?{height:collapse.interpolate({inputRange:[0,1],outputRange:[0,height.current||64]}),opacity:collapse,marginBottom:collapse.interpolate({inputRange:[0,1],outputRange:[0,4]}),overflow:'hidden'}:{marginBottom:4}}
+  accessibilityActions={[{name:'delete',label:'Apagar '+label}]} onAccessibilityAction={e=>{if(e.nativeEvent.actionName==='delete')dismiss();}}>
   <View style={{position:'absolute',top:0,bottom:0,left:0,right:0,borderRadius:16,backgroundColor:'#ff6b7a',alignItems:'flex-end',justifyContent:'center',paddingRight:18}}><Text style={{color:'#fff',fontWeight:'700',fontSize:12}}>Apagar</Text></View>
-  <Animated.View {...pan.panHandlers} style={{transform:[{translateX:x}],backgroundColor:c.bg,borderRadius:16}}>{children}</Animated.View>
- </View>;
+  <Animated.View {...pan.panHandlers} style={{transform:[{translateX:x}],backgroundColor:c.bg,borderRadius:16}}>{typeof children==='function'?children(dismiss):children}</Animated.View>
+ </Animated.View>;
 }
 export const NoticeRow=React.memo(function NoticeRow({item}:{item:Notice}){const c=useTheme(),notices=useNotifications(),area=noticeArea(item),st=AREA_STYLE[area]||AREA_STYLE.Outros,unread=item.state==='unread';
- return <Swipeable label={item.title} onDismiss={()=>void notices.clear(item)}><Pressable accessibilityRole="button" accessibilityLabel={'Abrir: '+item.title} onPress={()=>notices.open(item)} style={{flexDirection:'row',gap:12,paddingVertical:12,paddingHorizontal:10,borderRadius:16,backgroundColor:unread?st.color+'12':c.bg}}>
+ return <Swipeable label={item.title} onDismiss={()=>void notices.clear(item)}>{dismiss=><Pressable accessibilityRole="button" accessibilityLabel={'Abrir: '+item.title} onPress={()=>notices.open(item)} style={{flexDirection:'row',gap:12,paddingVertical:12,paddingHorizontal:10,borderRadius:16,backgroundColor:unread?st.color+'12':c.bg}}>
   <View style={{width:38,height:38,borderRadius:19,backgroundColor:st.color+'26',alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:18}}>{st.icon}</Text></View>
   <View style={{flex:1,gap:3}}>
    <View style={{flexDirection:'row',alignItems:'center',gap:6}}>{unread?<View style={{width:8,height:8,borderRadius:4,backgroundColor:st.color}}/>:null}<Text numberOfLines={2} style={{flex:1,color:c.text,fontSize:14,fontWeight:unread?'700':'500'}}>{item.title}</Text></View>
@@ -72,9 +78,9 @@ export const NoticeRow=React.memo(function NoticeRow({item}:{item:Notice}){const
   </View>
   <View style={{gap:2}}>
    {unread?<Pressable accessibilityLabel={'Marcar como lida: '+item.title} onPress={()=>void notices.read(item)} style={{padding:6}}><Icon name="check" size={16} color={c.muted}/></Pressable>:null}
-   <Pressable accessibilityLabel={'Limpar notificação: '+item.title} onPress={()=>void notices.clear(item)} style={{padding:6}}><Icon name="close" size={16} color={c.muted}/></Pressable>
+   <Pressable accessibilityLabel={'Limpar notificação: '+item.title} onPress={dismiss} style={{padding:6}}><Icon name="close" size={16} color={c.muted}/></Pressable>
   </View>
- </Pressable></Swipeable>;});
+ </Pressable>}</Swipeable>;});
 // "Pra agora": o sino olha as outras funções e resume o que pede atenção,
 // mesmo que nenhum aviso tenha chegado (contas vencendo, produto no menor preço).
 type Digest={id:string;icon:string;color:string;title:string;text:string;category:string;entity_id?:string};
@@ -133,12 +139,12 @@ function BellDigest(){const c=useTheme(),n=useNotifications(),shown=useDigest(),
  if(!shown.length)return null;
  const sectionNew=initial.current.size===0;
  return <Appear animate={sectionNew}><View style={{gap:2,marginBottom:6}}><Text style={{fontSize:13,color:c.muted,fontWeight:'700',paddingTop:6,paddingBottom:4}}>Pede atenção agora</Text>
-  {shown.map(d=><Appear key={d.id} animate={!sectionNew&&!initial.current!.has(d.id)}><Swipeable label={d.title} onDismiss={()=>hideDigest(d.id)}><Pressable accessibilityRole="button" accessibilityLabel={d.title} onPress={()=>n.open({id:d.id,title:d.title,body:d.text,state:'read',created_at:new Date().toISOString(),category:d.category,entity_id:d.entity_id})}
+  {shown.map(d=><Appear key={d.id} animate={!sectionNew&&!initial.current!.has(d.id)}><Swipeable label={d.title} onDismiss={()=>hideDigest(d.id)}>{dismiss=><Pressable accessibilityRole="button" accessibilityLabel={d.title} onPress={()=>n.open({id:d.id,title:d.title,body:d.text,state:'read',created_at:new Date().toISOString(),category:d.category,entity_id:d.entity_id})}
    style={{flexDirection:'row',gap:12,paddingVertical:12,paddingHorizontal:10,borderRadius:16,backgroundColor:d.color+'14',borderWidth:1,borderColor:d.color+'44'}}>
    <View style={{width:38,height:38,borderRadius:19,backgroundColor:d.color+'26',alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:18}}>{d.icon}</Text></View>
    <View style={{flex:1,gap:3}}><Text numberOfLines={2} style={{color:c.text,fontWeight:'700',fontSize:14}}>{d.title}</Text><Text numberOfLines={3} style={{color:c.muted,fontSize:12,lineHeight:18}}>{d.text}</Text></View>
-   <Pressable accessibilityLabel={'Dispensar: '+d.title} onPress={()=>hideDigest(d.id)} style={{padding:6,alignSelf:'flex-start'}}><Icon name="close" size={16} color={c.muted}/></Pressable>
-  </Pressable></Swipeable></Appear>)}</View></Appear>;}
+   <Pressable accessibilityLabel={'Dispensar: '+d.title} onPress={dismiss} style={{padding:6,alignSelf:'flex-start'}}><Icon name="close" size={16} color={c.muted}/></Pressable>
+  </Pressable>}</Swipeable></Appear>)}</View></Appear>;}
 export function NotificationList({grouped=false,firstPaint=false}:{grouped?:boolean;firstPaint?:boolean}){const n=useNotifications(),c=useTheme(),[filter,setFilter]=useState('all'),[limits,setLimits]=useState<Record<string,number>>({});
  const areas=useMemo(()=>{const m=new Map<string,number>();for(const i of n.items){const a=noticeArea(i);m.set(a,(m.get(a)||0)+1);}return [...m.entries()].sort((a,b)=>b[1]-a[1]);},[n.items]);
  const shown=useMemo(()=>n.items.filter(i=>filter==='all'||(filter==='unread'?i.state==='unread':noticeArea(i)===filter)),[n.items,filter]);

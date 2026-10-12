@@ -89,6 +89,12 @@ export function PriceReaderHost() {
         injectedJavaScript={script}
         javaScriptEnabled
         userAgent={USER_AGENT}
+        // Página de loja tenta abrir o app dela (intent://, meli://, aliexpress://...).
+        // A leitura é invisível: só http(s) carrega, o resto é recusado em silêncio.
+        originWhitelist={['https://*', 'http://*']}
+        onShouldStartLoadWithRequest={(req: any) => /^https?:\/\//i.test(String(req?.url || ''))}
+        javaScriptCanOpenWindowsAutomatically={false}
+        allowsLinkPreview={false}
         domStorageEnabled
         setSupportMultipleWindows={false}
         mediaPlaybackRequiresUserAction

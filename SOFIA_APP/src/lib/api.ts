@@ -187,7 +187,7 @@ export class SofiaApi {
   // Não depende mais de page_order: o servidor responde a agenda Google por conta própria.
   async calendarStatus():Promise<CalendarState> { try{return await this.request<CalendarState>('/md/calendar/status');}catch(e){if((e as ApiError).status===404)return {configured:false,connected:false};throw e;} }
   driveBackup() { return this.request<{ok?:boolean;skipped?:boolean;bytes?:number}>('/md/drive/backup',{},'POST',120000); }
-  calendarConnect() { return this.request<{url:string}>('/md/calendar/connect',{}); }
+  calendarConnect() { return this.request<{url:string}>('/md/calendar/connect',{app:true}); }
   calendarDisconnect() { return this.request<{ok:boolean}>('/md/calendar/disconnect',{}); }
   calendarSync() { return this.request<{ok:boolean}>('/md/calendar/sync',{},'POST',90000); }
   calendarSelect(id:string) { return this.request<{ok:boolean}>('/md/calendar/select',{id}); }

@@ -21,7 +21,7 @@ import {collectorState, onCollector, runCollection, loadProducts, recordPrice, c
 import type {StoreIssue} from '../lib/monitor-collector';
 import {
   PRODUCT_COLORS, WINDOWS, DROP_CHOICES, INTERVALS, money, percent, since, storeName, hostOf, nextColor,
-  alertsOf, alertSummary, analyzeProduct, allReadings, searchTerms, searchTargetsFor, addSource, removeSource, makePrimary, withMemory, storesOf,
+  alertsOf, alertSummary, analyzeProduct, allReadings, searchTerms, extractProductUrl, searchTargetsFor, addSource, removeSource, makePrimary, withMemory, storesOf,
 } from '../lib/monitoring';
 import type {ProductSeries, Window, Candidate, StoreSeries} from '../lib/monitoring';
 
@@ -106,7 +106,7 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
           <IconButton name="back" label="Voltar aos apps" onPress={onBack} />
           <View style={{flex: 1, paddingHorizontal: 4}}>
             <Text style={{fontSize: 11, letterSpacing: 1.2, color: c.muted, fontWeight: '600'}}>PREÇOS QUE VOCÊ ACOMPANHA</Text>
-            <Text style={{fontSize: 24, fontWeight: '800', color: c.text}}>Monitoramento</Text>
+            <Text style={{fontSize: 24, fontWeight: '800', color: c.text}}>Price Tracker</Text>
           </View>
           <IconButton name="plus" label="Adicionar produto" filled onPress={() => setAdding(true)} />
         </View>
@@ -220,10 +220,10 @@ function AddProduct({api, used, existing, onClose, onCreated}: {api: SofiaApi; u
   const [title, setTitle] = useState(''), [candidates, setCandidates] = useState<Candidate[]>([]), [picked, setPicked] = useState<Candidate | null>(null);
   const [color] = useState(nextColor(used)), [busy, setBusy] = useState(false);
 
-  async function paste() { const t = (await Clipboard.getStringAsync().catch(() => '')).trim(); const m = t.match(/https:\/\/\S+/); if (m) setUrl(m[0]); }
+  async function paste() { const t = (await Clipboard.getStringAsync().catch(() => '')).trim(); const u = extractProductUrl(t); if (u) setUrl(u); else if (t) setError('Não achei um link no que foi copiado.'); }
   async function read() {
-    const clean = (url.match(/https:\/\/\S+/) || [''])[0];
-    if (!clean) { setError('Cole um link completo, começando com https://'); return; }
+    const clean = extractProductUrl(url);
+    if (!clean) { setError('Não achei um link aí. Cole o link do produto (pode ser o texto inteiro do compartilhar).'); return; }
     if (existing.some(p => storesOf(p.monitor).some(s => s.url === clean))) { setError('Você já acompanha esse link.'); return; }
     setUrl(clean); setError(''); setStep('reading');
     const r = await readPrice(clean);
@@ -431,7 +431,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
   return (
     <MotionModal visible animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{flex: 1, backgroundColor: c.bg}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Header title={monitor.title} onClose={onClose} right={<IconButton name="refresh" label="Ler preços deste produto agora" disabled={running} onPress={readNow} />} />
+        <Header title={monitor.title} onClose={onClose} right={<View style={{flexDirection: 'row'}}><IconButton name="refresh" label="Ler preços deste produto agora" disabled={running} onPress={readNow} /><IconButton name="trash" label="Excluir produto" onPress={remove} /></View>} />
         <ScrollView keyboardShouldPersistTaps="handled" stickyHeaderIndices={[1]} contentContainerStyle={{paddingBottom: 50}}>
           {/* Destaque */}
           <View style={{padding: 18, paddingBottom: 10, gap: 6}}>

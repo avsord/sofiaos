@@ -155,7 +155,7 @@ function makeMobileApi(runtime, deps) {
       if (action === 'status' && m === 'GET') return send(await g.status());
       if (m !== 'POST') fail('NOT_FOUND', 'Operação desconhecida.', 404);
       rate(session, 'google', 20);
-      if (action === 'connect') return send(g.connectUrl());
+      if (action === 'connect') { const b = await bodyJson(req, 1024).catch(() => ({})); return send(g.connectUrl({ app: !!b.app })); }
       if (action === 'disconnect') return send(await g.disconnect());
       if (action === 'sync') return send(await g.sync());
       if (action === 'select') { const b = await bodyJson(req, 2048); return send(g.select(String(b.id || ''))); }

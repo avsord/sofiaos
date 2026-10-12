@@ -42,7 +42,10 @@ function DeferredBody({load,screenProps}:{load:()=>Screen;screenProps:Record<str
  // novo vem logo depois, em prioridade baixa, sem segurar o toque.
  const active=screenProps.active;
  const deferredActive=React.useDeferredValue(active);
- const props=active===undefined||Object.is(deferredActive,active)?screenProps:{...screenProps,active:deferredActive};
+ // Só a tela que SAI (active=false) fica com o valor adiado. A que ENTRA desenha
+ // já ativa: desenhar um quadro com o 'active' antigo e depois o novo causava a
+ // piscada ao sair do Price Tracker para a Agenda.
+ const props=active!==false||Object.is(deferredActive,active)?screenProps:{...screenProps,active:deferredActive};
  return <Component {...props}/>;
 }
 export const DeferredScreen=React.memo(function DeferredScreen({load,screenProps}:{load:()=>Screen;screenProps:Record<string,unknown>}){

@@ -1,4 +1,5 @@
 import {useVisibleLoad} from '../lib/visible-load';
+import * as WebBrowser from 'expo-web-browser';
 import React,{useEffect,useState} from 'react';
 import {View,Text,AppState,Alert,Linking} from 'react-native';
 import {SofiaApi} from '../lib/api';
@@ -11,7 +12,10 @@ export function GoogleCalendarSettings({api}:{api:SofiaApi}){
  async function load(){try{setStatus(await api.calendarStatus());setError('');}catch(e){setError(errorText(e));}}
  useVisibleLoad(()=>{void load();const s=AppState.addEventListener('change',v=>{if(v==='active')void load();});return()=>s.remove();},[api]);
  async function act(task:()=>Promise<unknown>){if(busy)return;setBusy(true);try{await task();await load();}catch(e){setError(errorText(e));}finally{setBusy(false);}}
- function connect(){Alert.alert('Conectar conta Google','A Sofia vai pedir acesso à sua Agenda (sincronizar nos dois sentidos), a uma pasta própria no seu Drive (backups) e à leitura do Gmail (só para avisar dos e-mails que você escolher em Apps → E-mails). Ela não enxerga os outros arquivos do Drive. Registros marcados como somente local não são enviados.',[{text:'Cancelar',style:'cancel'},{text:'Conectar',onPress:()=>void act(async()=>{const result=await api.calendarConnect();const url=new URL(result.url);if(url.protocol!=='https:')throw Error('Endereço de autorização inválido.');await Linking.openURL(url.toString());})}]);}
+ function connect(){Alert.alert('Conectar conta Google','A Sofia vai pedir acesso à sua Agenda (sincronizar nos dois sentidos), a uma pasta própria no seu Drive (backups) e à leitura do Gmail (só para avisar dos e-mails que você escolher em Apps → E-mails). Ela não enxerga os outros arquivos do Drive. Registros marcados como somente local não são enviados.',[{text:'Cancelar',style:'cancel'},{text:'Conectar',onPress:()=>void act(async()=>{const result=await api.calendarConnect();const url=new URL(result.url);if(url.protocol!=='https:')throw Error('Endereço de autorização inválido.');
+  // Janela do Google dentro do app (como em outros apps): escolhe a conta, permite e volta sozinho.
+  const session=await WebBrowser.openAuthSessionAsync(url.toString(),'sofiaapp://google');
+  if(session.type==='success'){const back=new URL(session.url.replace('sofiaapp://','https://x/'));if(back.searchParams.get('ok')!=='1')throw Error(back.searchParams.get('message')||'O Google não concluiu a conexão.');}})}]);}
  return <View style={[forms.card,{backgroundColor:c.surface,borderWidth:1,borderColor:c.line}]}><Text style={{fontSize:18,fontWeight:'600',color:c.text}}>Conta Google · Agenda, Drive e Gmail</Text>{status?.email?<Text style={{fontSize:12,color:c.muted}}>{status.email}</Text>:null}
  <Text accessibilityLiveRegion="polite" style={{color:c.accent}}>{status?.connected?'Conectado':status?.configured?'Não conectado':status?'Aguardando configuração no servidor':'Verificando conexão…'}</Text>
  <Text style={{fontSize:12,lineHeight:19,color:c.muted}}>Conecte uma vez. A agenda fica sincronizada nos dois sentidos (o calendário escolhido; os outros visíveis aparecem só para leitura) e o seu Google Drive recebe um backup criptografado por dia, na pasta Sofia OS/Backups.</Text>
