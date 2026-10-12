@@ -91,7 +91,10 @@ export function PriceReaderHost() {
         userAgent={USER_AGENT}
         // Página de loja tenta abrir o app dela (intent://, meli://, aliexpress://...).
         // A leitura é invisível: só http(s) carrega, o resto é recusado em silêncio.
-        originWhitelist={['https://*', 'http://*']}
+        // IMPORTANTE: a biblioteca manda qualquer link FORA desta lista para Linking.openURL —
+        // era isso que abria o app do Mercado Livre (meli://, intent://). Com '*' tudo passa
+        // pela regra de baixo, que só deixa carregar http(s) e recusa o resto em silêncio.
+        originWhitelist={['*']}
         onShouldStartLoadWithRequest={(req: any) => /^https?:\/\//i.test(String(req?.url || ''))}
         javaScriptCanOpenWindowsAutomatically={false}
         allowsLinkPreview={false}
