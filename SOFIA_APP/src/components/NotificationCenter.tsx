@@ -62,7 +62,7 @@ function Swipeable({children,onDismiss,label}:{children:React.ReactNode;onDismis
   <Animated.View {...pan.panHandlers} style={{transform:[{translateX:x}],backgroundColor:c.bg,borderRadius:16}}>{children}</Animated.View>
  </View>;
 }
-export function NoticeRow({item}:{item:Notice}){const c=useTheme(),notices=useNotifications(),area=noticeArea(item),st=AREA_STYLE[area]||AREA_STYLE.Outros,unread=item.state==='unread';
+export const NoticeRow=React.memo(function NoticeRow({item}:{item:Notice}){const c=useTheme(),notices=useNotifications(),area=noticeArea(item),st=AREA_STYLE[area]||AREA_STYLE.Outros,unread=item.state==='unread';
  return <Swipeable label={item.title} onDismiss={()=>void notices.clear(item)}><Pressable accessibilityRole="button" accessibilityLabel={'Abrir: '+item.title} onPress={()=>notices.open(item)} style={{flexDirection:'row',gap:12,paddingVertical:12,paddingHorizontal:10,borderRadius:16,backgroundColor:unread?st.color+'12':c.bg}}>
   <View style={{width:38,height:38,borderRadius:19,backgroundColor:st.color+'26',alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:18}}>{st.icon}</Text></View>
   <View style={{flex:1,gap:3}}>
@@ -74,7 +74,7 @@ export function NoticeRow({item}:{item:Notice}){const c=useTheme(),notices=useNo
    {unread?<Pressable accessibilityLabel={'Marcar como lida: '+item.title} onPress={()=>void notices.read(item)} style={{padding:6}}><Icon name="check" size={16} color={c.muted}/></Pressable>:null}
    <Pressable accessibilityLabel={'Limpar notificação: '+item.title} onPress={()=>void notices.clear(item)} style={{padding:6}}><Icon name="close" size={16} color={c.muted}/></Pressable>
   </View>
- </Pressable></Swipeable>;}
+ </Pressable></Swipeable>;});
 // "Pra agora": o sino olha as outras funções e resume o que pede atenção,
 // mesmo que nenhum aviso tenha chegado (contas vencendo, produto no menor preço).
 type Digest={id:string;icon:string;color:string;title:string;text:string;category:string;entity_id?:string};
@@ -139,7 +139,7 @@ function BellDigest(){const c=useTheme(),n=useNotifications(),shown=useDigest(),
    <View style={{flex:1,gap:3}}><Text numberOfLines={2} style={{color:c.text,fontWeight:'700',fontSize:14}}>{d.title}</Text><Text numberOfLines={3} style={{color:c.muted,fontSize:12,lineHeight:18}}>{d.text}</Text></View>
    <Pressable accessibilityLabel={'Dispensar: '+d.title} onPress={()=>hideDigest(d.id)} style={{padding:6,alignSelf:'flex-start'}}><Icon name="close" size={16} color={c.muted}/></Pressable>
   </Pressable></Swipeable></Appear>)}</View></Appear>;}
-export function NotificationList({grouped=false}:{grouped?:boolean}){const n=useNotifications(),c=useTheme(),[filter,setFilter]=useState('all'),[limits,setLimits]=useState<Record<string,number>>({});
+export function NotificationList({grouped=false,firstPaint=false}:{grouped?:boolean;firstPaint?:boolean}){const n=useNotifications(),c=useTheme(),[filter,setFilter]=useState('all'),[limits,setLimits]=useState<Record<string,number>>({});
  const areas=useMemo(()=>{const m=new Map<string,number>();for(const i of n.items){const a=noticeArea(i);m.set(a,(m.get(a)||0)+1);}return [...m.entries()].sort((a,b)=>b[1]-a[1]);},[n.items]);
  const shown=useMemo(()=>n.items.filter(i=>filter==='all'||(filter==='unread'?i.state==='unread':noticeArea(i)===filter)),[n.items,filter]);
  const groups=useMemo(()=>{const result=new Map<string,Notice[]>();for(const item of shown){const key=noticeDateGroup(item.created_at);if(!result.has(key))result.set(key,[]);result.get(key)!.push(item);}return result;},[shown]);
@@ -150,7 +150,7 @@ export function NotificationList({grouped=false}:{grouped?:boolean}){const n=use
   {n.error?<ErrorBanner text={n.error} onRetry={()=>void n.refresh()}/>:null}
   {n.items.length?<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:8}}>{chip('all','Todas',n.items.length)}{n.unread?chip('unread','Não lidas',n.unread):null}{areas.map(([a,count])=>chip(a,(AREA_STYLE[a]||AREA_STYLE.Outros).icon+' '+(AREA_SHORT[a]||a),count))}</ScrollView>:null}
   {!shown.length?<View style={{alignItems:'center',paddingVertical:24,gap:6}}><Text style={{fontSize:28}}>{n.loading?'⏳':'✨'}</Text><Text style={{color:c.muted}}>{n.loading?'Carregando…':filter==='all'?'Tudo em dia. Sem notificações.':'Nada aqui neste filtro.'}</Text></View>:null}
-  {[...groups].map(([group,items])=>{const limit=limits[group]||(grouped?20:12);return <View key={group} style={{gap:2}}><Text style={{fontSize:13,color:c.muted,fontWeight:'700',paddingTop:6,paddingBottom:4}}>{group}</Text>{items.slice(0,limit).map(item=><NoticeRow key={item.id} item={item}/>)}{items.length>limit?<Button title={'Ver mais ('+(items.length-limit)+')'} secondary onPress={()=>setLimits(old=>({...old,[group]:limit+20}))}/>:null}</View>;})}
+  {[...groups].slice(0,firstPaint?1:undefined).map(([group,items])=>{const limit=firstPaint?6:limits[group]||(grouped?20:12);return <View key={group} style={{gap:2}}><Text style={{fontSize:13,color:c.muted,fontWeight:'700',paddingTop:6,paddingBottom:4}}>{group}</Text>{items.slice(0,limit).map(item=><NoticeRow key={item.id} item={item}/>)}{!firstPaint&&items.length>limit?<Button title={'Ver mais ('+(items.length-limit)+')'} secondary onPress={()=>setLimits(old=>({...old,[group]:limit+20}))}/>:null}</View>;})}
  </View>;}
 /** O número aparece crescendo de 0 a 1 em vez de surgir seco. Depois disso, quando a contagem muda, só o número troca (sem pulo). */
 function BellBadge({count}:{count:number}){const c=useTheme(),reduced=useReducedMotion(),scale=useRef(new Animated.Value(count>0?1:0)).current,last=useRef(count),[shown,setShown]=useState(count);
@@ -165,15 +165,18 @@ export function NotificationBell({onViewAll}:{onViewAll:()=>void}){
  const c=useTheme(),n=useNotifications(),screen=useWindowDimensions(),insets=useSafeAreaInsets();
  const [open,setOpen]=useState(false),[anchor,setAnchor]=useState<BellAnchor>({x:screen.width-66,y:insets.top+20,width:44,height:44});
  const reduced=useReducedMotion();
- const bell=useRef<View|null>(null),motion=useRef(new Animated.Value(0)).current,closing=useRef(false),opening=useRef(false);
+ const bell=useRef<View|null>(null),motion=useRef(new Animated.Value(0)).current,closing=useRef(false),opening=useRef(false),anchorKnown=useRef(false),[settled,setSettled]=useState(false);
+ // Posição do sino medida antes (ao desenhar), não no toque: o painel abre no mesmo quadro.
+ function measureBell(){bell.current?.measureInWindow((x,y,width,height)=>{if(width>0){setAnchor({x,y,width,height});anchorKnown.current=true;}});}
  const layout=notificationPopoverLayout(anchor,screen,insets);
- function reveal(){closing.current=false;motion.stopAnimation();motion.setValue(0);setOpen(true);void n.refresh();}
- function show(){if(opening.current)return;opening.current=true;if(bell.current)bell.current.measureInWindow((x,y,width,height)=>{setAnchor({x,y,width,height});reveal();});else reveal();}
+ // A busca de avisos novos espera a animação terminar, para não disputar com ela.
+ function reveal(){closing.current=false;motion.stopAnimation();motion.setValue(0);setSettled(false);setOpen(true);setTimeout(()=>{void n.refresh();},420);}
+ function show(){if(opening.current)return;opening.current=true;if(anchorKnown.current||!bell.current)reveal();else bell.current.measureInWindow((x,y,width,height)=>{setAnchor({x,y,width,height});anchorKnown.current=true;reveal();});}
  function close(after?:()=>void){if(closing.current)return;closing.current=true;motion.stopAnimation();Animated.timing(motion,{toValue:0,duration:reduced?0:220,easing:MOTION_EASE,useNativeDriver:true}).start(({finished})=>{if(finished){setOpen(false);closing.current=false;opening.current=false;after?.();}});}
- function animateShown(){if(closing.current)return;Animated.timing(motion,{toValue:1,duration:reduced?0:280,easing:MOTION_EASE,useNativeDriver:true}).start();}
+ function animateShown(){if(closing.current)return;Animated.timing(motion,{toValue:1,duration:reduced?0:240,easing:MOTION_EASE,useNativeDriver:true}).start(()=>setSettled(true));}
  useEffect(()=>()=>motion.stopAnimation(),[motion]);
  useEffect(()=>{if(open)bell.current?.measureInWindow((x,y,width,height)=>setAnchor({x,y,width,height}));},[screen.width,screen.height,open]);
- return <><View ref={bell} collapsable={false}>
+ return <><View ref={bell} collapsable={false} onLayout={measureBell}>
   <Pressable testID="notification-bell" accessibilityRole="button" accessibilityLabel={'Notificações: '+n.unread+' não lidas'} onPress={show} style={{width:44,height:44,alignItems:'center',justifyContent:'center'}}><Icon name="bell" color={c.text}/><BellBadge count={n.unread}/></Pressable>
  </View><Modal visible={open} transparent hardwareAccelerated statusBarTranslucent navigationBarTranslucent animationType="none" onShow={animateShown} onRequestClose={()=>close()}>
   <View style={{flex:1}}>
@@ -181,7 +184,7 @@ export function NotificationBell({onViewAll}:{onViewAll:()=>void}){
    <Animated.View testID="notification-backdrop" style={{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:'#00000044',opacity:motion}}><Pressable accessibilityLabel="Fechar notificações" onPress={()=>close()} style={{flex:1}}/></Animated.View>
    <Animated.View testID="notification-popover" accessibilityViewIsModal style={{position:'absolute',...layout,backgroundColor:c.bg,borderWidth:1,borderColor:c.line,borderRadius:20,padding:14,gap:10,elevation:14,shadowColor:'#000',shadowOffset:{width:0,height:5},shadowOpacity:.18,shadowRadius:16,opacity:motion,transform:[{translateX:motion.interpolate({inputRange:[0,1],outputRange:[(anchor.x+anchor.width/2-(layout.left+layout.width/2))*.14,0]})},{translateY:motion.interpolate({inputRange:[0,1],outputRange:[-(layout.height/2)*.14,0]})},{scale:motion.interpolate({inputRange:[0,1],outputRange:[.86,1]})}]}}>
     <View style={{flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,fontSize:20,fontWeight:'700',color:c.text}}>Notificações</Text><IconButton name="close" label="Fechar notificações" onPress={()=>close()}/></View>
-    <ScrollView nestedScrollEnabled style={{flex:1}} contentContainerStyle={{paddingBottom:10}}><NotificationList/></ScrollView>
+    <ScrollView nestedScrollEnabled style={{flex:1}} contentContainerStyle={{paddingBottom:10}}><NotificationList firstPaint={!settled}/></ScrollView>
     {n.items.length?<View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:4}}>
      {n.unread>0?<Pressable accessibilityRole="button" accessibilityLabel="Marcar todas as notificações como lidas" onPress={()=>void n.readAll()} style={{minHeight:44,justifyContent:'center',flexShrink:1,minWidth:0}}><Text numberOfLines={1} adjustsFontSizeToFit style={{color:c.muted,fontSize:12,fontWeight:'400',paddingHorizontal:6}}>Marcar tudo como lido</Text></Pressable>:null}
      <Pressable accessibilityRole="button" accessibilityLabel="Limpar todas as notificações" onPress={()=>Alert.alert('Limpar notificações?','Somente os avisos serão removidos. Seus eventos e registros permanecem.',[{text:'Cancelar',style:'cancel'},{text:'Limpar',onPress:()=>void n.clearAll()}])} style={{minHeight:44,justifyContent:'center',flexShrink:0}}><Text numberOfLines={1} style={{color:c.muted,fontSize:12,padding:6}}>Limpar todas</Text></Pressable>
