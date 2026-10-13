@@ -2,6 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {View} from 'react-native';
 import {buildInjectedScript, parsePriceMessage, buildLinksScript, parseLinksMessage} from './price-extractor';
 import type {PriceReaderMessage, LinksReaderMessage} from './price-extractor';
+import {readerUrl, readerAgent} from './monitoring';
 
 // Uma única WebView invisível atende o app inteiro, uma página por vez.
 // Telas pedem leituras com readPrice()/readLinks(); o <PriceReaderHost/>
@@ -15,6 +16,7 @@ const TIMEOUT_MS = 26000;
 // Navegador de celular comum: algumas lojas recusam ou mudam a página quando
 // percebem a WebView padrão do Android.
 const USER_AGENT = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36';
+const DESKTOP_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36';
 const queue: Job[] = [];
 let current: Job | null = null, seq = 0, hosts = 0, startedAt = 0;
 // Diagnóstico: só domínio, tempo e resultado de cada página — nunca o link
@@ -54,7 +56,9 @@ function enqueue(job: Job) {
 }
 
 export function readPrice(url: string): Promise<PriceReaderMessage> {
-  return new Promise(resolve => enqueue({id: ++seq, kind: 'price', url, resolve}));
+  // O link guardado não muda; só o endereço aberto pelo leitor é limpo/ajustado por loja.
+  const target = readerUrl(url);
+  return new Promise(resolve => enqueue({id: ++seq, kind: 'price', url: target, resolve}));
 }
 export function readLinks(url: string, target: string, exclude: string, terms = ''): Promise<LinksReaderMessage> {
   return new Promise(resolve => enqueue({id: ++seq, kind: 'links', url, target, exclude, terms, resolve}));
@@ -88,7 +92,7 @@ export function PriceReaderHost() {
         source={{uri: job.url}}
         injectedJavaScript={script}
         javaScriptEnabled
-        userAgent={USER_AGENT}
+        userAgent={readerAgent(job.url) === 'desktop' ? DESKTOP_AGENT : USER_AGENT}
         // Página de loja tenta abrir o app dela (intent://, meli://, aliexpress://...).
         // A leitura é invisível: só http(s) carrega, o resto é recusado em silêncio.
         // IMPORTANTE: a biblioteca manda qualquer link FORA desta lista para Linking.openURL —

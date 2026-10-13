@@ -40,6 +40,26 @@ export function extractProductUrl(text: string): string {
   if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
   return url.replace(/^http:\/\//i, 'https://');
 }
+/** Endereço que o leitor de preço abre (o link guardado não muda):
+ * - Mercado Livre: tira rastreio e o '#origin=share'; se o link aponta um
+ *   anúncio (pdp_filters=item_id:MLB...), abre o anúncio direto.
+ * - AliExpress e Mercado Livre abrem como computador (ver readerAgent), porque a
+ *   versão de celular tenta mandar para o app e não mostra o preço. */
+export function readerUrl(url: string): string {
+  let u: URL; try { u = new URL(url); } catch { return url; }
+  const host = u.hostname.replace(/^www\./, '');
+  if (/(^|\.)mercadolivre\.com\.br$|(^|\.)mercadolibre\.com$/.test(host)) {
+    const item = /item_id:(MLB)-?(\d{6,})/i.exec(u.searchParams.get('pdp_filters') || '') || /\b(MLB)-?(\d{6,})/i.exec(u.searchParams.get('wid') || u.hash || '');
+    if (/^\/p\/MLB\d+/i.test(u.pathname) && item) return 'https://produto.mercadolivre.com.br/MLB-' + item[2];
+    u.search = ''; u.hash = '';
+    return u.toString();
+  }
+  if (/(^|\.)aliexpress\.(com|us)$/.test(host)) { u.hash = ''; ['spm', 'scm', 'pdp_npi', 'sourceType', 'aff_fcid', 'aff_fsk', 'aff_platform', 'sk', 'aff_trace_key', 'terminal_id', 'afSmartRedirect'].forEach(k => u.searchParams.delete(k)); return u.toString(); }
+  return url;
+}
+export function readerAgent(url: string): 'desktop' | 'mobile' {
+  return /mercadoli(vre|bre)\.com|aliexpress\./i.test(url) ? 'desktop' : 'mobile';
+}
 export function hostOf(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, '').toLowerCase(); } catch { return ''; }
 }

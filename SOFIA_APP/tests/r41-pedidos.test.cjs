@@ -15,7 +15,7 @@ test('4/8) leitura invisível nunca abre app nem site por fora',()=>{const s=rea
 test('3) "Ver mais" simples nas tarefas',()=>{assert.ok(read('src/screens/Home.tsx').includes(">Ver mais</Text>"));});
 test('5) a tela que entra não desenha com o active antigo (sem piscada)',()=>{assert.ok(read('src/lib/screen-loader.tsx').includes('active!==false||Object.is(deferredActive,active)'));});
 test('6) Conta Google em janela dentro do app que volta sozinha',()=>{const s=read('src/components/GoogleCalendarSettings.tsx');assert.ok(s.includes("WebBrowser.openAuthSessionAsync(url.toString(),'sofiaapp://google')"));assert.ok(read('src/lib/api.ts').includes("'/md/calendar/connect',{app:true}"));});
-test('7) lixeira dentro do produto',()=>{assert.ok(read('src/screens/Monitoring.tsx').includes('<IconButton name="trash" label="Excluir produto" onPress={remove} />'));});
+test('7) lixeira dentro do produto',()=>{assert.ok(read('src/screens/Monitoring.tsx').includes('label="Excluir produto"'));});
 test('9) widget com 5 itens e "Ver mais" no fim',()=>{const s=read('src/components/MonitorWidget.tsx');assert.ok(s.includes('.slice(0,5)'));assert.ok(s.includes('>Ver mais</Text>'));});
 test('10) apagar aviso: sai e a linha fecha suave, também pelo X',()=>{const s=read('src/components/NotificationCenter.tsx');assert.ok(s.includes('Animated.timing(collapse,{toValue:0'));assert.ok(s.includes("onPress={dismiss} style={{padding:6}}"));});
 test('11) nome Price Tracker',()=>{for(const f of ['src/screens/Monitoring.tsx','src/screens/Workspace.tsx','src/components/MonitorWidget.tsx'])assert.ok(read(f).includes('Price Tracker'),f);});

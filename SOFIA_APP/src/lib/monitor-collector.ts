@@ -122,7 +122,7 @@ export async function runCollection(api: SofiaApi, opts: {force?: boolean; scope
           } catch (e: any) { state.issues[key] = {kind: 'failed', error: String(e?.message || 'Não consegui salvar a leitura.'), at: Date.now()}; note({...base, ...meta, result: 'erro-ao-salvar', error: String(e?.message || '').slice(0, 80)}); }
         } else if (pick) { note({...base, ...meta, result: 'moeda-diferente', amount: pick.amount}); state.issues[key] = {kind: 'failed', error: 'A loja mostrou o preço em outra moeda (' + pick.currency + ').', at: Date.now()}; }
         else if (read.result.candidates.length) { state.issues[key] = {kind: 'confirm', candidates: read.result.candidates, title: read.title, at: Date.now()}; note({...base, ...meta, result: 'confirmar'}); }
-        else { state.issues[key] = {kind: 'failed', error: 'A página abriu, mas não mostrou preço.', at: Date.now()}; note({...base, ...meta, result: 'sem-preco'}); }
+        else { state.issues[key] = {kind: 'failed', error: 'A página abriu, mas não mostrou preço' + (read.title ? ' (a loja mostrou: "' + read.title.slice(0, 50) + '")' : '') + '.', at: Date.now()}; note({...base, ...meta, result: 'sem-preco', error: (read.title || '').slice(0, 60)}); }
       }
       state.done++; run.done = state.done; emit();
     }

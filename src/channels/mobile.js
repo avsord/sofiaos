@@ -296,6 +296,9 @@ function makeMobileApi(runtime, deps) {
     if (p === '/api/mobile/notifications' && m === 'GET') return send({ items: workspace.notifications(), push_enabled: false });
     match = p.match(/^\/api\/mobile\/notifications\/([\w-]+)\/read$/);
     if (match && m === 'POST') { workspace.markRead(validId(match[1])); return send({ ok: true }); }
+    // Apagar aviso no servidor (um, ou 'all'): antes o app dizia que isso 'aguardava atualização do servidor'.
+    match = p.match(/^\/api\/mobile\/md\/notifications\/([\w-]+)$/);
+    if (match && m === 'DELETE') return send(workspace.clearNotification(match[1] === 'all' ? 'all' : validId(match[1])));
     if (p === '/api/mobile/profile' && m === 'PATCH') {
       rate(session, 'write', 40); const b = await bodyJson(req, 2048);
       store.updateSettings({ profileName: cleanText(b.name, 'Nome', 80) }); return send({ profile: profile() });

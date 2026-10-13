@@ -333,7 +333,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
   const [saving, setSaving] = useState(''), [error, setError] = useState(''), [storeSheet, setStoreSheet] = useState(false);
   const [confirm, setConfirm] = useState<{store: StoreSeries; issue: Extract<StoreIssue, {kind: 'confirm'}>} | null>(null);
   const [menu, setMenu] = useState<StoreSeries | null>(null), [rename, setRename] = useState(product.monitor.title), [target, setTarget] = useState('');
-  const [relink, setRelink] = useState<{store: StoreSeries; text: string; error: string} | null>(null);
+  const [relink, setRelink] = useState<{store: StoreSeries; text: string; error: string} | null>(null), [productMenu, setProductMenu] = useState(false);
   const [showAll, setShowAll] = useState(false), [storeFocus, setStoreFocus] = useState<string | null>(null);
   useEffect(() => { setMonitor(product.monitor); }, [product.monitor]);
   const alerts = alertsOf(monitor);
@@ -432,7 +432,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
   return (
     <MotionModal visible animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{flex: 1, backgroundColor: c.bg}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Header title={monitor.title} onClose={onClose} right={<View style={{flexDirection: 'row'}}><IconButton name="refresh" label="Ler preços deste produto agora" disabled={running} onPress={readNow} /><IconButton name="trash" label="Excluir produto" onPress={remove} /></View>} />
+        <Header title={monitor.title} onClose={onClose} right={<IconButton name="more" label="Opções do produto" onPress={() => setProductMenu(true)} />} />
         <ScrollView keyboardShouldPersistTaps="handled" stickyHeaderIndices={[1]} contentContainerStyle={{paddingBottom: 50}}>
           {/* Destaque */}
           <View style={{padding: 18, paddingBottom: 10, gap: 6}}>
@@ -643,6 +643,16 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
         setStoreSheet(false);
         if (saved) void runCollection(api, {only: saved.id, scope: api.owner});
       }} /> : null}
+
+      <Sheet visible={productMenu} onClose={() => setProductMenu(false)} label="Fechar opções do produto">
+        <View style={{gap: 2}}>
+          <Text style={{fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 6}} numberOfLines={1}>{monitor.title}</Text>
+          <SheetItem label={running ? 'Lendo os preços…' : 'Atualizar preços agora'} onPress={() => { setProductMenu(false); if (!running) readNow(); }} />
+          {product.stores[0] ? <SheetItem label="Trocar o link principal" onPress={() => { setProductMenu(false); const s = product.stores.find(x => x.primary) || product.stores[0]; setRelink({store: s, text: s.url, error: ''}); }} /> : null}
+          <SheetItem label="Encontrar em outras lojas" onPress={() => { setProductMenu(false); setStoreSheet(true); }} />
+          <SheetItem danger label="Excluir produto" onPress={() => { setProductMenu(false); remove(); }} />
+        </View>
+      </Sheet>
 
       <Sheet visible={!!relink} onClose={() => setRelink(null)} label="Fechar troca de link">
         {relink ? (
