@@ -5,7 +5,7 @@ const {authorize}=require('../core/semantic-authority');
 const ACTION_SCHEMA={
   type:'object',
   properties:{
-    entity_kind:{type:'string',enum:['','idea','annotation','project','dream','course','recipe','film','music','video','reading','purchase','purchase_group','user_page']},
+    entity_kind:{type:'string',enum:['','idea','annotation','project','dream','course','recipe','film','music','video','reading','purchase','purchase_group','user_page','capsule','monitor','fin_account','fin_card','fin_tx','fin_budget','fin_goal','mail_rule','shopping_item','contact']},
     memory_kind:{type:'string',enum:['','fact','decision','idea','preference','rule']},
     title:{type:'string'},content:{type:'string'},area:{type:'string'},state:{type:'string'},scope:{type:'string',enum:['','all','active','single','selected']},
     date:{type:'string'},time:{type:'string'},location:{type:'string'},list_name:{type:'string'},quantity:{type:'string'},parent_title:{type:'string'},
@@ -14,7 +14,7 @@ const ACTION_SCHEMA={
     changes:{type:'array',maxItems:40,items:{type:'object',properties:{field:{type:'string'},value:{type:'string'}},required:['field','value'],additionalProperties:false}},
     priority:{type:'boolean'},token_limit:{type:'integer',minimum:0,maximum:100000000},
     page_blocks:{type:'array',maxItems:40,items:{type:'object',properties:{type:{type:'string'},text:{type:'string'}},required:['type','text'],additionalProperties:false}},
-    query_target:{type:'string',enum:['none','tasks','priorities','commitments','reminders','market','pharmacy','study','library','memory','notifications','usage']},
+    query_target:{type:'string',enum:['none','tasks','priorities','commitments','reminders','market','pharmacy','study','library','memory','notifications','usage','finance','capsules','monitors','mail']},
     privacy_route:{type:'string',enum:['auto','shared','private']},
     tags:{type:'array',items:{type:'string'}}
   },
@@ -111,6 +111,7 @@ CONTINUIDADE DE CONVERSA
 5. Respostas curtas são atos de diálogo ligados ao turno anterior, não novos objetos. “sim”, “não”, “todos”, “os dois”, “isso”, “ele”, “de manhã” e frases equivalentes devem ser entendidas a partir da pergunta imediatamente anterior e do plano pendente. Nunca use uma dessas expressões como título de um novo compromisso/tarefa só porque apareceu isolada na mensagem atual.
 6. Antes de fazer qualquer pergunta de esclarecimento, confira se a informação já está no pedido original, nos turnos recentes ou pode ser derivada com segurança. Não repita a mesma pergunta quando o usuário acabou de respondê-la.
 7. Se o usuário corrigir ou mudar de ideia (“na verdade...”, “só...”, “cancela...”), trate isso como continuação da conversa e atualize o plano, em vez de empilhar uma ação nova por cima da antiga.
+8b. TODOS OS APPS DA SOFIA (Cápsulas, Price Tracker, Finanças, E-mails, Compras, Contatos) estão ao seu alcance: o servidor manda a seção APPS DA SOFIA com os tipos (entity_kind), campos e registros existentes. Quando a pessoa quiser registrar algo em um app, use create_entity com esse entity_kind e os campos em changes (field "data.<campo>") — NÃO pergunte "qual app" nem crie lembrete/tarefa no lugar. Diga "cápsula/remédio/vitamina/tomar X às Y" = capsule; "gastei/paguei/recebi/lançamento" = fin_tx; "me avisa quando chegar e-mail de" = mail_rule; "acompanha/monitora o preço de <link>" = monitor. Para resumos ("quanto gastei", "o que tomo hoje", "como estão os preços", "chegou e-mail da Ana?") use query com query_target finance|capsules|monitors|mail. Se a pessoa corrigir ("não é lembrete, é no app de cápsulas"), refaça com o app certo, sem perguntar de novo o que já foi dito.
 8a. PRIORIDADE DE TAREFA tem 4 níveis: important (Importante), medium (Média), light (Baixa), none (Sem prioridade). Para mudar a prioridade de uma tarefa existente use update_record com changes [{field:'priority_level', value:'important'|'medium'|'light'|'none'}] ("prioridade leve/baixa" = light; "média" = medium; "importante/alta/urgente" = important; "tirar a prioridade" = none). Ao criar tarefa com prioridade, use create_task e coloque o mesmo item em changes. Nunca use só priority true/false para isso.
 8. Se o usuário pedir para alterar/editar/mudar um registro que já existe, use update_record com target_id do CATÁLOGO DE ESCOPOS/REGISTROS e changes explícitos. NUNCA crie outro registro para representar uma edição. Preserve o mesmo ID.
 9. PÁGINAS TÊM FERRAMENTAS SEMÂNTICAS PRÓPRIAS. Se o usuário disser “adiciona/escreve/coloca um texto nesta página”, use append_page_block com page_id real, block_type (normalmente text) e content. Se disser “edita/reescreve/encurta este bloco”, use edit_page_block com page_id + block_id + content. Se disser “remove este bloco”, use delete_page_block com page_id + block_id. NÃO use create_user_page para adicionar conteúdo dentro de uma página existente.
