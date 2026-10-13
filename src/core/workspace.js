@@ -1,6 +1,7 @@
 'use strict';
 const crypto=require('node:crypto');
 const {CATALOG}=require('./catalog');
+const mlIdentity=require('../services/mercado-livre-identity');
 const {OWNER}=require('../memory/store');
 const {AppError,now,id,cleanText,rejectSecrets,normalize}=require('./util');
 const AREAS=['Pessoal','Sofia OS','AVSORD','AVSORD Studio','AVSORD Technology','Enjoy The Void','Estudos','Assets','Geral'];
@@ -96,6 +97,7 @@ class Workspace {
        }
        data.source_urls=lines.join('\n');
      }
+     if(data.source_identities||old?.data.source_identities)data.source_identities=mlIdentity.mergePins(data.source_identities,old?.data.source_identities,[data.preferred_url,...String(data.source_urls||'').split('\n')]);
      if(data.line_color&&!/^#[0-9a-fA-F]{6}$/.test(data.line_color))throw new AppError('BAD_COLOR','Escolha uma cor válida para a linha do gráfico.');
      if(!Number.isInteger(data.interval_minutes)||data.interval_minutes<15||data.interval_minutes>43200)throw new AppError('BAD_INTERVAL','Intervalo entre 15 e 43200 minutos.');
      if(data.drop_percent!==''&&data.drop_percent>100)throw new AppError('BAD_PERCENT','Queda deve ficar entre 0 e 100%.');
@@ -198,18 +200,21 @@ class Workspace {
  syncJob(e){const active=e.state==='active'&&(e.kind==='routine'||e.data.method==='json');this.db.prepare('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,0) ON CONFLICT(entity_id,kind) DO UPDATE SET state=excluded.state,next_at=CASE WHEN jobs.state<>excluded.state THEN excluded.next_at ELSE jobs.next_at END,interval_minutes=excluded.interval_minutes').run(id(),e.id,e.kind,active?'active':'paused',active?now():null,null,null,e.kind==='monitor'?e.data.interval_minutes:1);}
  observations(key){if(this.get(key).kind!=='monitor')throw new AppError('BAD_KIND','Não é um monitor.');return this.db.prepare('SELECT * FROM observations WHERE monitor_id=? ORDER BY observed_at ASC,rowid ASC').all(key);}
  observe(key,b){const mon=this.get(key);if(mon.kind!=='monitor')throw new AppError('BAD_KIND','Não é um monitor.');
+   if(mon.data.method==='product'&&mon.state!=='active')throw new AppError('MONITOR_PAUSED','Acompanhamento pausado; leitura descartada.',409);
    const price=Number(b.price),shipping=Number(b.shipping??0);if(!Number.isFinite(price)||price<=0||price>1e8||!Number.isFinite(shipping)||shipping<0||shipping>1e8)throw new AppError('BAD_PRICE','Informe preço positivo e frete não negativo.');
    if(b.variant!==mon.data.variant||b.currency!==mon.data.currency)throw new AppError('VARIANT_MISMATCH','A moeda ou variante não corresponde ao monitor. Observação recusada.');
    const source=cleanText(b.source,'Fonte',1000),when=b.observed_at?dateTime(b.observed_at):now();rejectSecrets(source);
    if(Date.parse(when)>Date.now()+60000)throw new AppError('FUTURE_OBSERVATION','Uma observação não pode vir do futuro.');
+   let mlPin=null; if(b.source_identity){mlPin=mlIdentity.identity(b.source_identity);const sources=[mon.data.preferred_url,...String(mon.data.source_urls||'').split('\n')];if(!sources.includes(source)||!mlIdentity.isML(source))throw new AppError('SOURCE_REMOVED','A fonte não pertence ao acompanhamento.');const oldPin=mlIdentity.pins(mon.data.source_identities)[source];if(oldPin&&(oldPin.itemId!==mlPin.itemId||oldPin.sellerId!==mlPin.sellerId))throw new AppError('SELLER_MISMATCH','Não misturar ofertas no histórico.',409);}
    const previous=this.observations(key),cents=Math.round(price*100),freight=Math.round(shipping*100),total=cents+freight,sourceKey=b.source_key?cleanText(b.source_key,'ID da observação',160):null;
    const duplicate=sourceKey&&this.db.prepare('SELECT * FROM observations WHERE monitor_id=? AND source_key=?').get(key,sourceKey);if(duplicate)return {...duplicate,replayed:true};
-   return this.s.tx(()=>{const oid=id();this.db.prepare('INSERT INTO observations VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(oid,key,cents,freight,total,b.currency,b.variant,source,when,now(),sourceKey);
+   return this.s.tx(()=>{if(mlPin){const data={...mon.data,source_identities:JSON.stringify({...mlIdentity.pins(mon.data.source_identities),[source]:mlPin})};this.db.prepare('UPDATE entities SET data=?,revision=revision+1,updated_at=? WHERE id=? AND owner=?').run(JSON.stringify(data),now(),key,OWNER);}
+     const oid=id();this.db.prepare('INSERT INTO observations VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(oid,key,cents,freight,total,b.currency,b.variant,source,when,now(),sourceKey);
      const history=previous.filter(p=>p.observed_at<=when),latest=history.filter(p=>p.source===source).at(-1),min=history.length?Math.min(...history.map(x=>x.total_cents)):null;
      const reasons=[];if(mon.data.target_price!==''&&total<=Math.round(mon.data.target_price*100))reasons.push('atingiu o preço-alvo');
      if(latest&&mon.data.drop_percent!==''&&total<latest.total_cents&&(latest.total_cents-total)/latest.total_cents*100>=mon.data.drop_percent)reasons.push('atingiu a queda percentual');
      if(mon.data.new_low&&min!==null&&total<min)reasons.push('menor total desde o início das suas observações');
-     if(reasons.length&&(!previous.length||when>=previous.at(-1).observed_at)&&(!latest||latest.total_cents!==total))this.notify('price',mon.title+' — oportunidade',reasons.join('; ')+'. Total inclui o frete informado. Fonte: '+source,key,'opportunity',key+':'+total+':'+when.slice(0,10));
+     if(reasons.length&&(!previous.length||when>=previous.at(-1).observed_at)&&(!latest||latest.total_cents!==total))this.notify('price',mon.title+' — oportunidade',reasons.join('; ')+(mlPin?'. Preço do produto, sem frete. Fonte: ':'. Total inclui o frete informado. Fonte: ')+source,key,'opportunity',key+':'+total+':'+when.slice(0,10));
      this.event('entity',key,'observation',mon.area,'Observação de preço registrada');return this.db.prepare('SELECT * FROM observations WHERE id=?').get(oid);
    });
  }

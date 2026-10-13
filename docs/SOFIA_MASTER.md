@@ -128,6 +128,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
   única, motor gráfico C++ próprio de 21 MB, não portável para RN.
 
 ### 7.2 Monitoramento de preços
+- **Decisão do dono, 13/10/2026 — integração do pacote Mercado Livre unificado:** leituras do ML usam a rota autenticada `POST /api/mobile/price-tracker/mercadolivre/read`, HTML como texto, sem WebView nem abertura externa automática. Falha nunca aciona o leitor antigo. Anúncio/vendedor ficam fixos em `source_identities`, mantendo a URL original como chave do histórico. Catálogo sem anúncio só adota oferta na prévia de cadastro, com confirmação ao salvar. Esta seção registra a implementação do patch; publicação e leitura ao vivo exigem comprovação separada.
 - Já existe: entidade `monitor` (`src/core/catalog.js`), tabela `observations`,
   job no `src/services/scheduler.js`, `workspace.observe()` com alertas por
   preço-alvo, queda percentual e menor total histórico (`new_low`), e na UI
@@ -137,7 +138,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
   leitura de página de loja (`safe-feed.js` só aceita JSON); coleta de várias
   fontes.
 - **Sem registro de aplicativo em loja nenhuma** (sem OAuth, sem chave de API).
-- Coleta **no aparelho**, em WebView invisível, sobre a página renderizada
+- Para outras lojas, coleta **no aparelho**, em WebView invisível, sobre a página renderizada
   (`react-native-webview` via `npx expo install`).
 - Lojas desejadas: Mercado Livre, AliExpress, Pichau, Kabum, Shopee e outras.
   Busca interna confirmada só no Kabum (`/busca/<termo>`); demais a confirmar
@@ -190,6 +191,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 ## 9. Pendências (atualizar a cada rodada)
 
+- **Mercado Livre — integração HTML:** patch local pronto; obter escrita no GitHub e promover o conjunto completo; confirmar backup/volume antes do deploy do backend; rodar suíte completa/typecheck do app com dependências do lock; testar HTTP real na Railway e Android com receptor de intents. Nenhum preço ao vivo nem ausência de abertura de outro app foi comprovado em aparelho físico nesta rodada. HTML original é dado privado e não entra no repositório.
+
 0. **0.3.117 — rodada estrutural (princípios Telegram/Notion), decidida pelo dono sem nova consulta.** (1) Toque nunca monta tela: esqueleto imediato (`ScreenSkeleton`) + render da tela em `startTransition` (`useStartupMounts` não força mais a aba ativa no conjunto montado). (2) Fila ociosa com `startQuiet`: abertura conta como toque; hidratação e pré-montagens só após 800 ms de silêncio; prazos continuam. (3) Sincronização da Conversa de 2 s só com usuário parado (`userIsIdle`). (4) Toda renderização é evento `render:<nome>`; relatório ganha `renders`; `hidratar:read`. Base: relatório 0.3.116 (`docs/evidencias/relatorio-0.3.116-celular.md`): Conversa monta em 161 ms mas 1º toque segue 760 ms; bloqueios sem evento; hipóteses eliminadas (props instáveis, recorrência, leitura do histórico). **Decisão registrada:** o app passa a preferir mostrar esqueleto a congelar. **Ainda não feito (depende do `renders`):** reduzir o custo do re-render das duas telas cujo `active` muda; `useVisibleLoad` buscar rede a cada ativação; `BackgroundServices` re-renderizar ao entrar/sair do Início. **Regra: o caminho do gesto só pode conter trabalho O(1); tudo o mais vai para transição ou fila ociosa.**
 0. **0.3.116 — o relatório da 0.3.115 desmentiu uma hipótese e confirmou outra (`docs/evidencias/relatorio-0.3.115-celular.md`).** `agenda:expand` custa 0,6 ms: a expansão de recorrências NÃO era o custo da Agenda (a memória da 0.3.115 fica, é exata, mas não era o alvo). `composer:recorder` custa 148,8 ms: o `Composer` criava o gravador nativo ao montar e o consultava a cada 120 ms; abrir a Conversa pela 1ª vez levava 741 ms. Feito na 0.3.116: gravador criado só no 1º toque no microfone, consultado só enquanto grava, ciclo de vida próprio (sem ganchos do expo-audio). **Ainda sem causa medida:** ~146 ms do corpo da Agenda antes do calendário; 312 ms ao voltar ao Início. **Regra reforçada: uma medição que desmente a hipótese vale tanto quanto a que a confirma; não otimizar antes de medir, e dizer ao dono quando a hipótese cai.**
 0. **0.3.115 — primeira atribuição por dentro (relatório `docs/evidencias/relatorio-0.3.114-celular.md`).** Celular de dono = SoC Unisoc (CPU modesta). Agenda: 154 ms de JS puro ANTES do calendário; Conversa: 209 ms entre campo de digitação e commit; Início: 282–440 ms a cada retorno. Feito: memória exata das conversões de fuso (`agenda-recurrence.ts`; 2ª expansão = 0 chamadas a Intl, dia inteiro ~20x menos na 1ª; respostas idênticas, provado contra cópia congelada). **Não provado:** que isso explique os 154 ms. 0.3.115 mede `agenda:expand`, `agenda:priority`, `home:expand`, `home:priority`, `composer:recorder` em `operations`. **Próximo passo decidido pelos números do próximo relatório:** se `agenda:expand` for pequeno, o custo está em outro lugar da Agenda; se `composer:recorder` for grande, criar o gravador só ao tocar no microfone; se não, atacar o Início (retorno 282–440 ms).
@@ -218,6 +221,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
    12 h, filtro privado preservado em updates.
 
 ## 10. Diário de rodadas (só acrescentar; uma linha por rodada)
+- 13/10/2026 · candidato 0.3.137 / código 142, patch local, sem PR: leitor ML unificado com rota autenticada, cancelamento, fila limitada, identidade estável e integração Android sem fallback. Validações e limitações constam de `LEIA-ME.md` e relatórios do pacote de entrega. Sem deploy nem APK gerado nesta sessão.
 - 12/10/2026 · R24: Conta Google (Agenda completa + backup no Drive), avisos com app fechado, e-mail → conta a pagar, "Comprei" → despesa, leituras de preço num pedido só, agenda sem teto de 500, chave de e-mail com migração, versão oficial pedida ao CI ([approved-apk]).
 
 | Data | Versão | PR | O quê | Resultado |

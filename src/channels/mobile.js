@@ -26,6 +26,7 @@ function makeMobileApi(runtime, deps) {
   const extra = makeApi45(runtime, { bodyJson, json });
   const chatSync = require('../services/chat-sync').makeChatSyncApi(store, { bodyJson, json, client: 'mobile' });
   const inAudio = new Set(), rateBuckets = new Map();
+  const mercadoLivre = require('../services/mercado-livre').makeMercadoLivreReader({workspace, ...runtime.mercadoLivreOptions});
 
   // Shared SQLite storage for mobile capsule marks. No per-device dose history.
   store.db.exec('CREATE TABLE IF NOT EXISTS mobile_capsule_doses (owner TEXT NOT NULL,capsule_id TEXT NOT NULL,day TEXT NOT NULL,time TEXT NOT NULL,taken_at TEXT NOT NULL,title TEXT NOT NULL,dose_text TEXT NOT NULL,PRIMARY KEY(owner,capsule_id,day,time)) STRICT;');
@@ -115,6 +116,18 @@ function makeMobileApi(runtime, deps) {
       ownerAuth.setPassword(next); mobileSessions.revokeAll(); deps.revokeWebSessions?.(); return send({ ok: true });
     }
 
+    // Authenticated read only: no browser, database writes or external app launch.
+    if (p === '/api/mobile/price-tracker/mercadolivre/read' && m === 'POST') {
+      rate(session, 'mercadolivre', 12);
+      const b = await bodyJson(req, 12288), controller = new AbortController();
+      const cancel = () => controller.abort();
+      req.once('aborted', cancel); res.once('close', cancel);
+      try {
+        const result = await mercadoLivre.read(b, {signal: controller.signal, accountKey: OWNER});
+        if (!res.destroyed) return send(result);
+        return true;
+      } finally { req.off('aborted', cancel); res.off('close', cancel); }
+    }
     // Vigia de e-mails: senha de app só entra (nunca sai) e a verificação manual.
     if (p.startsWith('/api/mobile/mail/')) {
       const {PROVIDERS} = require('../services/mail-watch');
@@ -128,7 +141,7 @@ function makeMobileApi(runtime, deps) {
       fail('NOT_FOUND', 'Operação de e-mail desconhecida.', 404);
     }
     // Capacidades e rotas /md que o app já chamava e o servidor não tinha.
-    if (p === '/api/mobile/md/capabilities' && m === 'GET') return send({ page_order: false, calendar: runtime.google.configured(), google: runtime.google.configured(), drive_backup: runtime.google.configured(), dashboard_widgets: true, mail_watch: true });
+    if (p === '/api/mobile/md/capabilities' && m === 'GET') return send({ page_order: false, calendar: runtime.google.configured(), google: runtime.google.configured(), drive_backup: runtime.google.configured(), dashboard_widgets: true, mail_watch: true, mercado_livre_html: true });
     // Desempenho: todas as leituras de preço numa resposta só (antes era um pedido por produto).
     if (p === '/api/mobile/md/monitors/observations' && m === 'GET') {
       const out = {};

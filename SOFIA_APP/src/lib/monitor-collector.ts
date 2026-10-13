@@ -4,18 +4,28 @@ import type {Entity} from './types';
 import {buildProduct, storesDue, pickAutomatic, readMemory, alertReasons, money} from './monitoring';
 import type {ProductSeries, Candidate} from './monitoring';
 import {readPrice, readerDiagnostics} from './price-reader';
-import {readDirect} from './price-direct';
+import {readStorePrice, identityOf, storedMLIdentity} from './price-direct';
+import type {MercadoLivreReading} from './mercado-livre-types';
 import {notificationScope} from './bell-inbox';
 
-export type StoreIssue = {kind: 'failed'; error: string; at: number} | {kind: 'confirm'; candidates: Candidate[]; title: string; at: number};
+export type StoreIssue = {kind: 'failed'; error: string; at: number; code?: string} | {kind: 'confirm'; candidates: Candidate[]; title: string; at: number};
 type State = {running: boolean; done: number; total: number; label: string; issues: Record<string, StoreIssue>; lastRun: number | null; epoch: number};
 const state: State = {running: false, done: 0, total: 0, label: '', issues: {}, lastRun: null, epoch: 0};
+let activeApi: SofiaApi | null = null;
+let currentRead: {monitorId: string; controller: AbortController} | null = null;
+let cancelAll = false;
+const cancelledMonitors = new Set<string>();
+export function cancelCollection(api: SofiaApi, monitorId?: string) {
+  if (api !== activeApi) return;
+  if (monitorId) cancelledMonitors.add(monitorId); else cancelAll = true;
+  if (!monitorId || currentRead?.monitorId === monitorId) currentRead?.controller.abort();
+}
 const listeners = new Set<() => void>();
 const emit = () => { state.epoch++; listeners.forEach(l => l()); };
 export function collectorState(): State { return state; }
 
 // ---- Diagnóstico (vai no relatório do painel: Perfil → 5 toques na versão) ----
-type Outcome = {at: number; monitor: string; host: string; result: 'gravado' | 'confirmar' | 'falhou' | 'sem-preco' | 'moeda-diferente' | 'erro-ao-salvar'; amount?: number; origins?: string[]; candidates?: number; needsConfirmation?: boolean; error?: string};
+type Outcome = {at: number; monitor: string; host: string; result: 'gravado' | 'confirmar' | 'falhou' | 'sem-preco' | 'moeda-diferente' | 'erro-ao-salvar'; amount?: number; origins?: string[]; candidates?: number; needsConfirmation?: boolean; error?: string; code?: string};
 const outcomes: Outcome[] = [];
 const runs: Array<{at: number; ms: number; trigger: string; products: number; due: number; done: number; error?: string}> = [];
 let lastProducts: ProductSeries[] = [];
@@ -25,7 +35,7 @@ function note(o: Outcome) { outcomes.push(o); if (outcomes.length > 60) outcomes
 export function monitorDiagnostics(now = Date.now()) {
   return {
     collector: {running: state.running, done: state.done, total: state.total, lastRunAgoMin: state.lastRun ? Math.round((now - state.lastRun) / 60000) : null,
-      pendingIssues: Object.entries(state.issues).map(([k, v]) => ({monitor: short(k.split('|')[0]), host: hostOf(k.split('|').slice(1).join('|')), kind: v.kind, ...(v.kind === 'failed' ? {error: v.error.slice(0, 80)} : {candidates: v.candidates.length}), agoMin: Math.round((now - v.at) / 60000)}))},
+      pendingIssues: Object.entries(state.issues).map(([k, v]) => ({monitor: short(k.split('|')[0]), host: hostOf(k.split('|').slice(1).join('|')), kind: v.kind, ...(v.kind === 'failed' ? {error: v.error.slice(0, 80), code: v.code} : {candidates: v.candidates.length}), agoMin: Math.round((now - v.at) / 60000)}))},
     reader: readerDiagnostics(),
     products: lastProducts.map(p => ({id: short(p.monitor.id), state: p.monitor.state, interval: Number(p.monitor.data?.interval_minutes) || 360,
       alerts: {newLow: !!p.monitor.data?.new_low, drop: p.monitor.data?.drop_percent || null, target: !!p.monitor.data?.target_price},
@@ -88,11 +98,11 @@ export async function productsFrom(api: SofiaApi, all: Entity[]): Promise<Produc
 }
 
 /** Grava uma leitura confirmada (pela página ou pelo usuário). */
-export async function recordPrice(api: SofiaApi, monitor: Entity, url: string, amount: number, scope = '', rows?: Record<string, any>[], storeName = '') {
-  const at = new Date().toISOString();
+export async function recordPrice(api: SofiaApi, monitor: Entity, url: string, amount: number, scope = '', rows?: Record<string, any>[], storeName = '', reading?: MercadoLivreReading) {
+  const at = reading?.observedAt || new Date().toISOString();
   const history = rows ?? (await api.observations(monitor.id).then(r => r.items).catch(() => []));
   const reasons = alertReasons(monitor, history, url, amount);
-  await api.observe(monitor.id, {price: amount, shipping: 0, variant: monitor.data.variant, currency: monitor.data.currency || 'BRL', source: url, source_key: url.slice(0, 120) + '|' + at, observed_at: at});
+  await api.observe(monitor.id, {price: amount, shipping: 0, variant: monitor.data.variant, currency: monitor.data.currency || 'BRL', source: url, source_key: url.slice(0, 120) + '|' + at, observed_at: at, ...(reading ? {source_identity: identityOf(reading)} : {})});
   if (reasons.length && scope) await notify(scope, buildProduct(monitor, history), storeName || url, amount, reasons);
 }
 
@@ -100,6 +110,7 @@ export async function recordPrice(api: SofiaApi, monitor: Entity, url: string, a
  * Nunca roda duas vezes ao mesmo tempo. */
 export async function runCollection(api: SofiaApi, opts: {force?: boolean; scope?: string; only?: string; trigger?: string} = {}): Promise<void> {
   if (state.running) return;
+  activeApi = api; cancelAll = false; cancelledMonitors.clear();
   const began = Date.now(), run = {at: began, ms: 0, trigger: opts.trigger || (opts.force ? 'manual' : 'automatica') + (opts.only ? ':um-produto' : ''), products: 0, due: 0, done: 0} as (typeof runs)[number];
   state.running = true; state.done = 0; state.total = 0; state.label = 'Preparando…'; emit();
   try {
@@ -107,20 +118,25 @@ export async function runCollection(api: SofiaApi, opts: {force?: boolean; scope
     const jobs = products.flatMap(p => storesDue(p, Date.now(), !!opts.force).map(s => ({p, s})));
     state.total = jobs.length; run.products = products.length; run.due = jobs.length; emit();
     for (const {p, s} of jobs) {
+      if (cancelAll) break;
+      if (cancelledMonitors.has(p.monitor.id)) continue;
+      const controller = new AbortController(); currentRead = {monitorId: p.monitor.id, controller};
       state.label = s.name + ' · ' + p.monitor.title; emit();
       const key = issueKey(p.monitor.id, s.url);
-      // Leitor direto da loja primeiro (sem abrir página): resolve links que só
-      // redirecionam para o app da loja. Se a loja não tiver, cai no navegador escondido.
-      const read = (await readDirect(s.url).catch(() => null)) || (await readPrice(s.url));
+      // Mercado Livre usa somente a rota da Sofia, inclusive quando falha.
+      // O leitor de páginas permanece apenas para os outros provedores.
+      const read = await readStorePrice(s.url, api, readPrice, {monitorId: p.monitor.id, expectedSellerId: storedMLIdentity(p.monitor.data.source_identities, s.url)?.sellerId, signal: controller.signal});
+      if (cancelAll || cancelledMonitors.has(p.monitor.id) || controller.signal.aborted) continue;
       const base = {at: Date.now(), monitor: short(p.monitor.id), host: s.host};
-      if (!read.ok) { state.issues[key] = {kind: 'failed', error: read.error, at: Date.now()}; note({...base, result: 'falhou', error: read.error.slice(0, 80)}); }
+      if (!read.ok) { state.issues[key] = {kind: 'failed', error: read.error, code: read.code, at: Date.now()}; note({...base, result: 'falhou', error: read.error.slice(0, 80), code: read.code}); }
       else {
         const pick = pickAutomatic(read.result, readMemory(p.monitor)[s.url]);
         const meta = {candidates: read.result.candidates.length, needsConfirmation: read.result.needsConfirmation, origins: (pick || read.result.best)?.origins?.slice(0, 3)};
         if (pick && (!pick.currency || pick.currency === (p.monitor.data.currency || 'BRL'))) {
           try {
             const rows = await api.observations(p.monitor.id).then(r => r.items);
-            await recordPrice(api, p.monitor, s.url, pick.amount, opts.scope, rows, s.name);
+            if (cancelAll || cancelledMonitors.has(p.monitor.id) || controller.signal.aborted) continue;
+            await recordPrice(api, p.monitor, s.url, pick.amount, opts.scope, rows, s.name, read.mercadoLivre);
             delete state.issues[key]; note({...base, ...meta, result: 'gravado', amount: pick.amount});
           } catch (e: any) { state.issues[key] = {kind: 'failed', error: String(e?.message || 'Não consegui salvar a leitura.'), at: Date.now()}; note({...base, ...meta, result: 'erro-ao-salvar', error: String(e?.message || '').slice(0, 80)}); }
         } else if (pick) { note({...base, ...meta, result: 'moeda-diferente', amount: pick.amount}); state.issues[key] = {kind: 'failed', error: 'A loja mostrou o preço em outra moeda (' + pick.currency + ').', at: Date.now()}; }
@@ -130,5 +146,5 @@ export async function runCollection(api: SofiaApi, opts: {force?: boolean; scope
       state.done++; run.done = state.done; emit();
     }
   } catch (e: any) { run.error = String(e?.message || e).slice(0, 80); /* sem rede: tenta de novo na próxima rodada */ }
-  finally { run.ms = Date.now() - began; runs.push(run); if (runs.length > 30) runs.shift(); state.running = false; state.label = ''; state.lastRun = Date.now(); emit(); }
+  finally { currentRead = null; activeApi = null; run.ms = Date.now() - began; runs.push(run); if (runs.length > 30) runs.shift(); state.running = false; state.label = ''; state.lastRun = Date.now(); emit(); }
 }

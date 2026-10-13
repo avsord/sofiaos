@@ -7,6 +7,17 @@ import os
 import re
 from pathlib import Path
 import tempfile
+import contextlib as _contextlib, shutil as _shutil
+
+@_contextlib.contextmanager
+def temp_dir():
+    """Pasta temporária cuja limpeza NUNCA derruba o teste: no Windows um processo
+    (antivírus, indexador, git) pode segurar a pasta por instantes (WinError 32)."""
+    path = tempfile.mkdtemp()
+    try:
+        yield path
+    finally:
+        _shutil.rmtree(path, ignore_errors=True)
 import unittest
 from unittest.mock import patch
 
@@ -59,7 +70,7 @@ class DeliveryTests(unittest.TestCase):
         self.assertIn("CartaoQA048", parts['workspace'])
 
     def test_bundle_tampering_is_rejected(self):
-        with tempfile.TemporaryDirectory() as tmp, patch.object(shards.subprocess,'check_output',return_value='a'*40):
+        with temp_dir() as tmp, patch.object(shards.subprocess,'check_output',return_value='a'*40):
             dist, manifest = self.fixture(Path(tmp))
             with patch.dict(os.environ,{'SOFIA_SOURCE_SHA':'a'*40}):
                 self.assertEqual(shards.verify_bundle(dist),manifest)
@@ -67,7 +78,7 @@ class DeliveryTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'integrity'): shards.verify_bundle(dist)
 
     def test_source_mismatch_is_rejected(self):
-        with tempfile.TemporaryDirectory() as tmp, patch.object(shards.subprocess,'check_output',return_value='b'*40):
+        with temp_dir() as tmp, patch.object(shards.subprocess,'check_output',return_value='b'*40):
             dist, _ = self.fixture(Path(tmp))
             with self.assertRaises(ValueError): shards.verify_bundle(dist)
 
@@ -83,7 +94,7 @@ class DeliveryTests(unittest.TestCase):
     def test_all_shards_required_and_same_build(self):
         cwd = Path.cwd()
         try:
-            with tempfile.TemporaryDirectory() as tmp, patch.object(shards.subprocess,'check_output',return_value='a'*40), patch.dict(os.environ,{'GITHUB_RUN_ID':'123','SOFIA_SOURCE_SHA':'a'*40}):
+            with temp_dir() as tmp, patch.object(shards.subprocess,'check_output',return_value='a'*40), patch.dict(os.environ,{'GITHUB_RUN_ID':'123','SOFIA_SOURCE_SHA':'a'*40}):
                 root=Path(tmp);dist,evidence=self.evidence_fixture(root);os.chdir(root)
                 self.assertTrue(shards.verify_results(dist,evidence)['passed'])
                 f=evidence/'result-workspace.json';record=json.loads(f.read_text());record['passed']=False;f.write_text(json.dumps(record))
@@ -95,7 +106,7 @@ class DeliveryTests(unittest.TestCase):
     def test_stale_success_cannot_override_failed_retry(self):
         cwd=Path.cwd()
         try:
-            with tempfile.TemporaryDirectory() as tmp, patch.object(shards.subprocess,'check_output',return_value='a'*40), patch.dict(os.environ,{'GITHUB_RUN_ID':'123','SOFIA_SOURCE_SHA':'a'*40}):
+            with temp_dir() as tmp, patch.object(shards.subprocess,'check_output',return_value='a'*40), patch.dict(os.environ,{'GITHUB_RUN_ID':'123','SOFIA_SOURCE_SHA':'a'*40}):
                 root=Path(tmp);dist,evidence=self.evidence_fixture(root);os.chdir(root)
                 result=json.loads((evidence/'result-workspace.json').read_text());result.update(attempt=2,passed=False)
                 (evidence/'retry').mkdir();(evidence/'retry/result-workspace.json').write_text(json.dumps(result))

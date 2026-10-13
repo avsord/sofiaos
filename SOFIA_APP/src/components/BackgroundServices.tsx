@@ -3,7 +3,7 @@ import {useRenderCost} from '../lib/render-cost';
 import React,{useEffect,useRef} from 'react';
 import {AppState} from 'react-native';
 import {PriceReaderHost} from '../lib/price-reader';
-import {runCollection} from '../lib/monitor-collector';
+import {runCollection,cancelCollection} from '../lib/monitor-collector';
 import {registerBackgroundNotices} from '../lib/background-notify';
 import {scheduleIdleTask} from '../lib/idle-task';
 import type {SofiaApi} from '../lib/api';
@@ -36,8 +36,8 @@ export function BackgroundServices({api,scope,enabled,preloadWhenIdle=true,onCap
  useAgendaNotifications(api,scope,enabled,onAgenda);
  // Monitoramento: a primeira coleta espera a abertura terminar (45 s) e as
  // seguintes só leem o que venceu o intervalo de cada produto. Uma página
- // por vez, numa WebView invisível; nada disso disputa a primeira tela.
- useEffect(()=>{if(!enabled)return;const tick=()=>{if(AppState.currentState==='active')void runCollection(api,{scope});};const first=setTimeout(tick,45000),every=setInterval(tick,15*60000);return()=>{clearTimeout(first);clearInterval(every);};},[api,scope,enabled]);
+ // por vez; Mercado Livre no servidor, outras lojas na WebView. Nada na primeira tela.
+ useEffect(()=>{if(!enabled)return;const tick=()=>{if(AppState.currentState==='active')void runCollection(api,{scope});};const first=setTimeout(tick,45000),every=setInterval(tick,15*60000);return()=>{clearTimeout(first);clearInterval(every);cancelCollection(api);};},[api,scope,enabled]);
  useEffect(()=>{if(!enabled)return;const t=setTimeout(()=>{void registerBackgroundNotices();},60000);return()=>clearTimeout(t);},[enabled]);
  return enabled?<PriceReaderHost/>:null;
 }

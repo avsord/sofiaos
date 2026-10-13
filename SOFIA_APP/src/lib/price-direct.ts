@@ -1,59 +1,37 @@
 import type {PriceReaderMessage} from './price-extractor';
-
-// Leitor direto: algumas lojas publicam os dados do produto numa API própria.
-// Quando dá para usar isso, a Sofia não abre página nenhuma — nada de navegador
-// escondido, nada de redirecionar para o app da loja, nada de tela de login.
-// É mais rápido, mais confiável e não dá para ser confundido com um robô
-// navegando no site. Se a loja não tiver esse caminho, ou ele falhar, a leitura
-// normal (navegador escondido) continua valendo como estava.
-
-/** MLB1234567890 a partir de qualquer forma de link do Mercado Livre. */
-export function mercadoLivreItemId(url: string): string {
-  const raw = String(url || '');
-  let u: URL | null = null;
-  try { u = new URL(raw); } catch { u = null; }
-  if (u && !/(^|\.)mercadoli(vre|bre)\.com(\.br)?$/i.test(u.hostname.replace(/^www\./, ''))) return '';
-  if (!u && !/mercadoli(vre|bre)\.com/i.test(raw)) return '';
-  const from = (s: string) => { const m = /\b(MLB)-?(\d{6,})\b/i.exec(s || ''); return m ? 'MLB' + m[2] : ''; };
-  if (u) {
-    // O link de compartilhar traz o anúncio real em pdp_filters/wid, enquanto o
-    // endereço em si é a página do catálogo (/p/MLB...), que varia de vendedor.
-    return from(u.searchParams.get('pdp_filters') || '') || from(u.searchParams.get('wid') || '')
-      || from(u.hash) || from(u.pathname) || '';
-  }
-  return from(raw);
+import type {MercadoLivreApi, MercadoLivreOptions, MercadoLivreReading, MercadoLivreIdentity} from './mercado-livre-types';
+import {isMercadoLivreUrl} from './price-provider';
+export {isMercadoLivreUrl} from './price-provider';
+export type StoreReadMessage = (Extract<PriceReaderMessage, {ok: true}> & {mercadoLivre?: MercadoLivreReading}) | {ok: false; error: string; code?: string; keepLastPrice?: boolean};
+const failed = (code: string, error: string): StoreReadMessage => ({ok: false, code, error, keepLastPrice: true});
+export function identityOf(r: MercadoLivreReading): MercadoLivreIdentity {
+  return {provider: 'mercadolivre', itemId: r.itemId, catalogProductId: r.catalogProductId, identityKey: r.identityKey, sellerId: r.seller.id, sellerName: r.seller.name, normalizedUrl: r.normalizedUrl, priceBasis: 'product_excluding_shipping'};
 }
-
-type Fetcher = (url: string, init?: {signal?: AbortSignal; headers?: Record<string, string>}) => Promise<{ok: boolean; status: number; json: () => Promise<any>}>;
-
-async function getJson(fetcher: Fetcher, url: string, timeoutMs: number): Promise<any | null> {
-  const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), timeoutMs);
+export function storedMLIdentity(raw: unknown, source: string): MercadoLivreIdentity | undefined {
+  try { const data = JSON.parse(typeof raw === 'string' ? raw : '{}'); return data?.[source]; } catch { return undefined; }
+}
+/** Null means ONLY another provider, never a failed Mercado Livre request. */
+export async function readDirect(url: string, api: MercadoLivreApi, options: MercadoLivreOptions = {}): Promise<StoreReadMessage | null> {
+  if (!isMercadoLivreUrl(url)) return null;
+  if (options.signal?.aborted) return failed('CANCELLED', 'Leitura cancelada.');
   try {
-    const res = await fetcher(url, {signal: ctrl.signal, headers: {Accept: 'application/json'}});
-    if (!res.ok) return null;
-    return await res.json();
-  } catch { return null; } finally { clearTimeout(timer); }
+    const result = await api.readMercadoLivre(url, options);
+    if (options.signal?.aborted) return failed('CANCELLED', 'Leitura cancelada.');
+    if (!result?.ok) return failed(result?.code || 'INVALID_RESPONSE', result?.message || 'O servidor não retornou uma leitura válida.');
+    const r = result.reading;
+    if (!r || r.provider !== 'mercadolivre' || !/^MLB\d{6,16}$/.test(r.itemId) || r.identityKey !== 'mercadolivre:' + r.itemId || !/^\d{1,20}$/.test(r.seller?.id) || !r.title || !r.seller?.name || !Number.isSafeInteger(r.amountCents) || r.amountCents <= 0 || r.amountCents > 1e10 || r.currency !== 'BRL' || !Number.isFinite(Date.parse(r.observedAt)) || Date.parse(r.observedAt) > Date.now() + 60000 || !isMercadoLivreUrl(r.normalizedUrl)) return failed('INVALID_RESPONSE', 'Identidade, preço ou data inválidos; leitura descartada.');
+    if (options.expectedSellerId && options.expectedSellerId !== r.seller.id) return failed('SELLER_MISMATCH', 'O vendedor mudou; leitura descartada.');
+    const best = {amount: r.amountCents / 100, currency: 'BRL', origins: ['mercadolivre:html:' + r.itemId], confidence: 1};
+    return {ok: true, title: r.title, mercadoLivre: r, result: {found: true, needsConfirmation: false, best, candidates: [best]}};
+  } catch (error: any) {
+    if (options.signal?.aborted || error?.code === 'CANCELLED') return failed('CANCELLED', 'Leitura cancelada.');
+    return failed(error?.status === 404 ? 'READER_NOT_AVAILABLE' : String(error?.code || 'NETWORK'), error?.status === 404 ? 'O servidor ainda precisa receber o leitor do Mercado Livre.' : 'Não consegui consultar a Sofia. O último preço foi preservado.');
+  }
 }
-
-/** Preço e nome do produto pela API do Mercado Livre, sem abrir a página. */
-export async function readMercadoLivre(url: string, fetcher: Fetcher = fetch as any, timeoutMs = 12000): Promise<PriceReaderMessage | null> {
-  const id = mercadoLivreItemId(url);
-  if (!id) return null;
-  const item = await getJson(fetcher, 'https://api.mercadolibre.com/items/' + id, timeoutMs);
-  // Sem resposta utilizável (loja exigindo credencial, fora do ar, id de catálogo):
-  // devolve null para a leitura normal assumir, em vez de dizer que falhou.
-  if (!item || typeof item !== 'object') return null;
-  if (item.status && ['closed', 'inactive'].includes(String(item.status)) && !(Number(item.price) > 0)) return null;
-  const amount = Number(item.price);
-  if (!Number.isFinite(amount) || amount <= 0) return null;
-  const title = String(item.title || '').trim() || 'Produto do Mercado Livre';
-  const currency = String(item.currency_id || 'BRL');
-  const best = {amount, currency, origins: ['API do Mercado Livre'], confidence: 1};
-  return {ok: true, title, result: {found: true, needsConfirmation: false, best, candidates: [best]}};
-}
-
-/** Tenta ler o preço direto da loja. null = esta loja não tem esse caminho (usa o navegador). */
-export async function readDirect(url: string, fetcher: Fetcher = fetch as any, timeoutMs = 12000): Promise<PriceReaderMessage | null> {
-  if (mercadoLivreItemId(url)) return readMercadoLivre(url, fetcher, timeoutMs);
-  return null;
+/** Every collection entry point uses the same dispatch, including failures. */
+export async function readStorePrice(url: string, api: MercadoLivreApi, browserRead: (url: string) => Promise<PriceReaderMessage>, options: MercadoLivreOptions = {}): Promise<StoreReadMessage> {
+  if (options.signal?.aborted) return failed('CANCELLED', 'Leitura cancelada.');
+  const direct = await readDirect(url, api, options);
+  if (direct !== null) return direct;
+  return browserRead(url);
 }

@@ -1,3 +1,4 @@
+import type {MercadoLivreOptions, MercadoLivreResponse} from './mercado-livre-types';
 import {AUTH_STORAGE_KEY,PREFS_STORAGE_KEY,takeStartupAuth,takeStartupPrefs,invalidateStartupAuth,invalidateStartupPrefs} from './startup-read-ahead';
 import {StartupSnapshot} from './startup-snapshot';
 import {encryptedStorage} from './encrypted-storage';
@@ -69,6 +70,8 @@ export class SofiaApi {
   async persistLaunch(){await this.snapshots.flush();}
   async prefetchCache(path:string){if(!/^\/(workspace\/|conversations\?|agenda\?|md\/dashboard)/.test(path))return;const value=await this.fetchRequest(path,undefined,'GET',20000);this.startupReads.seed(path,value);}
   cached<T>(path:string){return this.snapshots.peek<T>(path);}
+  /** Guarda um resumo calculado no app (ex.: widget da Início) no mesmo cache criptografado da abertura. */
+  rememberLocal(path:string,value:unknown){this.snapshots.remember(path,value);}
   async discardCache(){this.cacheGeneration++;this.startupReads.invalidate();await this.snapshots.clear();}
   async liveBootstrap(){return this.fetchRequest<Bootstrap>('/bootstrap',undefined,'GET',20000);}
   preload(agenda:()=>Promise<unknown>){
@@ -106,22 +109,25 @@ export class SofiaApi {
     const read=()=>this.fetchRequest<T>(path,body,method,timeout);
     return this.warming&&path!=='/bootstrap' ? this.startupReads.prime(path,read) : this.startupReads.read(path,read);
   }
-  private async fetchRequest<T>(path:string,body:unknown,method:string,timeout:number):Promise<T>{
+  private async fetchRequest<T>(path:string,body:unknown,method:string,timeout:number,signal?:AbortSignal):Promise<T>{
     const started=Date.now();
-    try{return await this.fetchOnce<T>(path,body,method,timeout);}
+    try{return await this.fetchOnce<T>(path,body,method,timeout,signal);}
     catch(error){
       const e=error as ApiError;
       // Leitura que caiu porque o servidor estava reiniciando ou ocupado: tenta de novo uma vez, em silêncio.
       if(method==='GET'&&(e.status===502||e.status===503||e.status===504||e.code==='TIMEOUT')&&Date.now()-started<timeout){
         await new Promise(r=>setTimeout(r,1200));
-        try{return await this.fetchOnce<T>(path,body,method,timeout);}catch(again){noteApiFailure(path,method,again as ApiError,Date.now()-started);throw again;}
+        try{return await this.fetchOnce<T>(path,body,method,timeout,signal);}catch(again){noteApiFailure(path,method,again as ApiError,Date.now()-started);throw again;}
       }
       noteApiFailure(path,method,e,Date.now()-started);throw error;
     }
   }
-  private async fetchOnce<T>(path:string,body:unknown,method:string,timeout:number):Promise<T>{
+  private async fetchOnce<T>(path:string,body:unknown,method:string,timeout:number,signal?:AbortSignal):Promise<T>{
+    if(signal?.aborted)throw new ApiError('Leitura cancelada.','CANCELLED',0);
     await this.networkGate;
+    if(signal?.aborted)throw new ApiError('Leitura cancelada.','CANCELLED',0);
     const generation=this.cacheGeneration,controller = new AbortController(), timer = setTimeout(() => controller.abort(), timeout);
+    const cancel=()=>controller.abort();signal?.addEventListener('abort',cancel,{once:true});
     try {
       const response = await fetch(SITE + '/api/mobile' + path, { method, signal: controller.signal,
         headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(this.token ? { Authorization: 'Bearer ' + this.token } : {}) },
@@ -134,10 +140,11 @@ export class SofiaApi {
       if(generation===this.cacheGeneration&&path.startsWith('/chat-sync')&&data.conversation&&Array.isArray(data.messages)){this.snapshots.remember('/chat-sync/current',{...data,messages:data.messages.slice(-100)});this.snapshots.remember('/conversations/'+data.conversation.id,{...data,messages:data.messages.slice(-100)});}
       return data as T;
     } catch (error) {
+      if(signal?.aborted)throw new ApiError('Leitura cancelada.','CANCELLED',0);
       if (error instanceof ApiError) throw error;
       if (controller.signal.aborted) throw new ApiError('A conexão demorou. Recarregue antes de reenviar: sua mensagem pode ter chegado.', 'TIMEOUT', 0);
       throw new ApiError('Sem conexão com a Sofia. Verifique a internet e tente novamente.', 'NETWORK', 0);
-    } finally { clearTimeout(timer); }
+    } finally { clearTimeout(timer); signal?.removeEventListener('abort',cancel); }
   }
   login(email: string, password: string, device: string) { return this.request<Auth>('/auth/login', { email: email.trim(), password, device_name: device }); }
   bootstrap() { return this.request<Bootstrap>('/bootstrap'); }
@@ -215,6 +222,11 @@ export class SofiaApi {
   financeImportPreview(text: string, target: 'account' | 'card', targetId: string) { return this.request<{format: string; items: ImportItem[]; total: number; duplicates: number}>('/md/finance/import', {text, target, target_id: targetId}, 'POST', 60000); }
   financeImportCommit(items: ImportItem[], target: 'account' | 'card', targetId: string) { return this.request<{created: number; skipped: number}>('/md/finance/import/commit', {items, target, target_id: targetId}, 'POST', 60000); }
   financeBundle(window?: {from: string; to: string}) { return this.request<{items: Record<string, Entity[]>; carry?: Record<string, number>; window?: {from: string; to: string} | null; at: string}>('/md/finance' + (window ? '?from=' + window.from + '&to=' + window.to : ''), undefined, 'GET', 30000); }
+  // POST read bypasses the write cache invalidation path. No token goes to the store.
+  readMercadoLivre(link:string,options:MercadoLivreOptions={}) {
+    const {signal,...params}=options;
+    return this.fetchRequest<MercadoLivreResponse>('/price-tracker/mercadolivre/read',{link,...params},'POST',40000,signal);
+  }
   monitorObservations() { return this.request<{items: Record<string, any[]>}>('/md/monitors/observations'); }
   observations(id: string) { return this.request<{items: any[];status?:{last_at:string|null;last_error:string|null;next_at:string|null}}>('/workspace/entities/' + encodeURIComponent(id) + '/observations'); }
   mailSecret(id: string, password: string) { return this.request<{ok: boolean; messages: number}>('/mail/accounts/' + encodeURIComponent(id) + '/secret', {password}, 'POST', 45000); }

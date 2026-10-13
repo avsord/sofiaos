@@ -21,7 +21,11 @@ function fakeGoogle(){
     return res(200,{items:page,...(start+size<list.length?{nextPageToken:String(start+size)}:{})});}
    const body=opts.body?JSON.parse(opts.body):null;
    if(m==='POST'){const ev={id:'new'+(g.seq++),etag:'"e1"',...body};g.events[cal].push(ev);return res(200,ev);}
-   if(m==='PATCH'){const ev=g.events[cal].find(e=>e.id===evId);Object.assign(ev,body,{etag:'"e'+(g.seq++)+'"'});return res(200,ev);}
+   if(m==='PATCH'){const ev=g.events[cal].find(e=>e.id===evId);
+    // Como o Google de verdade: PATCH mescla objetos (reminders) e recusa useDefault junto com overrides.
+    const merged={...ev,...body};if(body.reminders)merged.reminders={...(ev.reminders||{}),...body.reminders};
+    if(merged.reminders&&merged.reminders.useDefault&&(merged.reminders.overrides||[]).length)return res(400,{error:{message:'Cannot specify both default reminders and overrides at the same time.'}});
+    Object.assign(ev,merged,{etag:'"e'+(g.seq++)+'"'});return res(200,ev);}
    if(m==='DELETE'){g.events[cal]=g.events[cal].filter(e=>e.id!==evId);return {ok:true,status:204,json:async()=>({})};}}
   if(u.pathname==='/drive/v3/files'&&m==='GET'){
    const q=u.searchParams.get('q')||'';
@@ -209,13 +213,50 @@ test('item travado para sempre no envio (chave estranha sobrando dos dados dele)
  // Simula o estrago real: um compromisso com uma chave que não existe mais no catálogo
  // (sobra de versão antiga ou de um bug já corrigido) — toda sincronização falhava igual, para sempre.
  const e=w.save({kind:'commitment',title:'Pegar encomenda correio',area:'Geral',data:{start_at:'2026-10-13T10:00:00-03:00',end_at:'2026-10-13T11:00:00-03:00',calendar_provider:'google',calendar_id:'primary',sync_state:'local',external_event_id:'',google_etag:''}});
- w.s.db.prepare("UPDATE entities SET data=json_set(data,'$.priority_level','important') WHERE id=?").run(e.id);
- assert.ok(JSON.parse(w.s.db.prepare('SELECT data FROM entities WHERE id=?').get(e.id).data).priority_level,'estrago aplicado de propósito');
+ w.s.db.prepare("UPDATE entities SET data=json_set(data,'$.campo_de_versao_antiga','x') WHERE id=?").run(e.id);
+ assert.ok(JSON.parse(w.s.db.prepare('SELECT data FROM entities WHERE id=?').get(e.id).data).campo_de_versao_antiga,'estrago aplicado de propósito');
  const r1=await svc.sync();
  assert.equal((r1.errors||[]).length,0,'não trava mais o envio: '+JSON.stringify(r1.errors));
  assert.equal(r1.sent,1);
- const after=w.get(e.id);assert.equal(after.data.sync_state,'synced');assert.ok(after.data.external_event_id);assert.ok(!('priority_level' in after.data),'a chave estranha sumiu sozinha');
+ const after=w.get(e.id);assert.equal(after.data.sync_state,'synced');assert.ok(after.data.external_event_id);assert.ok(!('campo_de_versao_antiga' in after.data),'a chave estranha sumiu sozinha');
  const r2=await svc.sync();assert.equal((r2.errors||[]).length,0);assert.equal(r2.sent,0,'já sincronizado: não tenta de novo');
+});
+
+test('compromisso com prioridade é salvo (sem "Campo não previsto") e a prioridade sobrevive ao envio ao Google',async t=>{
+ const {svc,core}=await connected(t);const w=core.workspace;
+ for(const level of ['none','important','medium','light']){
+  const e=w.save({kind:'commitment',title:'Ai '+level,area:'Pessoal',privacy:'private',state:'planned',data:{start_at:'2026-10-16T12:00:00.000Z',priority_level:level,calendar_provider:'google'}});
+  assert.equal(e.data.priority_level,level);
+ }
+ assert.throws(()=>w.save({kind:'commitment',title:'x',data:{start_at:'2026-10-16T12:00:00.000Z',priority_level:'urgentissimo'}}),/opção válida/);
+ const r=await svc.sync();assert.equal((r.errors||[]).length,0,JSON.stringify(r.errors));
+ const imp=w.list({kind:'commitment'}).find(x=>x.title==='Ai important');
+ assert.equal(imp.data.sync_state,'synced');assert.equal(imp.data.priority_level,'important','prioridade não é apagada pela sincronização');
+});
+
+test('pastas repetidas de quem JÁ tinha os IDs guardados também se juntam sozinhas (sem reconectar a conta)',async t=>{
+ const {svc,g}=await connected(t);
+ await svc.ensureFolders();svc.foldersCheckedAt=0; // como um servidor recém-iniciado com IDs antigos guardados
+ const cachedRoot=svc.link().drive.folders.root;
+ for(let i=0;i<3;i++)g.driveFiles.push({id:'velha'+i,name:'Sofia OS',folder:true,parents:[],createdTime:'2026-10-13T0'+(5+i)+':07:00.000Z'});
+ g.driveFiles.push({id:'backup-perdido',name:'backup.json',parents:['velha1']});
+ const id=await svc.folderId('Backups');
+ assert.ok(id);assert.equal(g.driveFiles.filter(f=>f.folder&&f.name==='Sofia OS'&&!f.trashed).length,1,'só sobrou uma "Sofia OS"');
+ assert.equal(svc.link().drive.folders.root,cachedRoot,'mantém a mais antiga');
+ assert.ok(g.driveFiles.find(f=>f.id==='backup-perdido').parents.includes(cachedRoot),'conteúdo das repetidas foi movido, não apagado');
+ const calls=g.calls?g.calls.length:0;await svc.folderId('Backups');if(g.calls)assert.equal(g.calls.length,calls,'dentro de 6 h usa o ID guardado, sem listar de novo');
+});
+
+test('compromisso que tinha lembrete próprio e volta ao padrão não dá "Cannot specify both default reminders and overrides"',async t=>{
+ const {svc,core,g}=await connected(t);const w=core.workspace;
+ const e=w.save({kind:'commitment',title:'Mais laeser',area:'Pessoal',data:{start_at:'2026-10-16T12:00:00.000Z',remind_minutes:30,calendar_provider:'google'}});
+ let r=await svc.sync();assert.equal((r.errors||[]).length,0,JSON.stringify(r.errors));
+ const ev=g.events.primary.find(x=>x.summary==='Mais laeser');assert.equal(ev.reminders.overrides[0].minutes,30);
+ // dono tira o lembrete próprio -> volta ao padrão do calendário
+ const cur=w.get(e.id);w.save({revision:cur.revision,title:'Mais laeser 2',data:{...cur.data,remind_minutes:''}},e.id);
+ r=await svc.sync();assert.equal((r.errors||[]).length,0,'não trava: '+JSON.stringify(r.errors));
+ const after=g.events.primary.find(x=>x.id===ev.id);assert.equal(after.summary,'Mais laeser 2');assert.equal(after.reminders.useDefault,true);assert.equal((after.reminders.overrides||[]).length,0);
+ assert.equal(w.get(e.id).data.sync_state,'synced');
 });
 
 test('pastas que rodam ao mesmo tempo (envio, anexos, voz, páginas) não criam cada uma a sua própria "Sofia OS"',async t=>{

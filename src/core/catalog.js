@@ -106,6 +106,7 @@ const CATALOG={
         "label": "Lembrar com antecedência (minutos)",
         "type": "number"
       },
+      {"key": "priority_level", "label": "Prioridade", "type": "select", "options": ["none", "important", "medium", "light"]},
       {
         "key": "calendar_provider",
         "label": "Provedor do calendário",
@@ -563,6 +564,13 @@ const CATALOG={
         "label": "Cor da linha no gráfico",
         "type": "text",
         "max": 20
+      },
+      {
+        "key": "source_identities",
+        "label": "Identidade fixa da oferta por link",
+        "type": "textarea",
+        "max": 24000,
+        "developerOnly": true
       },
       {
         "key": "reader_memory",

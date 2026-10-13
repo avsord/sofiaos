@@ -14,7 +14,7 @@ function runtimeFixture(t){
   const config={root:path.resolve(__dirname,'..'),dataDir:path.join(dir,'data'),backupDir:path.join(dir,'backups'),apiKey:'',privateApiKey:'',sharedApiKey:'',model:'gpt-5.6-luna',apiTimeoutMs:50,maxMessageChars:12000,maxContextChars:20000,metaAppId:'1617872666710770',metaLoginConfigId:'1590251151959449',metaGraphVersion:'v26.0',metaAppSecret:'',whatsappVerifyToken:'sofia_webhook_2026',publicBaseUrl:'https://sofiaos.up.railway.app'};
   const runtime=createRuntime(config,{store,provider:{respond:async()=>({reply:'ok',usage:{}}),structured:async()=>({data:{},reply:'{}',usage:{}})},secureDir:path.join(dir,'secure')});
   const server=http.createServer(runtime.handler);
-  t.after(async()=>{try{await runtime.scheduler.stop();}catch{} try{runtime.core.shutdown();}catch{} server.closeAllConnections();await new Promise(r=>server.close(r));store.close();fs.rmSync(dir,{recursive:true,force:true});});
+  t.after(async()=>{try{await runtime.scheduler.stop();}catch{} try{runtime.core.shutdown();}catch{} server.closeAllConnections();await new Promise(r=>server.close(r));store.close();(()=>{try{fs.rmSync(dir,{recursive:true,force:true,maxRetries:10,retryDelay:200});}catch{}})();});
   return new Promise(resolve=>server.listen(0,'127.0.0.1',()=>resolve({runtime,server,base:'http://127.0.0.1:'+server.address().port})));
 }
 

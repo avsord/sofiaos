@@ -7,7 +7,7 @@ test('061 actual native transition handles early/late splash without premature r
   cp.execFileSync('java',['-m','jdk.compiler/com.sun.tools.javac.Main','-d',tmp,path.join(app,'plugins/native/SofiaLaunchTransition.java'),path.join(__dirname,'native/SofiaLaunchTransitionTest.java')],{stdio:'pipe'});
   const result=cp.execFileSync('java',['-cp',tmp,'com.avsord.sofiaapp.SofiaLaunchTransitionTest'],{encoding:'utf8'});
   assert.match(result,/PASS: actual production transition/);
- }finally{fs.rmSync(tmp,{recursive:true,force:true});}
+ }finally{(()=>{try{fs.rmSync(tmp,{recursive:true,force:true,maxRetries:10,retryDelay:200});}catch{}})();}
 });
 test('061 current-month data is available before reveal; adjacent-month network waits',async()=>{
  const load=require('./load-ts.cjs'),effects=[],requests=[];

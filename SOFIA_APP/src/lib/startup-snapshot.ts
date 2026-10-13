@@ -10,21 +10,24 @@ const MAX_AGE=14*86400000,MAX_BYTES=4*1024*1024;
  * Ordinary refreshes now (a) never rewrite when the response is identical and (b) are spaced at least this far apart.
  * Erasing data and explicit flushes are never delayed. */
 export const MIN_WRITE_GAP_MS=30000;
+/** Resumo pronto do widget Price Tracker da Início (não é rota do servidor): permite
+ * desenhar o widget já no primeiro quadro, com a última leitura conhecida. */
+export const MONITOR_WIDGET_PATH='/local/monitor-widget';
 export const chatRead=(path:string)=>path==='/chat-sync/current'||path==='/conversations?offset=0'||/^\/conversations\/[\w-]+$/.test(path);
 // Keep the next launch independent of recently opened history/detail pages.
 export const startupPriority=(path:string)=>path==='/chat-sync/current'?0:
- ['/tasks','/home','/workspace/catalog','/md/dashboard','/agenda'].includes(path)?1:
+ ['/tasks','/home','/workspace/catalog','/md/dashboard','/agenda',MONITOR_WIDGET_PATH].includes(path)?1:
  /^\/agenda\?month=\d{4}-\d{2}$/.test(path)?2:3;
 const fresh=(path:string,at:number,now:number)=>at<=now+60000&&(chatRead(path)||now-at<MAX_AGE);
 // A separate, encrypted first-screen projection prevents years of chat/detail
 // history from being decrypted, transferred and parsed before Home can mount.
 export function launchRead(path:string,now=Date.now()){
  const date=new Date(now),month=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
- return ['/tasks','/home','/md/dashboard','/workspace/catalog','/chat-sync/current','/agenda?month='+month].includes(path);
+ return ['/tasks','/home','/md/dashboard','/workspace/catalog','/chat-sync/current','/agenda?month='+month,MONITOR_WIDGET_PATH].includes(path);
 }
 export function cacheableRead(path:string){
  if(chatRead(path))return true;
- if(['/bootstrap','/home','/tasks','/workspace/catalog','/workspace/integrations','/md/dashboard','/agenda','/chat-sync/current'].includes(path))return true;
+ if(['/bootstrap','/home','/tasks','/workspace/catalog','/workspace/integrations','/md/dashboard','/agenda','/chat-sync/current',MONITOR_WIDGET_PATH].includes(path))return true;
  if(/^\/agenda\?month=\d{4}-\d{2}$/.test(path))return true;
  return path.startsWith('/workspace/entities?')&&/(?:\?|&)offset=0(?:&|$)/.test(path)&&!/[?&]q=[^&]+/.test(path);
 }

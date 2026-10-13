@@ -269,7 +269,11 @@ class GoogleService {
     const start = allDay ? {date: d.calendar_date_start} : {dateTime: d.start_at, timeZone: TZ};
     const end = allDay ? {date: d.calendar_date_end || plusDays(d.calendar_date_start, 1)} : {dateTime: d.end_at || new Date(Date.parse(d.start_at) + 3600000).toISOString(), timeZone: TZ};
     return {summary: e.title, description: e.content || undefined, location: d.location || undefined, start, end,
-      reminders: d.remind_minutes !== '' && d.remind_minutes != null ? {useDefault: false, overrides: [{method: 'popup', minutes: Number(d.remind_minutes)}]} : {useDefault: true}};
+      reminders: d.remind_minutes !== '' && d.remind_minutes != null ? {useDefault: false, overrides: [{method: 'popup', minutes: Number(d.remind_minutes)}]}
+        // PATCH mescla objetos: mandar só {useDefault:true} num evento que JÁ tem lembretes próprios
+        // vira "useDefault + overrides" e o Google recusa ("Cannot specify both default reminders and
+        // overrides"). Mandar overrides vazio limpa os próprios e deixa só o padrão.
+        : {useDefault: true, overrides: []}};
   }
   async pushLocal(calId, report) {
     for (const t of this.db.prepare('SELECT * FROM google_tombstones').all()) {
@@ -286,8 +290,16 @@ class GoogleService {
         if (!isNew && e.revision <= (Number(d.google_rev) || 0)) continue;
         await breathe();
         try {
-          const ev = isNew ? await this.call('POST', CAL + '/calendars/' + encodeURIComponent(target) + '/events', this.eventBody(e))
-            : await this.call('PATCH', CAL + '/calendars/' + encodeURIComponent(target) + '/events/' + encodeURIComponent(d.external_event_id), this.eventBody(e));
+          const url = CAL + '/calendars/' + encodeURIComponent(target) + '/events' + (isNew ? '' : '/' + encodeURIComponent(d.external_event_id));
+          let ev;
+          try { ev = await this.call(isNew ? 'POST' : 'PATCH', url, this.eventBody(e)); }
+          catch (err) {
+            // Rede de segurança: se o Google ainda reclamar de lembretes, reenvia sem mexer neles
+            // (o horário/título/descrição é o que importa; lembrete não pode travar o resto).
+            if (!/default reminders and overrides|reminders/i.test(String(err.message))) throw err;
+            const {reminders, ...semLembretes} = this.eventBody(e);
+            ev = await this.call(isNew ? 'POST' : 'PATCH', url, semLembretes);
+          }
           this.w.save({revision: e.revision, data: {...cleanData(e.kind, d), calendar_id: target, external_event_id: ev.id, google_etag: ev.etag || '', sync_state: 'synced', google_rev: e.revision + 1}}, e.id);
           report.sent++;
         } catch (err) {
@@ -374,9 +386,19 @@ class GoogleService {
     }
     return keep.id;
   }
+  // Antes, a arrumação de pastas repetidas só rodava ao CONECTAR a conta: quem já tinha os IDs
+  // guardados de antes nunca via as duplicatas sumirem. Agora, mesmo com IDs guardados, confere
+  // uma vez por início do servidor e depois a cada 6 h (é só uma listagem; junta se precisar).
+  static FOLDER_RECHECK_MS = 6 * 3600 * 1000;
   async folderId(name) {
-    const l = this.link(); if (l?.drive?.folders?.[name]) return l.drive.folders[name];
-    const f = await this.ensureFolders(); return f ? f[name] : null;
+    const l = this.link(), cached = l?.drive?.folders?.[name];
+    const stale = !this.foldersCheckedAt || Date.now() - this.foldersCheckedAt > GoogleService.FOLDER_RECHECK_MS;
+    if (cached && !stale) return cached;
+    try {
+      const f = await this.ensureFolders();
+      if (f) { this.foldersCheckedAt = Date.now(); return f[name]; }
+    } catch (e) { if (!cached) throw e; this.foldersCheckedAt = Date.now(); }
+    return cached || null;
   }
 
   // ---------- Anexos no Drive ----------

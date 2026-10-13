@@ -1,0 +1,32 @@
+{
+  "@type": "ProductGroup",
+  "hasVariant": [
+    {
+      "sku": "MLB5937520436",
+      "productID": "MLB42258825",
+      "color": "Preto",
+      "offers": {
+        "price": 1576,
+        "priceCurrency": "BRL"
+      }
+    },
+    {
+      "sku": "MLB7568202750",
+      "productID": "MLB69202941",
+      "color": "Laranja",
+      "offers": {
+        "price": 1412.83,
+        "priceCurrency": "BRL"
+      }
+    },
+    {
+      "sku": "MLB5257044377",
+      "productID": "MLB47170556",
+      "color": "Prateado",
+      "offers": {
+        "price": 1412.83,
+        "priceCurrency": "BRL"
+      }
+    }
+  ]
+}

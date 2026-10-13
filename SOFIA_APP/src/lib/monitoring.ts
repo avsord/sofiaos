@@ -132,7 +132,9 @@ export function buildProduct(monitor: Entity, rows: Record<string, any>[], index
   }
   const lowPoint = best.reduce<Point | null>((m, p) => (!m || p.v < m.v ? p : m), null);
   const low = lowPoint ? {price: lowPoint.v, at: lowPoint.t} : null;
-  const atLow = !!now && !!low && best.length > 1 && now.price <= low.price;
+  // "Menor preço já visto" só faz sentido se o preço já foi MAIOR em algum momento.
+  // Preço que nunca mudou não é "o menor": é o único.
+  const atLow = !!now && !!low && best.some(p => p.v > low.price) && now.price <= low.price;
   const lastAt = obs.length ? obs.at(-1)!.at : null;
   return {monitor, color: colorOf(monitor, index), currency: String(monitor.data?.currency || 'BRL'), stores: storeSeries, best, now, change, low, atLow, lastAt};
 }
@@ -340,6 +342,7 @@ export type Analysis = {
   from: number; to: number; readings: number; days: number;
   min: {v: number; t: number} | null; max: {v: number; t: number} | null; avg: number | null; median: number | null;
   vsAvg: number | null; position: number | null; // 0 = menor do período, 1 = maior
+  flat: boolean; // menor e maior do período são o mesmo valor (preço não variou)
   spread: {cheap: string; expensive: string; diff: number} | null;
   saving: number | null; // quanto o melhor preço de agora economiza vs o maior do período
   verdict: Verdict; changes: Change[]; stores: StoreStats[];
@@ -367,6 +370,7 @@ export function analyzeProduct(p: ProductSeries, window: Window, now = Date.now(
   const vals = inWin.map(x => x.v);
   const minP = inWin.reduce<Point | null>((m, x) => (!m || x.v < m.v ? x : m), null);
   const maxP = inWin.reduce<Point | null>((m, x) => (!m || x.v > m.v ? x : m), null);
+  const flat = !!minP && !!maxP && maxP.v === minP.v;
   const avg = timeWeightedAverage(inWin, from, now);
   const sorted = [...vals].sort((a, b) => a - b);
   const median = sorted.length ? (sorted.length % 2 ? sorted[(sorted.length - 1) / 2] : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2) : null;
@@ -413,14 +417,31 @@ export function analyzeProduct(p: ProductSeries, window: Window, now = Date.now(
   let verdict: Verdict;
   if (cur === null) verdict = {kind: 'unknown', title: 'Sem leitura ainda', text: 'Assim que a Sofia ler o preço, a análise começa.'};
   else if (p.best.length < 3 || days < 2) verdict = {kind: 'unknown', title: 'Ainda conhecendo o preço', text: 'Com mais alguns dias de leituras dá pra dizer se o preço está bom.'};
-  else if (p.low && cur <= p.low.price) verdict = {kind: 'great', title: 'Melhor momento até agora', text: 'É o menor preço desde que você começou a acompanhar.'};
+  else if (flat) verdict = {kind: 'normal', title: 'Preço estável', text: 'O preço não mudou no período, então ainda não dá pra dizer se está baixo ou alto.'};
+  else if (p.atLow) verdict = {kind: 'great', title: 'Melhor momento até agora', text: 'É o menor preço desde que você começou a acompanhar.'};
   else if (position !== null && position <= 0.25) verdict = {kind: 'good', title: 'Bom preço', text: 'Está entre os mais baixos do período' + (vsAvg !== null ? ', ' + percent(vsAvg).replace('−', '') + ' abaixo da média.' : '.')};
   else if (position !== null && position >= 0.75) verdict = {kind: 'high', title: 'Caro agora', text: 'Está perto do maior preço do período. Se puder, espere.'};
   else verdict = {kind: 'normal', title: 'Preço dentro do normal', text: vsAvg === null ? 'Sem variação relevante no período.' : (vsAvg < 0 ? percent(vsAvg).replace('−', '') + ' abaixo' : percent(vsAvg).replace('+', '') + ' acima') + ' da média do período.'};
 
-  return {from, to: now, readings, days, min: minP ? {v: minP.v, t: minP.t} : null, max: maxP ? {v: maxP.v, t: maxP.t} : null, avg, median, vsAvg, position, spread, saving, verdict, changes, stores};
+  return {from, to: now, readings, days, min: minP ? {v: minP.v, t: minP.t} : null, max: maxP ? {v: maxP.v, t: maxP.t} : null, avg, median, vsAvg, position, flat, spread, saving, verdict, changes, stores};
 }
 
 export function allReadings(p: ProductSeries): Array<{t: number; store: string; v: number}> {
   return p.stores.flatMap(s => s.points.map(x => ({t: x.t, store: s.name, v: x.v}))).sort((a, b) => b.t - a.t);
+}
+
+// ---------- Widget da Início ----------
+/** Só o que o widget desenha: pequeno o bastante para ficar no cache de abertura
+ * e aparecer no primeiro quadro, antes de qualquer consulta à rede. */
+export type MonitorWidgetRow = {id: string; title: string; color: string; currency: string; atLow: boolean; lastAt: number | null;
+  price: number | null; store: string | null; change: number | null};
+export function widgetRows(list: ProductSeries[]): MonitorWidgetRow[] {
+  return [...list].sort((a, b) => Number(b.atLow) - Number(a.atLow) || (b.lastAt ?? 0) - (a.lastAt ?? 0)).map(p => ({
+    id: p.monitor.id, title: String(p.monitor.title || ''), color: p.color, currency: p.currency, atLow: p.atLow, lastAt: p.lastAt,
+    price: p.now ? p.now.price : null, store: p.now ? p.now.store.name : null, change: p.change}));
+}
+/** Aceita só o formato atual (cache de versão antiga ou corrompido vira "sem cache"). */
+export function validWidgetRows(v: unknown): MonitorWidgetRow[] | null {
+  if (!Array.isArray(v)) return null;
+  return v.every(r => r && typeof r.id === 'string' && typeof r.title === 'string' && typeof r.color === 'string' && typeof r.atLow === 'boolean') ? v as MonitorWidgetRow[] : null;
 }

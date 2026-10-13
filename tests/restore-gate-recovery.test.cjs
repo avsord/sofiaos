@@ -10,7 +10,7 @@ const {DatabaseSync}=require('node:sqlite');
 const {existing}=require('../tools/restore-gate.cjs');
 
 function makeVolume(t){
- const base=fs.mkdtempSync(path.join(os.tmpdir(),'restore-gate-'));t.after(()=>fs.rmSync(base,{recursive:true,force:true}));
+ const base=fs.mkdtempSync(path.join(os.tmpdir(),'restore-gate-'));t.after(()=>(()=>{try{fs.rmSync(base,{recursive:true,force:true,maxRetries:10,retryDelay:200});}catch{}})());
  fs.mkdirSync(path.join(base,'data'),{recursive:true});fs.mkdirSync(path.join(base,'secure'),{recursive:true});
  fs.writeFileSync(path.join(base,'secure','backup-master-v1.key'),'x');
  const db=new DatabaseSync(path.join(base,'data','sofia.sqlite'));db.exec('PRAGMA journal_mode=WAL');db.exec('CREATE TABLE t(v TEXT)');db.exec("INSERT INTO t VALUES('ok')");db.close();

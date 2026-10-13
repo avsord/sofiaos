@@ -12,7 +12,7 @@ function config(dir,privateApiKey=''){
 test('private server key restores the already configured private filter state after a fresh deploy',t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sofia-filter-sync-'));
   const store=new Store(path.join(dir,'data','sofia.sqlite'));
-  t.after(()=>{try{store.close();}catch{}fs.rmSync(dir,{recursive:true,force:true});});
+  t.after(()=>{try{store.close();}catch{}(()=>{try{fs.rmSync(dir,{recursive:true,force:true,maxRetries:10,retryDelay:200});}catch{}})();});
   assert.equal(store.settings().routingEnabled,false);
   assert.equal(store.settings().privateConfirmed,false);
   createRuntime(config(dir,PRIVATE_KEY),{store,secureDir:path.join(dir,'secure'),providerFactory:()=>({})});
@@ -24,7 +24,7 @@ test('private server key restores the already configured private filter state af
 test('server does not invent a private configuration when the private key is absent',t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sofia-filter-no-key-'));
   const store=new Store(path.join(dir,'data','sofia.sqlite'));
-  t.after(()=>{try{store.close();}catch{}fs.rmSync(dir,{recursive:true,force:true});});
+  t.after(()=>{try{store.close();}catch{}(()=>{try{fs.rmSync(dir,{recursive:true,force:true,maxRetries:10,retryDelay:200});}catch{}})();});
   createRuntime(config(dir,''),{store,secureDir:path.join(dir,'secure'),providerFactory:()=>({})});
   const settings=store.settings();
   assert.equal(settings.privateConfirmed,false);
@@ -33,7 +33,7 @@ test('server does not invent a private configuration when the private key is abs
 
 test('private key configured in the web persists and is restored for the mobile app after redeploy',t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sofia-filter-persist-'));
-  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  t.after(()=>(()=>{try{fs.rmSync(dir,{recursive:true,force:true,maxRetries:10,retryDelay:200});}catch{}})());
   const first={...config(dir,''),root:dir};
   saveCredential(first,'private',PRIVATE_KEY);
   assert.equal(first.privateApiKey,PRIVATE_KEY);
@@ -49,7 +49,7 @@ test('private key configured in the web persists and is restored for the mobile 
 
 test('validated private credential immediately activates the private route',async t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sofia-filter-activate-'));
-  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  t.after(()=>(()=>{try{fs.rmSync(dir,{recursive:true,force:true,maxRetries:10,retryDelay:200});}catch{}})());
   const store=new Store(path.join(dir,'data','sofia.sqlite'));
   t.after(()=>{try{store.close();}catch{}});
   const cfg={...config(dir,''),root:dir};

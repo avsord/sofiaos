@@ -1,0 +1,421 @@
+{
+ "appProps": {
+  "pageProps": {
+   "initialState": {
+    "id": "MLB42258825",
+    "filters": "item_id:MLB5296520523",
+    "components": {
+     "header": {
+      "title": "Fone de Ouvido Shokz OpenRun Pro 2 Sem Fio Condução Óssea Esporte Preto",
+      "reviews": {
+       "rating": 4.9,
+       "amount": 221
+      },
+      "subtitle": "Novo  |  +100 vendidos"
+     },
+     "price": {
+      "state": "VISIBLE",
+      "price": {
+       "type": "price",
+       "value": 1412.83,
+       "currency_symbol": "R$",
+       "currency_id": "BRL",
+       "billing": false,
+       "original_value_color": "GRAY",
+       "layout_specs": {
+        "margin_top": "size16"
+       },
+       "font_size": "XXLARGE",
+       "font_family": "SEMIBOLD"
+      }
+     },
+     "track": {
+      "melidata_event": {
+       "event_data": {
+        "item_id": "MLB5296520523",
+        "catalog_product_id": "MLB42258825",
+        "price": 1412.83,
+        "currency_id": "BRL",
+        "seller_id": 427963557,
+        "has_stock": true,
+        "item_condition": "new",
+        "quantity": 6,
+        "sold_quantity": 100,
+        "free_shipping": true,
+        "reputation_level": "4_light_green",
+        "power_seller_status": "silver",
+        "domain_id": "MLB-HEADPHONES",
+        "category_id": "MLB7457",
+        "seller_name": "TechPrime",
+        "credit_view_components": {
+         "pricing": {
+          "actual_price": 1412.83,
+          "recommended_methods": [
+           {
+            "id": "visa",
+            "issuer": "CREDIT_CARD",
+            "installments": 12,
+            "installment_amount": 137.15,
+            "installments_total": 1645.8,
+            "is_free_installment": false
+           }
+          ]
+         }
+        }
+       }
+      }
+     },
+     "main_actions": {
+      "form": {
+       "item_id": "MLB5296520523"
+      }
+     },
+     "bookmark": {
+      "item_id": "MLB5296520523"
+     },
+     "buy_box_offers": {
+      "items": [
+       {
+        "selected": false,
+        "item_id": "MLB6460681458",
+        "components": [
+         {
+          "id": "price",
+          "state": "VISIBLE",
+          "price": {
+           "type": "price",
+           "value": 1498.98,
+           "currency_symbol": "R$",
+           "currency_id": "BRL",
+           "billing": false,
+           "original_value_size": "XXSMALL",
+           "original_value_color": "GRAY",
+           "font_size": "LARGE",
+           "font_family": "SEMIBOLD"
+          },
+          "subtitles": [
+           {
+            "id": "pricing_price_subtitle",
+            "text": "10x {price_installments} sem juros"
+           },
+           {
+            "id": "seller",
+            "text": "Vendido por VALIMARTIGOSESPORTIVOS"
+           }
+          ]
+         }
+        ],
+        "title": {
+         "text": "Parcelamento sem juros"
+        }
+       },
+       {
+        "selected": true,
+        "item_id": "MLB5296520523",
+        "components": [
+         {
+          "id": "price",
+          "state": "VISIBLE",
+          "price": {
+           "type": "price",
+           "value": 1412.83,
+           "currency_symbol": "R$",
+           "currency_id": "BRL",
+           "billing": false,
+           "original_value_color": "GRAY",
+           "font_size": "XXLARGE",
+           "font_family": "SEMIBOLD"
+          }
+         }
+        ],
+        "title": {
+         "text": "Melhor preço"
+        }
+       }
+      ]
+     },
+     "seller_summary": {
+      "seller": {
+       "id": 427963557,
+       "name": "TechPrime"
+      },
+      "is_exclusive_official_store": false
+     },
+     "share": {
+      "permalink": "https://www.mercadolivre.com.br/fone-de-ouvido-shokz-openrun-pro-2-sem-fio-conducao-ossea-esporte-preto/p/MLB42258825?pdp_filters=item_id%3AMLB5296520523&matt_tool=38524122#origin=share&sid=share&wid=MLB5296520523"
+     },
+     "gallery": {
+      "pictures": [
+       {
+        "id": "820472-MLA99525270224_122025",
+        "width": 1200,
+        "height": 625
+       },
+       {
+        "id": "841974-MLA82430859633_022025",
+        "width": 1200,
+        "height": 484
+       },
+       {
+        "id": "831995-MLA82430859639_022025",
+        "width": 1200,
+        "height": 805
+       },
+       {
+        "id": "751343-MLA82430859647_022025",
+        "width": 1200,
+        "height": 833
+       },
+       {
+        "id": "994992-MLA82147883838_022025",
+        "width": 1171,
+        "height": 1200
+       }
+      ]
+     },
+     "breadcrumb": {
+      "categories": [
+       {
+        "label": {
+         "text": "Celulares e Telefones"
+        }
+       },
+       {
+        "label": {
+         "text": "Acessórios para Celulares"
+        }
+       },
+       {
+        "label": {
+         "text": "Fones de Ouvido"
+        }
+       }
+      ]
+     },
+     "others_products": {
+      "state": "VISIBLE",
+      "products": [
+       {
+        "title": {
+         "text": "18 produtos novos a partir de {price}",
+         "values": {
+          "price": {
+           "type": "price",
+           "value": 1277,
+           "currency_symbol": "R$"
+          }
+         }
+        }
+       }
+      ]
+     },
+     "bbw_alternatives": {
+      "state": "VISIBLE",
+      "items": [
+       {
+        "id": "MLB5343956368",
+        "product_tag": {
+         "text": "Melhor preço"
+        },
+        "seller": {
+         "id": "seller",
+         "type": "seller",
+         "state": "VISIBLE",
+         "title": "Vendido por",
+         "title_value": "HappyOutlet1",
+         "seller": {
+          "id": 740521218,
+          "name": "HappyOutlet1",
+          "reputation_level": "5_green"
+         }
+        },
+        "price": {
+         "price": {
+          "type": "price",
+          "value": 1277,
+          "original_value": 1909,
+          "currency_id": "BRL"
+         }
+        }
+       }
+      ]
+     },
+     "outside_variations": {
+      "pickers": [
+       {
+        "id": "COLOR",
+        "label": {
+         "text": "Cor:"
+        },
+        "products": [
+         {
+          "id": "MLB69202941",
+          "label": {
+           "text": "Laranja"
+          },
+          "decoration_type": "NONE",
+          "price": {
+           "value": 1412,
+           "currency_id": "BRL"
+          }
+         },
+         {
+          "id": "MLB47170556",
+          "label": {
+           "text": "Prateado"
+          },
+          "decoration_type": "NONE",
+          "price": {
+           "value": 1412,
+           "currency_id": "BRL"
+          }
+         },
+         {
+          "id": "MLB42258825",
+          "label": {
+           "text": "Preto"
+          },
+          "decoration_type": "SELECTED",
+          "price": {
+           "value": 1412,
+           "currency_id": "BRL"
+          }
+         }
+        ]
+       }
+      ]
+     },
+     "highlighted_specs_attrs": {
+      "components": [
+       {
+        "type": "technical_specifications",
+        "specs": [
+         {
+          "title": "Características principais",
+          "attributes": [
+           {
+            "id": "Marca",
+            "text": "Shokz"
+           },
+           {
+            "id": "Linha",
+            "text": "Sport"
+           },
+           {
+            "id": "Modelo",
+            "text": "OpenRun Pro 2"
+           },
+           {
+            "id": "Modelo alfanumérico",
+            "text": "AS800"
+           },
+           {
+            "id": "Cor",
+            "text": "Preto"
+           }
+          ]
+         },
+         {
+          "title": "Bateria",
+          "attributes": [
+           {
+            "id": "Duração máxima da bateria",
+            "text": "8 h"
+           }
+          ]
+         },
+         {
+          "title": "Resistência",
+          "attributes": [
+           {
+            "id": "Classificação IP",
+            "text": "IP67"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "shipping_section": {
+      "state": "VISIBLE",
+      "promises": {
+       "items": [
+        {
+         "id": "address_0",
+         "components": [
+          {
+           "id": "title",
+           "ui_type": "rich_text",
+           "parts": [
+            {
+             "type": "text",
+             "value": "Chegará entre 10 e 13/nov"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "id": "address_1",
+         "components": [
+          {
+           "id": "title",
+           "ui_type": "rich_text",
+           "parts": [
+            {
+             "type": "text",
+             "value": "Chegará entre 18 e 19/nov "
+            },
+            {
+             "type": "text",
+             "value": "grátis"
+            },
+            {
+             "type": "text",
+             "value": " "
+            },
+            {
+             "type": "currency",
+             "currency_id": "BRL",
+             "previous": true,
+             "price": 32.3
+            },
+            {
+             "type": "text",
+             "value": " "
+            },
+            {
+             "type": "currency",
+             "currency_id": "BRL",
+             "previous": false,
+             "price": 0
+            },
+            {
+             "type": "text",
+             "value": " por ser sua primeira compra"
+            }
+           ]
+          },
+          {
+           "ui_type": "rich_text",
+           "parts": [
+            {
+             "type": "action",
+             "value": "Mais detalhes e formas de entrega"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     },
+     "description": {
+      "content": "Experimente uma nova forma de ouvir com os Shokz OpenRun Pro 2, os fones de ouvido de condução óssea mais avançados da Shokz."
+     }
+    }
+   }
+  }
+ }
+}

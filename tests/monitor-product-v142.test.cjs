@@ -65,6 +65,8 @@ test('monitor antigo sem os campos novos continua salvável', t=>{
 test('queda percentual compara com a leitura anterior da MESMA loja, não de outra', t=>{
   const {core,store}=fixture(t);
   const m=monitor(core,{...NOVO_DO_APP,variant:'RTX 4070',preferred_url:'https://www.kabum.com.br/p/1',source_urls:'https://www.pichau.com.br/p/2',drop_percent:10});
+  // Collection now requires an active monitor; this test isolates the same-store rule.
+  core.workspace.save({...m,state:'active'},m.id);
   const at=(min)=>new Date(Date.now()-min*60000).toISOString();
   const obs=(source,price,min)=>core.workspace.observe(m.id,{price,variant:'RTX 4070',currency:'BRL',source,observed_at:at(min)});
   obs('https://www.kabum.com.br/p/1',3000,30);

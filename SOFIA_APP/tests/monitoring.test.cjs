@@ -113,3 +113,18 @@ test('gráfico: linha de referência (média, preço-alvo) entra na escala',()=>
  const g=m.chartGeometry([{id:'a',color:'#f00',points:[{t:T0,v:3000},{t:T0+H,v:3100}]}],{width:300,height:150,window:'all',mode:'price',now:T0+2*H,refs:[2000]});
  assert.ok(g.y0<=2000);assert.equal(g.refY.length,1);assert.ok(g.refY[0]>=0&&g.refY[0]<=150);
 });
+
+test('preço que nunca mudou não vira "menor preço": card único "Preço no período" e veredito "Preço estável"',()=>{
+ const one=mon({source_urls:''});
+ const rows=[row(K,846.76,0),row(K,846.76,30),row(K,846.76,60)];
+ const p=m.buildProduct(one,rows);
+ assert.equal(p.atLow,false,'mesmo preço sempre não é "menor preço já visto"');
+ const a=m.analyzeProduct(p,'all',T0+60*H);
+ assert.equal(a.flat,true);assert.equal(a.verdict.kind,'normal');assert.equal(a.verdict.title,'Preço estável');
+ // poucos dados continua "ainda conhecendo"
+ assert.equal(m.analyzeProduct(m.buildProduct(one,[row(K,846.76,0),row(K,846.76,1)]),'all',T0+2*H).verdict.kind,'unknown');
+ // quando o preço sobe e volta, aí sim é o menor já visto
+ const q=m.buildProduct(one,[row(K,846.76,0),row(K,900,30),row(K,846.76,60)]);
+ assert.equal(q.atLow,true);const b=m.analyzeProduct(q,'all',T0+60*H);
+ assert.equal(b.flat,false);assert.equal(b.verdict.kind,'great');
+});

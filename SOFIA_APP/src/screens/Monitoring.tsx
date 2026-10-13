@@ -15,11 +15,12 @@ import {Button, IconButton} from '../components/UI';
 import {PriceChart} from '../components/PriceChart';
 import {Spinner, LoadingLines} from '../components/Loading';
 import {readPrice, readLinks, USER_AGENT, DESKTOP_AGENT} from '../lib/price-reader';
-import {readDirect} from '../lib/price-direct';
+import {readStorePrice, identityOf, storedMLIdentity, isMercadoLivreUrl} from '../lib/price-direct';
+import type {MercadoLivreReading} from '../lib/mercado-livre-types';
 import {buildInjectedScript, parsePriceMessage} from '../lib/price-extractor';
 import type {StoreLink} from '../lib/price-extractor';
 import {fallbackSearchUrl} from '../lib/price-extractor';
-import {collectorState, onCollector, runCollection, loadProducts, recordPrice, clearIssue, issueKey} from '../lib/monitor-collector';
+import {collectorState, onCollector, runCollection, cancelCollection, loadProducts, recordPrice, clearIssue, issueKey} from '../lib/monitor-collector';
 import type {StoreIssue} from '../lib/monitor-collector';
 import {
   PRODUCT_COLORS, WINDOWS, DROP_CHOICES, INTERVALS, money, percent, since, storeName, hostOf, nextColor,
@@ -221,6 +222,10 @@ function AddProduct({api, used, existing, onClose, onCreated}: {api: SofiaApi; u
   const [url, setUrl] = useState(''), [step, setStep] = useState<'link' | 'reading' | 'review'>('link'), [error, setError] = useState('');
   const [title, setTitle] = useState(''), [candidates, setCandidates] = useState<Candidate[]>([]), [picked, setPicked] = useState<Candidate | null>(null);
   const [color] = useState(nextColor(used)), [busy, setBusy] = useState(false);
+  const [mlReading, setMlReading] = useState<MercadoLivreReading | undefined>();
+  const readController = React.useRef<AbortController | null>(null);
+  useEffect(() => () => readController.current?.abort(), []);
+
 
   async function paste() { const t = (await Clipboard.getStringAsync().catch(() => '')).trim(); const u = extractProductUrl(t); if (u) setUrl(u); else if (t) setError('Não achei um link no que foi copiado.'); }
   async function read() {
@@ -229,8 +234,15 @@ function AddProduct({api, used, existing, onClose, onCreated}: {api: SofiaApi; u
     if (existing.some(p => storesOf(p.monitor).some(s => s.url === clean))) { setError('Você já acompanha esse link.'); return; }
     setUrl(clean); setError(''); setStep('reading');
     // Leitor direto da loja primeiro (sem abrir página), igual à coleta automática.
-    const r = (await readDirect(clean).catch(() => null)) || (await readPrice(clean));
+    readController.current?.abort(); const controller = new AbortController(); readController.current = controller; setMlReading(undefined);
+    const r = await readStorePrice(clean, api, readPrice, {allowCatalogWinner: true, signal: controller.signal});
+    if (controller.signal.aborted) return;
     if (!r.ok) { setError(r.error + ' Você ainda pode acompanhar: a Sofia tenta ler de novo depois.'); setTitle(''); setCandidates([]); setPicked(null); setStep('review'); return; }
+    if (r.mercadoLivre) {
+      const reading = r.mercadoLivre;
+      if (existing.some(p => storesOf(p.monitor).some(s => storedMLIdentity(p.monitor.data.source_identities, s.url)?.identityKey === reading.identityKey))) {setError('Você já acompanha esse anúncio.'); setStep('link'); return;}
+      setMlReading(reading); setUrl(reading.normalizedUrl);
+    }
     setTitle(r.title.replace(/\s*[|–-]\s*(KaBuM!?|Mercado Livre|Pichau|Amazon\.com\.br|Magalu|AliExpress|Shopee).*$/i, '').trim());
     setCandidates(r.result.candidates);
     setPicked(r.result.best && !r.result.needsConfirmation ? r.result.best : null);
@@ -242,8 +254,8 @@ function AddProduct({api, used, existing, onClose, onCreated}: {api: SofiaApi; u
     try {
       const saved = await api.saveEntity({kind: 'monitor', title: name.slice(0, 200), content: '', area: 'Pessoal', state: 'active', privacy: 'private', tags: [],
         data: {method: 'product', variant: name.slice(0, 200), preferred_url: url, source_urls: '', discover: true, currency: 'BRL', interval_minutes: 360, new_low: true, line_color: color,
-          ...(picked ? {reader_memory: JSON.stringify({[url]: picked.origins.slice(0, 4)})} : {})}});
-      if (picked) await recordPrice(api, saved, url, picked.amount, '', []).catch(() => undefined);
+          ...(picked ? {reader_memory: JSON.stringify({[url]: picked.origins.slice(0, 4)})} : {}), ...(mlReading ? {source_identities: JSON.stringify({[url]: identityOf(mlReading)})} : {})}});
+      if (picked) await recordPrice(api, saved, url, picked.amount, '', [], '', mlReading).catch(() => undefined);
       onCreated(saved.id);
     } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
@@ -266,7 +278,7 @@ function AddProduct({api, used, existing, onClose, onCreated}: {api: SofiaApi; u
               </View>
               {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
               <Button title="Ler produto" disabled={!url.trim()} onPress={() => void read()} />
-              <Text style={{fontSize: 12, color: c.muted, lineHeight: 18}}>Funciona com KaBuM!, Mercado Livre, Pichau, Amazon, Magalu e a maioria das lojas. AliExpress e Shopee às vezes bloqueiam a leitura.</Text>
+              <Text style={{fontSize: 12, color: c.muted, lineHeight: 18}}>Mercado Livre é consultado no servidor, sem abrir a loja. Outras lojas usam o leitor interno. A loja pode recusar a consulta; nesse caso nenhum preço é inventado.</Text>
             </>
           ) : step === 'reading' ? (
             <View style={{alignItems: 'center', gap: 14, paddingVertical: 60}}>
@@ -281,6 +293,7 @@ function AddProduct({api, used, existing, onClose, onCreated}: {api: SofiaApi; u
                 <TextInput accessibilityLabel="Nome do produto" value={title} onChangeText={setTitle} placeholder="Nome do produto" placeholderTextColor={c.muted} multiline
                   style={{fontSize: 18, fontWeight: '700', color: c.text, padding: 0}} />
                 <Text style={{fontSize: 30, fontWeight: '800', color: c.text}}>{picked ? money(picked.amount) : '—'}</Text>
+                {mlReading ? <Text style={{fontSize: 13, color: c.muted}}>Vendedor: {mlReading.seller.name} · {mlReading.itemId}. Preço do produto, sem frete. Ao salvar, você confirma esta oferta.</Text> : null}
                 {!picked && candidates.length ? <Text style={{fontSize: 13, color: '#d9962b'}}>A página mostra mais de um valor. Toque no preço certo:</Text> : null}
                 {!picked && !candidates.length ? <Text style={{fontSize: 13, color: c.muted}}>Preço não encontrado agora. A Sofia tenta de novo nas próximas leituras.</Text> : null}
                 {candidates.length > 1 || (!picked && candidates.length) ? (
@@ -346,6 +359,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
   const readings = useMemo(() => allReadings(product), [product]);
 
   const patch = useCallback(async (data: Record<string, any>, extra: Partial<Entity> = {}, label = 'Salvo') => {
+    if ((extra.state && extra.state !== 'active') || data.preferred_url !== undefined || data.source_urls !== undefined) cancelCollection(api, monitor.id);
     setSaving('Salvando…'); setError('');
     try {
       const saved = await api.saveEntity({...monitor, ...extra, data: {...monitor.data, ...data}});
@@ -365,7 +379,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
   function remove() {
     Alert.alert('Parar de acompanhar?', `“${monitor.title}” e todo o histórico de preços serão apagados.`, [
       {text: 'Cancelar', style: 'cancel'},
-      {text: 'Apagar', style: 'destructive', onPress: () => { api.deleteEntity(monitor.id).then(onDeleted).catch(e => setError(errorText(e))); }},
+      {text: 'Apagar', style: 'destructive', onPress: () => { cancelCollection(api, monitor.id); api.deleteEntity(monitor.id).then(onDeleted).catch(e => setError(errorText(e))); }},
     ]);
   }
   // Comprou: vira despesa no Finanças (valor e loja do melhor preço) e o acompanhamento pausa.
@@ -398,8 +412,8 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
     const open = expanded && storeFocus === s.url;
     return (
       <View key={s.url} style={{borderTopWidth: i ? 1 : 0, borderColor: c.line}}>
-        <Pressable accessibilityRole="button" accessibilityLabel={(expanded ? 'Ver análise de ' : 'Abrir ') + s.name}
-          onPress={() => expanded ? setStoreFocus(f => f === s.url ? null : s.url) : void Linking.openURL(s.url)} onLongPress={() => setMenu(s)}
+        <Pressable accessibilityRole="button" accessibilityLabel={(expanded ? 'Ver análise de ' : 'Opções de ') + s.name}
+          onPress={() => expanded ? setStoreFocus(f => f === s.url ? null : s.url) : setMenu(s)} onLongPress={() => setMenu(s)}
           style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12}}>
           <View style={{width: 38, height: 38, borderRadius: 19, backgroundColor: sc + '26', alignItems: 'center', justifyContent: 'center'}}><Text style={{color: sc, fontWeight: '800'}}>{s.name.charAt(0)}</Text></View>
           <View style={{flex: 1, gap: 2}}>
@@ -408,7 +422,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
               {s.primary ? <Text style={{fontSize: 10, color: c.muted, borderWidth: 1, borderColor: c.line, borderRadius: 6, paddingHorizontal: 4}}>PRINCIPAL</Text> : null}
             </View>
             {iss?.kind === 'confirm' ? <Pressable onPress={() => setConfirm({store: s, issue: iss})}><Text style={{fontSize: 12, color: '#d9962b', fontWeight: '600'}}>Toque para confirmar o preço</Text></Pressable>
-              : iss?.kind === 'failed' ? <Pressable onPress={() => setViewer(s)}><Text style={{fontSize: 12, color: BAD}} numberOfLines={3}>Não consegui ler: {iss.error}</Text><Text style={{fontSize: 12, color: c.accent, fontWeight: '700'}}>Ver a página e ler daqui →</Text></Pressable>
+              : iss?.kind === 'failed' ? <Pressable onPress={() => setViewer(s)}><Text style={{fontSize: 12, color: BAD}} numberOfLines={3}>Não consegui ler: {iss.error}</Text><Text style={{fontSize: 12, color: c.accent, fontWeight: '700'}}>{isMercadoLivreUrl(s.url) ? 'Consultar no servidor →' : 'Ver a página e ler daqui →'}</Text></Pressable>
               : <Text style={{fontSize: 12, color: c.muted}}>{s.last ? 'lido ' + since(s.last.at) : 'ainda não lido'}{st && st.cheapestShare !== null && stores.length > 1 ? ' · mais barata ' + Math.round(st.cheapestShare * 100) + '% do tempo' : ''}</Text>}
           </View>
           <View style={{alignItems: 'flex-end', gap: 3}}>
@@ -501,8 +515,14 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
                 </View>
 
                 <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 10}}>
-                  <Stat label="Menor do período" value={a.min ? money(a.min.v, product.currency) : '—'} sub={a.min ? dateShort(a.min.t) : ''} color={GOOD} />
-                  <Stat label="Maior do período" value={a.max ? money(a.max.v, product.currency) : '—'} sub={a.max ? dateShort(a.max.t) : ''} color={BAD} />
+                  {a.flat && a.min ? (
+                    <Stat wide label="Preço no período" value={money(a.min.v, product.currency)} sub={'sem variação desde ' + dateShort(a.min.t)} />
+                  ) : (
+                    <>
+                      <Stat label="Menor do período" value={a.min ? money(a.min.v, product.currency) : '—'} sub={a.min ? dateShort(a.min.t) : ''} color={a.min ? GOOD : undefined} />
+                      <Stat label="Maior do período" value={a.max ? money(a.max.v, product.currency) : '—'} sub={a.max ? dateShort(a.max.t) : ''} color={a.max ? BAD : undefined} />
+                    </>
+                  )}
                   <Stat label="Agora vs média" value={a.vsAvg === null ? '—' : percent(a.vsAvg)} sub={a.avg !== null ? 'média ' + money(a.avg, product.currency) : ''} color={a.vsAvg === null ? undefined : a.vsAvg < 0 ? GOOD : a.vsAvg > 0 ? BAD : undefined} />
                   <Stat label="Mediana" value={a.median !== null ? money(a.median, product.currency) : '—'} sub="metade das leituras abaixo" />
                   <Stat label="Mudanças de preço" value={String(a.changes.length)} sub={a.changes.length ? 'última ' + dateShort(a.changes[0].t) : 'estável'} />
@@ -632,7 +652,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
             <Text style={{fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 6}}>{menu.name}</Text>
             <SheetItem label="Abrir na loja" onPress={() => { const u = menu.url; setMenu(null); void Linking.openURL(u); }} />
             <SheetItem label="Ler o preço agora" onPress={() => { setMenu(null); readNow(); }} />
-            <SheetItem label="Ver a página que a Sofia lê" onPress={() => { const s = menu; setMenu(null); setViewer(s); }} />
+            <SheetItem label={isMercadoLivreUrl(menu.url) ? "Ler pelo servidor" : "Ver a página que a Sofia lê"} onPress={() => { const s = menu; setMenu(null); setViewer(s); }} />
             <SheetItem label="Trocar o link" onPress={() => { const s = menu; setMenu(null); setRelink({store: s, text: s.url, error: ''}); }} />
             {!menu.primary ? <SheetItem label="Tornar loja principal" onPress={() => { const u = menu.url; setMenu(null); void patch(makePrimary(monitor, u)); }} /> : null}
             {product.stores.length > 1 ? <SheetItem danger label="Remover esta loja" onPress={() => { const u = menu.url; setMenu(null); void patch(removeSource(monitor, u)); }} />
@@ -767,10 +787,10 @@ function DropSimulator({drop, stores, currency, onChange}: {drop: number; stores
   );
 }
 
-function Stat({label, value, sub, color}: {label: string; value: string; sub?: string; color?: string}) {
+function Stat({label, value, sub, color, wide}: {label: string; value: string; sub?: string; color?: string; wide?: boolean}) {
   const c = useTheme();
   return (
-    <View style={{flexGrow: 1, flexBasis: '46%', backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.line, padding: 12, gap: 2}}>
+    <View style={{flexGrow: 1, flexBasis: wide ? '100%' : '46%', backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.line, padding: 12, gap: 2}}>
       <Text style={{fontSize: 11, color: c.muted}}>{label}</Text>
       <Text numberOfLines={1} adjustsFontSizeToFit style={{fontSize: 16, fontWeight: '800', color: color || c.text}}>{value}</Text>
       {sub ? <Text style={{fontSize: 10, color: c.muted}}>{sub}</Text> : null}
@@ -907,7 +927,37 @@ function AddStores({api, monitor, onClose, onAdded}: {api: SofiaApi; monitor: En
 // endereço e mesmo tipo de navegador da leitura escondida). Se a loja pedir
 // verificação, aceite de cookies ou login, a pessoa resolve aqui uma vez — os
 // cookies ficam no aparelho e as próximas leituras escondidas passam a funcionar.
-function PageViewer({api, monitor, store, onClose, onSaved}: {api: SofiaApi; monitor: Entity; store: StoreSeries; onClose: () => void; onSaved: () => Promise<void>}) {
+function PageViewer(props: {api: SofiaApi; monitor: Entity; store: StoreSeries; onClose: () => void; onSaved: () => Promise<void>}) {
+  return isMercadoLivreUrl(props.store.url) ? <MercadoLivrePreview {...props} /> : <StorePageViewer {...props} />;
+}
+function MercadoLivrePreview({api, monitor, store, onClose, onSaved}: {api: SofiaApi; monitor: Entity; store: StoreSeries; onClose: () => void; onSaved: () => Promise<void>}) {
+  const c = useTheme(), controller = React.useRef<AbortController | null>(null);
+  const [reading, setReading] = useState<MercadoLivreReading | null>(null), [status, setStatus] = useState(''), [busy, setBusy] = useState(false);
+  useEffect(() => () => controller.current?.abort(), []);
+  async function read() {
+    controller.current?.abort(); const abort = new AbortController(); controller.current = abort;
+    setBusy(true); setReading(null); setStatus('Consultando a Sofia, sem abrir o Mercado Livre…');
+    const r = await readStorePrice(store.url, api, readPrice, {monitorId: monitor.id, signal: abort.signal, expectedSellerId: storedMLIdentity(monitor.data.source_identities, store.url)?.sellerId});
+    if (abort.signal.aborted) return;
+    if (r.ok && r.mercadoLivre) {setReading(r.mercadoLivre); setStatus('Confira a oferta abaixo.');}
+    else setStatus(r.ok ? 'O servidor não retornou a identidade da oferta.' : ((r.code ? r.code + ': ' : '') + r.error));
+    setBusy(false);
+  }
+  async function save() {
+    if (!reading) return; setBusy(true);
+    try {await recordPrice(api, monitor, store.url, reading.amountCents / 100, api.owner, undefined, store.name, reading); await onSaved();}
+    catch (e) {setStatus(errorText(e));} finally {setBusy(false);}
+  }
+  return <MotionModal visible animationType="slide" onRequestClose={onClose}><View style={{flex: 1, backgroundColor: c.bg}}>
+    <Header title="Mercado Livre · leitura no servidor" onClose={onClose} />
+    <View style={{padding: 20, gap: 16}}>
+      <Text style={{color: c.muted}}>A página é lida como texto. Nenhum navegador ou aplicativo da loja será aberto por esta consulta.</Text>
+      {status ? <Text style={{color: c.text}}>{status}</Text> : null}
+      {reading ? <><Text style={{color: c.text, fontSize: 19, fontWeight: '700'}}>{reading.title}</Text><Text style={{color: c.text}}>Vendedor: {reading.seller.name} · {reading.itemId}</Text><Text style={{color: c.text, fontSize: 28}}>{money(reading.amountCents / 100, 'BRL')}</Text><Text style={{color: c.muted}}>Preço sem frete. Lido em {new Date(reading.observedAt).toLocaleString('pt-BR')}.</Text><Button title="Confirmar esta leitura" loading={busy} onPress={() => void save()} /></> : <Button title="Ler preço no servidor" loading={busy} onPress={() => void read()} />}
+    </View></View></MotionModal>;
+}
+
+function StorePageViewer({api, monitor, store, onClose, onSaved}: {api: SofiaApi; monitor: Entity; store: StoreSeries; onClose: () => void; onSaved: () => Promise<void>}) {
   const c = useTheme(), ref = React.useRef<any>(null);
   const [status, setStatus] = useState(''), [cands, setCands] = useState<Candidate[]>([]), [busy, setBusy] = useState(false);
   const WebView = require('react-native-webview').default;
@@ -932,7 +982,7 @@ function PageViewer({api, monitor, store, onClose, onSaved}: {api: SofiaApi; mon
         <Header title={store.name + ' · como a Sofia vê'} onClose={onClose} />
         <View style={{flex: 1}}>
           <WebView ref={ref} source={{uri: target}} userAgent={agent} javaScriptEnabled domStorageEnabled sharedCookiesEnabled thirdPartyCookiesEnabled
-            originWhitelist={['*']} onShouldStartLoadWithRequest={(req: any) => /^https?:\/\//i.test(String(req?.url || ''))} setSupportMultipleWindows={false} javaScriptCanOpenWindowsAutomatically={false}
+            originWhitelist={['*']} onShouldStartLoadWithRequest={(req: any) => /^https?:\/\//i.test(String(req?.url || '')) && !isMercadoLivreUrl(String(req?.url || ''))} setSupportMultipleWindows={false} javaScriptCanOpenWindowsAutomatically={false}
             onMessage={(e: any) => onMessage(e.nativeEvent.data)} />
         </View>
         <View style={{padding: 14, gap: 10, borderTopWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>

@@ -34,6 +34,6 @@ function createRuntime(config,options={}){
  const scheduler=new Scheduler(workspace,options.schedulerOptions);
  const {GoogleService}=require('../services/google');const google=options.google||new GoogleService(store,workspace,config,{backups,fetchImpl:options.googleFetch,env:options.googleEnv});
  const {MailWatcher}=require('../services/mail-watch');const mailWatch=options.mailWatch||new MailWatcher(workspace,config,options.mailOptions||{});mailWatch.google=google;
- const runtime={store,backups,core,config,workspace,routing,usageService,audioService,vault,scheduler,mailWatch,google,ownerAuth:options.ownerAuth,accountMailer:options.accountMailer};runtime.handler=createHandler(runtime);return runtime;
+ const runtime={mercadoLivreOptions:options.mercadoLivreOptions,store,backups,core,config,workspace,routing,usageService,audioService,vault,scheduler,mailWatch,google,ownerAuth:options.ownerAuth,accountMailer:options.accountMailer};runtime.handler=createHandler(runtime);return runtime;
 }
 module.exports={createRuntime,contextLookup};

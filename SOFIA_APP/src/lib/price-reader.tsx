@@ -1,3 +1,4 @@
+import {isMercadoLivreUrl} from './price-provider';
 import React, {useEffect, useState} from 'react';
 import {View} from 'react-native';
 import {buildInjectedScript, parsePriceMessage, buildLinksScript, parseLinksMessage} from './price-extractor';
@@ -56,11 +57,13 @@ function enqueue(job: Job) {
 }
 
 export function readPrice(url: string): Promise<PriceReaderMessage> {
+  if (isMercadoLivreUrl(url)) return Promise.resolve({ok: false, error: 'Mercado Livre é lido pelo servidor, nunca pela WebView.'});
   // O link guardado não muda; só o endereço aberto pelo leitor é limpo/ajustado por loja.
   const target = readerUrl(url);
   return new Promise(resolve => enqueue({id: ++seq, kind: 'price', url: target, resolve}));
 }
 export function readLinks(url: string, target: string, exclude: string, terms = ''): Promise<LinksReaderMessage> {
+  if (isMercadoLivreUrl(url)) return Promise.resolve({ok: false, error: 'A busca de links do Mercado Livre não usa navegação automática.'});
   return new Promise(resolve => enqueue({id: ++seq, kind: 'links', url, target, exclude, terms, resolve}));
 }
 export function readerBusy() { return !!current || queue.length > 0; }
@@ -99,7 +102,7 @@ export function PriceReaderHost() {
         // era isso que abria o app do Mercado Livre (meli://, intent://). Com '*' tudo passa
         // pela regra de baixo, que só deixa carregar http(s) e recusa o resto em silêncio.
         originWhitelist={['*']}
-        onShouldStartLoadWithRequest={(req: any) => /^https?:\/\//i.test(String(req?.url || ''))}
+        onShouldStartLoadWithRequest={(req: any) => /^https?:\/\//i.test(String(req?.url || '')) && !isMercadoLivreUrl(String(req?.url || ''))}
         javaScriptCanOpenWindowsAutomatically={false}
         // Mesmos cookies da página aberta à mão em 'Ver a página que a Sofia lê':
         // verificação ou aceite feitos lá passam a valer para a leitura escondida.

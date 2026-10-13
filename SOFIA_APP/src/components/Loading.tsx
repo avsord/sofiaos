@@ -1,7 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {Animated, Easing, StyleSheet, Text, View} from 'react-native';
-import Svg, {Circle} from 'react-native-svg';
-import {useTheme} from '../lib/theme';
+import Svg, {Circle, Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
+import {useTheme, dark} from '../lib/theme';
 
 /** Anel fino girando, como o do Notion: discreto, cinza, sem a rodinha grossa
  * e colorida do Android. O arco ocupa 3/4 do círculo. */
@@ -86,6 +86,45 @@ export function PageLoading({title, eyebrow, label, rows = 4, testID}: {title?: 
         <Text style={{color: c.text, fontSize: 13, fontWeight: '600'}}>{label || 'Carregando'}</Text>
       </View>
       <LoadingLines rows={rows} />
+    </View>
+  );
+}
+
+/** Reflexo que atravessa os blocos do esqueleto (estilo Facebook/LinkedIn).
+ * Um único valor animado para a tela toda: todos os blocos brilham juntos e o
+ * custo é de uma animação só, no thread nativo. Roda mesmo com "remover
+ * animações" ligado — é sinal de carregamento, não enfeite (pedido do dono). */
+const ShimmerContext = React.createContext<Animated.Value | null>(null);
+export function ShimmerGroup({children, duration = 1300}: {children: React.ReactNode; duration?: number}) {
+  const x = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.timing(x, {toValue: 1, duration, easing: Easing.inOut(Easing.quad), useNativeDriver: true}));
+    loop.start();
+    return () => loop.stop();
+  }, [x, duration]);
+  return <ShimmerContext.Provider value={x}>{children}</ShimmerContext.Provider>;
+}
+const BAND = 140, TRAVEL = 520;
+export function ShimmerBlock({width, height, radius = 6, style}: {width: number | string; height: number; radius?: number; style?: any}) {
+  const c = useTheme(), x = React.useContext(ShimmerContext);
+  const shine = c.bg === dark.bg ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.75)';
+  return (
+    <View style={[{width: width as any, height, borderRadius: radius, backgroundColor: c.line, overflow: 'hidden'}, style]}>
+      {x ? (
+        <Animated.View pointerEvents="none" style={{position: 'absolute', top: 0, bottom: 0, width: BAND,
+          transform: [{translateX: x.interpolate({inputRange: [0, 1], outputRange: [-BAND, TRAVEL]})}]}}>
+          <Svg width={BAND} height="100%">
+            <Defs>
+              <LinearGradient id="sofiaShimmer" x1="0" y1="0" x2="1" y2="0">
+                <Stop offset="0" stopColor={shine} stopOpacity="0" />
+                <Stop offset="0.5" stopColor={shine} stopOpacity="1" />
+                <Stop offset="1" stopColor={shine} stopOpacity="0" />
+              </LinearGradient>
+            </Defs>
+            <Rect x="0" y="0" width={BAND} height="100%" fill="url(#sofiaShimmer)" />
+          </Svg>
+        </Animated.View>
+      ) : null}
     </View>
   );
 }

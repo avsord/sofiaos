@@ -5,5 +5,5 @@ test('086 native entrance is smooth, monotonic and shares its system clock at ha
  try {
   cp.execFileSync('java',['-m','jdk.compiler/com.sun.tools.javac.Main','-d',tmp,path.join(app,'plugins/native/SofiaLaunchMotion.java'),path.join(__dirname,'native/SofiaLaunchMotionTest.java')],{stdio:'pipe'});
   assert.match(cp.execFileSync('java',['-cp',tmp,'com.avsord.sofiaapp.SofiaLaunchMotionTest'],{encoding:'utf8'}),/native motion passed/);
- } finally { fs.rmSync(tmp,{recursive:true,force:true}); }
+ } finally { (()=>{try{fs.rmSync(tmp,{recursive:true,force:true,maxRetries:10,retryDelay:200});}catch{}})(); }
 });

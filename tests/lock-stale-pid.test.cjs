@@ -8,7 +8,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const {acquireLock}=require('../src/core/lock');
 
-function dir(t){const d=fs.mkdtempSync(path.join(os.tmpdir(),'lock-stale-'));t.after(()=>fs.rmSync(d,{recursive:true,force:true}));return d;}
+function dir(t){const d=fs.mkdtempSync(path.join(os.tmpdir(),'lock-stale-'));t.after(()=>(()=>{try{fs.rmSync(d,{recursive:true,force:true,maxRetries:10,retryDelay:200});}catch{}})());return d;}
 function writeLock(d,data){fs.mkdirSync(d,{recursive:true});fs.writeFileSync(path.join(d,'server.lock'),JSON.stringify(data),{mode:0o600});}
 
 test('trava antiga com o MESMO pid do processo atual (reinício de contêiner) e idade alta: não bloqueia mais',t=>{
