@@ -15,8 +15,8 @@ type Job =
 const TIMEOUT_MS = 26000;
 // Navegador de celular comum: algumas lojas recusam ou mudam a página quando
 // percebem a WebView padrão do Android.
-const USER_AGENT = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36';
-const DESKTOP_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36';
+export const USER_AGENT = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36';
+export const DESKTOP_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36';
 const queue: Job[] = [];
 let current: Job | null = null, seq = 0, hosts = 0, startedAt = 0;
 // Diagnóstico: só domínio, tempo e resultado de cada página — nunca o link
@@ -101,6 +101,10 @@ export function PriceReaderHost() {
         originWhitelist={['*']}
         onShouldStartLoadWithRequest={(req: any) => /^https?:\/\//i.test(String(req?.url || ''))}
         javaScriptCanOpenWindowsAutomatically={false}
+        // Mesmos cookies da página aberta à mão em 'Ver a página que a Sofia lê':
+        // verificação ou aceite feitos lá passam a valer para a leitura escondida.
+        sharedCookiesEnabled
+        thirdPartyCookiesEnabled
         allowsLinkPreview={false}
         domStorageEnabled
         setSupportMultipleWindows={false}

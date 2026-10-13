@@ -14,14 +14,15 @@ import {Icon} from '../components/Icon';
 import {Button, IconButton} from '../components/UI';
 import {PriceChart} from '../components/PriceChart';
 import {Spinner, LoadingLines} from '../components/Loading';
-import {readPrice, readLinks} from '../lib/price-reader';
+import {readPrice, readLinks, USER_AGENT, DESKTOP_AGENT} from '../lib/price-reader';
+import {buildInjectedScript, parsePriceMessage} from '../lib/price-extractor';
 import type {StoreLink} from '../lib/price-extractor';
 import {fallbackSearchUrl} from '../lib/price-extractor';
 import {collectorState, onCollector, runCollection, loadProducts, recordPrice, clearIssue, issueKey} from '../lib/monitor-collector';
 import type {StoreIssue} from '../lib/monitor-collector';
 import {
   PRODUCT_COLORS, WINDOWS, DROP_CHOICES, INTERVALS, money, percent, since, storeName, hostOf, nextColor,
-  alertsOf, alertSummary, analyzeProduct, allReadings, searchTerms, extractProductUrl, replaceSource, searchTargetsFor, addSource, removeSource, makePrimary, withMemory, storesOf,
+  alertsOf, alertSummary, analyzeProduct, allReadings, searchTerms, extractProductUrl, replaceSource, readerUrl, readerAgent, searchTargetsFor, addSource, removeSource, makePrimary, withMemory, storesOf,
 } from '../lib/monitoring';
 import type {ProductSeries, Window, Candidate, StoreSeries} from '../lib/monitoring';
 
@@ -334,6 +335,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
   const [confirm, setConfirm] = useState<{store: StoreSeries; issue: Extract<StoreIssue, {kind: 'confirm'}>} | null>(null);
   const [menu, setMenu] = useState<StoreSeries | null>(null), [rename, setRename] = useState(product.monitor.title), [target, setTarget] = useState('');
   const [relink, setRelink] = useState<{store: StoreSeries; text: string; error: string} | null>(null), [productMenu, setProductMenu] = useState(false);
+  const [viewer, setViewer] = useState<StoreSeries | null>(null);
   const [showAll, setShowAll] = useState(false), [storeFocus, setStoreFocus] = useState<string | null>(null);
   useEffect(() => { setMonitor(product.monitor); }, [product.monitor]);
   const alerts = alertsOf(monitor);
@@ -404,7 +406,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
               {s.primary ? <Text style={{fontSize: 10, color: c.muted, borderWidth: 1, borderColor: c.line, borderRadius: 6, paddingHorizontal: 4}}>PRINCIPAL</Text> : null}
             </View>
             {iss?.kind === 'confirm' ? <Pressable onPress={() => setConfirm({store: s, issue: iss})}><Text style={{fontSize: 12, color: '#d9962b', fontWeight: '600'}}>Toque para confirmar o preço</Text></Pressable>
-              : iss?.kind === 'failed' ? <Text style={{fontSize: 12, color: BAD}} numberOfLines={2}>Não consegui ler: {iss.error}</Text>
+              : iss?.kind === 'failed' ? <Pressable onPress={() => setViewer(s)}><Text style={{fontSize: 12, color: BAD}} numberOfLines={3}>Não consegui ler: {iss.error}</Text><Text style={{fontSize: 12, color: c.accent, fontWeight: '700'}}>Ver a página e ler daqui →</Text></Pressable>
               : <Text style={{fontSize: 12, color: c.muted}}>{s.last ? 'lido ' + since(s.last.at) : 'ainda não lido'}{st && st.cheapestShare !== null && stores.length > 1 ? ' · mais barata ' + Math.round(st.cheapestShare * 100) + '% do tempo' : ''}</Text>}
           </View>
           <View style={{alignItems: 'flex-end', gap: 3}}>
@@ -628,6 +630,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
             <Text style={{fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 6}}>{menu.name}</Text>
             <SheetItem label="Abrir na loja" onPress={() => { const u = menu.url; setMenu(null); void Linking.openURL(u); }} />
             <SheetItem label="Ler o preço agora" onPress={() => { setMenu(null); readNow(); }} />
+            <SheetItem label="Ver a página que a Sofia lê" onPress={() => { const s = menu; setMenu(null); setViewer(s); }} />
             <SheetItem label="Trocar o link" onPress={() => { const s = menu; setMenu(null); setRelink({store: s, text: s.url, error: ''}); }} />
             {!menu.primary ? <SheetItem label="Tornar loja principal" onPress={() => { const u = menu.url; setMenu(null); void patch(makePrimary(monitor, u)); }} /> : null}
             {product.stores.length > 1 ? <SheetItem danger label="Remover esta loja" onPress={() => { const u = menu.url; setMenu(null); void patch(removeSource(monitor, u)); }} />
@@ -643,6 +646,8 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
         setStoreSheet(false);
         if (saved) void runCollection(api, {only: saved.id, scope: api.owner});
       }} /> : null}
+
+      {viewer ? <PageViewer api={api} monitor={monitor} store={viewer} onClose={() => setViewer(null)} onSaved={async () => { setViewer(null); clearIssue(issueKey(monitor.id, viewer.url)); await onChanged(); }} /> : null}
 
       <Sheet visible={productMenu} onClose={() => setProductMenu(false)} label="Fechar opções do produto">
         <View style={{gap: 2}}>
@@ -892,6 +897,52 @@ function AddStores({api, monitor, onClose, onAdded}: {api: SofiaApi; monitor: En
           </View>
         ) : null}
       </KeyboardAvoidingView>
+    </MotionModal>
+  );
+}
+
+// Página que a Sofia lê, VISÍVEL: mostra exatamente o que a loja devolve (mesmo
+// endereço e mesmo tipo de navegador da leitura escondida). Se a loja pedir
+// verificação, aceite de cookies ou login, a pessoa resolve aqui uma vez — os
+// cookies ficam no aparelho e as próximas leituras escondidas passam a funcionar.
+function PageViewer({api, monitor, store, onClose, onSaved}: {api: SofiaApi; monitor: Entity; store: StoreSeries; onClose: () => void; onSaved: () => Promise<void>}) {
+  const c = useTheme(), ref = React.useRef<any>(null);
+  const [status, setStatus] = useState(''), [cands, setCands] = useState<Candidate[]>([]), [busy, setBusy] = useState(false);
+  const WebView = require('react-native-webview').default;
+  const target = readerUrl(store.url), agent = readerAgent(target) === 'desktop' ? DESKTOP_AGENT : USER_AGENT;
+  async function save(cand: Candidate) {
+    setBusy(true);
+    try {
+      const saved = await api.saveEntity({...monitor, data: {...monitor.data, reader_memory: withMemory(monitor, store.url, cand.origins)}});
+      await recordPrice(api, saved, store.url, cand.amount, api.owner, undefined, store.name);
+      await onSaved();
+    } catch (e) { setStatus(errorText(e)); } finally { setBusy(false); }
+  }
+  function onMessage(raw: string) {
+    const r = parsePriceMessage(raw);
+    if (!r.ok) { setStatus('Não consegui ler: ' + r.error); return; }
+    if (!r.result.candidates.length) { setStatus('Esta página não mostra preço que a Sofia reconheça' + (r.title ? ' (título: "' + r.title.slice(0, 60) + '")' : '') + '. Se for o produto certo, role até o preço e tente de novo.'); return; }
+    setCands(r.result.candidates); setStatus(r.result.needsConfirmation ? 'Toque no preço certo:' : 'Encontrei o preço. Confirme:');
+  }
+  return (
+    <MotionModal visible animationType="slide" onRequestClose={onClose}>
+      <View style={{flex: 1, backgroundColor: c.bg}}>
+        <Header title={store.name + ' · como a Sofia vê'} onClose={onClose} />
+        <View style={{flex: 1}}>
+          <WebView ref={ref} source={{uri: target}} userAgent={agent} javaScriptEnabled domStorageEnabled sharedCookiesEnabled thirdPartyCookiesEnabled
+            originWhitelist={['*']} onShouldStartLoadWithRequest={(req: any) => /^https?:\/\//i.test(String(req?.url || ''))} setSupportMultipleWindows={false} javaScriptCanOpenWindowsAutomatically={false}
+            onMessage={(e: any) => onMessage(e.nativeEvent.data)} />
+        </View>
+        <View style={{padding: 14, gap: 10, borderTopWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
+          {status ? <Text style={{color: c.text, fontSize: 13}}>{status}</Text> : <Text style={{color: c.muted, fontSize: 12}}>Se aparecer verificação, aviso de cookies ou "abrir no app", resolva por aqui (sem sair). Quando o produto e o preço aparecerem, toque em Ler preço.</Text>}
+          {cands.length ? <View style={{gap: 8}}>{cands.slice(0, 4).map((cand, i) => (
+            <Pressable key={i} disabled={busy} onPress={() => void save(cand)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: c.line}}>
+              <Text style={{fontWeight: '700', color: c.text}}>{money(cand.amount, cand.currency || 'BRL')}</Text>
+              <Text style={{flex: 1, fontSize: 11, color: c.muted}} numberOfLines={1}>{cand.origins.join(' · ')}</Text>
+            </Pressable>))}</View> : null}
+          <Button title="Ler preço desta página" loading={busy} onPress={() => { setCands([]); setStatus('Lendo…'); ref.current?.injectJavaScript(buildInjectedScript()); }} />
+        </View>
+      </View>
     </MotionModal>
   );
 }
