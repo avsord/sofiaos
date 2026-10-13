@@ -135,7 +135,10 @@ function makeMobileApi(runtime, deps) {
       for (let offset = 0; offset < 5000; offset += 500) { const page = workspace.list({ kind: 'monitor', limit: 500, offset }); for (const mon of page) if (mon.state !== 'archived') out[mon.id] = workspace.observations(mon.id); if (page.length < 500) break; }
       return send({ items: out });
     }
-    // Finanças: os 5 tipos numa resposta só (antes: 5+ pedidos paginados de 100).
+    // Finanças: os 5 tipos numa resposta só. Com ?from=AAAA-MM&to=AAAA-MM manda só os
+    // lançamentos da janela (+ recorrentes e não pagos, que valem para qualquer mês) e o
+    // "saldo acumulado" de cada conta até o início da janela: o app soma esse acumulado ao
+    // saldo inicial e todos os cálculos continuam certos sem precisar do histórico inteiro.
     if (p === '/api/mobile/md/finance' && m === 'GET') {
       const out = {};
       for (const kind of ['fin_account', 'fin_card', 'fin_tx', 'fin_budget', 'fin_goal']) {
@@ -143,7 +146,33 @@ function makeMobileApi(runtime, deps) {
         for (let offset = 0; offset < 50000; offset += 500) { const page = workspace.list({ kind, limit: 500, offset }); list.push(...page); if (page.length < 500) break; }
         out[kind] = list;
       }
-      return send({ items: out, at: new Date().toISOString() });
+      const from = /^\d{4}-\d{2}$/.test(url.searchParams.get('from') || '') ? url.searchParams.get('from') : '', to = /^\d{4}-\d{2}$/.test(url.searchParams.get('to') || '') ? url.searchParams.get('to') : '';
+      let carry = {}, window = null;
+      if (from && to && from <= to) {
+        const start = from + '-01', end = to + '-31';
+        const all = out.fin_tx.filter(e => e.state !== 'archived');
+        const effect = (t, accountId) => {
+          const d = t.data || {}; if (d.paid === false) return 0; const amount = Number(d.amount || 0);
+          if (d.kind === 'income' && d.account_id === accountId) return amount;
+          if (d.kind === 'expense' && !d.card_id && d.account_id === accountId) return -amount;
+          if (d.kind === 'card_payment' && d.account_id === accountId) return -amount;
+          if (d.kind === 'transfer') return (d.to_account_id === accountId ? amount : 0) - (d.account_id === accountId ? amount : 0);
+          return 0;
+        };
+        for (const a of out.fin_account) carry[a.id] = Math.round(all.filter(t => String(t.data?.date || '') < start).reduce((s, t) => s + effect(t, a.id), 0) * 100) / 100;
+        out.fin_tx = all.filter(t => { const d = t.data || {}; const date = String(d.date || ''); return (date >= start && date <= end) || (d.recurrence && d.recurrence !== 'none') || d.paid === false || (d.invoice_month && d.invoice_month >= from && d.invoice_month <= to); });
+        window = { from, to };
+      }
+      return send({ items: out, carry, window, at: new Date().toISOString() });
+    }
+    // Importar extrato (OFX/CSV): prévia e gravação. O arquivo vem como texto (até 5 MB).
+    if (p === '/api/mobile/md/finance/import' && m === 'POST') {
+      const b = await bodyJson(req, 5 * 1024 * 1024);
+      return send(require('../services/bank-import').preview(workspace, { text: String(b.text || ''), target: b.target === 'card' ? 'card' : 'account', target_id: String(b.target_id || '') }));
+    }
+    if (p === '/api/mobile/md/finance/import/commit' && m === 'POST') {
+      const b = await bodyJson(req, 5 * 1024 * 1024);
+      return send(require('../services/bank-import').commit(workspace, { items: b.items, target: b.target === 'card' ? 'card' : 'account', target_id: String(b.target_id || ''), privacy: 'private', source_id: null }));
     }
     if (p === '/api/mobile/md/dashboard') {
       const allowedWidgets = ['monitoring', 'tasks', 'capsules'];

@@ -1708,7 +1708,12 @@ const CATALOG={
         "label": "Repetir até (AAAA-MM)",
         "type": "text",
         "max": 7
-      }
+      },
+        {
+          "key": "import_id",
+          "label": "Identificador da importação (extrato)",
+          "type": "text"
+        }
     ],
     "description": "Despesa, receita, transferência ou pagamento de fatura."
   },

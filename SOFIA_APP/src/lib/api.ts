@@ -41,6 +41,7 @@ const apiFailures:Array<{at:string;path:string;method:string;status:number;code:
 function noteApiFailure(path:string,method:string,e:ApiError,ms:number){apiFailures.push({at:new Date().toISOString(),path:path.split('?')[0].slice(0,80),method,status:Number(e?.status)||0,code:String(e?.code||'?'),ms});if(apiFailures.length>40)apiFailures.shift();}
 export function apiDiagnostics(){return {recentFailures:apiFailures.slice(-25)};}
 export function startupSnapshotFor(scope:string){return new StartupSnapshot(encryptedStorage,SITE+'|'+scope.trim().toLowerCase()+'|startup-v1');}
+export type ImportItem = {import_id: string; date: string; desc: string; amount: number; kind: string; category: string; duplicate: boolean; skip: string};
 export class SofiaApi {
   private readonly md:LegacyMdAdapter;
   private readonly startupReads=new StartupReads();
@@ -211,7 +212,9 @@ export class SofiaApi {
   attachmentSource(id:string) { if(!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('Imagem inválida.');return {uri:SITE+'/api/mobile/workspace/attachments/'+encodeURIComponent(id)+'?inline=1',headers:{Authorization:'Bearer '+this.token}}; }
   entityAction(id: string, input: object) { return this.request<any>('/workspace/entities/' + encodeURIComponent(id) + '/action', input); }
   async libraryOrganization(){const items:Entity[]=[];for(let offset=0;;offset+=100){const page=await this.request<{items:Entity[]}>('/workspace/entities?group=library&limit=100&offset='+offset);items.push(...page.items);if(page.items.length<100)return {items};}}
-  financeBundle() { return this.request<{items: Record<string, Entity[]>; at: string}>('/md/finance', undefined, 'GET', 30000); }
+  financeImportPreview(text: string, target: 'account' | 'card', targetId: string) { return this.request<{format: string; items: ImportItem[]; total: number; duplicates: number}>('/md/finance/import', {text, target, target_id: targetId}, 'POST', 60000); }
+  financeImportCommit(items: ImportItem[], target: 'account' | 'card', targetId: string) { return this.request<{created: number; skipped: number}>('/md/finance/import/commit', {items, target, target_id: targetId}, 'POST', 60000); }
+  financeBundle(window?: {from: string; to: string}) { return this.request<{items: Record<string, Entity[]>; carry?: Record<string, number>; window?: {from: string; to: string} | null; at: string}>('/md/finance' + (window ? '?from=' + window.from + '&to=' + window.to : ''), undefined, 'GET', 30000); }
   monitorObservations() { return this.request<{items: Record<string, any[]>}>('/md/monitors/observations'); }
   observations(id: string) { return this.request<{items: any[];status?:{last_at:string|null;last_error:string|null;next_at:string|null}}>('/workspace/entities/' + encodeURIComponent(id) + '/observations'); }
   mailSecret(id: string, password: string) { return this.request<{ok: boolean; messages: number}>('/mail/accounts/' + encodeURIComponent(id) + '/secret', {password}, 'POST', 45000); }

@@ -1,9 +1,12 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Svg, {Path, Rect, Line} from 'react-native-svg';
 import {useTheme} from '../lib/theme';
 import {encryptedStorage} from '../lib/encrypted-storage';
+import * as DocumentPicker from 'expo-document-picker';
+import {File} from 'expo-file-system';
+import type {ImportItem} from '../lib/api';
 import type {SofiaApi} from '../lib/api';
 import type {Entity} from '../lib/types';
 import {errorText} from '../lib/chat-model';
@@ -32,14 +35,23 @@ const dateBR = (d: string) => d ? d.slice(8, 10) + '/' + d.slice(5, 7) : '';
 const weekday = (d: string) => new Date(d + 'T12:00:00Z').toLocaleDateString('pt-BR', {weekday: 'long', day: '2-digit', month: 'long', timeZone: 'UTC'});
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
-function toData(all: Record<string, Entity[]>): Data {
+type Bundle = {items: Record<string, Entity[]>; carry?: Record<string, number>; window?: {from: string; to: string} | null};
+/** Mês a mês: o servidor manda só os lançamentos da janela e o "saldo acumulado" de cada
+ * conta até o início dela. Somado ao saldo inicial, todos os cálculos (saldo, previsto,
+ * gráfico dia a dia) continuam exatos sem baixar o histórico inteiro. */
+function toData(all: Record<string, Entity[]>, carry: Record<string, number> = {}): Data {
   const g = (k: string) => all[k] || [];
-  return {accounts: g('fin_account').map(toAccount), cards: g('fin_card').map(toCard), txs: g('fin_tx').filter(e => e.state !== 'archived').map(toTx),
+  return {accounts: g('fin_account').map(toAccount).map(a => ({...a, initial: a.initial + (carry[a.id] || 0)})), cards: g('fin_card').map(toCard), txs: g('fin_tx').filter(e => e.state !== 'archived').map(toTx),
     budgets: g('fin_budget').filter(e => e.state !== 'archived').map(toBudget), goals: g('fin_goal').filter(e => e.state !== 'archived').map(toGoal)};
 }
-/** Um pedido só ao servidor; servidor antigo cai nos pedidos por tipo, em paralelo. */
-async function loadAll(api: SofiaApi): Promise<Record<string, Entity[]>> {
-  try { return (await api.financeBundle()).items; }
+/** Janela de meses que cada aba precisa: Resumo/Lançamentos/Cartões/Planejamento = mês anterior
+ * ao próximo (previsto, fatura, "a pagar"); Relatórios = 6 meses (tendência). */
+export function financeWindow(month: string, tab: string): {from: string; to: string} {
+  return tab === 'reports' ? {from: addMonths(month, -5), to: addMonths(month, 1)} : {from: addMonths(month, -1), to: addMonths(month, 1)};
+}
+/** Um pedido só ao servidor (com janela); servidor antigo (sem janela) devolve tudo, e o mais antigo ainda cai nos pedidos por tipo. */
+async function loadAll(api: SofiaApi, window: {from: string; to: string}): Promise<Bundle> {
+  try { const r = await api.financeBundle(window); return {items: r.items, carry: r.carry || {}, window: r.window || null}; }
   catch (e) { if ((e as any)?.status !== 404) throw e; }
   const all: Record<string, Entity[]> = {};
   await Promise.all(KINDS.map(async kind => {
@@ -47,15 +59,15 @@ async function loadAll(api: SofiaApi): Promise<Record<string, Entity[]>> {
     for (let offset = 0; ; offset += 100) { const r = await api.entities(kind, '', offset); list.push(...r.items); if (r.items.length < 100) break; }
     all[kind] = list;
   }));
-  return all;
+  return {items: all, carry: {}, window: null};
 }
 // Última versão guardada no aparelho, CRIPTOGRAFADA (Keystore do Android):
 // o Finanças abre na hora com ela e se atualiza por trás.
 const cacheScope = (api: SofiaApi) => 'sofia-finance-v1|' + api.owner.trim().toLowerCase();
-async function readCache(api: SofiaApi): Promise<Record<string, Entity[]> | null> {
-  try { const raw = await encryptedStorage.read(cacheScope(api)); const v = raw ? JSON.parse(raw) : null; return v && typeof v === 'object' ? v : null; } catch { return null; }
+async function readCache(api: SofiaApi): Promise<Bundle | null> {
+  try { const raw = await encryptedStorage.read(cacheScope(api)); const v = raw ? JSON.parse(raw) : null; return v && typeof v === 'object' && v.items ? v : null; } catch { return null; }
 }
-function writeCache(api: SofiaApi, all: Record<string, Entity[]>) { void encryptedStorage.write(cacheScope(api), JSON.stringify(all)).catch(() => undefined); }
+function writeCache(api: SofiaApi, bundle: Bundle) { void encryptedStorage.write(cacheScope(api), JSON.stringify(bundle)).catch(() => undefined); }
 function saveEntity(api: SofiaApi, kind: string, title: string, data: Record<string, any>, existing?: Entity, state?: string) {
   return existing ? api.saveEntity({...existing, title, ...(state ? {state} : {}), data: {...existing.data, ...data}})
     : api.saveEntity({kind, title, content: '', area: 'Pessoal', state: state || 'active', privacy: 'private', tags: [], data});
@@ -96,20 +108,22 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
   const [tab, setTab] = useState<Tab>('home'), [month, setMonth] = useState(monthOf(todayISO()));
   const [editing, setEditing] = useState<Partial<Tx> | null>(null), [manage, setManage] = useState(false);
   const [accountFilter, setAccountFilter] = useState<string>('');
+  const window = financeWindow(month, tab), windowKey = window.from + '..' + window.to, loaded = useRef<string>('');
   const reload = useCallback(async () => {
     setLoading(true);
-    try { const all = await loadAll(api); setData(toData(all)); setError(''); writeCache(api, all); }
+    try { const bundle = await loadAll(api, window); setData(toData(bundle.items, bundle.carry)); setError(''); loaded.current = windowKey; if (window.from <= monthOf(todayISO()) && window.to >= monthOf(todayISO())) writeCache(api, bundle); }
     catch (e) { setError(errorText(e)); }
     finally { setLoading(false); }
-  }, [api]);
-  // Abre na hora com a última versão guardada; a atualização chega por trás.
+  }, [api, windowKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Abre na hora com a última versão guardada (mês atual); a atualização chega por trás.
+  // Mudou o mês ou foi para Relatórios: busca a janela nova, mantendo o que está na tela até chegar.
   useEffect(() => {
     if (!active) return;
     let live = true;
-    void readCache(api).then(all => { if (live && all) setData(d => d || toData(all)); });
-    void reload();
+    if (!loaded.current) void readCache(api).then(b => { if (live && b && !loaded.current) setData(d => d || toData(b.items, b.carry)); });
+    if (loaded.current !== windowKey) void reload();
     return () => { live = false; };
-  }, [active, reload, api]);
+  }, [active, reload, api, windowKey]);
 
   const d = data;
   const newTx = (kind: TxKind = 'expense') => setEditing({kind, date: todayISO(), paid: true});
@@ -328,8 +342,14 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
   const days = useMemo(() => { const m = new Map<string, Tx[]>(); for (const t of list) { if (!m.has(t.date)) m.set(t.date, []); m.get(t.date)!.push(t); } return [...m.entries()]; }, [list]);
   const sum = list.reduce((s, t) => s + (t.kind === 'income' ? t.amount : t.kind === 'expense' ? -t.amount : 0), 0);
   const filterName = d.accounts.find(a => a.id === accountFilter)?.name || d.cards.find(x => x.id === accountFilter)?.name;
+  const [importing, setImporting] = useState(false);
   return (
     <>
+      <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
+        <Text style={{fontSize: 12, color: c.muted}}>Extrato do banco ou do cartão (OFX ou CSV)</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Importar extrato" onPress={() => setImporting(true)} style={{paddingVertical: 6, paddingHorizontal: 12, borderRadius: 99, backgroundColor: c.accentSoft}}><Text style={{color: c.accent, fontWeight: '700', fontSize: 13}}>Importar extrato</Text></Pressable>
+      </View>
+      {importing ? <ImportSheet api={api} d={d} onClose={() => setImporting(false)} onDone={async () => { setImporting(false); await reload(); }} /> : null}
       <TextInput accessibilityLabel="Buscar lançamento" value={q} onChangeText={setQ} placeholder="Buscar por descrição ou categoria" placeholderTextColor={c.muted}
         style={{borderWidth: 1, borderColor: c.line, borderRadius: 14, padding: 12, color: c.text, backgroundColor: c.surface}} />
       <Chips scroll value={kind} onChange={setKind} options={[{value: 'all' as const, label: 'Todos'}, {value: 'expense' as const, label: 'Despesas'}, {value: 'income' as const, label: 'Receitas'}, {value: 'transfer' as const, label: 'Transferências'}, {value: 'card_payment' as const, label: 'Faturas'}]} />
@@ -773,6 +793,77 @@ function AccountCardSheet({api, d, edit, onClose, onSaved}: {api: SofiaApi; d: D
         <Button title="Salvar" loading={busy} onPress={() => void save()} />
         {edit.item ? <Pressable onPress={async () => { try { await saveEntity(api, isCard ? 'fin_card' : 'fin_account', edit.item!.name, {}, edit.item!.entity, archived ? 'active' : 'archived'); onSaved(); } catch (e) { setError(errorText(e)); } }} style={{alignItems: 'center', padding: 10}}><Text style={{color: archived ? c.accent : c.danger}}>{archived ? 'Reativar' : 'Arquivar (o histórico fica)'}</Text></Pressable> : null}
       </ScrollView>
+    </Sheet>
+  );
+}
+
+// ---------- Importar extrato (OFX/CSV) ----------
+function ImportSheet({api, d, onClose, onDone}: {api: SofiaApi; d: Data; onClose: () => void; onDone: () => Promise<void>}) {
+  const c = useTheme();
+  const [target, setTarget] = useState<{type: 'account' | 'card'; id: string} | null>(() => d.accounts.filter(a => !a.archived).length === 1 && !d.cards.length ? {type: 'account', id: d.accounts[0].id} : null);
+  const [file, setFile] = useState<{name: string; text: string} | null>(null), [preview, setPreview] = useState<ImportItem[] | null>(null), [chosen, setChosen] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [result, setResult] = useState<{created: number; skipped: number} | null>(null);
+  async function pick() {
+    setError('');
+    try {
+      const r = await DocumentPicker.getDocumentAsync({type: ['*/*'], copyToCacheDirectory: true, multiple: false});
+      if (r.canceled || !r.assets?.[0]) return;
+      const a = r.assets[0]; const text = await new File(a.uri).text();
+      setFile({name: a.name || 'extrato', text}); setPreview(null); setChosen(new Set());
+    } catch (e) { setError(errorText(e)); }
+  }
+  async function analyze() {
+    if (!file || !target) return;
+    setBusy(true); setError('');
+    try { const r = await api.financeImportPreview(file.text, target.type, target.id); setPreview(r.items); setChosen(new Set(r.items.filter(i => !i.duplicate && !i.skip).map(i => i.import_id))); }
+    catch (e) { setError(errorText(e)); } finally { setBusy(false); }
+  }
+  async function confirm() {
+    if (!preview || !target) return;
+    setBusy(true); setError('');
+    try { const r = await api.financeImportCommit(preview.filter(i => chosen.has(i.import_id)), target.type, target.id); setResult(r); }
+    catch (e) { setError(errorText(e)); } finally { setBusy(false); }
+  }
+  const toggle = (id: string) => setChosen(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const chosenItems = preview ? preview.filter(i => chosen.has(i.import_id)) : [];
+  const sum = chosenItems.reduce((s, i) => s + (i.kind === 'income' ? i.amount : -i.amount), 0);
+  return (
+    <Sheet visible onClose={onClose} label="Fechar importação de extrato">
+      <View style={{gap: 12}}>
+        <Text style={{fontSize: 18, fontWeight: '700', color: c.text}}>Importar extrato</Text>
+        {result ? (
+          <View style={{gap: 10}}>
+            <Text style={{color: c.text}}>{result.created} lançamento{result.created === 1 ? '' : 's'} importado{result.created === 1 ? '' : 's'}{result.skipped ? ' · ' + result.skipped + ' já existia' + (result.skipped === 1 ? '' : 'm') + ' (não duplicado)' : ''}.</Text>
+            <Button title="Pronto" onPress={() => void onDone()} />
+          </View>
+        ) : (
+          <>
+            <Text style={{fontSize: 12, color: c.muted}}>Exporte o extrato no app do banco (OFX ou CSV) e escolha o arquivo aqui. Nada entra duplicado: o que já foi importado fica desmarcado.</Text>
+            <Text style={{fontSize: 12, color: c.muted, fontWeight: '700'}}>1. De onde é o extrato?</Text>
+            <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
+              {d.accounts.filter(a => !a.archived).map(a => <Pressable key={a.id} onPress={() => { setTarget({type: 'account', id: a.id}); setPreview(null); }} style={{paddingVertical: 8, paddingHorizontal: 12, borderRadius: 99, backgroundColor: target?.id === a.id ? c.accent : c.surface, borderWidth: 1, borderColor: c.line}}><Text style={{color: target?.id === a.id ? '#fff' : c.text, fontWeight: '600'}}>{a.name}</Text></Pressable>)}
+              {d.cards.filter(x => !x.archived).map(x => <Pressable key={x.id} onPress={() => { setTarget({type: 'card', id: x.id}); setPreview(null); }} style={{paddingVertical: 8, paddingHorizontal: 12, borderRadius: 99, backgroundColor: target?.id === x.id ? c.accent : c.surface, borderWidth: 1, borderColor: c.line}}><Text style={{color: target?.id === x.id ? '#fff' : c.text, fontWeight: '600'}}>💳 {x.name}</Text></Pressable>)}
+            </View>
+            <Text style={{fontSize: 12, color: c.muted, fontWeight: '700'}}>2. Arquivo</Text>
+            <Button title={file ? file.name : 'Escolher arquivo (OFX ou CSV)'} secondary onPress={() => void pick()} />
+            {file && target && !preview ? <Button title="Analisar extrato" loading={busy} onPress={() => void analyze()} /> : null}
+            {preview ? (
+              <View style={{gap: 6}}>
+                <Text style={{fontSize: 12, color: c.muted, fontWeight: '700'}}>3. Confira ({chosenItems.length} de {preview.length} marcados · {money(Math.abs(sum))} {sum >= 0 ? 'de entrada' : 'de saída'})</Text>
+                <View style={{maxHeight: 320}}><ScrollView nestedScrollEnabled>
+                  {preview.map(i => <Pressable key={i.import_id} disabled={!!i.skip} onPress={() => toggle(i.import_id)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderColor: c.line, opacity: i.skip ? 0.45 : 1}}>
+                    <View style={{width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: chosen.has(i.import_id) ? c.accent : c.line, backgroundColor: chosen.has(i.import_id) ? c.accent : 'transparent', alignItems: 'center', justifyContent: 'center'}}>{chosen.has(i.import_id) ? <Text style={{color: '#fff', fontSize: 13, fontWeight: '800'}}>✓</Text> : null}</View>
+                    <View style={{flex: 1}}><Text style={{color: c.text}} numberOfLines={1}>{i.desc}</Text><Text style={{fontSize: 11, color: c.muted}}>{i.date.split('-').reverse().join('/')}{i.category ? ' · ' + i.category : ''}{i.duplicate ? ' · já importado' : ''}{i.skip ? ' · ' + i.skip : ''}</Text></View>
+                    <Text style={{fontWeight: '700', color: i.kind === 'income' ? '#2fc58b' : c.text}}>{i.kind === 'income' ? '+' : '-'}{money(i.amount)}</Text>
+                  </Pressable>)}
+                </ScrollView></View>
+                <Button title={'Importar ' + chosenItems.length + (chosenItems.length === 1 ? ' lançamento' : ' lançamentos')} loading={busy} disabled={!chosenItems.length} onPress={() => void confirm()} />
+              </View>
+            ) : null}
+            {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
+          </>
+        )}
+      </View>
     </Sheet>
   );
 }
