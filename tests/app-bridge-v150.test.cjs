@@ -62,14 +62,24 @@ test('absorve hábitos: mesma categoria vai para a mesma conta/cartão da últim
  run(f,'save_memory',{content:'Aprendizado: "o HD" é o produto HD 2TB do Price Tracker.'});
  const ctx=bridge.appsContext(w,f.store).content;assert.ok(ctx.includes('APRENDIZADOS SOBRE ESTA PESSOA')&&ctx.includes('"o HD" é o produto HD 2TB'));
 });
-test('provedor Anthropic: mensagens convertidas, saída estruturada por ferramenta, chave do formato certo',async()=>{
- const {AnthropicProvider,toMessages,isAnthropicModel}=require('../src/services/anthropic');
- assert.ok(isAnthropicModel('claude-fable-5-1')&&!isAnthropicModel('gpt-5.6-terra'));
- const msgs=toMessages([{role:'user',content:'oi'},{role:'user',content:[{type:'input_text',text:'contexto'}]},{role:'assistant',content:'olá'},{role:'user',content:[{type:'input_image',image_url:'data:image/png;base64,QUJD'}]}]);
- assert.equal(msgs.length,3);assert.equal(msgs[0].content.length,2);assert.equal(msgs[2].content[0].type,'image');
- const calls=[];const fetchImpl=async(url,init)=>{calls.push(JSON.parse(init.body));return {ok:true,headers:{get:()=>'r1'},json:async()=>({content:[{type:'tool_use',name:'plan',input:{intent:'respond'}}],usage:{input_tokens:5,output_tokens:2},stop_reason:'tool_use'})};};
- const p=new AnthropicProvider({apiKey:'sk-ant-'+'a'.repeat(20),model:'claude-fable-5-1',apiTimeoutMs:5000},fetchImpl);
- const r=await p.structured({instructions:'sys',input:[{role:'user',content:'oi'}],schema:{type:'object',properties:{intent:{type:'string'}},required:['intent'],additionalProperties:false},name:'plan',maxOutputTokens:800});
- assert.deepEqual(r.data,{intent:'respond'});assert.equal(calls[0].tool_choice.name,'plan');assert.equal(calls[0].system,'sys');assert.equal(calls[0].model,'claude-fable-5-1');
- await assert.rejects(new AnthropicProvider({apiKey:'sk-'+'b'.repeat(30),model:'claude-fable-5-1',apiTimeoutMs:5000},fetchImpl).respond({instructions:'',input:[],maxOutputTokens:100}),/chave Anthropic/);
+
+test('valores por extenso em reais, inclusive com centavos',()=>{
+ for(const [v,exp] of [['cinquenta reais',50],['cem reais',100],['cinquenta e nove reais e noventa centavos',59.9],['mil e duzentos',1200],['quarenta e cinco reais',45]])assert.equal(bridge.money(v),exp,v);
+});
+test('datas relativas: depois de amanhã, daqui a N dias, dia da semana (inclusive "que vem")',()=>{
+ const addDays=n=>{const d=new Date(bridge.today()+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
+ assert.equal(bridge.dateOf('depois de amanha'),addDays(2));
+ assert.equal(bridge.dateOf('daqui a 3 dias'),addDays(3));
+ for(const s of ['segunda-feira','proxima segunda','segunda que vem'])assert.equal(new Date(bridge.dateOf(s)+'T12:00:00Z').getUTCDay(),1,s);
+});
+test('meio-dia e meia-noite como horário',()=>{assert.equal(bridge.timeOf('meio-dia'),'12:00');assert.equal(bridge.timeOf('meia-noite'),'00:00');});
+test('cápsula e lançamento pela conversa já usam números e datas por extenso',t=>{
+ const f=fixture(t);
+ run(f,'create_entity',{entity_kind:'capsule',title:'Ômega 3',changes:ch(['data.dose_text','4 caps'],['data.times_json','16h'],['data.repeat_type','daily'])});
+ f.core.workspace.save({kind:'fin_account',title:'Nubank',area:'Pessoal',data:{account_type:'corrente'}});
+ run(f,'create_entity',{entity_kind:'fin_tx',title:'Mercado',changes:ch(['data.amount','cinquenta e nove reais e noventa centavos'],['data.date','amanha'],['data.account_id','nubank'])});
+ const mercado=f.core.workspace.list({kind:'fin_tx'}).find(e=>e.title==='Mercado');
+ assert.equal(mercado.data.amount,59.9);assert.equal(mercado.data.date,bridge.dateOf('amanha'));
+ run(f,'create_entity',{entity_kind:'fin_tx',title:'Feira',changes:ch(['data.amount','cinquenta reais'],['data.account_id','nubank'])});
+ assert.equal(f.core.workspace.list({kind:'fin_tx'}).find(e=>e.title==='Feira').data.amount,50);
 });

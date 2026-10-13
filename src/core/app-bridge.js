@@ -12,12 +12,50 @@ const TZ='America/Sao_Paulo';
 function today(){return new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
 function addDays(date,n){const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
 function fold(s){return String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
-function money(v){if(typeof v==='number')return v;const s=fold(v).replace(/r\$|reais?|brl|\s/g,'');if(!s)return NaN;const n=s.includes(',')?s.replace(/\./g,'').replace(',','.'):s;return Number(n);}
+// Números por extenso em português (0 a 999.999), para "cinquenta reais",
+// "duas cápsulas", "mil e duzentos". Soma unidades/dezenas/centenas e "mil".
+const UNIT={zero:0,um:1,uma:1,dois:2,duas:2,tres:3,quatro:4,cinco:5,seis:6,sete:7,oito:8,nove:9,dez:10,onze:11,doze:12,treze:13,catorze:14,quatorze:14,quinze:15,dezesseis:16,dezessete:17,dezoito:18,dezenove:19};
+const TEN={vinte:20,trinta:30,quarenta:40,cinquenta:50,sessenta:60,setenta:70,oitenta:80,noventa:90};
+const HUNDRED={cem:100,cento:100,duzentos:200,duzentas:200,trezentos:300,trezentas:300,quatrocentos:400,quatrocentas:400,quinhentos:500,quinhentas:500,seiscentos:600,seiscentas:600,setecentos:700,setecentas:700,oitocentos:800,oitocentas:800,novecentos:900,novecentas:900};
+function wordsToNumber(text){
+ const words=fold(text).split(/[\s-]+/).filter(w=>w&&w!=='e');
+ if(!words.length||!words.every(w=>w in UNIT||w in TEN||w in HUNDRED||w==='mil'))return null;
+ let total=0,chunk=0;
+ for(const w of words){
+  if(w==='mil'){total+=(chunk||1)*1000;chunk=0;}
+  else if(w in HUNDRED)chunk+=HUNDRED[w];
+  else if(w in TEN)chunk+=TEN[w];
+  else if(w in UNIT)chunk+=UNIT[w];
+ }
+ return total+chunk;
+}
+/** Valor em reais: aceita número, "R$ 45,90", "45.90", e por extenso
+ * ("cinquenta reais", "cinquenta e nove reais e noventa centavos", "cem"). */
+function money(v){
+ if(typeof v==='number')return v;
+ const raw=fold(v);if(!raw)return NaN;
+ const cents=/^(.*?)\s*reais?\s*e\s*(.*?)\s*centavos?$/.exec(raw)||/^(.*?)\s+e\s+(\d{1,2})$/.exec(raw.replace(/reais?|r\$/g,'').trim());
+ if(cents){const whole=wordsToNumber(cents[1])??Number(cents[1].replace(',','.'));const cc=wordsToNumber(cents[2])??Number(cents[2]);if(Number.isFinite(whole)&&Number.isFinite(cc))return whole+cc/100;}
+ const byWords=wordsToNumber(raw.replace(/r\$|reais?|brl/g,''));if(byWords!=null)return byWords;
+ const s=raw.replace(/r\$|reais?|brl|\s/g,'');if(!s)return NaN;
+ const n=s.includes(',')?s.replace(/\./g,'').replace(',','.'):s;return Number(n);
+}
 function bool(v){const s=fold(v);return ['true','1','sim','yes','on','ligado','ativo','pago','paga'].includes(s)||v===true;}
-function dateOf(v){const s=fold(v);if(!s||s==='hoje')return today();if(s==='amanha')return addDays(today(),1);if(s==='ontem')return addDays(today(),-1);if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);const m=/^(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?$/.exec(s);if(m){const y=m[3]?(m[3].length===2?'20'+m[3]:m[3]):today().slice(0,4);return y+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');}return s;}
-function timeOf(v){const s=fold(v).replace(/\s*(horas?|hrs?|hs?)\s*$/,'').replace(/h/,':').replace(/:$/,'').replace(/\s+/g,'');const m=/^(\d{1,2})(?::(\d{1,2}))?$/.exec(s);if(!m)return '';const h=Number(m[1]),mi=Number(m[2]||0);if(h>23||mi>59)return '';return String(h).padStart(2,'0')+':'+String(mi).padStart(2,'0');}
+const WEEKNAME={domingo:0,segunda:1,terca:2,quarta:3,quinta:4,sexta:5,sabado:6};
+function nextWeekday(target,skipToday){let d=today();if(skipToday)d=addDays(d,1);while(new Date(d+'T12:00:00Z').getUTCDay()!==target)d=addDays(d,1);return d;}
+function dateOf(v){
+ const s=fold(v);if(!s||s==='hoje')return today();if(s==='amanha')return addDays(today(),1);if(s==='depois de amanha')return addDays(today(),2);if(s==='ontem')return addDays(today(),-1);
+ if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);
+ const daqui=/^daqui\s+a\s+(\d+)\s*dias?$/.exec(s);if(daqui)return addDays(today(),Number(daqui[1]));
+ if(s==='semana que vem'||s==='proxima semana')return addDays(today(),7);
+ const wd=/^(proxim[ao]\s+)?(domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)(\s+que\s+vem)?$/.exec(s);
+ if(wd){const name=wd[2].replace('-feira','');return nextWeekday(WEEKNAME[name],Boolean(wd[1]||wd[3]));}
+ const m=/^(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?$/.exec(s);if(m){const y=m[3]?(m[3].length===2?'20'+m[3]:m[3]):today().slice(0,4);return y+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');}
+ return s;
+}
+function timeOf(v){const f=fold(v);if(f==='meio-dia'||f==='meio dia')return '12:00';if(f==='meia-noite'||f==='meia noite')return '00:00';const s=f.replace(/\s*(horas?|hrs?|hs?)\s*$/,'').replace(/h/,':').replace(/:$/,'').replace(/\s+/g,'');const m=/^(\d{1,2})(?::(\d{1,2}))?$/.exec(s);if(!m)return '';const h=Number(m[1]),mi=Number(m[2]||0);if(h>23||mi>59)return '';return String(h).padStart(2,'0')+':'+String(mi).padStart(2,'0');}
 const WEEK={dom:0,seg:1,ter:2,qua:3,qui:4,sex:5,sab:6};
-function weekdays(v){if(Array.isArray(v))return v.map(Number).filter(n=>n>=0&&n<=6);const out=new Set();for(const part of fold(v).split(/[,\s/e]+/)){const k=part.slice(0,3);if(k in WEEK)out.add(WEEK[k]);else if(/^\d$/.test(part))out.add(Number(part));}return [...out].sort();}
+function weekdays(v){if(Array.isArray(v))return v.map(Number).filter(n=>n>=0&&n<=6);const f=fold(v);if(f==='dias uteis')return [1,2,3,4,5];if(f==='fim de semana'||f==='final de semana')return [0,6];const out=new Set();for(const part of f.split(/[,\s/e]+/)){const k=part.slice(0,3);if(k in WEEK)out.add(WEEK[k]);else if(/^\d$/.test(part))out.add(Number(part));}return [...out].sort();}
 
 // Sinônimos para campos de escolha, por app.
 const SYNONYM={
