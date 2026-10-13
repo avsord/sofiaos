@@ -125,7 +125,8 @@ export async function runCollection(api: SofiaApi, opts: {force?: boolean; scope
       const key = issueKey(p.monitor.id, s.url);
       // Mercado Livre usa somente a rota da Sofia, inclusive quando falha.
       // O leitor de páginas permanece apenas para os outros provedores.
-      const read = await readStorePrice(s.url, api, readPrice, {monitorId: p.monitor.id, expectedSellerId: storedMLIdentity(p.monitor.data.source_identities, s.url)?.sellerId, signal: controller.signal});
+      const pinned = storedMLIdentity(p.monitor.data.source_identities, s.url);
+      const read = await readStorePrice(s.url, api, readPrice, {monitorId: p.monitor.id, expectedSellerId: pinned?.sellerId, fetchUrl: pinned?.normalizedUrl, signal: controller.signal});
       if (cancelAll || cancelledMonitors.has(p.monitor.id) || controller.signal.aborted) continue;
       const base = {at: Date.now(), monitor: short(p.monitor.id), host: s.host};
       if (!read.ok) { state.issues[key] = {kind: 'failed', error: read.error, code: read.code, at: Date.now()}; note({...base, result: 'falhou', error: read.error.slice(0, 80), code: read.code}); }

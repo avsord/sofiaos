@@ -119,7 +119,8 @@ function makeMobileApi(runtime, deps) {
     // Authenticated read only: no browser, database writes or external app launch.
     if (p === '/api/mobile/price-tracker/mercadolivre/read' && m === 'POST') {
       rate(session, 'mercadolivre', 12);
-      const b = await bodyJson(req, 12288), controller = new AbortController();
+      // Ate ~4 MB: o celular envia o bloco de dados da pagina do produto (ver mercado-livre-device.ts).
+      const b = await bodyJson(req, 4_500_000), controller = new AbortController();
       const cancel = () => controller.abort();
       req.once('aborted', cancel); res.once('close', cancel);
       try {

@@ -22,8 +22,8 @@ test('real PageViewer branch mounts server preview for ML, never requires native
 });
 test('SofiaApi ML read is POST read, not a cache-mutating request; signal passed separately',()=>{
  const src=fs.readFileSync(path.join(__dirname,'../src/lib/api.ts'),'utf8');
- const part=src.slice(src.indexOf('  readMercadoLivre('),src.indexOf('  monitorObservations('));
- assert.ok(part.includes("'/price-tracker/mercadolivre/read'"));assert.ok(part.includes('this.fetchRequest<'));assert.ok(!part.includes('this.request<'));assert.ok(part.includes('const {signal,...params}=options'));
+ const part=src.slice(src.indexOf('  async readMercadoLivre('),src.indexOf('  monitorObservations('));
+ assert.ok(part.includes("'/price-tracker/mercadolivre/read'"));assert.ok(part.includes('this.fetchRequest<'));assert.ok(!part.includes('this.request<'));assert.ok(part.includes('const {signal,fetchUrl,...params}=options'));
 });
 
 const providerForCollection=load('src/lib/price-provider.ts');

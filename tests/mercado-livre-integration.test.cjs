@@ -115,3 +115,34 @@ test('ML metadata: removing a store drops its pin without rejecting the save or 
  assert.deepEqual(pins(edited.data.source_identities),{});
  assert.equal(w.observations(mon.id)[0].id,row.id);
 });
+
+// ---- 0.3.138: pagina baixada pelo CELULAR (o Mercado Livre manda a Railway para login) ----
+test('ML route: pagina enviada pelo celular passa pela MESMA extracao estrita, sem o servidor acessar a loja',async t=>{
+ let calls=0;const f=await setup(t,async()=>{calls++;return new Response('',{status:302,headers:{location:'https://www.mercadolivre.com.br/jms/mlb/lgz/login'}});});
+ const mon=makeMonitor(f);
+ // a pagina real (~1 MB) cabe no limite da rota
+ const big=html().replace('</script>',';'+' '.repeat(1_200_000)+'</script>');
+ const r=await f.request({link:LINK,monitorId:mon.id,html:big,finalUrl:PIN.normalizedUrl},f.token);
+ assert.equal(r.status,200);assert.equal(r.body.ok,true,JSON.stringify(r.body));
+ assert.equal(r.body.reading.amountCents,141283);assert.equal(r.body.reading.seller.id,'427963557');assert.equal(r.body.reading.fetchedFrom,'device');
+ assert.ok(Number.isFinite(Date.parse(r.body.reading.observedAt)));
+ assert.equal(calls,0,'com a pagina do celular o servidor nao acessa o Mercado Livre');
+ assert.equal(f.workspace.observations(mon.id).length,0);
+});
+test('ML route: pagina do celular com outro anuncio, preco divergente ou sem dados e recusada (preco anterior preservado)',async t=>{
+ const f=await setup(t,async()=>assert.fail('servidor nao deve buscar'));
+ const other=JSON.parse(JSON.stringify(FIXTURE));other.appProps.pageProps.initialState.components.price.price.value=100;
+ const bad='<script id="__NORDIC_RENDERING_CTX__">_n.ctx.r='+JSON.stringify(other)+'</script>';
+ let r=await f.request({link:LINK,html:bad},f.token);assert.equal(r.body.ok,false);assert.equal(r.body.code,'PRICE_CONFLICT');assert.equal(r.body.keepLastPrice,true);
+ r=await f.request({link:'https://www.mercadolivre.com.br/p/MLB42258825?pdp_filters=item_id:MLB6460681458',html:html()},f.token);assert.equal(r.body.code,'ITEM_MISMATCH');
+ r=await f.request({link:LINK,html:'<html>login</html>'},f.token);assert.equal(r.body.ok,false);assert.equal(r.body.code,'STATE_NOT_FOUND');
+ r=await f.request({link:LINK,html:123},f.token);assert.equal(r.body.code,'INVALID_INPUT');
+ r=await f.request({link:LINK,html:''},f.token);assert.equal(r.body.code,'INVALID_INPUT');
+});
+test('ML route: link curto resolvido no celular usa o destino final, que precisa ser do Mercado Livre',async t=>{
+ const f=await setup(t,async()=>assert.fail('servidor nao deve buscar'));
+ let r=await f.request({link:'https://mercadolivre.com/sec/1AbC23x',html:html(),finalUrl:LINK,allowCatalogWinner:true},f.token);
+ assert.equal(r.body.ok,true,JSON.stringify(r.body));assert.equal(r.body.reading.identityKey,'mercadolivre:MLB5296520523');
+ r=await f.request({link:'https://mercadolivre.com/sec/1AbC23x',html:html(),finalUrl:'https://evil.example/p/MLB42258825'},f.token);
+ assert.equal(r.body.ok,false);
+});

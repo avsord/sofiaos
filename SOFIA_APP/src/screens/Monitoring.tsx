@@ -937,7 +937,8 @@ function MercadoLivrePreview({api, monitor, store, onClose, onSaved}: {api: Sofi
   async function read() {
     controller.current?.abort(); const abort = new AbortController(); controller.current = abort;
     setBusy(true); setReading(null); setStatus('Consultando a Sofia, sem abrir o Mercado Livre…');
-    const r = await readStorePrice(store.url, api, readPrice, {monitorId: monitor.id, signal: abort.signal, expectedSellerId: storedMLIdentity(monitor.data.source_identities, store.url)?.sellerId});
+    const pinned = storedMLIdentity(monitor.data.source_identities, store.url);
+    const r = await readStorePrice(store.url, api, readPrice, {monitorId: monitor.id, signal: abort.signal, expectedSellerId: pinned?.sellerId, fetchUrl: pinned?.normalizedUrl});
     if (abort.signal.aborted) return;
     if (r.ok && r.mercadoLivre) {setReading(r.mercadoLivre); setStatus('Confira a oferta abaixo.');}
     else setStatus(r.ok ? 'O servidor não retornou a identidade da oferta.' : ((r.code ? r.code + ': ' : '') + r.error));
