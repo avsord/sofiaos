@@ -7,3 +7,10 @@ test('Listas, Biblioteca e Estudos carregam no mesmo estilo das telas novas (ane
 test('mensagem de erro da conta de e-mail usa a cor do tema (certa em claro e escuro), não um vermelho fixo',()=>{
  assert.ok(!read('src/screens/Mail.tsx').includes("color: '#ff6b7a', fontSize: 12"));assert.ok(read('src/screens/Mail.tsx').includes('color: c.danger, fontSize: 12'));
 });
+test('Listas, Biblioteca e Estudos usam o mesmo cabeçalho das telas novas (voltar à esquerda, legenda discreta, título); a tela principal de Apps continua com o título grande',()=>{
+ const ui=read('src/components/UI.tsx');assert.ok(ui.includes('export function ModuleHeader('));
+ assert.ok(ui.includes('<IconButton name="back" label="Voltar aos apps" onPress={onBack}/><View style={{flex:1,paddingHorizontal:4}}>'),'voltar fica à esquerda, antes do título');
+ const w=read('src/screens/Workspace.tsx');
+ assert.ok(w.includes("{module?<ModuleHeader title={selected?.title||'Seus espaços'} caption={selected?.caption"));
+ assert.ok(w.includes(":<ScreenTitle title={selected?.title||'Seus espaços'} eyebrow={module==='all'?"),'tela principal de Apps mantém o título de aba');
+});

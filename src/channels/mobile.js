@@ -271,7 +271,7 @@ function makeMobileApi(runtime, deps) {
       if (receipt && (receipt.audio_hash !== hash || receipt.conversation_id !== input.conversation_id)) fail('ID_CONFLICT', 'Este identificador já pertence a outro áudio.', 409);
       const old = store.db.prepare('SELECT id,conversation_id,content FROM messages WHERE owner=? AND client_id=?').get(OWNER, key);
       const voice = old ? store.voiceMessage(old.id) : null;
-      if (old && (old.conversation_id !== input.conversation_id || (!receipt && !voice) || (voice && digest(Buffer.from(voice.blob)) !== hash))) fail('ID_CONFLICT', 'Este identificador já pertence a outra mensagem.', 409);
+      if (old && (old.conversation_id !== input.conversation_id || (!receipt && !voice) || (voice && (voice.blob && voice.blob.length ? digest(Buffer.from(voice.blob)) : voice.sha256) !== hash))) fail('ID_CONFLICT', 'Este identificador já pertence a outra mensagem.', 409);
       inAudio.add(key); let transcript = receipt?.transcript || (voice ? old.content : '');
       try {
         routing.profile('private');
@@ -293,7 +293,8 @@ function makeMobileApi(runtime, deps) {
     if (match && m === 'GET') {
       const row = store.message(validId(match[1])); conversation(row.conversation_id, { history: true });
       const voice = store.voiceMessage(row.id); if (!voice) fail('NOT_FOUND', 'Áudio não encontrado.', 404);
-      const bytes = Buffer.from(voice.blob), range = /^bytes=(\d+)-(\d*)$/.exec(String(req.headers.range || ''));
+      // Voz com mais de 1 dia pode estar no Drive: busca lá (com cache) quando o blob não está mais aqui.
+      const bytes = runtime.google && runtime.google.voiceBytes ? await runtime.google.voiceBytes(voice) : Buffer.from(voice.blob), range = /^bytes=(\d+)-(\d*)$/.exec(String(req.headers.range || ''));
       res.setHeader('Content-Type', voice.mime); res.setHeader('Accept-Ranges', 'bytes');
       if (range) {
         const start = Number(range[1]), end = range[2] ? Math.min(Number(range[2]), bytes.length - 1) : bytes.length - 1;

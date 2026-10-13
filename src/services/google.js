@@ -36,6 +36,9 @@ class GoogleService {
       CREATE TABLE IF NOT EXISTS md_kv(key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
     // Anexos (capas, fotos, arquivos) podem morar no Drive da pessoa: aqui fica só a referência.
     try { if (!this.db.prepare('PRAGMA table_info(attachments)').all().some(c => c.name === 'drive_id')) this.db.exec('ALTER TABLE attachments ADD COLUMN drive_id TEXT'); } catch { /* sem tabela de anexos */ }
+    // Mensagens de voz (as maiores: até dezenas de MB cada) também podem morar no Drive.
+    // sha256 guarda a impressão do áudio original para o reenvio idempotente continuar seguro sem o blob aqui.
+    try { const cols = this.db.prepare('PRAGMA table_info(voice_messages)').all().map(c => c.name); if (!cols.includes('drive_id')) this.db.exec('ALTER TABLE voice_messages ADD COLUMN drive_id TEXT'); if (!cols.includes('sha256')) this.db.exec('ALTER TABLE voice_messages ADD COLUMN sha256 TEXT'); } catch { /* sem tabela de voz */ }
     this.blobCache = new Map(); this.blobCacheBytes = 0; this.offloading = false;
     // Apagar na Sofia um evento ligado ao Google também apaga lá na próxima sincronização.
     const original = workspace.deleteEntity.bind(workspace);
@@ -83,7 +86,7 @@ class GoogleService {
     const old = this.link() || {};
     this.saveLink({...old, refresh: this.seal(tokens.refresh_token), email, scopes: String(tokens.scope || ''), connected_at: now(), calendar_id: old.calendar_id || 'primary', sync: {}, last_error: '', conflicts: []});
     this.access = {token: tokens.access_token, exp: Date.now() + (Number(tokens.expires_in) || 3000) * 1000 - 60000};
-    setTimeout(() => { this.ensureFolders().catch(() => {}).then(() => { this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); this.offloadAttachments().catch(() => {}); }); }, 50).unref?.();
+    setTimeout(() => { this.ensureFolders().catch(() => {}).then(() => { this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); this.offloadAttachments().catch(() => {}); this.offloadVoices().catch(() => {}); this.exportPages().catch(() => {}); }); }, 50).unref?.();
     return {ok: true, message: 'Conta Google conectada' + (email ? ' (' + email + ')' : '') + '. Pode voltar para a Sofia.'};
   }
   /** Do app (janela do Google aberta pela própria Sofia): devolve um redirecionamento
@@ -160,7 +163,7 @@ class GoogleService {
     return {...base, syncing: this.busy, email: l.email, last_sync: l.last_sync, error: l.last_error || undefined, calendar_id: cal?.id || 'primary', calendar_name: cal?.summary || 'Principal',
       calendars, warnings, conflicts: l.conflicts || [], history: (l.history || []).slice(0, 10),
       gmail: {connected: /gmail\.readonly/.test(l.scopes || '')},
-      drive: {connected: /drive\.file/.test(l.scopes || ''), last_backup: l.drive?.last_backup, last_backup_error: l.drive?.last_error, backups: l.drive?.count || 0, folder: 'Sofia OS/Backups', folders: l.drive?.folders ? Object.keys(l.drive.folders) : [], attachments: this.attachmentStats()}};
+      drive: {connected: /drive\.file/.test(l.scopes || ''), last_backup: l.drive?.last_backup, last_backup_error: l.drive?.last_error, backups: l.drive?.count || 0, folder: 'Sofia OS/Backups', folders: l.drive?.folders ? Object.keys(l.drive.folders) : [], attachments: this.attachmentStats(), voices: this.voiceStats(), pages: l.drive?.pages_exported || 0}};
   }
   select(calendarId) {
     const l = this.link(); if (!l?.refresh) throw new AppError('GOOGLE_NOT_CONNECTED', 'Conta Google não conectada.', 409);
@@ -316,9 +319,10 @@ class GoogleService {
   // Assim que a pessoa conecta, a Sofia cria a casa dela no Drive, organizada:
   //   Sofia OS/Backups   (cópias criptografadas do banco, uma por dia)
   //   Sofia OS/Anexos    (capas de página, fotos e arquivos; aqui no servidor fica só a referência)
-  //   Sofia OS/Páginas   (reservada para exportações das páginas)
+  //   Sofia OS/Áudios    (mensagens de voz da conversa com mais de 1 dia)
+  //   Sofia OS/Páginas   (cada página sua como um arquivo .md legível, atualizado quando muda)
   // Os ids ficam guardados no link; nunca se cria pasta repetida (folder() reaproveita).
-  static FOLDERS = ['Backups', 'Anexos', 'Páginas'];
+  static FOLDERS = ['Backups', 'Anexos', 'Áudios', 'Páginas'];
   async ensureFolders() {
     const l = this.link(); if (!l?.refresh || !/drive\.file/.test(l.scopes || '')) return null;
     const root = await this.folder('Sofia OS'); const folders = {root};
@@ -332,6 +336,91 @@ class GoogleService {
   }
 
   // ---------- Anexos no Drive ----------
+  voiceStats() {
+    try { const r = this.db.prepare('SELECT COUNT(*) AS total, SUM(CASE WHEN drive_id IS NOT NULL THEN 1 ELSE 0 END) AS in_drive, SUM(CASE WHEN drive_id IS NULL THEN length(blob) ELSE 0 END) AS local_bytes FROM voice_messages').get(); return {total: r.total || 0, in_drive: r.in_drive || 0, local_mb: Math.round((r.local_bytes || 0) / 1048576 * 10) / 10}; } catch { return {total: 0, in_drive: 0, local_mb: 0}; }
+  }
+  /** Leva para o Drive as mensagens de voz com mais de 1 dia (as recentes ficam aqui: tocam na hora
+   * e ainda podem ser reenviadas). Só depois de o Drive confirmar, o blob sai daqui. */
+  async offloadVoices(limit = 5) {
+    const l = this.link(); if (!l?.refresh || !/drive\.file/.test(l.scopes || '') || this.offloadingVoice) return {moved: 0};
+    this.offloadingVoice = true; let moved = 0;
+    try {
+      const dir = await this.folderId('Áudios'); if (!dir) return {moved: 0};
+      const cutoff = new Date(Date.now() - 864e5).toISOString();
+      const rows = this.db.prepare('SELECT message_id, mime, blob, created_at FROM voice_messages WHERE drive_id IS NULL AND length(blob) > 0 AND created_at < ? ORDER BY created_at LIMIT ?').all(cutoff, limit);
+      for (const v of rows) {
+        const buf = Buffer.from(v.blob), sha = crypto.createHash('sha256').update(buf).digest('hex');
+        const ext = /mp4|m4a|aac/.test(v.mime) ? '.m4a' : /ogg/.test(v.mime) ? '.ogg' : /mpeg|mp3/.test(v.mime) ? '.mp3' : /wav/.test(v.mime) ? '.wav' : '.webm';
+        const name = 'voz-' + String(v.created_at).slice(0, 19).replace(/[:T]/g, '-') + ext, boundary = 'sofia' + id();
+        const meta = JSON.stringify({name, parents: [dir], mimeType: v.mime || 'application/octet-stream', description: 'Mensagem de voz da Sofia OS', appProperties: {sofia_voice: v.message_id}});
+        const body = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${v.mime || 'application/octet-stream'}\r\n\r\n`), buf, Buffer.from(`\r\n--${boundary}--`)]);
+        const up = await this.call('POST', UPLOAD + '/files?uploadType=multipart&fields=id', body, {'Content-Type': 'multipart/related; boundary=' + boundary});
+        if (!up.id) continue;
+        this.db.prepare('UPDATE voice_messages SET drive_id=?, sha256=?, blob=? WHERE message_id=?').run(up.id, sha, Buffer.alloc(0), v.message_id);
+        moved++;
+      }
+      return {moved};
+    } finally { this.offloadingVoice = false; }
+  }
+  /** Bytes de uma mensagem de voz: daqui se ainda estiver; senão do Drive (mesmo cache dos anexos). */
+  async voiceBytes(v) {
+    if (v.blob && v.blob.length) return Buffer.from(v.blob);
+    if (!v.drive_id) return Buffer.alloc(0);
+    return this.attachmentBytes({id: 'voice:' + v.message_id, blob: null, drive_id: v.drive_id});
+  }
+  /** Página → Markdown legível (abre em qualquer editor ou no próprio Drive). */
+  static pageMarkdown(page) {
+    let blocks = []; try { blocks = JSON.parse(page.data?.blocks_json || '[]'); } catch { blocks = []; }
+    const out = ['# ' + (page.data?.icon ? page.data.icon + ' ' : '') + page.title, ''];
+    if (page.data?.purpose) out.push('> ' + String(page.data.purpose).replace(/\n/g, '\n> '), '');
+    let n = 0;
+    for (const b of Array.isArray(blocks) ? blocks : []) {
+      const t = String(b.text || '').trim(), type = String(b.type || 'text');
+      if (type !== 'number') n = 0;
+      if (type === 'divider') { out.push('---'); continue; }
+      if (!t && type !== 'todo') { out.push(''); continue; }
+      if (type === 'heading1') out.push('# ' + t);
+      else if (type === 'heading2') out.push('## ' + t);
+      else if (type === 'heading3' || type === 'heading4') out.push('### ' + t);
+      else if (type === 'bullet' || type === 'toggle') out.push('- ' + t);
+      else if (type === 'number') out.push((++n) + '. ' + t);
+      else if (type === 'todo') out.push('- [' + (b.checked ? 'x' : ' ') + '] ' + t);
+      else if (type === 'quote' || type === 'callout') out.push('> ' + t);
+      else if (type === 'code') out.push('```', t, '```');
+      else out.push(t);
+    }
+    return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+  }
+  /** Cada página vira um .md em Sofia OS/Páginas e é atualizada quando muda (pela revisão).
+   * Apagou a página na Sofia: o arquivo vai para a lixeira do Drive. Até `limit` por rodada. */
+  async exportPages(limit = 20) {
+    const l = this.link(); if (!l?.refresh || !/drive\.file/.test(l.scopes || '') || this.exportingPages) return {exported: 0};
+    this.exportingPages = true; let exported = 0, removed = 0;
+    try {
+      const dir = await this.folderId('Páginas'); if (!dir) return {exported: 0};
+      const map = this.kvGet('drive_pages') || {};
+      const pages = []; for (let offset = 0; offset < 20000; offset += 500) { const page = this.w.list({kind: 'user_page', limit: 500, offset}); pages.push(...page); if (page.length < 500) break; }
+      const alive = new Set(pages.filter(p => p.state !== 'archived').map(p => p.id));
+      for (const pageId of Object.keys(map)) if (!alive.has(pageId)) { await this.call('PATCH', DRIVE + '/files/' + map[pageId].file, {trashed: true}).catch(() => {}); delete map[pageId]; removed++; }
+      for (const page of pages.filter(p => p.state !== 'archived')) {
+        if (exported >= limit) break;
+        const known = map[page.id]; if (known && known.rev === page.revision) continue;
+        const md = Buffer.from(GoogleService.pageMarkdown(page), 'utf8');
+        const name = (String(page.title || 'Sem título').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 100) || 'Sem título') + '.md', boundary = 'sofia' + id();
+        const meta = known ? {name} : {name, parents: [dir], mimeType: 'text/markdown', description: 'Página da Sofia OS', appProperties: {sofia_page: page.id}};
+        const body = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: text/markdown; charset=UTF-8\r\n\r\n`), md, Buffer.from(`\r\n--${boundary}--`)]);
+        const res = known
+          ? await this.call('PATCH', UPLOAD + '/files/' + known.file + '?uploadType=multipart&fields=id', body, {'Content-Type': 'multipart/related; boundary=' + boundary}).catch(e => (e.googleStatus === 404 ? null : Promise.reject(e)))
+          : await this.call('POST', UPLOAD + '/files?uploadType=multipart&fields=id', body, {'Content-Type': 'multipart/related; boundary=' + boundary});
+        if (!res) { delete map[page.id]; continue; } // arquivo apagado à mão no Drive: recria na próxima rodada
+        map[page.id] = {file: res.id || known.file, rev: page.revision};
+        exported++;
+      }
+      this.kvSet('drive_pages', map);
+      const cur = this.link(); if (cur) this.saveLink({...cur, drive: {...(cur.drive || {}), pages_exported: Object.keys(map).length}});
+      return {exported, removed};
+    } finally { this.exportingPages = false; }
+  }
   attachmentStats() {
     try { const r = this.db.prepare('SELECT COUNT(*) AS total, SUM(CASE WHEN drive_id IS NOT NULL THEN 1 ELSE 0 END) AS in_drive, SUM(CASE WHEN drive_id IS NULL THEN bytes ELSE 0 END) AS local_bytes FROM attachments').get(); return {total: r.total || 0, in_drive: r.in_drive || 0, local_mb: Math.round((r.local_bytes || 0) / 1048576 * 10) / 10}; } catch { return {total: 0, in_drive: 0, local_mb: 0}; }
   }
@@ -399,7 +488,7 @@ class GoogleService {
 
   start(intervalMs = 15 * 60000) {
     if (this.timer) return;
-    const tick = () => { const l = this.link(); if (!l?.refresh || this.busy) return; this.offloadAttachments().catch(() => {}); this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); };
+    const tick = () => { const l = this.link(); if (!l?.refresh || this.busy) return; this.offloadAttachments().catch(() => {}); this.offloadVoices().catch(() => {}); this.exportPages().catch(() => {}); this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); };
     this.timer = setInterval(tick, intervalMs); this.timer.unref?.();
     setTimeout(tick, 30000).unref?.();
   }

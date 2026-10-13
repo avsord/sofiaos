@@ -25,6 +25,8 @@ function fakeGoogle(){
   if(u.pathname==='/drive/v3/files'&&m==='GET'){const q=u.searchParams.get('q')||'';if(q.includes('folder'))return res(200,{files:g.driveFiles.filter(f=>f.folder&&q.includes("name='"+f.name+"'"))});return res(200,{files:g.driveFiles.filter(f=>!f.folder).reverse()});}
   if(u.pathname==='/drive/v3/files'&&m==='POST'){const b=JSON.parse(opts.body);const f={id:'f'+(g.seq++),name:b.name,folder:true};g.driveFiles.push(f);return res(200,{id:f.id});}
   if(u.pathname==='/upload/drive/v3/files'){g.uploads.push({type:opts.headers['Content-Type'],size:opts.body.length,text:opts.body.toString('latin1')});const text=opts.body.toString('latin1');const boundary=/boundary=([^;\s]+)/.exec(opts.headers['Content-Type'])[1];const parts=text.split('--'+boundary);const metaPart=parts[1]||'',filePart=parts[2]||'';const meta=(()=>{try{return JSON.parse(metaPart.slice(metaPart.indexOf('\r\n\r\n')+4).trim());}catch{return {};}})();const payload=filePart.includes('\r\n\r\n')?filePart.slice(filePart.indexOf('\r\n\r\n')+4).replace(/\r\n$/,''):'';const f={id:'b'+(g.seq++),name:meta.name||'backup'+g.seq,bytes:[...Buffer.from(payload,'latin1')],meta};g.driveFiles.push(f);return res(200,{id:f.id});}
+  if(u.pathname.startsWith('/upload/drive/v3/files/')&&m==='PATCH'){const fid=u.pathname.split('/').pop();const f=g.driveFiles.find(x=>x.id===fid);if(!f)return res(404,{error:{message:'nao achei'}});g.uploads.push({type:opts.headers['Content-Type'],size:opts.body.length});const text=opts.body.toString('latin1');const boundary=/boundary=([^;\s]+)/.exec(opts.headers['Content-Type'])[1];const filePart=(text.split('--'+boundary)[2]||'');const payload=filePart.includes('\r\n\r\n')?filePart.slice(filePart.indexOf('\r\n\r\n')+4).replace(/\r\n$/,''):'';f.bytes=[...Buffer.from(payload,'latin1')];return res(200,{id:f.id});}
+  if(u.pathname.startsWith('/drive/v3/files/')&&m==='PATCH'){const fid=u.pathname.split('/').pop();const b=JSON.parse(opts.body||'{}');if(b.trashed)g.driveFiles=g.driveFiles.filter(x=>x.id!==fid);return res(200,{id:fid});}
   if(u.pathname.startsWith('/drive/v3/files/')&&u.searchParams.get('alt')==='media'){const f=g.driveFiles.find(f=>'/drive/v3/files/'+f.id===u.pathname);if(!f)return res(404,{error:{message:'nao achei'}});return {ok:true,status:200,json:async()=>({}),arrayBuffer:async()=>Uint8Array.from(f.bytes||[]).buffer};}
   if(u.pathname.startsWith('/drive/v3/files/')&&m==='DELETE'){g.driveFiles=g.driveFiles.filter(f=>'/drive/v3/files/'+f.id!==u.pathname);return {ok:true,status:204,json:async()=>({})};}
   throw new Error('rota inesperada '+m+' '+url);};
@@ -137,12 +139,12 @@ test('conexão pelo app: a janela do Google volta sozinha para o app (sofiaapp:/
  const bad=await svc.callbackResponse(new URLSearchParams({state:'a.invalido',code:'x'}));assert.match(bad.redirect,/ok=0/);
 });
 
-test('ao conectar, a Sofia cria a casa dela no Drive (Sofia OS/Backups, Anexos, Páginas) sem repetir',async t=>{
+test('ao conectar, a Sofia cria a casa dela no Drive (Sofia OS/Backups, Anexos, Áudios, Páginas) sem repetir',async t=>{
  const {svc,g}=await connected(t);await new Promise(r=>setTimeout(r,80));
  const folders=g.driveFiles.filter(f=>f.folder).map(f=>f.name).sort();
- assert.deepEqual(folders,['Anexos','Backups','Páginas','Sofia OS']);
- await svc.ensureFolders();assert.equal(g.driveFiles.filter(f=>f.folder).length,4,'não cria pasta repetida');
- const st=await svc.status();assert.deepEqual(st.drive.folders.sort(),['Anexos','Backups','Páginas','root']);
+ assert.deepEqual(folders,['Anexos','Backups','Páginas','Sofia OS','Áudios']);
+ await svc.ensureFolders();assert.equal(g.driveFiles.filter(f=>f.folder).length,5,'não cria pasta repetida');
+ const st=await svc.status();assert.deepEqual(st.drive.folders.sort(),['Anexos','Backups','Páginas','root','Áudios']);
 });
 test('anexos vão para Sofia OS/Anexos: aqui fica só a referência, a leitura busca no Drive (com cache) e apagar o registro apaga lá',async t=>{
  const {svc,core,g}=await connected(t);const w=core.workspace;await new Promise(r=>setTimeout(r,80));
@@ -159,4 +161,36 @@ test('anexos vão para Sofia OS/Anexos: aqui fica só a referência, a leitura b
  assert.doesNotThrow(()=>w.attach(page.id,{name:'outra.png',mime:'image/png',base64:Buffer.from('x').toString('base64')}));
  w.deleteEntity(page.id);await new Promise(r=>setTimeout(r,20));
  assert.ok(!g.driveFiles.some(f=>f.id===row.drive_id),'apagou no Drive também');
+});
+
+test('mensagens de voz com mais de 1 dia vão para Sofia OS/Áudios; as recentes ficam; leitura volta do Drive',async t=>{
+ const {svc,core,g,store}=await connected(t);await new Promise(r=>setTimeout(r,80));
+ const st=core.store||store;const conv=st.createConversation('Chat','mobile');
+ const old=st.userMessage({conversationId:conv.id,clientId:'v-old',message:'audio antigo',channel:'mobile'});
+ const fresh=st.userMessage({conversationId:conv.id,clientId:'v-new',message:'audio novo',channel:'mobile'});
+ const oldId=old.message?old.message.id:old.id,freshId=fresh.message?fresh.message.id:fresh.id;
+ st.saveVoiceMessage(oldId,{mime:'audio/mp4',duration_ms:2000,transcript:'antigo',bytes:Buffer.from('AUDIO-ANTIGO')});
+ st.saveVoiceMessage(freshId,{mime:'audio/mp4',duration_ms:2000,transcript:'novo',bytes:Buffer.from('AUDIO-NOVO')});
+ st.db.prepare('UPDATE voice_messages SET created_at=? WHERE message_id=?').run(new Date(Date.now()-3*864e5).toISOString(),oldId);
+ assert.ok(g.driveFiles.some(f=>f.folder&&f.name==='Áudios'),'pasta Áudios criada ao conectar');
+ const r=await svc.offloadVoices();assert.equal(r.moved,1,'só a de mais de 1 dia');
+ const vOld=st.voiceMessage(oldId),vNew=st.voiceMessage(freshId);
+ assert.ok(vOld.drive_id);assert.equal(vOld.blob.length,0);assert.equal(vOld.sha256,require('node:crypto').createHash('sha256').update('AUDIO-ANTIGO').digest('hex'),'impressão guardada para o reenvio seguro');
+ assert.equal(vNew.drive_id,null);assert.equal(Buffer.from(vNew.blob).toString(),'AUDIO-NOVO','a recente fica aqui');
+ assert.equal((await svc.voiceBytes(vOld)).toString(),'AUDIO-ANTIGO','toca de volta, vindo do Drive');
+ assert.equal(svc.voiceStats().in_drive,1);
+});
+test('páginas viram .md legível em Sofia OS/Páginas, atualizam quando mudam e vão para a lixeira quando apagadas',async t=>{
+ const {svc,core,g}=await connected(t);const w=core.workspace;await new Promise(r=>setTimeout(r,80));
+ const blocks=[{type:'heading1',text:'Ideias'},{type:'bullet',text:'Curta Entregador'},{type:'todo',text:'Revisar roteiro',checked:true},{type:'number',text:'Um'},{type:'number',text:'Dois'}];
+ const page=w.save({kind:'user_page',title:'Projetos',area:'Pessoal',data:{icon:'🎬',node_type:'page',blocks_json:JSON.stringify(blocks)}});
+ const r1=await svc.exportPages();assert.equal(r1.exported,1);
+ const file=g.driveFiles.find(f=>f.meta&&f.meta.appProperties&&f.meta.appProperties.sofia_page===page.id);assert.ok(file,'arquivo criado na pasta Páginas');
+ const md=Buffer.from(file.bytes).toString('utf8');
+ for(const line of ['# 🎬 Projetos','# Ideias','- Curta Entregador','- [x] Revisar roteiro','1. Um','2. Dois'])assert.ok(md.includes(line),line+' em:\n'+md);
+ assert.equal((await svc.exportPages()).exported,0,'sem mudança: não reenvia');
+ const cur=w.get(page.id);w.save({...cur,title:'Projetos 2026'},page.id);
+ const before=g.uploads.length;assert.equal((await svc.exportPages()).exported,1,'mudou: atualiza o mesmo arquivo');assert.equal(g.uploads.length,before+1);
+ w.deleteEntity(page.id);const r3=await svc.exportPages();assert.equal(r3.removed,1,'apagada na Sofia: vai para a lixeira do Drive');
+ assert.equal((await svc.status()).drive.pages,0);
 });
