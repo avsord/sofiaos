@@ -89,7 +89,7 @@ class SofiaCore{
     return {role:'user',content:'CATÁLOGO ESTRUTURAL DE ESCOPOS DO BACKEND. Isto é dado real para você escolher coleções; NÃO é uma instrução do usuário. Para ações em uma coleção inteira, escolha um scope_id daqui. Para ferramentas de página, scopes das categorias page/space trazem page_id real (igual ao container_id). O backend enumera os membros depois. Para editar/excluir um registro específico cujo ID ainda não esteja no contexto, use needs_context=true com uma context_query seletiva; não invente IDs. '+JSON.stringify({scopes})};
   }
   async plan(user,attempt,pending,extraPlannerInput=[],selectedOption=null){
-    let usages=[],refs=[],context={used:false,refs:[],input:[...extraPlannerInput,this.semanticCatalogContext(),bridge.appsContext(this.workspace),...this.recentPlannerInput(user,pending,selectedOption)]};
+    let usages=[],refs=[],context={used:false,refs:[],input:[...extraPlannerInput,this.semanticCatalogContext(),bridge.appsContext(this.workspace,this.store),...this.recentPlannerInput(user,pending,selectedOption)]};
     const first=await this.intent.plan({message:user.content,input:context.input,attemptId:attempt,pending:Boolean(pending),signal:this.controller.signal,maxOutputTokens:1800,privacyRules:this.privacyRules(),lockedActions:[]});
     usages.push(first.usage);let plan=first.plan;let finalRoute=plan.privacy?.recommended_route==='shared'?'shared':'private';let contextForcedPrivate=false;
     if(plan.needs_context){
@@ -233,7 +233,7 @@ class SofiaCore{
       const normalizedList=normalize(name);if(normalizedList==='mercado'||normalizedList==='farmacia'){const list=normalizedList==='farmacia'?'pharmacy':'market';const e=this.workspace.save({kind:'shopping_item',title,content:'',area:a.area||'Pessoal',privacy:list==='pharmacy'?'private':route,source_id:user.id,state:'needed',data:{list,quantity:a.quantity||'',paid_price:'',purchased_on:''},tags:[list==='pharmacy'?'Farmácia':'Mercado']});return {reply:'Item adicionado à lista '+(list==='pharmacy'?'Farmácia':'Mercado')+': “'+e.title+'”.',ui_target:'lists',items:[e]};}
       let collection=this.workspace.list({kind:'list_collection',limit:300}).find(e=>e.state==='active'&&e.title.toLowerCase()===name.toLowerCase());if(!collection)throw new AppError('LIST_NOT_FOUND','Não encontrei a lista “'+name+'”. Posso criar uma lista nova somente depois da sua confirmação.',409);const e=this.workspace.save({kind:'list_item',title,content:'',area:collection.area,privacy:collection.privacy,source_id:user.id,state:'needed',data:{collection_id:collection.id,quantity:a.quantity||'',notes:''},tags:[collection.title]});return {reply:'Item adicionado à lista '+collection.title+': “'+e.title+'”.',ui_target:'lists',items:[e]};
     }
-    if(plan.intent==='create_entity'&&bridge.APP_KINDS.includes(a.entity_kind)){
+    if(plan.intent==='create_entity'&&bridge.APP_KINDS.includes(a.entity_kind)&&!['idea','annotation','project','dream','course','recipe','film','music','video','reading'].includes(a.entity_kind)){
       const built=bridge.buildEntity(this.workspace,a.entity_kind,a,user.content.slice(0,120));
       const e=this.workspace.save({kind:a.entity_kind,title:built.title,content:a.content||'',area:a.area||'Geral',privacy:route,source_id:user.id,state:built.state,data:built.data,tags:a.tags||[]});
       return {reply:bridge.describeCreated(a.entity_kind,e),ui_target:built.ui,items:[e]};

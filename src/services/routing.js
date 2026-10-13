@@ -1,8 +1,9 @@
 'use strict';
 const {AppError,id,now}=require('../core/util');
 const {OpenAIProvider}=require('./openai');
+const {AnthropicProvider,isAnthropicModel}=require('./anthropic');
 class RoutingService {
- constructor(store,config,providerFactory){this.store=store;this.config=config;this.factory=providerFactory||((c)=>new OpenAIProvider(c));}
+ constructor(store,config,providerFactory){this.store=store;this.config=config;this.factory=providerFactory||((c)=>isAnthropicModel(c.model)?new AnthropicProvider(c):new OpenAIProvider(c));}
  profile(route){const s=this.store.settings();if(!['private','shared'].includes(route))throw new AppError('BAD_ROUTE','Rota inválida.');
    const privateRoute=route==='private';
    const key=(privateRoute?this.config.privateApiKey:this.config.sharedApiKey)||(s.legacyRoute===route?this.config.apiKey:'');

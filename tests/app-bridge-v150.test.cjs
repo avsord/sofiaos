@@ -45,8 +45,31 @@ test('consultas: finanças do mês, cápsulas de hoje, Price Tracker, e-mails',t
 });
 test('a IA recebe os apps, os campos e os registros existentes no contexto',t=>{
  const f=fixture(t);f.core.workspace.save({kind:'fin_account',title:'Nubank',area:'Pessoal',data:{account_type:'corrente'}});
- const ctx=bridge.appsContext(f.core.workspace).content;
- for(const s of ['capsule (Cápsulas','fin_tx (Finanças','mail_rule (E-mails','monitor (Price Tracker','REGISTROS EXISTENTES','"Nubank"','query_target=finance'])assert.ok(ctx.includes(s),s);
+ f.store.saveNote?null:null;
+ const ctx=bridge.appsContext(f.core.workspace,f.store).content;
+ for(const s of ['capsule (Cápsula; app Cápsulas','fin_tx (Lançamento; app Finanças','mail_rule (Regra de e-mail; app E-mails','monitor (Monitoramento; app Price Tracker','contact (Contato','routine (Rotina','REGISTROS EXISTENTES','"Nubank"','query_target=finance','times_json=Horários'])assert.ok(ctx.includes(s),s);
+ assert.ok(!ctx.includes('mail_hit ('),'tipos internos ficam de fora');
  const engine=require('node:fs').readFileSync(require('node:path').join(__dirname,'../src/services/intent-engine.js'),'utf8');
- assert.ok(engine.includes("'capsule','monitor','fin_account','fin_card','fin_tx','fin_budget','fin_goal','mail_rule','shopping_item','contact'"));assert.ok(engine.includes("'finance','capsules','monitors','mail'"));assert.ok(engine.includes('8b. TODOS OS APPS DA SOFIA'));
+ assert.ok(engine.includes("...require('../core/app-bridge').APP_KINDS"));assert.ok(engine.includes('8c. APRENDA COM A PESSOA'));assert.ok(engine.includes("'finance','capsules','monitors','mail'"));assert.ok(engine.includes('8b. TODOS OS APPS DA SOFIA'));
+});
+
+test('absorve hábitos: mesma categoria vai para a mesma conta/cartão da última vez; aprendizados entram no contexto',t=>{
+ const f=fixture(t);const w=f.core.workspace;
+ const nu=w.save({kind:'fin_account',title:'Nubank',area:'Pessoal',data:{account_type:'corrente'}});w.save({kind:'fin_account',title:'Itaú',area:'Pessoal',data:{account_type:'corrente'}});
+ run(f,'create_entity',{entity_kind:'fin_tx',title:'Mercado',changes:ch(['data.amount','50'],['data.category','Mercado'],['data.account_id','Nubank'])});
+ run(f,'create_entity',{entity_kind:'fin_tx',title:'Feira',changes:ch(['data.amount','20'],['data.category','mercado'])});
+ assert.equal(w.list({kind:'fin_tx'}).find(e=>e.title==='Feira').data.account_id,nu.id,'sem perguntar: aprendeu que mercado é no Nubank');
+ run(f,'save_memory',{content:'Aprendizado: "o HD" é o produto HD 2TB do Price Tracker.'});
+ const ctx=bridge.appsContext(w,f.store).content;assert.ok(ctx.includes('APRENDIZADOS SOBRE ESTA PESSOA')&&ctx.includes('"o HD" é o produto HD 2TB'));
+});
+test('provedor Anthropic: mensagens convertidas, saída estruturada por ferramenta, chave do formato certo',async()=>{
+ const {AnthropicProvider,toMessages,isAnthropicModel}=require('../src/services/anthropic');
+ assert.ok(isAnthropicModel('claude-fable-5-1')&&!isAnthropicModel('gpt-5.6-terra'));
+ const msgs=toMessages([{role:'user',content:'oi'},{role:'user',content:[{type:'input_text',text:'contexto'}]},{role:'assistant',content:'olá'},{role:'user',content:[{type:'input_image',image_url:'data:image/png;base64,QUJD'}]}]);
+ assert.equal(msgs.length,3);assert.equal(msgs[0].content.length,2);assert.equal(msgs[2].content[0].type,'image');
+ const calls=[];const fetchImpl=async(url,init)=>{calls.push(JSON.parse(init.body));return {ok:true,headers:{get:()=>'r1'},json:async()=>({content:[{type:'tool_use',name:'plan',input:{intent:'respond'}}],usage:{input_tokens:5,output_tokens:2},stop_reason:'tool_use'})};};
+ const p=new AnthropicProvider({apiKey:'sk-ant-'+'a'.repeat(20),model:'claude-fable-5-1',apiTimeoutMs:5000},fetchImpl);
+ const r=await p.structured({instructions:'sys',input:[{role:'user',content:'oi'}],schema:{type:'object',properties:{intent:{type:'string'}},required:['intent'],additionalProperties:false},name:'plan',maxOutputTokens:800});
+ assert.deepEqual(r.data,{intent:'respond'});assert.equal(calls[0].tool_choice.name,'plan');assert.equal(calls[0].system,'sys');assert.equal(calls[0].model,'claude-fable-5-1');
+ await assert.rejects(new AnthropicProvider({apiKey:'sk-'+'b'.repeat(30),model:'claude-fable-5-1',apiTimeoutMs:5000},fetchImpl).respond({instructions:'',input:[],maxOutputTokens:100}),/chave Anthropic/);
 });

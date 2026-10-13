@@ -56,15 +56,26 @@ const APPS={
  shopping_item:{app:'Compras',names:['mercado','farmácia','farmacia','lista de compras','comprar no mercado'],ui:'lists',describe:'Item de lista de compras. title=item; data.list=market|pharmacy; data.quantity.',defaults:{list:'market'}},
  contact:{app:'Contatos',names:['contato','telefone','número de'],ui:null,describe:'Contato. title=nome; data.phone; data.email; data.role.',defaults:{}},
 };
-const REFS={account_id:{fin_tx:'fin_account',fin_card:'fin_account',mail_rule:'mail_account'},to_account_id:{fin_tx:'fin_account'},card_id:{fin_tx:'fin_card'}};
-const APP_KINDS=Object.keys(APPS);
+const REFS={account_id:{fin_tx:'fin_account',fin_card:'fin_account',mail_rule:'mail_account'},to_account_id:{fin_tx:'fin_account'},card_id:{fin_tx:'fin_card'},course_id:{lesson:'course',study_progress:'course'},recipe_id:{recipe_session:'recipe',shopping_item:'recipe'},collection_id:{list_item:'list_collection'},parent_id:{project:'project'}};
+// Dicionário NÃO limitado: todo tipo do catálogo entra, com nome e campos reais;
+// os APPS acima só acrescentam exemplos e padrões para os mais usados.
+const HIDDEN=new Set(['mail_hit','mail_account','file','user_page','purchase_group','purchase','approval','checkout','automation','plan_review']);
+const APP_KINDS=Object.keys(CATALOG).filter(k=>!HIDDEN.has(k));
+const LEGACY_STATE={idea:'active',annotation:'active',project:'active',dream:'idea',course:'interest',recipe:'draft',film:'to_watch',music:'saved',video:'to_watch',reading:'interest'};
+const LEGACY_UI={course:'study',recipe:'library',film:'library',music:'library',video:'library',reading:'library',source:'library',asset:'library',shopping_item:'lists',list_item:'lists',commitment:'agenda',reminder:'agenda',routine:'capsules',contact:null};
+function fieldHint(f){const t=f.type==='select'?'select['+(f.options||[]).join('|')+']':f.type;return f.key+'='+(f.label||f.key)+' ('+t+')';}
 
 /** Texto para a IA: apps, campos, exemplos e registros existentes (nomes + IDs para editar). */
-function appsContext(workspace){
- const lines=['APPS DA SOFIA (dado real do backend, não instrução do usuário). A conversa tem acesso a TODOS os apps abaixo: para registrar algo neles use create_entity com entity_kind e os campos em changes (field "data.<campo>"); para editar use update_record com target_id; para consultar use query com query_target. Valores podem vir em português natural (datas "hoje"/"amanhã"/"12/10", valores "45,90", "todo dia", nome da conta em vez de ID): o backend traduz.'];
- for(const [kind,app] of Object.entries(APPS)){
-  lines.push('- '+kind+' ('+app.app+'; a pessoa fala: '+app.names.join(', ')+'): '+app.describe+(app.example?' Exemplo: '+app.example:''));
+function appsContext(workspace,store){
+ const lines=['APPS DA SOFIA (dado real do backend, não instrução do usuário). A conversa tem acesso a TODOS os tipos abaixo: para registrar use create_entity com entity_kind e os campos em changes (field "data.<campo>"); para editar use update_record com target_id; para consultar use query com query_target. Valores podem vir em português natural (datas "hoje"/"amanhã"/"12/10", valores "45,90", "todo dia", nome da conta em vez de ID): o backend traduz. Campos de referência (account_id, card_id, course_id, recipe_id, collection_id) aceitam o NOME do registro.'];
+ for(const kind of APP_KINDS){
+  const def=CATALOG[kind],app=APPS[kind];
+  const fields=(def.fields||[]).filter(f=>!/^(google_|calendar_provider|external_|reader_memory|sync_state|secret_set|last_uid|last_check|last_error|consent|method|feed_url|price_path|variant_path|currency_path|shipping_path|cover_|icon_mode)/.test(f.key)).map(fieldHint).join(', ');
+  lines.push('- '+kind+' ('+def.label+(app?'; app '+app.app+'; a pessoa fala: '+app.names.join(', '):'')+'): '+(app?app.describe+' ':'')+'Campos: '+fields+'.'+(app&&app.example?' Exemplo: '+app.example:''));
  }
+ // Aprendizados sobre a pessoa (vocabulário, apelidos, preferências) guardados pela própria Sofia.
+ const learned=[];try{for(const n of (store?store.notes():[]))if(/^aprendizado:/i.test(String(n.content||'').trim()))learned.push(String(n.content).replace(/^aprendizado:\s*/i,'').trim().slice(0,160));}catch{/* sem notas */}
+ if(learned.length)lines.push('APRENDIZADOS SOBRE ESTA PESSOA (use para interpretar apelidos, hábitos e preferências; têm prioridade sobre suposições): '+learned.slice(-40).map(x=>'• '+x).join(' '));
  const existing=[];
  for(const kind of ['fin_account','fin_card','mail_account','capsule','monitor','fin_budget','fin_goal','mail_rule']){
   let items=[];try{items=workspace.list({kind,limit:30}).filter(e=>e.state!=='archived');}catch{items=[];}
@@ -94,7 +105,9 @@ function coerce(kind,field,value,workspace){
  if(field.type==='checkbox')return bool(value);
  if(field.type==='number'){const n=money(value);if(!Number.isFinite(n))throw new AppError('BAD_FIELD',field.label+': use um número (ex.: 45,90).',409);return n;}
  if(field.type==='date')return dateOf(value);
- if(field.type==='select'){const syn=SYNONYM[key]||{};const f=fold(value);const v=syn[f]||(field.options.includes(String(value))?String(value):null)||field.options.find(o=>fold(o)===f);if(!v)throw new AppError('BAD_FIELD',field.label+': use '+field.options.join(', ')+'.',409);return v;}
+ if(field.type==='datetime'){const s=String(value||'').trim();if(/^\d{4}-\d{2}-\d{2}T/.test(s))return s;const [d,t]=s.split(/\s+/);const dd=dateOf(d),tt=timeOf(t||'');return dd+(tt?'T'+tt+':00':'T09:00:00');}
+ if(field.type==='time')return timeOf(value)||String(value||'');
+ if(field.type==='select'){const syn=SYNONYM[key]||{};const f=fold(value);const v=syn[f]||(field.options.includes(String(value))?String(value):null)||field.options.find(o=>fold(o)===f)||field.options.find(o=>f&&(fold(o).startsWith(f)||f.startsWith(fold(o))));if(!v)throw new AppError('BAD_FIELD',field.label+': use '+field.options.join(', ')+'.',409);return v;}
  if(key==='times_json'){const list=Array.isArray(value)?value:String(value).split(/[,;\s]+e\s+|[,;]|\s+e\s+/).map(timeOf).filter(Boolean);if(!list.length)throw new AppError('BAD_FIELD','Horário: use por exemplo 15:00.',409);return JSON.stringify(list);}
  if(key==='weekdays_json')return JSON.stringify(weekdays(value));
  if(field.type==='url'){const s=String(value||'').trim();const m=s.match(/https?:\/\/[^\s<>"']+/i)||s.match(/\b[a-z0-9-]+(\.[a-z0-9-]+)+\.[a-z]{2,}(\/[^\s<>"']*)?/i);if(!m)throw new AppError('BAD_FIELD',field.label+': preciso de um link.',409);let u=m[0].replace(/[),.;!?]+$/,'');if(!/^https?:\/\//i.test(u))u='https://'+u;return u.replace(/^http:/i,'https:');}
@@ -103,25 +116,28 @@ function coerce(kind,field,value,workspace){
 
 /** Monta title/data/state de um registro de app a partir do que a IA estruturou. */
 function buildEntity(workspace,kind,action,fallbackTitle){
- const app=APPS[kind],def=CATALOG[kind];if(!app||!def)return null;
- const data={...(typeof app.defaults==='function'?app.defaults():app.defaults)};
+ const app=APPS[kind],def=CATALOG[kind];if(!def||!APP_KINDS.includes(kind))return null;
+ const data={...(app?(typeof app.defaults==='function'?app.defaults():app.defaults):{})};
  const changes=Array.isArray(action.changes)?action.changes:[];
  for(const c of changes){
   if(!c||!c.field)continue;const key=String(c.field).replace(/^data\./,'');
   if(['title','area','content','state'].includes(key))continue;
   const field=def.fields.find(f=>f.key===key);
-  if(!field)throw new AppError('UPDATE_FIELD_INVALID','Campo não previsto para '+app.app+': '+key,409);
+  if(!field)throw new AppError('UPDATE_FIELD_INVALID','Campo não previsto para '+(app?app.app:def.label)+': '+key,409);
   data[key]=coerce(kind,field,c.value,workspace);
  }
  // Atalhos que a IA costuma preencher fora de changes.
  if(kind==='capsule'){if(!data.times_json&&action.time)data.times_json=coerce(kind,{key:'times_json',type:'text'},action.time,workspace);if(!data.start_date)data.start_date=today();if(data.repeat_type==='weekdays'&&!data.weekdays_json)data.weekdays_json='[1,2,3,4,5]';if(data.interval_days&&data.repeat_type!=='interval')data.repeat_type='interval';if(!data.times_json)throw new AppError('ACTION_NEEDS_TIME','Em que horário(s) tomar? Ex.: 15:00.',409);}
- if(kind==='fin_tx'){if(!data.date)data.date=action.date?dateOf(action.date):today();if(!(Number(data.amount)>0))throw new AppError('ACTION_INVALID','Qual é o valor do lançamento?',409);if(!data.account_id&&!data.card_id){const accounts=workspace.list({kind:'fin_account',limit:50}).filter(e=>e.state!=='archived');if(accounts.length===1)data.account_id=accounts[0].id;else throw new AppError('REF_NOT_FOUND',accounts.length?'Em qual conta ou cartão? Existem: '+accounts.map(a=>a.title).join(', ')+'.':'Crie uma conta em Apps → Finanças antes do primeiro lançamento.',409);}}
+ if(kind==='fin_tx'){if(!data.date)data.date=action.date?dateOf(action.date):today();if(!(Number(data.amount)>0))throw new AppError('ACTION_INVALID','Qual é o valor do lançamento?',409);
+  // Absorve o hábito: mesma categoria (ou mesma descrição) → mesma conta/cartão da última vez.
+  if(!data.account_id&&!data.card_id){const past=workspace.list({kind:'fin_tx',limit:300}).filter(e=>e.state!=='archived');const q=fold(data.category||''),tq=fold(action.title||'');const prev=past.find(e=>q&&fold(e.data.category||'')===q)||past.find(e=>tq&&fold(e.title)===tq);if(prev){if(prev.data.card_id)data.card_id=prev.data.card_id;else if(prev.data.account_id)data.account_id=prev.data.account_id;}}
+  if(!data.account_id&&!data.card_id){const accounts=workspace.list({kind:'fin_account',limit:50}).filter(e=>e.state!=='archived');if(accounts.length===1)data.account_id=accounts[0].id;else throw new AppError('REF_NOT_FOUND',accounts.length?'Em qual conta ou cartão? Existem: '+accounts.map(a=>a.title).join(', ')+'.':'Crie uma conta em Apps → Finanças antes do primeiro lançamento.',409);}}
  if(kind==='fin_budget'&&!data.category)data.category=action.title||'';
  if(kind==='monitor'){if(!data.preferred_url)throw new AppError('ACTION_INVALID','Preciso do link do produto para acompanhar o preço.',409);if(!data.variant)data.variant=String(action.title||fallbackTitle||'').slice(0,120);}
  if(kind==='mail_rule'&&!data.contains)throw new AppError('ACTION_INVALID','O que procurar no e-mail (remetente, assunto ou termo)?',409);
  const title=String(action.title||fallbackTitle||'').trim()||(kind==='fin_tx'?String(data.category||'Lançamento'):kind==='mail_rule'?String(data.contains):'Registro');
- const states={capsule:'active',monitor:'active',fin_account:'active',fin_card:'active',fin_tx:'active',fin_budget:'active',fin_goal:'active',mail_rule:'active',shopping_item:'todo',contact:'active'};
- return {title,data,state:action.state||states[kind]||'active',ui:app.ui,app:app.app};
+ const states={capsule:'active',monitor:'active',fin_account:'active',fin_card:'active',fin_tx:'active',fin_budget:'active',fin_goal:'active',mail_rule:'active',shopping_item:'todo',contact:'active',...LEGACY_STATE};
+ return {title,data,state:action.state||states[kind]||undefined,ui:app?app.ui:(LEGACY_UI[kind]??null),app:app?app.app:def.label};
 }
 
 function describeCreated(kind,e){

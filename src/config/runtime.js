@@ -7,7 +7,8 @@ function makeConfig(overrides = {}) {
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new AppError('BAD_PORT', 'PORT precisa ser um número entre 1 e 65535.');
   return {
     root, port, host: '127.0.0.1', dataDir: process.env.SOFIA_DATA_DIR ? path.resolve(root, process.env.SOFIA_DATA_DIR) : path.join(root, 'data'), backupDir: process.env.SOFIA_BACKUP_DIR ? path.resolve(root, process.env.SOFIA_BACKUP_DIR) : path.join(root, 'backups'),
-    model: process.env.OPENAI_MODEL?.trim() || 'gpt-5.6-terra',
+    // SOFIA_MODEL (ou OPENAI_MODEL): 'claude-fable-5-1', 'claude-opus-5-5'... usa a Anthropic (chave sk-ant-... nas mesmas rotas); 'gpt-...' usa a OpenAI.
+    model: process.env.SOFIA_MODEL?.trim() || process.env.OPENAI_MODEL?.trim() || 'gpt-5.6-terra',
     apiKey: process.env.OPENAI_API_KEY?.trim() || '',
     adminApiKey: process.env.OPENAI_ADMIN_KEY?.trim() || '',
     transcriptionModel: process.env.OPENAI_TRANSCRIPTION_MODEL?.trim() || 'gpt-transcribe',
