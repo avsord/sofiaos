@@ -33,7 +33,9 @@ function wordsToNumber(text){
  * ("cinquenta reais", "cinquenta e nove reais e noventa centavos", "cem"). */
 function money(v){
  if(typeof v==='number')return v;
- const raw=fold(v);if(!raw)return NaN;
+ // Gíria brasileira para dinheiro: conto, pila, pau, mango(s); "um barão" = mil; "2k" = 2000
+ const raw=fold(v).replace(/\b(contos?|pilas?|paus?|mangos?)\b/g,'reais').replace(/\bum\s+barao\b/g,'mil reais').replace(/\b(\d+)\s*barao\b/g,(_,n)=>String(Number(n)*1000)+' reais').replace(/\b(\d+)\s*k\b/g,(_,n)=>String(Number(n)*1000));if(!raw)return NaN;
+ if(/^(?:meio|meia)\s*(?:real|reais)?$/.test(raw))return 0.5;
  const cents=/^(.*?)\s*reais?\s*e\s*(.*?)\s*centavos?$/.exec(raw)||/^(.*?)\s+e\s+(\d{1,2})$/.exec(raw.replace(/reais?|r\$/g,'').trim());
  if(cents){const whole=wordsToNumber(cents[1])??Number(cents[1].replace(',','.'));const cc=wordsToNumber(cents[2])??Number(cents[2]);if(Number.isFinite(whole)&&Number.isFinite(cc))return whole+cc/100;}
  const byWords=wordsToNumber(raw.replace(/r\$|reais?|brl/g,''));if(byWords!=null)return byWords;
@@ -48,19 +50,40 @@ function dateOf(v){
  if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);
  const daqui=/^daqui\s+a\s+(\d+)\s*dias?$/.exec(s);if(daqui)return addDays(today(),Number(daqui[1]));
  if(s==='semana que vem'||s==='proxima semana')return addDays(today(),7);
+ if(s==='semana passada')return addDays(today(),-7);
+ const atras=/^(?:ha\s+)?(\d+)\s*dias?\s*atras$/.exec(s)||/^ha\s+(\d+)\s*dias?$/.exec(s);if(atras)return addDays(today(),-Number(atras[1]));
+ // "dia 15" = o próximo dia 15 (este mês se ainda não passou; senão o mês que vem)
+ const diaN=/^(?:no\s+)?dia\s+(\d{1,2})$/.exec(s);if(diaN){const d=Number(diaN[1]);const t=today();const thisMonth=t.slice(0,7)+'-'+String(d).padStart(2,'0');if(thisMonth>=t)return thisMonth;const [y,m]=t.split('-').map(Number);const ny=m===12?y+1:y,nm=m===12?1:m+1;return ny+'-'+String(nm).padStart(2,'0')+'-'+String(d).padStart(2,'0');}
+ if(/^(fim|final)\s+do\s+mes$/.test(s)){const [y,m]=today().split('-').map(Number);return y+'-'+String(m).padStart(2,'0')+'-'+String(new Date(Date.UTC(y,m,0)).getUTCDate()).padStart(2,'0');}
+ if(/^(comeco|inicio)\s+do\s+(mes\s+que\s+vem|proximo\s+mes)$/.test(s)){const [y,m]=today().split('-').map(Number);const ny=m===12?y+1:y,nm=m===12?1:m+1;return ny+'-'+String(nm).padStart(2,'0')+'-01';}
+ const past=/^(domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)\s+(passad[ao]|retrasad[ao])$/.exec(s);
+ if(past){const target=WEEKNAME[past[1].replace('-feira','')];let d=addDays(today(),-1);while(new Date(d+'T12:00:00Z').getUTCDay()!==target)d=addDays(d,-1);return past[2].startsWith('retrasad')?addDays(d,-7):d;}
  const wd=/^(proxim[ao]\s+)?(domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)(\s+que\s+vem)?$/.exec(s);
  if(wd){const name=wd[2].replace('-feira','');return nextWeekday(WEEKNAME[name],Boolean(wd[1]||wd[3]));}
  const m=/^(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?$/.exec(s);if(m){const y=m[3]?(m[3].length===2?'20'+m[3]:m[3]):today().slice(0,4);return y+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');}
  return s;
 }
-function timeOf(v){const f=fold(v);if(f==='meio-dia'||f==='meio dia')return '12:00';if(f==='meia-noite'||f==='meia noite')return '00:00';const s=f.replace(/\s*(horas?|hrs?|hs?)\s*$/,'').replace(/h/,':').replace(/:$/,'').replace(/\s+/g,'');const m=/^(\d{1,2})(?::(\d{1,2}))?$/.exec(s);if(!m)return '';const h=Number(m[1]),mi=Number(m[2]||0);if(h>23||mi>59)return '';return String(h).padStart(2,'0')+':'+String(mi).padStart(2,'0');}
+// Períodos do dia viram um horário padrão sensato (a pessoa ajusta se quiser).
+const PERIOD={'de manha':'08:00','manha':'08:00','cedo':'07:00','ao acordar':'07:00','quando acordar':'07:00','no cafe':'08:00','no cafe da manha':'08:00','no almoco':'12:30','almoco':'12:30','depois do almoco':'13:30','a tarde':'15:00','de tarde':'15:00','tarde':'15:00','fim de tarde':'18:00','final de tarde':'18:00','a noite':'20:00','de noite':'20:00','noite':'20:00','no jantar':'20:00','jantar':'20:00','antes de dormir':'22:00','ao dormir':'22:00','na hora de dormir':'22:00','madrugada':'03:00'};
+/** "a cada 8 horas" / "de 12 em 12 horas" / "3 vezes ao dia" → lista de horários a partir das 8h. */
+function timesEvery(text){
+ const f=fold(text);
+ const m=/(?:a\s+cada|de)\s+(\d{1,2})\s*(?:em\s+\d{1,2}\s*)?(?:h|horas?)/.exec(f);
+ const vezes=/(\d|uma|duas|tres|quatro)\s*(?:x|vezes)\s*(?:ao|por)\s*dia/.exec(f);
+ let step=null;
+ if(m)step=Number(m[1]);else if(vezes){const n=UNIT[vezes[1]]??Number(vezes[1]);if(n>0)step=Math.round(24/n);}
+ if(!step||step<1||step>24)return null;
+ const out=[];for(let h=8;h<8+24;h+=step)out.push(String(h%24).padStart(2,'0')+':00');
+ return out.slice(0,Math.ceil(24/step));
+}
+function timeOf(v){const f=fold(v).replace(/^(as|a|no|na|de|pela|pelo)\s+/,'');if(PERIOD[f])return PERIOD[f];if(f==='meio-dia'||f==='meio dia')return '12:00';if(f==='meia-noite'||f==='meia noite')return '00:00';const s=f.replace(/\s*(horas?|hrs?|hs?)\s*$/,'').replace(/h/,':').replace(/:$/,'').replace(/\s+/g,'');const m=/^(\d{1,2})(?::(\d{1,2}))?$/.exec(s);if(!m)return '';const h=Number(m[1]),mi=Number(m[2]||0);if(h>23||mi>59)return '';return String(h).padStart(2,'0')+':'+String(mi).padStart(2,'0');}
 const WEEK={dom:0,seg:1,ter:2,qua:3,qui:4,sex:5,sab:6};
 function weekdays(v){if(Array.isArray(v))return v.map(Number).filter(n=>n>=0&&n<=6);const f=fold(v);if(f==='dias uteis')return [1,2,3,4,5];if(f==='fim de semana'||f==='final de semana')return [0,6];const out=new Set();for(const part of f.split(/[,\s/e]+/)){const k=part.slice(0,3);if(k in WEEK)out.add(WEEK[k]);else if(/^\d$/.test(part))out.add(Number(part));}return [...out].sort();}
 
 // Sinônimos para campos de escolha, por app.
 const SYNONYM={
  capsule_type:{remedio:'medicine',medicamento:'medicine',medicine:'medicine',remedy:'medicine',suplemento:'supplement',supplement:'supplement',vitamina:'supplement',erva:'herbal',cha:'herbal',herbal:'herbal',natural:'herbal'},
- repeat_type:{diario:'daily',diaria:'daily','todo dia':'daily','todos os dias':'daily',daily:'daily','dias uteis':'weekdays',semanal:'weekdays',weekdays:'weekdays',intervalo:'interval',interval:'interval',mensal:'monthly',monthly:'monthly',anual:'yearly',yearly:'yearly','uma vez':'once',once:'once',unico:'once'},
+ repeat_type:{diario:'daily',diaria:'daily','todo dia':'daily','todos os dias':'daily','todo santo dia':'daily',daily:'daily','dia sim dia nao':'interval','dia sim, dia nao':'interval','dias alternados':'interval','dias uteis':'weekdays',semanal:'weekdays',weekdays:'weekdays',intervalo:'interval',interval:'interval',mensal:'monthly',monthly:'monthly',anual:'yearly',yearly:'yearly','uma vez':'once',once:'once',unico:'once'},
  kind:{despesa:'expense',gasto:'expense',gastei:'expense',saida:'expense',expense:'expense',receita:'income',entrada:'income',ganho:'income',salario:'income',income:'income',transferencia:'transfer',transfer:'transfer','pagamento de fatura':'card_payment',fatura:'card_payment',card_payment:'card_payment'},
  recurrence:{nenhuma:'none',none:'none',mensal:'monthly',monthly:'monthly',semanal:'weekly',weekly:'weekly',anual:'yearly',yearly:'yearly'},
  field:{qualquer:'any',any:'any',tudo:'any',remetente:'from',from:'from','de':'from',assunto:'subject',subject:'subject',titulo:'subject',texto:'body',corpo:'body',body:'body',conteudo:'body'},
@@ -125,35 +148,46 @@ function appsContext(workspace,store){
 }
 
 /** Acha um registro por nome (ou id) entre os de um tipo. */
-function resolveRef(workspace,kind,value){
+// Distância de edição simples (erros de digitação: "Nubak" ~ "Nubank").
+function editDistance(a,b){const m=a.length,n=b.length;if(!m)return n;if(!n)return m;let prev=Array.from({length:n+1},(_,i)=>i);for(let i=1;i<=m;i++){const cur=[i];for(let j=1;j<=n;j++)cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));prev=cur;}return prev[n];}
+/** Apelidos que a Sofia aprendeu: notas "Apelido: <nome> = <id>". */
+function learnedAliases(store){const out=new Map();try{for(const n of (store?store.notes():[])){const m=/^apelido:\s*["\u201c']?([^"\u201d'=]+?)["\u201d']?\s*=\s*([\w-]{6,})\s*$/i.exec(String(n.content||'').trim());if(m)out.set(fold(m[1]),m[2]);}}catch{/* sem notas */}return out;}
+function resolveRef(workspace,kind,value,store){
  const raw=String(value||'').trim();if(!raw)return '';
  try{const byId=workspace.get(raw);if(byId&&byId.kind===kind)return byId.id;}catch{/* não é id */}
  const items=workspace.list({kind,limit:200}).filter(e=>e.state!=='archived');
- const q=fold(raw);
- const hit=items.find(e=>fold(e.title)===q)||items.find(e=>fold(e.data?.address||'')===q)||items.find(e=>fold(e.title).includes(q)||q.includes(fold(e.title)));
+ const q=fold(raw).replace(/^(o|a|os|as|meu|minha|meus|minhas|do|da|no|na)\s+/,'');
+ const aliases=learnedAliases(store);const alias=aliases.get(fold(raw))||aliases.get(q);if(alias){try{const e=workspace.get(alias);if(e&&e.kind===kind)return e.id;}catch{/* apelido antigo */}}
+ const exact=items.filter(e=>fold(e.title)===q||fold(e.data?.address||'')===q);if(exact.length)return exact[0].id;
+ const partial=items.filter(e=>fold(e.title).includes(q)||q.includes(fold(e.title)));
+ if(partial.length===1)return partial[0].id;
+ if(partial.length>1)throw new AppError('REF_AMBIGUOUS','Qual delas: '+partial.map(e=>e.title).slice(0,6).join(', ')+'?',409);
+ const close=items.map(e=>({e,d:editDistance(fold(e.title),q)})).filter(x=>x.d<=Math.max(1,Math.floor(q.length/4))).sort((a,b)=>a.d-b.d);
+ if(close.length&&(close.length===1||close[0].d<close[1].d))return close[0].e.id;
+ const hit=null;
  if(hit)return hit.id;
  const label={fin_account:'conta',fin_card:'cartão',mail_account:'conta de e-mail'}[kind]||kind;
  throw new AppError('REF_NOT_FOUND','Não achei '+label+' chamada “'+raw.slice(0,40)+'”'+(items.length?'. Existem: '+items.map(e=>e.title).slice(0,8).join(', ')+'.':'. Crie primeiro em '+(APPS[kind]?.app||'Apps')+'.'),409);
 }
 
 /** Traduz um valor para o tipo do campo do catálogo (com sinônimos e português natural). */
-function coerce(kind,field,value,workspace){
+function coerce(kind,field,value,workspace,store){
  const key=field.key;
- if(REFS[key]&&REFS[key][kind])return resolveRef(workspace,REFS[key][kind],value);
+ if(REFS[key]&&REFS[key][kind])return resolveRef(workspace,REFS[key][kind],value,store);
  if(field.type==='checkbox')return bool(value);
  if(field.type==='number'){const n=money(value);if(!Number.isFinite(n))throw new AppError('BAD_FIELD',field.label+': use um número (ex.: 45,90).',409);return n;}
  if(field.type==='date')return dateOf(value);
  if(field.type==='datetime'){const s=String(value||'').trim();if(/^\d{4}-\d{2}-\d{2}T/.test(s))return s;const [d,t]=s.split(/\s+/);const dd=dateOf(d),tt=timeOf(t||'');return dd+(tt?'T'+tt+':00':'T09:00:00');}
  if(field.type==='time')return timeOf(value)||String(value||'');
  if(field.type==='select'){const syn=SYNONYM[key]||{};const f=fold(value);const v=syn[f]||(field.options.includes(String(value))?String(value):null)||field.options.find(o=>fold(o)===f)||field.options.find(o=>f&&(fold(o).startsWith(f)||f.startsWith(fold(o))));if(!v)throw new AppError('BAD_FIELD',field.label+': use '+field.options.join(', ')+'.',409);return v;}
- if(key==='times_json'){const list=Array.isArray(value)?value:String(value).split(/[,;\s]+e\s+|[,;]|\s+e\s+/).map(timeOf).filter(Boolean);if(!list.length)throw new AppError('BAD_FIELD','Horário: use por exemplo 15:00.',409);return JSON.stringify(list);}
+ if(key==='times_json'){const every=Array.isArray(value)?null:timesEvery(String(value));const list=every||(Array.isArray(value)?value:String(value).split(/[,;\s]+e\s+|[,;]|\s+e\s+/).map(timeOf).filter(Boolean));if(!list.length)throw new AppError('BAD_FIELD','Horário: use por exemplo 15:00.',409);return JSON.stringify(list);}
  if(key==='weekdays_json')return JSON.stringify(weekdays(value));
  if(field.type==='url'){const s=String(value||'').trim();const m=s.match(/https?:\/\/[^\s<>"']+/i)||s.match(/\b[a-z0-9-]+(\.[a-z0-9-]+)+\.[a-z]{2,}(\/[^\s<>"']*)?/i);if(!m)throw new AppError('BAD_FIELD',field.label+': preciso de um link.',409);let u=m[0].replace(/[),.;!?]+$/,'');if(!/^https?:\/\//i.test(u))u='https://'+u;return u.replace(/^http:/i,'https:');}
  return value==null?'':String(value);
 }
 
 /** Monta title/data/state de um registro de app a partir do que a IA estruturou. */
-function buildEntity(workspace,kind,action,fallbackTitle){
+function buildEntity(workspace,kind,action,fallbackTitle,store){
  const app=APPS[kind],def=CATALOG[kind];if(!def||!APP_KINDS.includes(kind))return null;
  const data={...(app?(typeof app.defaults==='function'?app.defaults():app.defaults):{})};
  const changes=Array.isArray(action.changes)?action.changes:[];
@@ -162,11 +196,12 @@ function buildEntity(workspace,kind,action,fallbackTitle){
   if(['title','area','content','state'].includes(key))continue;
   const field=def.fields.find(f=>f.key===key);
   if(!field)throw new AppError('UPDATE_FIELD_INVALID','Campo não previsto para '+(app?app.app:def.label)+': '+key,409);
-  data[key]=coerce(kind,field,c.value,workspace);
+  data[key]=coerce(kind,field,c.value,workspace,store);
  }
  // Atalhos que a IA costuma preencher fora de changes.
- if(kind==='capsule'){if(!data.times_json&&action.time)data.times_json=coerce(kind,{key:'times_json',type:'text'},action.time,workspace);if(!data.start_date)data.start_date=today();if(data.repeat_type==='weekdays'&&!data.weekdays_json)data.weekdays_json='[1,2,3,4,5]';if(data.interval_days&&data.repeat_type!=='interval')data.repeat_type='interval';if(!data.times_json)throw new AppError('ACTION_NEEDS_TIME','Em que horário(s) tomar? Ex.: 15:00.',409);}
+ if(kind==='capsule'){if(!data.times_json&&action.time)data.times_json=coerce(kind,{key:'times_json',type:'text'},action.time,workspace,store);if(!data.start_date)data.start_date=today();if(data.repeat_type==='weekdays'&&!data.weekdays_json)data.weekdays_json='[1,2,3,4,5]';if(data.interval_days&&data.repeat_type!=='interval')data.repeat_type='interval';if(!data.times_json)throw new AppError('ACTION_NEEDS_TIME','Em que horário(s) tomar? Ex.: 15:00.',409);}
  if(kind==='fin_tx'){if(!data.date)data.date=action.date?dateOf(action.date):today();if(!(Number(data.amount)>0))throw new AppError('ACTION_INVALID','Qual é o valor do lançamento?',409);
+  if(!data.category){const tq=fold(action.title||'');const prevSame=tq&&workspace.list({kind:'fin_tx',limit:300}).find(e=>e.state!=='archived'&&fold(e.title)===tq&&e.data.category);if(prevSame)data.category=prevSame.data.category;}
   // Absorve o hábito: mesma categoria (ou mesma descrição) → mesma conta/cartão da última vez.
   if(!data.account_id&&!data.card_id){const past=workspace.list({kind:'fin_tx',limit:300}).filter(e=>e.state!=='archived');const q=fold(data.category||''),tq=fold(action.title||'');const prev=past.find(e=>q&&fold(e.data.category||'')===q)||past.find(e=>tq&&fold(e.title)===tq);if(prev){if(prev.data.card_id)data.card_id=prev.data.card_id;else if(prev.data.account_id)data.account_id=prev.data.account_id;}}
   if(!data.account_id&&!data.card_id){const accounts=workspace.list({kind:'fin_account',limit:50}).filter(e=>e.state!=='archived');if(accounts.length===1)data.account_id=accounts[0].id;else throw new AppError('REF_NOT_FOUND',accounts.length?'Em qual conta ou cartão? Existem: '+accounts.map(a=>a.title).join(', ')+'.':'Crie uma conta em Apps → Finanças antes do primeiro lançamento.',409);}}
@@ -188,14 +223,21 @@ function describeCreated(kind,e){
 }
 
 /** Consultas por app. */
-function query(workspace,store,target){
+function query(workspace,store,target,action={}){
+ const filter=fold([action.title,action.content].filter(Boolean).join(' '));
  const money=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
- if(target==='capsules'){const items=workspace.list({kind:'capsule',limit:200}).filter(e=>e.state==='active');if(!items.length)return {reply:'Nenhuma cápsula cadastrada. Diga, por exemplo: “tomar 1 ômega 3 todo dia às 16h”.',items:[]};const lines=items.map(e=>{let t=[];try{t=JSON.parse(e.data.times_json||'[]');}catch{}return '• '+e.title+(e.data.dose_text?' — '+e.data.dose_text:'')+(t.length?' às '+t.join(', '):'');});return {reply:'Cápsulas de hoje:\n'+lines.join('\n'),ui_target:'capsules',items};}
- if(target==='monitors'){const items=workspace.list({kind:'monitor',limit:100}).filter(e=>e.state!=='archived');if(!items.length)return {reply:'Nenhum produto no Price Tracker ainda. Me manda um link que eu passo a acompanhar.',items:[]};const lines=items.map(e=>{const obs=workspace.observations(e.id);const last=obs[obs.length-1];return '• '+e.title+(last?': '+money((last.total_cents||last.price_cents||0)/100)+(last.source?' ('+(()=>{try{return new URL(last.source).hostname.replace(/^www\./,'');}catch{return '';}})()+')':''):': sem leitura ainda')+(e.state==='paused'?' (pausado)':'');});return {reply:'Price Tracker:\n'+lines.join('\n'),ui_target:'monitoring',items};}
- if(target==='mail'){const hits=workspace.list({kind:'mail_hit',limit:10});if(!hits.length)return {reply:'Nenhum e-mail bateu nas regras ainda.',items:[]};return {reply:'Últimos e-mails que a Sofia pegou:\n'+hits.map(h=>'• '+(h.data.from_name||h.data.from_addr||'?')+': '+(h.data.subject||'(sem assunto)')).join('\n'),ui_target:'mail',items:hits};}
+ if(target==='capsules'){let items=workspace.list({kind:'capsule',limit:200}).filter(e=>e.state==='active');const period=/manha|cedo/.test(filter)?['05','06','07','08','09','10','11']:/tarde/.test(filter)?['12','13','14','15','16','17']:/noite|dormir/.test(filter)?['18','19','20','21','22','23']:null;if(period)items=items.filter(e=>{try{return JSON.parse(e.data.times_json||'[]').some(t=>period.includes(String(t).slice(0,2)));}catch{return false;}});if(!items.length)return {reply:'Nenhuma cápsula cadastrada. Diga, por exemplo: “tomar 1 ômega 3 todo dia às 16h”.',items:[]};const lines=items.map(e=>{let t=[];try{t=JSON.parse(e.data.times_json||'[]');}catch{}return '• '+e.title+(e.data.dose_text?' — '+e.data.dose_text:'')+(t.length?' às '+t.join(', '):'');});return {reply:'Cápsulas de hoje:\n'+lines.join('\n'),ui_target:'capsules',items};}
+ if(target==='monitors'){let items=workspace.list({kind:'monitor',limit:100}).filter(e=>e.state!=='archived');if(filter.length>2){const q=filter.replace(/\b(preco|precos|quanto|esta|ta|do|da|de|o|a|meu|minha|custa|custando|como|estao|os|as)\b/g,' ').replace(/\s+/g,' ').trim();const sel=q?items.filter(e=>fold(e.title).includes(q)||q.split(' ').some(w=>w.length>2&&fold(e.title).includes(w))):[];if(sel.length)items=sel;}if(!items.length)return {reply:'Nenhum produto no Price Tracker ainda. Me manda um link que eu passo a acompanhar.',items:[]};const lines=items.map(e=>{const obs=workspace.observations(e.id);const last=obs[obs.length-1];return '• '+e.title+(last?': '+money((last.total_cents||last.price_cents||0)/100)+(last.source?' ('+(()=>{try{return new URL(last.source).hostname.replace(/^www\./,'');}catch{return '';}})()+')':''):': sem leitura ainda')+(e.state==='paused'?' (pausado)':'');});return {reply:'Price Tracker:\n'+lines.join('\n'),ui_target:'monitoring',items};}
+ if(target==='mail'){let hits=workspace.list({kind:'mail_hit',limit:50});if(filter.length>2){const sel=hits.filter(h=>filter.split(' ').some(w=>w.length>2&&(fold(h.data.from_name||'').includes(w)||fold(h.data.from_addr||'').includes(w)||fold(h.data.subject||'').includes(w))));if(sel.length)hits=sel;}hits=hits.slice(0,10);if(!hits.length)return {reply:'Nenhum e-mail bateu nas regras ainda.',items:[]};return {reply:'Últimos e-mails que a Sofia pegou:\n'+hits.map(h=>'• '+(h.data.from_name||h.data.from_addr||'?')+': '+(h.data.subject||'(sem assunto)')).join('\n'),ui_target:'mail',items:hits};}
  if(target==='finance'){
-  const month=today().slice(0,7);const txs=[];for(let offset=0;offset<20000;offset+=500){const page=workspace.list({kind:'fin_tx',limit:500,offset});txs.push(...page.filter(e=>e.state!=='archived'));if(page.length<500)break;}
-  const inMonth=txs.filter(t=>String(t.data.date||'').startsWith(month));
+  const askedMonth=(()=>{const m=/(\d{4})-(\d{2})/.exec(String(action.date||''));if(m)return m[1]+'-'+m[2];const names=['janeiro','fevereiro','marco','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];const i=names.findIndex(n=>filter.includes(n));const [y,mm]=today().split('-').map(Number);if(i>=0)return ((i+1)>mm?y-1:y)+'-'+String(i+1).padStart(2,'0');if(/mes passado/.test(filter))return (mm===1?y-1:y)+'-'+String(mm===1?12:mm-1).padStart(2,'0');return null;})();
+  const month=askedMonth||today().slice(0,7);const txs=[];for(let offset=0;offset<20000;offset+=500){const page=workspace.list({kind:'fin_tx',limit:500,offset});txs.push(...page.filter(e=>e.state!=='archived'));if(page.length<500)break;}
+  let inMonth=txs.filter(t=>String(t.data.date||'').startsWith(month));
+  // Filtro por conta, cartão ou categoria ("quanto gastei com mercado", "no Nubank")
+  const accHit=workspace.list({kind:'fin_account',limit:50}).find(a=>filter.includes(fold(a.title)));const cardHit=workspace.list({kind:'fin_card',limit:50}).find(a=>filter.includes(fold(a.title)));
+  const catWords=filter.replace(/\b(quanto|gastei|gasto|gastos|com|em|no|na|de|do|da|esse|este|mes|neste|nesse|o|a|os|as|total|tenho|saldo|recebi|ganhei|passado|financas|resumo)\b/g,' ').replace(/\s+/g,' ').trim();
+  const categories=[...new Set(txs.map(t=>fold(t.data.category||'')).filter(Boolean))];const catHit=catWords?categories.find(c=>c===catWords||c.includes(catWords)||catWords.includes(c)):null;
+  if(accHit)inMonth=inMonth.filter(t=>t.data.account_id===accHit.id||t.data.to_account_id===accHit.id);if(cardHit)inMonth=inMonth.filter(t=>t.data.card_id===cardHit.id);if(catHit)inMonth=inMonth.filter(t=>fold(t.data.category||'')===catHit);
   const sum=k=>inMonth.filter(t=>t.data.kind===k&&t.data.paid!==false).reduce((s,t)=>s+Number(t.data.amount||0),0);
   const income=sum('income'),expense=sum('expense');
   const cats=new Map();for(const t of inMonth.filter(t=>t.data.kind==='expense'))cats.set(t.data.category||'Outros',(cats.get(t.data.category||'Outros')||0)+Number(t.data.amount||0));
@@ -203,7 +245,10 @@ function query(workspace,store,target){
   const pending=txs.filter(t=>t.data.kind==='expense'&&t.data.paid===false&&String(t.data.date||'')>=today()).sort((a,b)=>String(a.data.date).localeCompare(String(b.data.date))).slice(0,5);
   const accounts=workspace.list({kind:'fin_account',limit:50}).filter(e=>e.state!=='archived');
   const balance=accounts.reduce((s,a)=>{const base=Number(a.data.initial_balance||0);const flow=txs.filter(t=>t.data.paid!==false).reduce((x,t)=>{if(t.data.kind==='income'&&t.data.account_id===a.id)return x+Number(t.data.amount||0);if((t.data.kind==='expense'||t.data.kind==='card_payment')&&t.data.account_id===a.id)return x-Number(t.data.amount||0);if(t.data.kind==='transfer'){if(t.data.account_id===a.id)return x-Number(t.data.amount||0);if(t.data.to_account_id===a.id)return x+Number(t.data.amount||0);}return x;},0);return s+base+flow;},0);
-  const lines=['Finanças deste mês ('+month.split('-').reverse().join('/')+'):','• Receitas: '+money(income),'• Despesas: '+money(expense),'• Resultado: '+money(income-expense),'• Saldo das contas: '+money(balance)];
+  const scope=[accHit?'na conta '+accHit.title:'',cardHit?'no cartão '+cardHit.title:'',catHit?'em '+(inMonth[0]?.data.category||catHit):''].filter(Boolean).join(', ');
+  const lines=['Finanças de '+month.split('-').reverse().join('/')+(scope?' ('+scope+')':'')+':','• Receitas: '+money(income),'• Despesas: '+money(expense),'• Resultado: '+money(income-expense)];
+  if(!accHit&&!cardHit&&!catHit)lines.push('• Saldo das contas: '+money(balance));
+  else if(accHit){const base=Number(accHit.data.initial_balance||0);const flow=txs.filter(t=>t.data.paid!==false).reduce((x,t)=>{if(t.data.kind==='income'&&t.data.account_id===accHit.id)return x+Number(t.data.amount||0);if(((t.data.kind==='expense'&&!t.data.card_id)||t.data.kind==='card_payment')&&t.data.account_id===accHit.id)return x-Number(t.data.amount||0);if(t.data.kind==='transfer'){if(t.data.account_id===accHit.id)return x-Number(t.data.amount||0);if(t.data.to_account_id===accHit.id)return x+Number(t.data.amount||0);}return x;},0);lines.push('• Saldo de '+accHit.title+': '+money(base+flow));}
   if(top.length)lines.push('• Maiores gastos: '+top.join(', '));
   if(pending.length)lines.push('• A pagar: '+pending.map(t=>t.title+' '+money(t.data.amount)+' ('+String(t.data.date).split('-').reverse().slice(0,2).join('/')+')').join(', '));
   if(!inMonth.length&&!accounts.length)lines.push('Nenhum lançamento ainda. Diga, por exemplo: “gastei 45,90 no mercado hoje”.');
