@@ -14,7 +14,9 @@ export class ChatTailIntent {
 export function useChatTail(list:RefObject<FlatList<any>|null>,active:boolean){
  const lastGesture=useRef(0),intent=useRef(new ChatTailIntent()).current,[showJump,setShowJump]=useState(false);
  const follow=useCallback(()=>{intent.follow();setShowJump(false);list.current?.scrollToOffset({offset:0,animated:false});},[intent,list]);
- const keep=useCallback(()=>{if(intent.following&&!intent.interacting)list.current?.scrollToOffset({offset:0,animated:false});},[intent,list]);
+ // Segue a mensagem nova: agora e de novo no quadro seguinte, porque a lista pode
+ // reposicionar o conteúdo depois do aviso de tamanho (e a mensagem ficava escondida).
+ const keep=useCallback(()=>{if(!intent.following||intent.interacting)return;list.current?.scrollToOffset({offset:0,animated:false});requestAnimationFrame(()=>{if(intent.following&&!intent.interacting)list.current?.scrollToOffset({offset:0,animated:false});});},[intent,list]);
  // Reset while hidden as well as on entry: the first visible frame is already at zero.
  useLayoutEffect(()=>{follow();},[active,follow]);
  useEffect(()=>{const s=AppState.addEventListener('change',state=>{if(state==='active')follow();});return()=>s.remove();},[follow]);
