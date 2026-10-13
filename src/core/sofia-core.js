@@ -34,16 +34,16 @@ function contextLookup(value){
   return text.slice(0,250)+' … '+text.slice(-247);
 }
 
-// Prioridade de tarefa tem 4 níveis no app (Importante, Média, Leve, Sem). A IA
+// Prioridade de tarefa tem 4 níveis no app (Importante, Média, Baixa, Sem). A IA
 // mandava só sim/não: "coloca em prioridade leve" virava "não" e nada mudava.
-const PRIORITY_LABEL={important:'Importante',medium:'Média',light:'Leve',none:'sem prioridade'};
+const PRIORITY_LABEL={important:'Importante',medium:'Média',light:'Baixa',none:'sem prioridade'};
 function priorityLevelOf(value){
  const v=String(value==null?'':value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
  if(['important','importante','alta','urgente','maxima','high','true','1','sim','yes'].includes(v))return 'important';
  if(['medium','media','medio','normal','moderada'].includes(v))return 'medium';
  if(['light','leve','baixa','low','pouca','menor'].includes(v))return 'light';
  if(['none','sem','nenhuma','nenhum','false','0','nao','no',''].includes(v)||v.startsWith('sem '))return 'none';
- throw new AppError('UPDATE_FIELD_INVALID','Prioridade desconhecida: '+String(value).slice(0,30)+'. Use Importante, Média, Leve ou Sem prioridade.',409);
+ throw new AppError('UPDATE_FIELD_INVALID','Prioridade desconhecida: '+String(value).slice(0,30)+'. Use Importante, Média, Baixa ou Sem prioridade.',409);
 }
 class SofiaCore{
   constructor({store,provider,config,workspace,routing,usageService}){

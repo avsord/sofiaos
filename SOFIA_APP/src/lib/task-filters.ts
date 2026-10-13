@@ -2,7 +2,7 @@ import type {Task} from './types';
 export const TASK_PRIORITIES=[
  {value:'important',label:'Importante',symbol:'!!!',color:'#D94B57'},
  {value:'medium',label:'Média',symbol:'!!',color:'#B77713'},
- {value:'light',label:'Leve',symbol:'!',color:'#378E78'},
+ {value:'light',label:'Baixa',symbol:'!',color:'#378E78'},
  {value:'none',label:'Sem prioridade',symbol:'—',color:null},
 ] as const;
 export function taskPriority(task:Partial<Task>){return TASK_PRIORITIES.find(p=>p.value===task.priority_level)||TASK_PRIORITIES[task.priority?0:3];}
