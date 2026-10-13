@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {Animated, Easing, StyleSheet, Text, View} from 'react-native';
-import Svg, {Circle, Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
+import Svg, {Circle} from 'react-native-svg';
 import {useTheme, dark} from '../lib/theme';
 
 /** Anel fino girando, como o do Notion: discreto, cinza, sem a rodinha grossa
@@ -91,9 +91,16 @@ export function PageLoading({title, eyebrow, label, rows = 4, testID}: {title?: 
 }
 
 /** Reflexo que atravessa os blocos do esqueleto (estilo Facebook/LinkedIn).
- * Um único valor animado para a tela toda: todos os blocos brilham juntos e o
- * custo é de uma animação só, no thread nativo. Roda mesmo com "remover
- * animações" ligado — é sinal de carregamento, não enfeite (pedido do dono). */
+ * Um unico valor animado para a tela toda: todos os blocos brilham juntos.
+ * Implementado so com View/Animated.View (sem react-native-svg): criar um
+ * Svg/LinearGradient custa bem mais para o sistema montar que uma View comum,
+ * e este componente fica no caminho critico da primeira tela (antes do app
+ * terminar de abrir) - o custo extra de um Svg ali media mais tempo de
+ * abertura em todo cold start sem preco salvo ainda (0.3.137: ficou 100ms+
+ * mais lento que a 0.3.94 nesse caminho). Tres faixas semi-transparentes
+ * lado a lado (fraca/forte/fraca) imitam a borda suave do gradiente antigo
+ * sem o custo de montar um Svg. Roda mesmo com "remover animacoes" ligado —
+ * e sinal de carregamento, nao enfeite (pedido do dono). */
 const ShimmerContext = React.createContext<Animated.Value | null>(null);
 export function ShimmerGroup({children, duration = 1300}: {children: React.ReactNode; duration?: number}) {
   const x = useRef(new Animated.Value(0)).current;
@@ -104,25 +111,19 @@ export function ShimmerGroup({children, duration = 1300}: {children: React.React
   }, [x, duration]);
   return <ShimmerContext.Provider value={x}>{children}</ShimmerContext.Provider>;
 }
-const BAND = 140, TRAVEL = 520;
+const BAND = 140, TRAVEL = 520, SEGMENT = BAND / 3;
 export function ShimmerBlock({width, height, radius = 6, style}: {width: number | string; height: number; radius?: number; style?: any}) {
   const c = useTheme(), x = React.useContext(ShimmerContext);
   const shine = c.bg === dark.bg ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.75)';
+  const edge = c.bg === dark.bg ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.20)';
   return (
     <View style={[{width: width as any, height, borderRadius: radius, backgroundColor: c.line, overflow: 'hidden'}, style]}>
       {x ? (
-        <Animated.View pointerEvents="none" style={{position: 'absolute', top: 0, bottom: 0, width: BAND,
+        <Animated.View pointerEvents="none" style={{position: 'absolute', top: 0, bottom: 0, width: BAND, flexDirection: 'row',
           transform: [{translateX: x.interpolate({inputRange: [0, 1], outputRange: [-BAND, TRAVEL]})}]}}>
-          <Svg width={BAND} height="100%">
-            <Defs>
-              <LinearGradient id="sofiaShimmer" x1="0" y1="0" x2="1" y2="0">
-                <Stop offset="0" stopColor={shine} stopOpacity="0" />
-                <Stop offset="0.5" stopColor={shine} stopOpacity="1" />
-                <Stop offset="1" stopColor={shine} stopOpacity="0" />
-              </LinearGradient>
-            </Defs>
-            <Rect x="0" y="0" width={BAND} height="100%" fill="url(#sofiaShimmer)" />
-          </Svg>
+          <View style={{width: SEGMENT, backgroundColor: edge}} />
+          <View style={{width: SEGMENT, backgroundColor: shine}} />
+          <View style={{width: SEGMENT, backgroundColor: edge}} />
         </Animated.View>
       ) : null}
     </View>

@@ -8,7 +8,13 @@ test('widget do Price Tracker entra no cache de abertura (aparece no primeiro qu
  assert.equal(snap.MONITOR_WIDGET_PATH,'/local/monitor-widget');
  assert.equal(snap.cacheableRead(snap.MONITOR_WIDGET_PATH),true);
  assert.equal(snap.launchRead(snap.MONITOR_WIDGET_PATH),true);
- assert.equal(snap.startupPriority(snap.MONITOR_WIDGET_PATH),1);
+});
+test('o resumo do widget nunca compete com dados reais do usuario pelas 32 vagas do cache geral',()=>{
+ // launchRead (usado no blob pequeno e instantaneo de abertura) continua incluindo o widget;
+ // startupPriority (usado no corte de 32 itens do cache completo) NAO deve.
+ assert.equal(snap.startupPriority(snap.MONITOR_WIDGET_PATH),snap.startupPriority('/alguma/pagina/qualquer'),
+  'resumo do widget deve ficar no mesmo nivel padrao de qualquer outro dado, nunca acima de rascunhos/paginas reais');
+ assert.ok(snap.startupPriority(snap.MONITOR_WIDGET_PATH)>snap.startupPriority('/tasks'),'nao pode empatar com telas essenciais');
 });
 test('resumo do widget é pequeno, ordenado e validado',()=>{
  const p=(id,atLow,lastAt,price)=>({monitor:{id,title:'P'+id},color:'#f00',currency:'BRL',atLow,lastAt,now:price===null?null:{price,store:{name:'KaBuM!'}},change:null,stores:[{points:new Array(500).fill({t:1,v:1})}],best:new Array(500).fill({t:1,v:1})});
@@ -31,4 +37,9 @@ test('reflexo: uma animação só, nativa, e sem respeitar "remover animações"
  assert.ok(l.includes('export function ShimmerGroup')&&l.includes('export function ShimmerBlock'));
  assert.ok(/ShimmerGroup[\s\S]*useNativeDriver: true/.test(l));
  assert.ok(!/ShimmerGroup[\s\S]*isReduceMotionEnabled/.test(l));
+});
+test('reflexo nao usa Svg/LinearGradient (0.3.137: custava tempo de abertura no caminho critico da Inicio)',()=>{
+ const l=read('src/components/Loading.tsx');
+ const shimmer=l.slice(l.indexOf('export function ShimmerGroup'));
+ assert.ok(!/LinearGradient|<Svg|Defs|Stop/.test(shimmer),'shimmer deve usar so View/Animated.View');
 });

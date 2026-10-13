@@ -15,8 +15,13 @@ export const MIN_WRITE_GAP_MS=30000;
 export const MONITOR_WIDGET_PATH='/local/monitor-widget';
 export const chatRead=(path:string)=>path==='/chat-sync/current'||path==='/conversations?offset=0'||/^\/conversations\/[\w-]+$/.test(path);
 // Keep the next launch independent of recently opened history/detail pages.
+// MONITOR_WIDGET_PATH is intentionally NOT in this tier-1 group: it only needs
+// to be in launchRead() below (the small, fixed-size home-v1 blob) to show up
+// instantly on open. Putting it here too made it compete for the shared 32-slot
+// cap in flush() against real user data (page drafts, chat) under heavy use —
+// a widget summary must never be able to evict something the user actually saved.
 export const startupPriority=(path:string)=>path==='/chat-sync/current'?0:
- ['/tasks','/home','/workspace/catalog','/md/dashboard','/agenda',MONITOR_WIDGET_PATH].includes(path)?1:
+ ['/tasks','/home','/workspace/catalog','/md/dashboard','/agenda'].includes(path)?1:
  /^\/agenda\?month=\d{4}-\d{2}$/.test(path)?2:3;
 const fresh=(path:string,at:number,now:number)=>at<=now+60000&&(chatRead(path)||now-at<MAX_AGE);
 // A separate, encrypted first-screen projection prevents years of chat/detail
