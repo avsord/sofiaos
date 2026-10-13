@@ -45,7 +45,7 @@ function makeApi45(runtime,{bodyJson,json}){const {store,workspace:w,routing,vau
     throw new AppError('BAD_ACTION','Ação não disponível.');
   }
  }
- match=p.match(/^\/api\/attachments\/([\w-]+)$/);if(m==='GET'&&match){const a=w.attachment(validId(match[1])),inline=url.searchParams.get('inline')==='1';res.setHeader('Content-Type',inline?(a.mime||'application/octet-stream'):'application/octet-stream');res.setHeader('Content-Disposition',(inline?'inline':'attachment')+"; filename*=UTF-8''"+encodeURIComponent(a.name));res.end(Buffer.from(a.blob));return true;}
+ match=p.match(/^\/api\/attachments\/([\w-]+)$/);if(m==='GET'&&match){const a=w.attachment(validId(match[1])),inline=url.searchParams.get('inline')==='1';res.setHeader('Content-Type',inline?(a.mime||'application/octet-stream'):'application/octet-stream');res.setHeader('Content-Disposition',(inline?'inline':'attachment')+"; filename*=UTF-8''"+encodeURIComponent(a.name));const bytes=(runtime&&runtime.google&&runtime.google.attachmentBytes)?await runtime.google.attachmentBytes(a):Buffer.from(a.blob);res.setHeader('Content-Length',String(bytes.length));res.end(bytes);return true;}
  if(m==='POST'&&p==='/api/relations')return send({items:w.link(await body())},201);
  if(m==='GET'&&p==='/api/relations')return send({items:w.links(url.searchParams.get('type'),validId(url.searchParams.get('id')))});
  if(m==='GET'&&p==='/api/timeline')return send({items:w.timeline({area:url.searchParams.get('area')||'',limit:Number(url.searchParams.get('limit')||100),offset:Number(url.searchParams.get('offset')||0)})});

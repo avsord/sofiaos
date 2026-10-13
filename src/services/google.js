@@ -34,11 +34,16 @@ class GoogleService {
       CREATE TABLE IF NOT EXISTS google_oauth_state(state TEXT PRIMARY KEY, created_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS google_tombstones(calendar_id TEXT NOT NULL, event_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(calendar_id, event_id));
       CREATE TABLE IF NOT EXISTS md_kv(key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
+    // Anexos (capas, fotos, arquivos) podem morar no Drive da pessoa: aqui fica só a referência.
+    try { if (!this.db.prepare('PRAGMA table_info(attachments)').all().some(c => c.name === 'drive_id')) this.db.exec('ALTER TABLE attachments ADD COLUMN drive_id TEXT'); } catch { /* sem tabela de anexos */ }
+    this.blobCache = new Map(); this.blobCacheBytes = 0; this.offloading = false;
     // Apagar na Sofia um evento ligado ao Google também apaga lá na próxima sincronização.
     const original = workspace.deleteEntity.bind(workspace);
     workspace.deleteEntity = (entityId) => {
       let e = null; try { e = workspace.get(entityId); } catch { /* deixa o original reclamar */ }
+      let driveIds = []; try { driveIds = this.db.prepare('SELECT drive_id FROM attachments WHERE entity_id=? AND drive_id IS NOT NULL').all(entityId).map(r => r.drive_id); } catch { /* sem coluna */ }
       const result = original(entityId);
+      for (const did of driveIds) this.call('DELETE', DRIVE + '/files/' + did).catch(() => {});
       if (e && e.kind === 'commitment' && e.data.calendar_provider === 'google' && e.data.external_event_id && !e.data.google_readonly)
         this.db.prepare('INSERT OR IGNORE INTO google_tombstones VALUES(?,?,?)').run(e.data.calendar_id || 'primary', e.data.external_event_id, now());
       return result;
@@ -78,7 +83,7 @@ class GoogleService {
     const old = this.link() || {};
     this.saveLink({...old, refresh: this.seal(tokens.refresh_token), email, scopes: String(tokens.scope || ''), connected_at: now(), calendar_id: old.calendar_id || 'primary', sync: {}, last_error: '', conflicts: []});
     this.access = {token: tokens.access_token, exp: Date.now() + (Number(tokens.expires_in) || 3000) * 1000 - 60000};
-    setTimeout(() => { this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); }, 50).unref?.();
+    setTimeout(() => { this.ensureFolders().catch(() => {}).then(() => { this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); this.offloadAttachments().catch(() => {}); }); }, 50).unref?.();
     return {ok: true, message: 'Conta Google conectada' + (email ? ' (' + email + ')' : '') + '. Pode voltar para a Sofia.'};
   }
   /** Do app (janela do Google aberta pela própria Sofia): devolve um redirecionamento
@@ -155,7 +160,7 @@ class GoogleService {
     return {...base, syncing: this.busy, email: l.email, last_sync: l.last_sync, error: l.last_error || undefined, calendar_id: cal?.id || 'primary', calendar_name: cal?.summary || 'Principal',
       calendars, warnings, conflicts: l.conflicts || [], history: (l.history || []).slice(0, 10),
       gmail: {connected: /gmail\.readonly/.test(l.scopes || '')},
-      drive: {connected: /drive\.file/.test(l.scopes || ''), last_backup: l.drive?.last_backup, last_backup_error: l.drive?.last_error, backups: l.drive?.count || 0, folder: 'Sofia OS/Backups'}};
+      drive: {connected: /drive\.file/.test(l.scopes || ''), last_backup: l.drive?.last_backup, last_backup_error: l.drive?.last_error, backups: l.drive?.count || 0, folder: 'Sofia OS/Backups', folders: l.drive?.folders ? Object.keys(l.drive.folders) : [], attachments: this.attachmentStats()}};
   }
   select(calendarId) {
     const l = this.link(); if (!l?.refresh) throw new AppError('GOOGLE_NOT_CONNECTED', 'Conta Google não conectada.', 409);
@@ -307,6 +312,67 @@ class GoogleService {
     if (found.files?.length) return found.files[0].id;
     return (await this.call('POST', DRIVE + '/files?fields=id', {name, mimeType: 'application/vnd.google-apps.folder', ...(parent ? {parents: [parent]} : {})})).id;
   }
+  // ---------- Estrutura de pastas no Drive ----------
+  // Assim que a pessoa conecta, a Sofia cria a casa dela no Drive, organizada:
+  //   Sofia OS/Backups   (cópias criptografadas do banco, uma por dia)
+  //   Sofia OS/Anexos    (capas de página, fotos e arquivos; aqui no servidor fica só a referência)
+  //   Sofia OS/Páginas   (reservada para exportações das páginas)
+  // Os ids ficam guardados no link; nunca se cria pasta repetida (folder() reaproveita).
+  static FOLDERS = ['Backups', 'Anexos', 'Páginas'];
+  async ensureFolders() {
+    const l = this.link(); if (!l?.refresh || !/drive\.file/.test(l.scopes || '')) return null;
+    const root = await this.folder('Sofia OS'); const folders = {root};
+    for (const name of GoogleService.FOLDERS) folders[name] = await this.folder(name, root);
+    this.saveLink({...this.link(), drive: {...(this.link().drive || {}), folders}});
+    return folders;
+  }
+  async folderId(name) {
+    const l = this.link(); if (l?.drive?.folders?.[name]) return l.drive.folders[name];
+    const f = await this.ensureFolders(); return f ? f[name] : null;
+  }
+
+  // ---------- Anexos no Drive ----------
+  attachmentStats() {
+    try { const r = this.db.prepare('SELECT COUNT(*) AS total, SUM(CASE WHEN drive_id IS NOT NULL THEN 1 ELSE 0 END) AS in_drive, SUM(CASE WHEN drive_id IS NULL THEN bytes ELSE 0 END) AS local_bytes FROM attachments').get(); return {total: r.total || 0, in_drive: r.in_drive || 0, local_mb: Math.round((r.local_bytes || 0) / 1048576 * 10) / 10}; } catch { return {total: 0, in_drive: 0, local_mb: 0}; }
+  }
+  /** Leva para o Drive os anexos que ainda estão só no servidor (até `limit` por rodada), e aqui fica só a referência. */
+  async offloadAttachments(limit = 10) {
+    const l = this.link(); if (!l?.refresh || !/drive\.file/.test(l.scopes || '') || this.offloading) return {moved: 0};
+    this.offloading = true; let moved = 0;
+    try {
+      const dir = await this.folderId('Anexos'); if (!dir) return {moved: 0};
+      const rows = this.db.prepare('SELECT id, entity_id, name, mime, bytes, blob FROM attachments WHERE drive_id IS NULL AND length(blob) > 0 ORDER BY created_at LIMIT ?').all(limit);
+      for (const a of rows) {
+        const boundary = 'sofia' + id();
+        const meta = JSON.stringify({name: a.name, parents: [dir], mimeType: a.mime || 'application/octet-stream', description: 'Anexo da Sofia OS (' + a.entity_id + ')', appProperties: {sofia_attachment: a.id, sofia_entity: a.entity_id}});
+        const body = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${a.mime || 'application/octet-stream'}\r\n\r\n`), Buffer.from(a.blob), Buffer.from(`\r\n--${boundary}--`)]);
+        const up = await this.call('POST', UPLOAD + '/files?uploadType=multipart&fields=id,size', body, {'Content-Type': 'multipart/related; boundary=' + boundary});
+        if (!up.id) continue;
+        // Só depois de o Drive confirmar: aqui fica a referência e um blob vazio (o tamanho original segue em bytes).
+        this.db.prepare('UPDATE attachments SET drive_id=?, blob=? WHERE id=?').run(up.id, Buffer.alloc(0), a.id);
+        moved++;
+      }
+      const cur = this.link(); if (cur) this.saveLink({...cur, drive: {...(cur.drive || {}), attachments_moved_at: now(), attachments_error: ''}});
+      return {moved};
+    } catch (e) {
+      const cur = this.link(); if (cur) this.saveLink({...cur, drive: {...(cur.drive || {}), attachments_error: String(e.message).slice(0, 200)}});
+      throw e;
+    } finally { this.offloading = false; }
+  }
+  /** Bytes de um anexo: do servidor se ainda estão aqui; senão do Drive (com cache de até 30 MB em memória). */
+  async attachmentBytes(a) {
+    if (a.blob && a.blob.length) return Buffer.from(a.blob);
+    if (!a.drive_id) return Buffer.alloc(0);
+    const hit = this.blobCache.get(a.id); if (hit) { hit.at = Date.now(); return hit.buf; }
+    const l = this.link(); if (!l?.refresh) throw new AppError('GOOGLE_NOT_CONNECTED', 'Este anexo está no seu Google Drive. Conecte a Conta Google em Perfil → Conta Google para abrir.', 503);
+    const res = await this.fetch(DRIVE + '/files/' + a.drive_id + '?alt=media', {headers: {Authorization: 'Bearer ' + await this.token()}});
+    if (!res.ok) throw new AppError('GOOGLE_API', 'Não consegui baixar o anexo do Drive (' + res.status + ').', 502);
+    const buf = Buffer.from(await res.arrayBuffer());
+    this.blobCache.set(a.id, {buf, at: Date.now()}); this.blobCacheBytes += buf.length;
+    while (this.blobCacheBytes > 30 * 1048576 && this.blobCache.size) { const [oldest] = [...this.blobCache.entries()].sort((x, y) => x[1].at - y[1].at)[0]; this.blobCacheBytes -= this.blobCache.get(oldest).buf.length; this.blobCache.delete(oldest); }
+    return buf;
+  }
+
   async backupToDrive(force = false) {
     const l = this.link();
     if (!l?.refresh || !/drive\.file/.test(l.scopes || '') || !this.backups) return {skipped: true};
@@ -333,7 +399,7 @@ class GoogleService {
 
   start(intervalMs = 15 * 60000) {
     if (this.timer) return;
-    const tick = () => { const l = this.link(); if (!l?.refresh || this.busy) return; this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); };
+    const tick = () => { const l = this.link(); if (!l?.refresh || this.busy) return; this.offloadAttachments().catch(() => {}); this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); };
     this.timer = setInterval(tick, intervalMs); this.timer.unref?.();
     setTimeout(tick, 30000).unref?.();
   }

@@ -24,7 +24,8 @@ function fakeGoogle(){
    if(m==='DELETE'){g.events[cal]=g.events[cal].filter(e=>e.id!==evId);return {ok:true,status:204,json:async()=>({})};}}
   if(u.pathname==='/drive/v3/files'&&m==='GET'){const q=u.searchParams.get('q')||'';if(q.includes('folder'))return res(200,{files:g.driveFiles.filter(f=>f.folder&&q.includes("name='"+f.name+"'"))});return res(200,{files:g.driveFiles.filter(f=>!f.folder).reverse()});}
   if(u.pathname==='/drive/v3/files'&&m==='POST'){const b=JSON.parse(opts.body);const f={id:'f'+(g.seq++),name:b.name,folder:true};g.driveFiles.push(f);return res(200,{id:f.id});}
-  if(u.pathname==='/upload/drive/v3/files'){g.uploads.push({type:opts.headers['Content-Type'],size:opts.body.length,text:opts.body.toString('latin1')});const f={id:'b'+(g.seq++),name:'backup'+g.seq};g.driveFiles.push(f);return res(200,{id:f.id});}
+  if(u.pathname==='/upload/drive/v3/files'){g.uploads.push({type:opts.headers['Content-Type'],size:opts.body.length,text:opts.body.toString('latin1')});const text=opts.body.toString('latin1');const boundary=/boundary=([^;\s]+)/.exec(opts.headers['Content-Type'])[1];const parts=text.split('--'+boundary);const metaPart=parts[1]||'',filePart=parts[2]||'';const meta=(()=>{try{return JSON.parse(metaPart.slice(metaPart.indexOf('\r\n\r\n')+4).trim());}catch{return {};}})();const payload=filePart.includes('\r\n\r\n')?filePart.slice(filePart.indexOf('\r\n\r\n')+4).replace(/\r\n$/,''):'';const f={id:'b'+(g.seq++),name:meta.name||'backup'+g.seq,bytes:[...Buffer.from(payload,'latin1')],meta};g.driveFiles.push(f);return res(200,{id:f.id});}
+  if(u.pathname.startsWith('/drive/v3/files/')&&u.searchParams.get('alt')==='media'){const f=g.driveFiles.find(f=>'/drive/v3/files/'+f.id===u.pathname);if(!f)return res(404,{error:{message:'nao achei'}});return {ok:true,status:200,json:async()=>({}),arrayBuffer:async()=>Uint8Array.from(f.bytes||[]).buffer};}
   if(u.pathname.startsWith('/drive/v3/files/')&&m==='DELETE'){g.driveFiles=g.driveFiles.filter(f=>'/drive/v3/files/'+f.id!==u.pathname);return {ok:true,status:204,json:async()=>({})};}
   throw new Error('rota inesperada '+m+' '+url);};
  return g;
@@ -134,4 +135,28 @@ test('conexão pelo app: a janela do Google volta sozinha para o app (sofiaapp:/
  const web=svc.connectUrl().url;const r2=await svc.callbackResponse(new URLSearchParams({code:'abc',state:new URL(web).searchParams.get('state')}));
  assert.ok(r2.html&&r2.html.includes('Pronto'),'pelo navegador continua mostrando a página');
  const bad=await svc.callbackResponse(new URLSearchParams({state:'a.invalido',code:'x'}));assert.match(bad.redirect,/ok=0/);
+});
+
+test('ao conectar, a Sofia cria a casa dela no Drive (Sofia OS/Backups, Anexos, Páginas) sem repetir',async t=>{
+ const {svc,g}=await connected(t);await new Promise(r=>setTimeout(r,80));
+ const folders=g.driveFiles.filter(f=>f.folder).map(f=>f.name).sort();
+ assert.deepEqual(folders,['Anexos','Backups','Páginas','Sofia OS']);
+ await svc.ensureFolders();assert.equal(g.driveFiles.filter(f=>f.folder).length,4,'não cria pasta repetida');
+ const st=await svc.status();assert.deepEqual(st.drive.folders.sort(),['Anexos','Backups','Páginas','root']);
+});
+test('anexos vão para Sofia OS/Anexos: aqui fica só a referência, a leitura busca no Drive (com cache) e apagar o registro apaga lá',async t=>{
+ const {svc,core,g}=await connected(t);const w=core.workspace;await new Promise(r=>setTimeout(r,80));
+ const page=w.save({kind:'user_page',title:'Capa',area:'Pessoal',data:{}});
+ const att=w.attach(page.id,{name:'capa.png',mime:'image/png',base64:Buffer.from('PNGDATA-123').toString('base64')});
+ assert.equal(svc.attachmentStats().in_drive,0);
+ const r=await svc.offloadAttachments();assert.equal(r.moved,1);
+ const row=w.attachment(att.id);assert.ok(row.drive_id);assert.equal(row.blob.length,0,'o blob sai do servidor');assert.equal(row.bytes,11,'o tamanho original fica');
+ assert.equal(svc.attachmentStats().in_drive,1);assert.equal(svc.attachmentStats().local_mb,0);
+ const up=g.driveFiles.find(f=>f.id===row.drive_id);assert.equal(up.meta.mimeType,'image/png');assert.equal(up.meta.appProperties.sofia_attachment,att.id);
+ const bytes=await svc.attachmentBytes(row);assert.equal(bytes.toString(),'PNGDATA-123');
+ const again=await svc.attachmentBytes(row);assert.equal(again.toString(),'PNGDATA-123');
+ // limite de 50 MB: só conta o que ainda está no servidor
+ assert.doesNotThrow(()=>w.attach(page.id,{name:'outra.png',mime:'image/png',base64:Buffer.from('x').toString('base64')}));
+ w.deleteEntity(page.id);await new Promise(r=>setTimeout(r,20));
+ assert.ok(!g.driveFiles.some(f=>f.id===row.drive_id),'apagou no Drive também');
 });
