@@ -11,6 +11,7 @@ function fakeGoogle(){
   events:{primary:[],feriados:[],oculto:[]},changes:{primary:[],feriados:[]},expired:new Set(),calls:[],uploads:[],driveFiles:[],seq:1};
  const res=(status,body)=>({ok:status<300,status,json:async()=>body});
  g.fetch=async(url,opts={})=>{const u=new URL(url),m=opts.method||'GET';g.calls.push(m+' '+u.pathname+u.search);
+  if(g.fail){const f=g.fail(m,u.pathname+u.search);if(f)return res(f.status,{error:{message:f.message}});}
   if(u.href.startsWith('https://oauth2.googleapis.com/token')){const b=new URLSearchParams(opts.body);if(b.get('grant_type')==='authorization_code')return res(200,{access_token:'at1',refresh_token:'rt-secreto',expires_in:3600,scope:'openid email https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive.file',id_token:'x.'+Buffer.from(JSON.stringify({email:'pedro@gmail.com'})).toString('base64url')+'.y'});return res(200,{access_token:'at2',expires_in:3600});}
   if(u.pathname==='/calendar/v3/users/me/calendarList')return res(200,{items:g.calendars});
   let mm=u.pathname.match(/^\/calendar\/v3\/calendars\/([^/]+)\/events(?:\/([^/]+))?$/);
@@ -22,10 +23,17 @@ function fakeGoogle(){
    if(m==='POST'){const ev={id:'new'+(g.seq++),etag:'"e1"',...body};g.events[cal].push(ev);return res(200,ev);}
    if(m==='PATCH'){const ev=g.events[cal].find(e=>e.id===evId);Object.assign(ev,body,{etag:'"e'+(g.seq++)+'"'});return res(200,ev);}
    if(m==='DELETE'){g.events[cal]=g.events[cal].filter(e=>e.id!==evId);return {ok:true,status:204,json:async()=>({})};}}
-  if(u.pathname==='/drive/v3/files'&&m==='GET'){const q=u.searchParams.get('q')||'';if(q.includes('folder'))return res(200,{files:g.driveFiles.filter(f=>f.folder&&q.includes("name='"+f.name+"'"))});return res(200,{files:g.driveFiles.filter(f=>!f.folder).reverse()});}
-  if(u.pathname==='/drive/v3/files'&&m==='POST'){const b=JSON.parse(opts.body);const f={id:'f'+(g.seq++),name:b.name,folder:true};g.driveFiles.push(f);return res(200,{id:f.id});}
-  if(u.pathname==='/upload/drive/v3/files'){g.uploads.push({type:opts.headers['Content-Type'],size:opts.body.length,text:opts.body.toString('latin1')});const text=opts.body.toString('latin1');const boundary=/boundary=([^;\s]+)/.exec(opts.headers['Content-Type'])[1];const parts=text.split('--'+boundary);const metaPart=parts[1]||'',filePart=parts[2]||'';const meta=(()=>{try{return JSON.parse(metaPart.slice(metaPart.indexOf('\r\n\r\n')+4).trim());}catch{return {};}})();const payload=filePart.includes('\r\n\r\n')?filePart.slice(filePart.indexOf('\r\n\r\n')+4).replace(/\r\n$/,''):'';const f={id:'b'+(g.seq++),name:meta.name||'backup'+g.seq,bytes:[...Buffer.from(payload,'latin1')],meta};g.driveFiles.push(f);return res(200,{id:f.id});}
+  if(u.pathname==='/drive/v3/files'&&m==='GET'){
+   const q=u.searchParams.get('q')||'';
+   const parentM=/'([^']+)' in parents/.exec(q);
+   if(q.includes('folder')){let list=g.driveFiles.filter(f=>f.folder&&q.includes("name='"+f.name+"'"));if(parentM)list=list.filter(f=>(f.parents||[]).includes(parentM[1]));return res(200,{files:list.map(f=>({id:f.id,name:f.name,createdTime:f.createdTime}))});}
+   if(parentM)return res(200,{files:g.driveFiles.filter(f=>(f.parents||[]).includes(parentM[1])).map(f=>({id:f.id,parents:f.parents||[]}))});
+   return res(200,{files:g.driveFiles.filter(f=>!f.folder).reverse()});
+  }
+  if(u.pathname==='/drive/v3/files'&&m==='POST'){const b=JSON.parse(opts.body);const f={id:'f'+(g.seq++),name:b.name,folder:true,parents:b.parents||[],createdTime:new Date(Date.now()+(g.seq)).toISOString()};g.driveFiles.push(f);return res(200,{id:f.id});}
+  if(u.pathname==='/upload/drive/v3/files'){g.uploads.push({type:opts.headers['Content-Type'],size:opts.body.length,text:opts.body.toString('latin1')});const text=opts.body.toString('latin1');const boundary=/boundary=([^;\s]+)/.exec(opts.headers['Content-Type'])[1];const parts=text.split('--'+boundary);const metaPart=parts[1]||'',filePart=parts[2]||'';const meta=(()=>{try{return JSON.parse(metaPart.slice(metaPart.indexOf('\r\n\r\n')+4).trim());}catch{return {};}})();const payload=filePart.includes('\r\n\r\n')?filePart.slice(filePart.indexOf('\r\n\r\n')+4).replace(/\r\n$/,''):'';const f={id:'b'+(g.seq++),name:meta.name||'backup'+g.seq,parents:meta.parents||[],bytes:[...Buffer.from(payload,'latin1')],meta};g.driveFiles.push(f);return res(200,{id:f.id});}
   if(u.pathname.startsWith('/upload/drive/v3/files/')&&m==='PATCH'){const fid=u.pathname.split('/').pop();const f=g.driveFiles.find(x=>x.id===fid);if(!f)return res(404,{error:{message:'nao achei'}});g.uploads.push({type:opts.headers['Content-Type'],size:opts.body.length});const text=opts.body.toString('latin1');const boundary=/boundary=([^;\s]+)/.exec(opts.headers['Content-Type'])[1];const filePart=(text.split('--'+boundary)[2]||'');const payload=filePart.includes('\r\n\r\n')?filePart.slice(filePart.indexOf('\r\n\r\n')+4).replace(/\r\n$/,''):'';f.bytes=[...Buffer.from(payload,'latin1')];return res(200,{id:f.id});}
+  if(u.pathname.startsWith('/drive/v3/files/')&&m==='PATCH'&&(u.searchParams.get('addParents')||u.searchParams.get('removeParents'))){const fid=u.pathname.split('/').pop();const f=g.driveFiles.find(x=>x.id===fid);if(!f)return res(404,{error:{message:'nao achei'}});const add=u.searchParams.get('addParents'),rm=u.searchParams.get('removeParents');f.parents=(f.parents||[]).filter(p=>p!==rm);if(add&&!f.parents.includes(add))f.parents.push(add);return res(200,{id:fid});}
   if(u.pathname.startsWith('/drive/v3/files/')&&m==='PATCH'){const fid=u.pathname.split('/').pop();const b=JSON.parse(opts.body||'{}');if(b.trashed)g.driveFiles=g.driveFiles.filter(x=>x.id!==fid);return res(200,{id:fid});}
   if(u.pathname.startsWith('/drive/v3/files/')&&u.searchParams.get('alt')==='media'){const f=g.driveFiles.find(f=>'/drive/v3/files/'+f.id===u.pathname);if(!f)return res(404,{error:{message:'nao achei'}});return {ok:true,status:200,json:async()=>({}),arrayBuffer:async()=>Uint8Array.from(f.bytes||[]).buffer};}
   if(u.pathname.startsWith('/drive/v3/files/')&&m==='DELETE'){g.driveFiles=g.driveFiles.filter(f=>'/drive/v3/files/'+f.id!==u.pathname);return {ok:true,status:204,json:async()=>({})};}
@@ -111,11 +119,12 @@ test('Sofia → Google: novo, editado e apagado; conflito não sobrescreve nada'
 
 test('Drive: backup criptografado na pasta Sofia OS/Backups, guarda 14 e limpa o servidor',async t=>{
  const {svc,g,backups}=await connected(t);
- for(let i=0;i<16;i++)g.driveFiles.push({id:'old'+i,name:'antigo'+i});
+ const dir=await svc.folderId('Backups'); // garante a pasta antes de semear "backups antigos" dentro dela
+ for(let i=0;i<16;i++)g.driveFiles.push({id:'old'+i,name:'antigo'+i,parents:[dir]});
  const r=await svc.backupToDrive(true);assert.equal(r.ok,true);
  assert.equal(g.uploads.length,1);assert.match(g.uploads[0].type,/multipart\/related/);assert.match(g.uploads[0].text,/"name":"sofia-/);
  assert.ok(g.driveFiles.some(f=>f.folder&&f.name==='Sofia OS')&&g.driveFiles.some(f=>f.folder&&f.name==='Backups'));
- assert.ok(g.driveFiles.filter(f=>!f.folder).length<=14);
+ assert.ok(g.driveFiles.filter(f=>!f.folder&&(f.parents||[]).includes(dir)).length<=14);
  assert.equal((await svc.backupToDrive()).skipped,true,'um por dia');
  assert.ok(backups.list().length<=3);
  assert.equal((await svc.status()).drive.last_backup.slice(0,10),new Date().toISOString().slice(0,10));
@@ -207,4 +216,40 @@ test('item travado para sempre no envio (chave estranha sobrando dos dados dele)
  assert.equal(r1.sent,1);
  const after=w.get(e.id);assert.equal(after.data.sync_state,'synced');assert.ok(after.data.external_event_id);assert.ok(!('priority_level' in after.data),'a chave estranha sumiu sozinha');
  const r2=await svc.sync();assert.equal((r2.errors||[]).length,0);assert.equal(r2.sent,0,'já sincronizado: não tenta de novo');
+});
+
+test('pastas que rodam ao mesmo tempo (envio, anexos, voz, páginas) não criam cada uma a sua própria "Sofia OS"',async t=>{
+ const {svc,g}=await connected(t);
+ await Promise.all([svc.ensureFolders(),svc.ensureFolders(),svc.ensureFolders()]);
+ assert.equal(g.driveFiles.filter(f=>f.folder&&f.name==='Sofia OS').length,1);
+ assert.equal(g.driveFiles.filter(f=>f.folder).length,5,'raiz + Backups + Anexos + Áudios + Páginas, uma vez cada');
+});
+test('bagunça já feita (4 pastas "Sofia OS" de antes desta correção) se desfaz sozinha: fica uma, o conteúdo das outras é preservado',async t=>{
+ const {svc,core,g}=await connected(t);const w=core.workspace;
+ g.driveFiles=g.driveFiles.filter(f=>!(f.folder&&f.name==='Sofia OS'));
+ const ids=[];for(let i=0;i<4;i++){const id='dup'+i;g.driveFiles.push({id,name:'Sofia OS',folder:true,parents:[],createdTime:'2026-10-13T0'+i+':07:00.000Z'});ids.push(id);}
+ g.driveFiles.push({id:'arquivo-perdido',name:'algo.md',parents:[ids[2]]}); // conteúdo dentro de uma das duplicatas
+ const folders=await svc.ensureFolders();
+ assert.equal(g.driveFiles.filter(f=>f.folder&&f.name==='Sofia OS').length,1,'só sobrou uma');
+ assert.equal(folders.root,ids[0],'a mais velha (02:07 -> 00:07, a de índice 0) venceu');
+ const arquivo=g.driveFiles.find(f=>f.id==='arquivo-perdido');assert.deepEqual(arquivo.parents,[ids[0]]),'o conteúdo foi movido para a vencedora, não se perdeu';
+});
+test('aniversário e outros tipos especiais do Google (foco, fora do escritório...) entram como só-leitura, mesmo vindos do calendário principal',async t=>{
+ const {svc,core,g}=await connected(t);const w=core.workspace;
+ g.events.primary=[ev('bday1','Feliz aniversário!','2026-10-20','2026-10-21',{eventType:'birthday'}),ev('focus1','Foco','2026-10-13T09:00:00-03:00','2026-10-13T11:00:00-03:00',{eventType:'focusTime'}),ev('normal1','Dentista','2026-10-13T15:00:00-03:00','2026-10-13T16:00:00-03:00')];
+ await svc.sync();
+ const items=w.list({kind:'commitment',limit:50});
+ assert.equal(items.find(x=>x.title==='Feliz aniversário!').data.google_readonly,true);
+ assert.equal(items.find(x=>x.title==='Foco').data.google_readonly,true);
+ assert.equal(items.find(x=>x.title==='Dentista').data.google_readonly,false);
+});
+test('compromisso travado para sempre porque o Google recusa editar aquele tipo de evento vira só-leitura sozinho, em vez de repetir o erro pra sempre',async t=>{
+ const {svc,core,g}=await connected(t);const w=core.workspace;
+ const e=w.save({kind:'commitment',title:'Happy birthday!',area:'Geral',data:{start_at:'2026-10-20T03:00:00.000Z',end_at:'2026-10-21T03:00:00.000Z',calendar_provider:'google',calendar_id:'primary',sync_state:'synced',external_event_id:'bday-ext',google_etag:'"x"',google_rev:1}});
+ w.save({revision:e.revision,data:{...e.data}},e.id); // bump revision local sem bater o google_rev
+ g.fail=(method,url)=>method==='PATCH'&&url.includes('/events/bday-ext')?{status:400,message:"Google: Attempt made to modify 'birthday' event in a way that is not valid for t"}:null;
+ const r=await svc.sync();
+ assert.equal((r.errors||[]).length,0,'não aparece mais o erro vermelho para sempre: '+JSON.stringify(r.errors));
+ assert.equal(w.get(e.id).data.google_readonly,true);
+ g.fail=null;const r2=await svc.sync();assert.equal(r2.sent,0,'agora é só-leitura: nunca mais tenta reenviar');
 });

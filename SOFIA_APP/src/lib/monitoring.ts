@@ -58,7 +58,10 @@ export function readerUrl(url: string): string {
   return url;
 }
 export function readerAgent(url: string): 'desktop' | 'mobile' {
-  return /mercadoli(vre|bre)\.com|aliexpress\./i.test(url) ? 'desktop' : 'mobile';
+  // O Mercado Livre voltou a mostrar o site de computador aqui, mas agora pedindo login para ver
+  // o produto — provavelmente porque "computador sem histórico nenhum" parece mais suspeito para
+  // eles do que um celular comum. Volta a se apresentar como celular, igual à leitura das outras lojas.
+  return /aliexpress\./i.test(url) ? 'desktop' : 'mobile';
 }
 export function hostOf(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, '').toLowerCase(); } catch { return ''; }

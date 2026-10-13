@@ -201,7 +201,10 @@ class GoogleService {
     const popup = (ev.reminders?.overrides || []).find(r => r.method === 'popup');
     return {start_at: start, end_at: end, location: String(ev.location || '').slice(0, 900), remind_minutes: popup ? popup.minutes : '', calendar_provider: 'google', calendar_id: calId,
       external_event_id: ev.id, sync_state: readonly ? 'readonly' : 'synced', calendar_all_day: allDay, calendar_date_start: allDay ? ev.start.date : '', calendar_date_end: allDay ? (ev.end?.date || plusDays(ev.start.date, 1)) : '',
-      google_etag: String(ev.etag || ''), google_recurring_id: String(ev.recurringEventId || ''), google_readonly: !!readonly};
+      // Aniversário e outros tipos especiais do Google (local de trabalho, foco, fora do
+      // escritório, criado a partir de e-mail) têm edição restrita na própria API do Google,
+      // mesmo vindos do calendário principal — nunca tenta reenviar mudança para eles.
+      google_etag: String(ev.etag || ''), google_recurring_id: String(ev.recurringEventId || ''), google_readonly: !!readonly || (!!ev.eventType && ev.eventType !== 'default')};
   }
   saveFromGoogle(ev, calId, readonly, existing, report) {
     const declined = (ev.attendees || []).some(a => a.self && a.responseStatus === 'declined');
@@ -287,7 +290,13 @@ class GoogleService {
             : await this.call('PATCH', CAL + '/calendars/' + encodeURIComponent(target) + '/events/' + encodeURIComponent(d.external_event_id), this.eventBody(e));
           this.w.save({revision: e.revision, data: {...cleanData(e.kind, d), calendar_id: target, external_event_id: ev.id, google_etag: ev.etag || '', sync_state: 'synced', google_rev: e.revision + 1}}, e.id);
           report.sent++;
-        } catch (err) { report.errors.push('Enviar "' + e.title.slice(0, 40) + '": ' + String(err.message).slice(0, 80)); }
+        } catch (err) {
+          // Aniversário e outros tipos especiais: o Google recusa a edição pela API mesmo
+          // vindos do calendário principal. Em vez de tentar de novo para sempre, marca como
+          // só-leitura agora mesmo — resolve sozinho, sem esperar a próxima sincronização completa.
+          if (/not valid for t|cannot be (updated|modified)|read-?only/i.test(String(err.message))) { try { this.w.save({revision: e.revision, data: {...cleanData(e.kind, d), google_readonly: true, google_rev: e.revision + 1}}, e.id); } catch { /* tenta de novo na próxima */ } }
+          else report.errors.push('Enviar "' + e.title.slice(0, 40) + '": ' + String(err.message).slice(0, 80));
+        }
       }
       if (page.length < 500) break;
     }
@@ -334,12 +343,36 @@ class GoogleService {
   //   Sofia OS/Páginas   (cada página sua como um arquivo .md legível, atualizado quando muda)
   // Os ids ficam guardados no link; nunca se cria pasta repetida (folder() reaproveita).
   static FOLDERS = ['Backups', 'Anexos', 'Áudios', 'Páginas'];
-  async ensureFolders() {
+  // offloadAttachments/offloadVoices/exportPages rodam juntos, sem esperar um pelo outro: se
+  // cada um corresse ensureFolders() por conta própria, cada um buscaria "ainda não existe" ao
+  // mesmo tempo e cada um criaria a própria pasta "Sofia OS" — foi assim que apareceram pastas
+  // repetidas. Uma chamada em andamento é compartilhada por todo mundo que pedir enquanto isso.
+  ensureFolders() {
+    if (!this.ensureFoldersPromise) this.ensureFoldersPromise = this.ensureFoldersOnce().finally(() => { this.ensureFoldersPromise = null; });
+    return this.ensureFoldersPromise;
+  }
+  async ensureFoldersOnce() {
     const l = this.link(); if (!l?.refresh || !/drive\.file/.test(l.scopes || '')) return null;
-    const root = await this.folder('Sofia OS'); const folders = {root};
-    for (const name of GoogleService.FOLDERS) folders[name] = await this.folder(name, root);
+    const root = await this.dedupedFolder('Sofia OS'); const folders = {root};
+    for (const name of GoogleService.FOLDERS) folders[name] = await this.dedupedFolder(name, root);
     this.saveLink({...this.link(), drive: {...(this.link().drive || {}), folders}});
     return folders;
+  }
+  /** Como folder(), mas se achar MAIS de uma pasta com o mesmo nome (de uma corrida antiga, antes
+   * desta correção), mantém a mais velha, move o conteúdo das outras para dentro dela e manda as
+   * outras para a lixeira — assim uma bagunça já feita se desfaz sozinha, sem mexer no Drive à mão. */
+  async dedupedFolder(name, parent) {
+    const q = `mimeType='application/vnd.google-apps.folder' and name='${name.replace(/'/g, "\\'")}' and trashed=false` + (parent ? ` and '${parent}' in parents` : '');
+    const found = await this.call('GET', DRIVE + '/files?fields=files(id,name,createdTime)&orderBy=createdTime&q=' + encodeURIComponent(q));
+    const files = found.files || [];
+    if (!files.length) return (await this.call('POST', DRIVE + '/files?fields=id', {name, mimeType: 'application/vnd.google-apps.folder', ...(parent ? {parents: [parent]} : {})})).id;
+    const [keep, ...extra] = files;
+    for (const dup of extra) {
+      const inside = await this.call('GET', DRIVE + '/files?fields=files(id,parents)&q=' + encodeURIComponent(`'${dup.id}' in parents and trashed=false`));
+      for (const item of inside.files || []) await this.call('PATCH', DRIVE + '/files/' + item.id + '?addParents=' + keep.id + '&removeParents=' + dup.id, {}).catch(() => {});
+      await this.call('PATCH', DRIVE + '/files/' + dup.id, {trashed: true}).catch(() => {});
+    }
+    return keep.id;
   }
   async folderId(name) {
     const l = this.link(); if (l?.drive?.folders?.[name]) return l.drive.folders[name];
@@ -480,7 +513,7 @@ class GoogleService {
     try {
       const made = this.backups.create('drive');
       const bytes = fs.readFileSync(path.join(this.backups.directory, made.name));
-      const root = await this.folder('Sofia OS'), dir = await this.folder('Backups', root);
+      const dir = await this.folderId('Backups');
       const boundary = 'sofia' + id();
       const meta = JSON.stringify({name: made.name, parents: [dir], mimeType: 'application/octet-stream', description: 'Backup criptografado da Sofia OS'});
       const body = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/octet-stream\r\n\r\n`), bytes, Buffer.from(`\r\n--${boundary}--`)]);
