@@ -9,6 +9,17 @@
 // Tokens ficam criptografados (AES-256-GCM) com SOFIA_CALENDAR_TOKEN_KEY.
 const crypto = require('node:crypto'), fs = require('node:fs'), path = require('node:path');
 const {AppError, now, id} = require('../core/util');
+const {CATALOG} = require('../core/catalog');
+// Antes de regravar a entidade depois de enviar ao Google, descarta qualquer chave que não é
+// um campo de verdade daquele tipo (pode ter sobrado de uma versão antiga do app ou de um bug
+// já corrigido). Sem isso, UM registro com uma chave estranha travava o envio dele para sempre:
+// toda sincronização tentava de novo, falhava do mesmo jeito, e nunca marcava como enviado.
+function cleanData(kind, data) {
+  const allowed = new Set((CATALOG[kind]?.fields || []).map(f => f.key));
+  const out = {};
+  for (const k of Object.keys(data || {})) if (allowed.has(k)) out[k] = data[k];
+  return out;
+}
 
 const SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/gmail.readonly'];
 const AUTH = 'https://accounts.google.com/o/oauth2/v2/auth', TOKEN = 'https://oauth2.googleapis.com/token', REVOKE = 'https://oauth2.googleapis.com/revoke';
@@ -196,7 +207,7 @@ class GoogleService {
     const declined = (ev.attendees || []).some(a => a.self && a.responseStatus === 'declined');
     const cancelled = ev.status === 'cancelled' || declined;
     if (cancelled) {
-      if (existing && existing.state !== 'cancelled') { report.removed++; return this.w.save({revision: existing.revision, state: 'cancelled', data: {...existing.data, google_rev: existing.revision + 1}}, existing.id); }
+      if (existing && existing.state !== 'cancelled') { report.removed++; try { return this.w.save({revision: existing.revision, state: 'cancelled', data: {...cleanData('commitment', existing.data), google_rev: existing.revision + 1}}, existing.id); } catch (e) { report.errors.push(String(e.message).slice(0, 120)); return existing; } }
       return existing;
     }
     if (!ev.start || (!ev.start.date && !ev.start.dateTime)) { report.skipped++; return null; }
@@ -204,7 +215,7 @@ class GoogleService {
     let title = String(ev.summary || '(sem título)').slice(0, 240), content = String(ev.description || '').replace(/<[^>]+>/g, ' ').slice(0, 15000);
     const state = ev.status === 'tentative' ? 'pending' : 'confirmed';
     const attempt = (t, c) => existing
-      ? this.w.save({revision: existing.revision, title: t, content: c, state: existing.state === 'done' ? 'done' : state, data: {...existing.data, ...data, google_rev: existing.revision + 1}}, existing.id)
+      ? this.w.save({revision: existing.revision, title: t, content: c, state: existing.state === 'done' ? 'done' : state, data: {...cleanData('commitment', existing.data), ...data, google_rev: existing.revision + 1}}, existing.id)
       : this.w.save({kind: 'commitment', title: t, content: c, area: 'Pessoal', privacy: 'private', state, data: {...data, google_rev: 1}});
     let saved;
     try { saved = attempt(title, content); }
@@ -274,7 +285,7 @@ class GoogleService {
         try {
           const ev = isNew ? await this.call('POST', CAL + '/calendars/' + encodeURIComponent(target) + '/events', this.eventBody(e))
             : await this.call('PATCH', CAL + '/calendars/' + encodeURIComponent(target) + '/events/' + encodeURIComponent(d.external_event_id), this.eventBody(e));
-          this.w.save({revision: e.revision, data: {...d, calendar_id: target, external_event_id: ev.id, google_etag: ev.etag || '', sync_state: 'synced', google_rev: e.revision + 1}}, e.id);
+          this.w.save({revision: e.revision, data: {...cleanData(e.kind, d), calendar_id: target, external_event_id: ev.id, google_etag: ev.etag || '', sync_state: 'synced', google_rev: e.revision + 1}}, e.id);
           report.sent++;
         } catch (err) { report.errors.push('Enviar "' + e.title.slice(0, 40) + '": ' + String(err.message).slice(0, 80)); }
       }

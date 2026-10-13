@@ -194,3 +194,17 @@ test('páginas viram .md legível em Sofia OS/Páginas, atualizam quando mudam e
  w.deleteEntity(page.id);const r3=await svc.exportPages();assert.equal(r3.removed,1,'apagada na Sofia: vai para a lixeira do Drive');
  assert.equal((await svc.status()).drive.pages,0);
 });
+
+test('item travado para sempre no envio (chave estranha sobrando dos dados dele) se autocorrige e passa a sincronizar',async t=>{
+ const {svc,core,g}=await connected(t);const w=core.workspace;
+ // Simula o estrago real: um compromisso com uma chave que não existe mais no catálogo
+ // (sobra de versão antiga ou de um bug já corrigido) — toda sincronização falhava igual, para sempre.
+ const e=w.save({kind:'commitment',title:'Pegar encomenda correio',area:'Geral',data:{start_at:'2026-10-13T10:00:00-03:00',end_at:'2026-10-13T11:00:00-03:00',calendar_provider:'google',calendar_id:'primary',sync_state:'local',external_event_id:'',google_etag:''}});
+ w.s.db.prepare("UPDATE entities SET data=json_set(data,'$.priority_level','important') WHERE id=?").run(e.id);
+ assert.ok(JSON.parse(w.s.db.prepare('SELECT data FROM entities WHERE id=?').get(e.id).data).priority_level,'estrago aplicado de propósito');
+ const r1=await svc.sync();
+ assert.equal((r1.errors||[]).length,0,'não trava mais o envio: '+JSON.stringify(r1.errors));
+ assert.equal(r1.sent,1);
+ const after=w.get(e.id);assert.equal(after.data.sync_state,'synced');assert.ok(after.data.external_event_id);assert.ok(!('priority_level' in after.data),'a chave estranha sumiu sozinha');
+ const r2=await svc.sync();assert.equal((r2.errors||[]).length,0);assert.equal(r2.sent,0,'já sincronizado: não tenta de novo');
+});
