@@ -124,7 +124,7 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
                   <Pressable key={a.id} onPress={() => setAddAccount(a)} style={{padding: 14, borderRadius: 16, backgroundColor: c.surface, borderWidth: 1, borderColor: a.data.last_error ? '#ff6b7a88' : c.line, gap: 4}}>
                     <Text style={{color: c.text, fontWeight: '700'}}>{a.data.address}</Text>
                     <Text style={{color: c.muted, fontSize: 12}}>{PROVIDERS.find(p => p.value === a.data.provider)?.label} · {a.state === 'paused' ? 'pausada' : a.data.secret_set ? 'conectada' : 'falta a senha de app'}{a.data.last_check ? ' · lida ' + relativeTime(String(a.data.last_check)) : ''}</Text>
-                    {a.data.last_error ? <Text style={{color: '#ff6b7a', fontSize: 12}}>{a.data.last_error}</Text> : null}
+                    {a.data.last_error ? <Text style={{color: c.danger, fontSize: 12}}>{a.data.last_error}</Text> : null}
                   </Pressable>
                 ))}
               </>

@@ -21,7 +21,12 @@ export function useChatTail(list:RefObject<FlatList<any>|null>,active:boolean){
  useLayoutEffect(()=>{follow();},[active,follow]);
  useEffect(()=>{const s=AppState.addEventListener('change',state=>{if(state==='active')follow();});return()=>s.remove();},[follow]);
  const position=(e:NativeSyntheticEvent<NativeScrollEvent>)=>setShowJump(intent.position(Math.max(0,e.nativeEvent.contentOffset.y)));
- return {showJump,follow,pause:()=>intent.pause(),onContentSizeChange:keep,onLayout:keep,
+ // Reconfere a descida sem forçar: só desce se ainda está seguindo (não desfaz
+ // um scroll manual feito durante um envio demorado, como o de um áudio). Duas
+ // checagens (agora e no quadro seguinte) cobrem a composer recolhendo da
+ // gravação para o normal bem na hora em que a mensagem final entra na lista.
+ const resettle=useCallback(()=>{keep();requestAnimationFrame(keep);},[keep]);
+ return {showJump,follow,pause:()=>intent.pause(),resettle,onContentSizeChange:keep,onLayout:keep,
   onScroll:position,onScrollBeginDrag:()=>{lastGesture.current=Date.now();intent.begin();},onScrollEndDrag:(e:NativeSyntheticEvent<NativeScrollEvent>)=>{position(e);intent.end();},
   onMomentumScrollBegin:()=>{if(lastGesture.current&&Date.now()-lastGesture.current<600)intent.begin();},onMomentumScrollEnd:(e:NativeSyntheticEvent<NativeScrollEvent>)=>{position(e);intent.end();keep();}};
 }

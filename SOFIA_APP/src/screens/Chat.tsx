@@ -47,7 +47,7 @@ function Bubble({message,previous,api,onRetry,selecting,selected,onSelect}:{mess
 }
 export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRefreshBootstrap,taskContext,onClearTaskContext}:{taskContext?:Task|null;onClearTaskContext?:()=>void;api:SofiaApi;bootstrap:Bootstrap;enterToSend:boolean;autoSendVoice:boolean;onLock:(v:boolean)=>void;active:boolean;onRefreshBootstrap:()=>Promise<void>|void}) {useRenderCost('chat');
  const c=useTheme(),list=useRef<FlatList<Message>>(null);
- const {follow:followChat,pause:pauseChat,showJump,...chatScroll}=useChatTail(list,active);
+ const {follow:followChat,pause:pauseChat,showJump,resettle,...chatScroll}=useChatTail(list,active);
  const cached=useMemo(()=>{const saved=api.cached<ChatSnapshot>('/chat-sync/current');return saved?recentChatPage(saved):undefined;},[api]);
  const historyGesture=useRef(new ChatHistoryGesture()),olderBusy=useRef(false),historyBuffer=useRef<MessagePage|null>(null);
  const [loadingOlder,setLoadingOlder]=useState(false);
@@ -144,6 +144,10 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
     result=await api.chat({...data,message:content});
    }
    if(!mounted.current)return;setMessages(prev=>reconcileChatWindow(prev,result));setClarification(result.clarification);
+   // Reconfere a descida depois do envio: a mensagem de voz entra com o seu tamanho
+   // final (a composer já recolheu da gravação) só agora, não quando a bolha local
+   // otimista tinha acabado de aparecer.
+   resettle();
    if(message.localVoice){deleteVoice(message.localVoice.uri);voices.current.delete(message.localVoice.uri);}
   }catch(e){if(!mounted.current)return;const explanation=errorText(e);setError(explanation);setMessages(prev=>mergeMessages(prev,[{...message,status:'failed',error:explanation}]));try{const page=await api.history(targetId);if(mounted.current&&currentId.current===targetId)setMessages(prev=>reconcileChatWindow(prev,page));}catch{}}
   finally{sendLock.current=false;if(mounted.current)setSending(false);}
