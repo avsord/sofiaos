@@ -31,6 +31,6 @@ export function ProfilePhotoEditor({scope,name}:{scope:string;name:string}){
    {uri?<Image source={{uri}} style={{width:'100%',height:'100%'}} resizeMode="cover"/>:<Brand size={72} label={initials(name)}/>}
    {busy?<View style={{position:'absolute',top:0,right:0,bottom:0,left:0,backgroundColor:'#00000055',alignItems:'center',justifyContent:'center'}}><ActivityIndicator color="#fff"/></View>:null}
   </Pressable>
-  <Pressable testID="profile-camera-button" accessibilityRole="button" accessibilityLabel="Escolher ou tirar foto do perfil" onPress={menu} disabled={busy} hitSlop={5} style={{position:'absolute',right:0,bottom:0,width:34,height:34,borderRadius:17,backgroundColor:c.accent,alignItems:'center',justifyContent:'center',borderWidth:3,borderColor:c.surface,elevation:2}}><Icon name="camera" size={17} color="#fff"/></Pressable>
+  <Pressable testID="profile-camera-button" accessibilityRole="button" accessibilityLabel="Escolher ou tirar foto do perfil" onPress={menu} disabled={busy} hitSlop={5} style={{position:'absolute',right:0,bottom:0,width:34,height:34,borderRadius:17,backgroundColor:c.accent,alignItems:'center',justifyContent:'center',borderWidth:3,borderColor:c.surface,elevation:2}}><Icon name="camera" size={17} color={c.onAccent}/></Pressable>
  </View>;
 }

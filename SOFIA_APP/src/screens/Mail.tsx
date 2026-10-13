@@ -38,7 +38,7 @@ async function listAll(api: SofiaApi, kind: string) {
 }
 function Chips<T extends string>({value, options, onChange}: {value: T; options: Array<{value: T; label: string}>; onChange: (v: T) => void}) {
   const c = useTheme();
-  return <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>{options.map(o => <Pressable key={o.value} onPress={() => onChange(o.value)} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: o.value === value ? c.accent : c.input}}><Text style={{color: o.value === value ? '#fff' : c.text, fontWeight: '600', fontSize: 13}}>{o.label}</Text></Pressable>)}</View>;
+  return <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>{options.map(o => <Pressable key={o.value} onPress={() => onChange(o.value)} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: o.value === value ? c.accent : c.input}}><Text style={{color: o.value === value ? c.onAccent : c.text, fontWeight: '600', fontSize: 13}}>{o.label}</Text></Pressable>)}</View>;
 }
 function Field({label, value, onChange, placeholder, secure = false, email = false}: {label: string; value: string; onChange: (v: string) => void; placeholder?: string; secure?: boolean; email?: boolean}) {
   const c = useTheme();

@@ -2,7 +2,7 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Svg, {Path, Rect, Line} from 'react-native-svg';
-import {useTheme} from '../lib/theme';
+import {useTheme, light} from '../lib/theme';
 import {encryptedStorage} from '../lib/encrypted-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import {File} from 'expo-file-system';
@@ -164,7 +164,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
         {d && d.accounts.length ? (
           <View style={{position: 'absolute', right: 18, bottom: insets.bottom + 22, flexDirection: 'row', gap: 10}}>
             <Pressable accessibilityRole="button" accessibilityLabel="Nova receita" onPress={() => newTx('income')} style={{width: 52, height: 52, borderRadius: 26, backgroundColor: GOOD, alignItems: 'center', justifyContent: 'center', elevation: 6}}><Text style={{color: '#fff', fontSize: 22, fontWeight: '800'}}>+</Text></Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="Nova despesa" onPress={() => newTx('expense')} style={{height: 52, paddingHorizontal: 20, borderRadius: 26, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, elevation: 6}}><Text style={{color: '#fff', fontSize: 22, fontWeight: '800'}}>−</Text><Text style={{color: '#fff', fontWeight: '700'}}>Despesa</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Nova despesa" onPress={() => newTx('expense')} style={{height: 52, paddingHorizontal: 20, borderRadius: 26, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, elevation: 6}}><Text style={{color: c.onAccent, fontSize: 22, fontWeight: '800'}}>−</Text><Text style={{color: c.onAccent, fontWeight: '700'}}>Despesa</Text></Pressable>
           </View>
         ) : null}
 
@@ -223,14 +223,14 @@ function HomeTab({d, month, api, reload, onTx, onTab, onAccount, onManage}: {d: 
     <>
       <View style={{backgroundColor: c.accent, borderRadius: 24, padding: 18, gap: 14}}>
         <View style={{flexDirection: 'row', alignItems: 'center'}}>
-          <Text style={{flex: 1, color: '#ffffffcc', fontSize: 13}}>Saldo geral</Text>
-          <Pressable accessibilityLabel={hide ? 'Mostrar valores' : 'Esconder valores'} onPress={() => setHide(h => !h)}><Icon name="eye" size={18} color="#ffffffcc" /></Pressable>
+          <Text style={{flex: 1, color: c.onAccent + 'cc', fontSize: 13}}>Saldo geral</Text>
+          <Pressable accessibilityLabel={hide ? 'Mostrar valores' : 'Esconder valores'} onPress={() => setHide(h => !h)}><Icon name="eye" size={18} color={c.onAccent + 'cc'} /></Pressable>
         </View>
-        <Text style={{color: '#fff', fontSize: 32, fontWeight: '800'}}>{show(total)}</Text>
-        <Text style={{color: '#ffffffcc', fontSize: 12}}>Previsto no fim de {monthLabel(month).split(' ')[0].toLowerCase()}: <Text style={{color: '#fff', fontWeight: '700'}}>{show(forecast)}</Text></Text>
+        <Text style={{color: c.onAccent, fontSize: 32, fontWeight: '800'}}>{show(total)}</Text>
+        <Text style={{color: c.onAccent + 'cc', fontSize: 12}}>Previsto no fim de {monthLabel(month).split(' ')[0].toLowerCase()}: <Text style={{color: c.onAccent, fontWeight: '700'}}>{show(forecast)}</Text></Text>
         <View style={{flexDirection: 'row', gap: 10}}>
-          <View style={{flex: 1, backgroundColor: '#ffffff22', borderRadius: 14, padding: 10}}><Text style={{color: '#ffffffcc', fontSize: 11}}>↑ Receitas</Text><Text style={{color: '#fff', fontWeight: '800', fontSize: 16}}>{show(s.income)}</Text>{s.incomePending ? <Text style={{color: '#ffffffaa', fontSize: 10}}>+ {show(s.incomePending)} a receber</Text> : null}</View>
-          <View style={{flex: 1, backgroundColor: '#ffffff22', borderRadius: 14, padding: 10}}><Text style={{color: '#ffffffcc', fontSize: 11}}>↓ Despesas</Text><Text style={{color: '#fff', fontWeight: '800', fontSize: 16}}>{show(s.expense)}</Text>{s.expensePending ? <Text style={{color: '#ffffffaa', fontSize: 10}}>+ {show(s.expensePending)} a pagar</Text> : null}</View>
+          <View style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 14, padding: 10}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↑ Receitas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.income)}</Text>{s.incomePending ? <Text style={{color: '#ffffffaa', fontSize: 10}}>+ {show(s.incomePending)} a receber</Text> : null}</View>
+          <View style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 14, padding: 10}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↓ Despesas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.expense)}</Text>{s.expensePending ? <Text style={{color: '#ffffffaa', fontSize: 10}}>+ {show(s.expensePending)} a pagar</Text> : null}</View>
         </View>
       </View>
 
@@ -430,29 +430,32 @@ function TxEditor({api, d, tx, onClose, onSaved}: {api: SofiaApi; d: Data; tx: P
       ? [{text: 'Cancelar', style: 'cancel'}, {text: 'Só este', onPress: () => void del(false)}, {text: 'Este e os pendentes', style: 'destructive', onPress: () => void del(true)}]
       : [{text: 'Cancelar', style: 'cancel'}, {text: 'Apagar', style: 'destructive', onPress: () => void del(false)}]);
   }
-  const head = kind === 'income' ? GOOD : kind === 'transfer' ? '#4fa3ff' : c.accent;
+  // A abinha selecionada tem fundo branco fixo, então o texto dela precisa de uma cor sempre
+  // escura o bastante contra branco — a própria cor do destaque no modo claro serve bem para isso,
+  // mesmo no app em modo escuro (é só o texto dessa abinha, não muda o resto da tela).
+  const head = kind === 'income' ? GOOD : kind === 'transfer' ? '#4fa3ff' : c.accent, headText = head === c.accent ? c.onAccent : '#fff', selectedTabText = head === c.accent ? light.accent : head;
   return (
     <MotionModal visible animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{flex: 1, backgroundColor: c.bg}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={{backgroundColor: head, paddingTop: 40, paddingBottom: 18, paddingHorizontal: 16, gap: 12}}>
           <View style={{flexDirection: 'row', alignItems: 'center'}}>
-            <Pressable accessibilityLabel="Fechar" onPress={onClose} style={{padding: 8}}><Text style={{color: '#fff', fontSize: 18}}>✕</Text></Pressable>
-            <Text style={{flex: 1, color: '#fff', fontWeight: '700', fontSize: 17}}>{editing ? 'Editar' : tx.virtual ? 'Confirmar repetição' : 'Novo lançamento'}</Text>
-            {editing ? <Pressable accessibilityLabel="Apagar lançamento" onPress={remove} style={{padding: 8}}><Icon name="trash" size={20} color="#fff" /></Pressable> : null}
+            <Pressable accessibilityLabel="Fechar" onPress={onClose} style={{padding: 8}}><Text style={{color: headText, fontSize: 18}}>✕</Text></Pressable>
+            <Text style={{flex: 1, color: headText, fontWeight: '700', fontSize: 17}}>{editing ? 'Editar' : tx.virtual ? 'Confirmar repetição' : 'Novo lançamento'}</Text>
+            {editing ? <Pressable accessibilityLabel="Apagar lançamento" onPress={remove} style={{padding: 8}}><Icon name="trash" size={20} color={headText} /></Pressable> : null}
           </View>
           {!editing ? (
-            <View style={{flexDirection: 'row', backgroundColor: '#ffffff26', borderRadius: 99, padding: 3}}>
+            <View style={{flexDirection: 'row', backgroundColor: headText + '26', borderRadius: 99, padding: 3}}>
               {([['expense', 'Despesa'], ['income', 'Receita'], ['transfer', 'Transferência']] as Array<[TxKind, string]>).map(([k, l]) => (
                 <Pressable key={k} onPress={() => { setKind(k); setCategory(''); if (k !== 'expense' && d.cards.some(x => x.id === source)) setSource(firstAccount); }} style={{flex: 1, paddingVertical: 7, borderRadius: 99, backgroundColor: kind === k ? '#fff' : 'transparent', alignItems: 'center'}}>
-                  <Text style={{color: kind === k ? head : '#fff', fontWeight: '700', fontSize: 13}}>{l}</Text>
+                  <Text style={{color: kind === k ? selectedTabText : headText, fontWeight: '700', fontSize: 13}}>{l}</Text>
                 </Pressable>
               ))}
             </View>
           ) : null}
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
-            <Text style={{color: '#ffffffcc', fontSize: 22}}>R$</Text>
-            <TextInput accessibilityLabel="Valor" value={amount} onChangeText={setAmount} placeholder="0,00" placeholderTextColor="#ffffff88" keyboardType="decimal-pad" autoFocus={!editing}
-              style={{flex: 1, color: '#fff', fontSize: 38, fontWeight: '800', padding: 0}} />
+            <Text style={{color: headText + 'cc', fontSize: 22}}>R$</Text>
+            <TextInput accessibilityLabel="Valor" value={amount} onChangeText={setAmount} placeholder="0,00" placeholderTextColor={headText + '88'} keyboardType="decimal-pad" autoFocus={!editing}
+              style={{flex: 1, color: headText, fontSize: 38, fontWeight: '800', padding: 0}} />
           </View>
         </View>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 18, gap: 16, paddingBottom: 40}}>
@@ -852,7 +855,7 @@ function ImportSheet({api, d, onClose, onDone}: {api: SofiaApi; d: Data; onClose
                 <Text style={{fontSize: 12, color: c.muted, fontWeight: '700'}}>3. Confira ({chosenItems.length} de {preview.length} marcados · {money(Math.abs(sum))} {sum >= 0 ? 'de entrada' : 'de saída'})</Text>
                 <View style={{maxHeight: 320}}><ScrollView nestedScrollEnabled>
                   {preview.map(i => <Pressable key={i.import_id} disabled={!!i.skip} onPress={() => toggle(i.import_id)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderColor: c.line, opacity: i.skip ? 0.45 : 1}}>
-                    <View style={{width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: chosen.has(i.import_id) ? c.accent : c.line, backgroundColor: chosen.has(i.import_id) ? c.accent : 'transparent', alignItems: 'center', justifyContent: 'center'}}>{chosen.has(i.import_id) ? <Text style={{color: '#fff', fontSize: 13, fontWeight: '800'}}>✓</Text> : null}</View>
+                    <View style={{width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: chosen.has(i.import_id) ? c.accent : c.line, backgroundColor: chosen.has(i.import_id) ? c.accent : 'transparent', alignItems: 'center', justifyContent: 'center'}}>{chosen.has(i.import_id) ? <Text style={{color: c.onAccent, fontSize: 13, fontWeight: '800'}}>✓</Text> : null}</View>
                     <View style={{flex: 1}}><Text style={{color: c.text}} numberOfLines={1}>{i.desc}</Text><Text style={{fontSize: 11, color: c.muted}}>{i.date.split('-').reverse().join('/')}{i.category ? ' · ' + i.category : ''}{i.duplicate ? ' · já importado' : ''}{i.skip ? ' · ' + i.skip : ''}</Text></View>
                     <Text style={{fontWeight: '700', color: i.kind === 'income' ? '#2fc58b' : c.text}}>{i.kind === 'income' ? '+' : '-'}{money(i.amount)}</Text>
                   </Pressable>)}

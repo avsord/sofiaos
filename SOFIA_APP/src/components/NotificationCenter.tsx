@@ -153,7 +153,7 @@ export function NotificationList({grouped=false,firstPaint=false}:{grouped?:bool
  const areas=useMemo(()=>{const m=new Map<string,number>();for(const i of n.items){const a=noticeArea(i);m.set(a,(m.get(a)||0)+1);}return [...m.entries()].sort((a,b)=>b[1]-a[1]);},[n.items]);
  const shown=useMemo(()=>n.items.filter(i=>filter==='all'||(filter==='unread'?i.state==='unread':noticeArea(i)===filter)),[n.items,filter]);
  const groups=useMemo(()=>{const result=new Map<string,Notice[]>();for(const item of shown){const key=noticeDateGroup(item.created_at);if(!result.has(key))result.set(key,[]);result.get(key)!.push(item);}return result;},[shown]);
- const chip=(value:string,label:string,count?:number)=><Pressable key={value} accessibilityRole="button" accessibilityState={{selected:filter===value}} onPress={()=>setFilter(value)} style={{flexDirection:'row',alignItems:'center',gap:5,paddingHorizontal:11,paddingVertical:6,borderRadius:99,backgroundColor:filter===value?c.accent:c.input}}><Text style={{color:filter===value?'#fff':c.text,fontSize:12,fontWeight:'600'}}>{label}</Text>{count?<Text style={{color:filter===value?'#ffffffcc':c.muted,fontSize:11}}>{count}</Text>:null}</Pressable>;
+ const chip=(value:string,label:string,count?:number)=><Pressable key={value} accessibilityRole="button" accessibilityState={{selected:filter===value}} onPress={()=>setFilter(value)} style={{flexDirection:'row',alignItems:'center',gap:5,paddingHorizontal:11,paddingVertical:6,borderRadius:99,backgroundColor:filter===value?c.accent:c.input}}><Text style={{color:filter===value?c.onAccent:c.text,fontSize:12,fontWeight:'600'}}>{label}</Text>{count?<Text style={{color:filter===value?'#ffffffcc':c.muted,fontSize:11}}>{count}</Text>:null}</Pressable>;
  return <View style={{gap:10}}>
   <BellDigest/>
   {n.localOnly?<Text style={{color:c.muted,fontSize:11,lineHeight:17}}>Servidor atual: até 300 avisos recentes. A limpeza global aguarda a atualização do servidor; marcar como lida é sincronizado.</Text>:null}
@@ -170,7 +170,7 @@ function BellBadge({count}:{count:number}){const c=useTheme(),reduced=useReduced
   else if(count===0&&prev>0)Animated.timing(scale,{toValue:0,duration:160,easing:MOTION_EASE,useNativeDriver:true}).start(()=>setShown(0));
  },[count,reduced,scale]);
  if(!shown&&!count)return null;
- return <Animated.View pointerEvents="none" style={{position:'absolute',right:0,top:0,minWidth:18,height:18,borderRadius:9,backgroundColor:c.accent,alignItems:'center',justifyContent:'center',paddingHorizontal:3,transform:[{scale}]}}><Text style={{color:'#fff',fontSize:10,fontWeight:'700'}}>{shown>99?'99+':shown}</Text></Animated.View>;}
+ return <Animated.View pointerEvents="none" style={{position:'absolute',right:0,top:0,minWidth:18,height:18,borderRadius:9,backgroundColor:c.accent,alignItems:'center',justifyContent:'center',paddingHorizontal:3,transform:[{scale}]}}><Text style={{color:c.onAccent,fontSize:10,fontWeight:'700'}}>{shown>99?'99+':shown}</Text></Animated.View>;}
 export function NotificationBell({onViewAll}:{onViewAll:()=>void}){
  const c=useTheme(),n=useNotifications(),screen=useWindowDimensions(),insets=useSafeAreaInsets();
  const [open,setOpen]=useState(false),[anchor,setAnchor]=useState<BellAnchor>({x:screen.width-66,y:insets.top+20,width:44,height:44});
