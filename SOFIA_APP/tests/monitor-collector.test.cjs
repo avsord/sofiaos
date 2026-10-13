@@ -10,7 +10,7 @@ const pages={[K]:{ok:true,title:'Placa Secreta',result:{found:true,needsConfirma
 const reader={readPrice:async u=>pages[u],readerDiagnostics:()=>({hostMounted:true,queue:0,busy:null,totals:{jobs:2},recent:[]})};
 const notified=[];
 const collector=load('src/lib/monitor-collector.ts',{'expo-notifications':{getPermissionsAsync:async()=>({granted:true}),setNotificationChannelAsync:async()=>{},scheduleNotificationAsync:async r=>{notified.push(r);},AndroidImportance:{HIGH:4}},
- './monitoring':monitoring,'./price-reader':reader,'./bell-inbox':{notificationScope:s=>'scope-'+s.length}});
+ './monitoring':monitoring,'./price-reader':reader,'./price-direct':{readDirect:async()=>null},'./bell-inbox':{notificationScope:s=>'scope-'+s.length}});
 const monitor={id:'abcdef1234567890',kind:'monitor',title:'Placa Secreta Ultra',state:'active',revision:1,data:{method:'product',variant:'Placa Secreta Ultra',currency:'BRL',preferred_url:K,source_urls:P,interval_minutes:360,new_low:true,drop_percent:'',target_price:''},created_at:'2026-10-01'};
 const observed=[];
 const api={owner:'pedro@example.com',entities:async()=>({items:[monitor]}),observations:async()=>({items:[]}),observe:async(id,b)=>{observed.push({id,...b});return {};}};

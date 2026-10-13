@@ -15,6 +15,7 @@ import {Button, IconButton} from '../components/UI';
 import {PriceChart} from '../components/PriceChart';
 import {Spinner, LoadingLines} from '../components/Loading';
 import {readPrice, readLinks, USER_AGENT, DESKTOP_AGENT} from '../lib/price-reader';
+import {readDirect} from '../lib/price-direct';
 import {buildInjectedScript, parsePriceMessage} from '../lib/price-extractor';
 import type {StoreLink} from '../lib/price-extractor';
 import {fallbackSearchUrl} from '../lib/price-extractor';
@@ -227,7 +228,8 @@ function AddProduct({api, used, existing, onClose, onCreated}: {api: SofiaApi; u
     if (!clean) { setError('Não achei um link aí. Cole o link do produto (pode ser o texto inteiro do compartilhar).'); return; }
     if (existing.some(p => storesOf(p.monitor).some(s => s.url === clean))) { setError('Você já acompanha esse link.'); return; }
     setUrl(clean); setError(''); setStep('reading');
-    const r = await readPrice(clean);
+    // Leitor direto da loja primeiro (sem abrir página), igual à coleta automática.
+    const r = (await readDirect(clean).catch(() => null)) || (await readPrice(clean));
     if (!r.ok) { setError(r.error + ' Você ainda pode acompanhar: a Sofia tenta ler de novo depois.'); setTitle(''); setCandidates([]); setPicked(null); setStep('review'); return; }
     setTitle(r.title.replace(/\s*[|–-]\s*(KaBuM!?|Mercado Livre|Pichau|Amazon\.com\.br|Magalu|AliExpress|Shopee).*$/i, '').trim());
     setCandidates(r.result.candidates);

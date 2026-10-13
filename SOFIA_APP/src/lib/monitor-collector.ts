@@ -4,6 +4,7 @@ import type {Entity} from './types';
 import {buildProduct, storesDue, pickAutomatic, readMemory, alertReasons, money} from './monitoring';
 import type {ProductSeries, Candidate} from './monitoring';
 import {readPrice, readerDiagnostics} from './price-reader';
+import {readDirect} from './price-direct';
 import {notificationScope} from './bell-inbox';
 
 export type StoreIssue = {kind: 'failed'; error: string; at: number} | {kind: 'confirm'; candidates: Candidate[]; title: string; at: number};
@@ -108,7 +109,9 @@ export async function runCollection(api: SofiaApi, opts: {force?: boolean; scope
     for (const {p, s} of jobs) {
       state.label = s.name + ' · ' + p.monitor.title; emit();
       const key = issueKey(p.monitor.id, s.url);
-      const read = await readPrice(s.url);
+      // Leitor direto da loja primeiro (sem abrir página): resolve links que só
+      // redirecionam para o app da loja. Se a loja não tiver, cai no navegador escondido.
+      const read = (await readDirect(s.url).catch(() => null)) || (await readPrice(s.url));
       const base = {at: Date.now(), monitor: short(p.monitor.id), host: s.host};
       if (!read.ok) { state.issues[key] = {kind: 'failed', error: read.error, at: Date.now()}; note({...base, result: 'falhou', error: read.error.slice(0, 80)}); }
       else {
