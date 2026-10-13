@@ -28,7 +28,7 @@ import {StartupHome} from './src/components/StartupHome';
 import {TabPager} from './src/components/TabPager';
 import {MenuTab} from './src/components/MenuTab';
 import {NotificationProvider,noticeArea} from './src/components/NotificationCenter';
-import {Spinner} from './src/components/Loading';
+import {Spinner,FadeSwap} from './src/components/Loading';
 import {createMenuMotion} from './src/lib/menu-motion';
 import type {TabPagerHandle} from './src/components/TabPager';
 import {useStartupMounts} from './src/lib/startup-mounts';
@@ -193,11 +193,11 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?0:1}]} pointerEvents={tab==='notifications'?'none':'auto'} accessibilityElementsHidden={tab==='notifications'} importantForAccessibility={tab==='notifications'?'no-hide-descendants':'auto'}>
   <TabPager motion={menuMotion} ref={pager} activeTab={tab} readyTabs={mountedTabs} fluencyMode={fluency==='new'?'new':'old'} onPreviewTabs={setPreviewTabs} enabled={!gestureLocked&&!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)&&!(tab==='apps'&&workspaceDepth)} onSelect={navigate}>
    {initialDataReady?<DeferredScreen load={loadHome} screenProps={{launchVisible:visible,onDiscussTask:discussTask,onOpenCapsules:openCapsules,onOpenMonitoring:openMonitoringFromHome,onOpenTasks:openTasks,onGestureLock:setGestureLocked,api,bootstrap,navigate,onOpenAgenda:openAgenda,active:screenTab==='home'}}/>:<StartupHome profile={bootstrap.profile}/>}
-   {mountedTabs.has('chat')?<DeferredScreen key={'chat-'+chatEpoch} load={loadChat} screenProps={{taskContext,onClearTaskContext:clearTaskContext,api,bootstrap,enterToSend:prefs.enterToSend,autoSendVoice:prefs.autoSendVoice,onLock:setLocked,active:screenTab==='chat',onRefreshBootstrap:boot}}/>:<ScreenSkeleton tab='chat'/>}
-   {mountedTabs.has('pages')?<DeferredScreen key={bootstrap.profile.email} load={loadPages} screenProps={{api,active:screenTab==='pages',storageScope:bootstrap.profile.email,onDepthChange:setPagesDepth}}/>:<ScreenSkeleton tab='pages'/>}
-   {mountedTabs.has('agenda')?<DeferredScreen load={loadAgenda} screenProps={{onGestureLock:setGestureLocked,api,target:agendaTarget,active:screenTab==='agenda'}}/>:<ScreenSkeleton tab='agenda'/>}
-   {mountedTabs.has('apps')?<DeferredScreen load={loadWorkspace} screenProps={{onDiscussTask:discussTask,openCapsulesKey:capsulesTarget,openMonitoringKey:monitoringTarget.n,openMonitoringId:monitoringTarget.id,openFinanceKey:financeTarget,openTasksKey:tasksTarget,openMailKey:mailTarget,resetKey:workspaceReset,api,navigate,onDepthChange:setWorkspaceDepth,active:screenTab==='apps'}}/>:<ScreenSkeleton tab='apps'/>}
-   {mountedTabs.has('profile')?<DeferredScreen load={loadProfile} screenProps={{api,bootstrap,prefs,onPrefs:changePrefs,onProfile:profile,onLogout:logout,onCheckUpdate:manualUpdate,onChatHistoryCleared:clearChat}}/>:<ScreenSkeleton tab='profile'/>}
+   {<FadeSwap ready={mountedTabs.has('chat')} fallback={<ScreenSkeleton tab='chat'/>}><DeferredScreen key={'chat-'+chatEpoch} load={loadChat} screenProps={{taskContext,onClearTaskContext:clearTaskContext,api,bootstrap,enterToSend:prefs.enterToSend,autoSendVoice:prefs.autoSendVoice,onLock:setLocked,active:screenTab==='chat',onRefreshBootstrap:boot}}/></FadeSwap>}
+   {<FadeSwap ready={mountedTabs.has('pages')} fallback={<ScreenSkeleton tab='pages'/>}><DeferredScreen key={bootstrap.profile.email} load={loadPages} screenProps={{api,active:screenTab==='pages',storageScope:bootstrap.profile.email,onDepthChange:setPagesDepth}}/></FadeSwap>}
+   {<FadeSwap ready={mountedTabs.has('agenda')} fallback={<ScreenSkeleton tab='agenda'/>}><DeferredScreen load={loadAgenda} screenProps={{onGestureLock:setGestureLocked,api,target:agendaTarget,active:screenTab==='agenda'}}/></FadeSwap>}
+   {<FadeSwap ready={mountedTabs.has('apps')} fallback={<ScreenSkeleton tab='apps'/>}><DeferredScreen load={loadWorkspace} screenProps={{onDiscussTask:discussTask,openCapsulesKey:capsulesTarget,openMonitoringKey:monitoringTarget.n,openMonitoringId:monitoringTarget.id,openFinanceKey:financeTarget,openTasksKey:tasksTarget,openMailKey:mailTarget,resetKey:workspaceReset,api,navigate,onDepthChange:setWorkspaceDepth,active:screenTab==='apps'}}/></FadeSwap>}
+   {<FadeSwap ready={mountedTabs.has('profile')} fallback={<ScreenSkeleton tab='profile'/>}><DeferredScreen load={loadProfile} screenProps={{api,bootstrap,prefs,onPrefs:changePrefs,onProfile:profile,onLogout:logout,onCheckUpdate:manualUpdate,onChatHistoryCleared:clearChat}}/></FadeSwap>}
   </TabPager>
  </View>
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?1:0,backgroundColor:c.bg}]} pointerEvents={tab==='notifications'?'auto':'none'} accessibilityElementsHidden={tab!=='notifications'} importantForAccessibility={tab==='notifications'?'auto':'no-hide-descendants'}>{tab==='notifications'?<DeferredScreen load={loadNotifications} screenProps={{api,onBack:notificationBack}}/>:null}</View>

@@ -1,5 +1,5 @@
-import React, {useEffect, useRef} from 'react';
-import {Animated, Easing, Text, View} from 'react-native';
+import React, {useEffect, useRef, useState} from 'react';
+import {Animated, Easing, StyleSheet, Text, View} from 'react-native';
 import Svg, {Circle} from 'react-native-svg';
 import {useTheme} from '../lib/theme';
 
@@ -46,6 +46,26 @@ export function LoadingLines({rows = 3, separated = true}: {rows?: number; separ
         </View>
       ))}
     </Animated.View>
+  );
+}
+
+/** Troca de esqueleto para conteúdo de verdade suavizada: os dois ficam
+ * empilhados por ~160 ms, o conteúdo entra esmaecendo por cima e o esqueleto
+ * sai, em vez de um corte seco (a "piscada" ao abrir um menu pela primeira
+ * vez, quando o aquecimento em segundo plano termina bem na hora do toque). */
+export function FadeSwap({ready, fallback, children}: {ready: boolean; fallback: React.ReactNode; children: React.ReactNode}) {
+  const [everReady, setEverReady] = useState(ready), fade = useRef(new Animated.Value(ready ? 1 : 0)).current, [showFallback, setShowFallback] = useState(!ready);
+  useEffect(() => {
+    if (!ready) return;
+    setEverReady(true);
+    Animated.timing(fade, {toValue: 1, duration: 160, useNativeDriver: true}).start(() => setShowFallback(false));
+  }, [ready, fade]);
+  if (!everReady) return <>{fallback}</>;
+  return (
+    <View style={{flex: 1}}>
+      <Animated.View style={{flex: 1, opacity: fade}}>{children}</Animated.View>
+      {showFallback ? <View style={StyleSheet.absoluteFill} pointerEvents="none">{fallback}</View> : null}
+    </View>
   );
 }
 
