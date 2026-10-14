@@ -22,7 +22,7 @@ test('v129: endpoints públicos e institucionais funcionam sem liberar o painel'
   const f=await runtimeFixture(t);
   const health=await fetch(f.base+'/health');assert.equal(health.status,200);
   const privacy=await fetch(f.base+'/privacy');assert.equal(privacy.status,200);assert.match(await privacy.text(),/Política de Privacidade/);
-  const site=await fetch(f.base+'/site');assert.equal(site.status,200);assert.match(await site.text(),/Plataforma SaaS/);
+  const site=await fetch(f.base+'/site');assert.equal(site.status,200);assert.match(await site.text(),/Organização pessoal com IA/);const logo=await fetch(f.base+'/sofia-logo.png');assert.equal(logo.status,200);assert.equal(logo.headers.get('content-type'),'image/png');assert.match(site.headers.get('content-security-policy')||'',/img-src 'self'/);
   const terms=await fetch(f.base+'/terms');assert.equal(terms.status,200);assert.match(await terms.text(),/Termos de Serviço/);
   const deletion=await fetch(f.base+'/data-deletion');assert.equal(deletion.status,200);assert.match(await deletion.text(),/Exclusão de dados/);
   const connect=await fetch(f.base+'/whatsapp/connect');assert.equal(connect.status,200);assert.match(await connect.text(),/Conectar WhatsApp Business/);

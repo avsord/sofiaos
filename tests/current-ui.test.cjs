@@ -153,9 +153,11 @@ test('v130: infraestrutura Railway mantém endpoints públicos e protege o paine
 });
 
 
-test('v129: site público da Meta descreve serviço, responsável e políticas sem abrir o painel',()=>{
+test('v129: site público descreve serviço, responsável e políticas sem abrir o painel',()=>{
   const site=read('public/site.html'),terms=read('public/terms.html'),deletion=read('public/data-deletion.html'),handler=read('src/core/http-handler.js');
-  assert.ok(site.includes('Automação e atendimento'));
+  assert.ok(site.includes('Organização pessoal com IA'));
+  assert.ok(site.includes('/sofia-logo.png'));
+  assert.ok(!/whatsapp/i.test(site));
   assert.ok(site.includes('Pedro Henrique Silva'));
   assert.ok(site.includes('sofiaos.core@gmail.com'));
   assert.ok(site.includes('/login'));
