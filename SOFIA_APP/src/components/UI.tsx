@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, StyleSheet, Image } from 'react-native';
 import { useTheme } from '../lib/theme';
 import { Icon, IconName } from './Icon';
 export function IconButton({name,label,onPress,disabled=false,filled=false,size=44}:{name:IconName;label:string;onPress:()=>void;disabled?:boolean;filled?:boolean;size?:number}) {
@@ -8,6 +8,9 @@ export function IconButton({name,label,onPress,disabled=false,filled=false,size=
 export function Button({title,onPress,loading=false,disabled=false,secondary=false}:{title:string;onPress:()=>void;loading?:boolean;disabled?:boolean;secondary?:boolean}) {
  const c=useTheme(); return <Pressable accessibilityRole="button" disabled={disabled||loading} onPress={onPress} style={({pressed})=>({minHeight:50,borderRadius:16,paddingHorizontal:18,alignItems:'center',justifyContent:'center',backgroundColor:secondary?c.accentSoft:c.accent,opacity:disabled?0.4:pressed?0.7:1})}>{loading?<ActivityIndicator color={secondary?c.accent:c.onAccent}/>:<Text style={{fontSize:15,fontWeight:'700',color:secondary?c.accent:c.onAccent}}>{title}</Text>}</Pressable>;
 }
+// 0.3.139: logo oficial da Sofia (esfera). Brand continua para iniciais de perfil.
+const SOFIA_LOGO=require('../../assets/sofia-logo-app.png');
+export function SofiaLogo({size=44}:{size?:number}) { return <Image source={SOFIA_LOGO} style={{width:size,height:size}} resizeMode="contain" accessibilityLabel="Sofia OS"/>; }
 export function Brand({size=44,label='S'}:{size?:number;label?:string}) { const c=useTheme();return <View style={{width:size,height:size,borderRadius:size/2,backgroundColor:c.accent,alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:size*.4,fontWeight:'700',color:c.onAccent}}>{label}</Text></View>; }
 export function Empty({title,body,icon='chat'}:{title:string;body:string;icon?:IconName}) { const c=useTheme();return <View style={{alignItems:'center',padding:32,gap:12}}><View style={{padding:18,borderRadius:28,backgroundColor:c.accentSoft}}><Icon name={icon} color={c.accent} size={28}/></View><Text style={{fontSize:20,fontWeight:'600',color:c.text,textAlign:'center'}}>{title}</Text><Text style={{fontSize:14,lineHeight:22,color:c.muted,textAlign:'center'}}>{body}</Text></View>; }
 export function ErrorBanner({text,onRetry}:{text:string;onRetry?:()=>void}) {const c=useTheme();return <View accessibilityRole="alert" style={{backgroundColor:c.dangerBg,padding:14,borderRadius:14,margin:12,gap:6}}><Text style={{color:c.danger,fontSize:13,lineHeight:19}}>{text}</Text>{onRetry&&<Pressable onPress={onRetry} accessibilityRole="button" style={{minHeight:36,justifyContent:'center'}}><Text style={{fontWeight:'700',color:c.danger}}>Tentar novamente</Text></Pressable>}</View>;}

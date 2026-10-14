@@ -295,7 +295,7 @@ test('108 native splash icon is fully invisible, overlay fades the only S on eve
  assert.ok(logo.includes('android:fillColor="#00FFFFFF"'));
  assert.ok(logo.includes('android:strokeColor="#00FFFFFF"'));
  assert.equal(logo.split('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_empty</item>').length-1,1);
- assert.ok(native.includes('activity.resources.getDrawable(R.drawable.sofia_launch_mark'));
+ assert.ok(native.includes('activity.resources.getDrawable(R.drawable.sofia_launch_orb'));
  assert.ok(native.includes('paint.alpha = (255f * fade).toInt()'));
  assert.ok(motion.includes('S_FADE_IN_MS = 140L'));
  assert.ok(native.includes('surface.animate().alpha(0f).setDuration(95L)'));

@@ -81,7 +81,7 @@ object SofiaLaunchOverlay {
             ?: (192f * activity.resources.displayMetrics.density).toInt()
           val markSize = (iconSize * 1.5f).toInt()
           val pixels = Bitmap.createBitmap(markSize, markSize, Bitmap.Config.ARGB_8888)
-          val mark = activity.resources.getDrawable(R.drawable.sofia_launch_mark, activity.theme).mutate()
+          val mark = activity.resources.getDrawable(R.drawable.sofia_launch_orb, activity.theme).mutate()
           mark.setBounds(0, 0, markSize, markSize)
           mark.draw(Canvas(pixels))
           val now = SystemClock.uptimeMillis()
@@ -329,7 +329,7 @@ private class SofiaEarlySplashSurface(
   private val startedAt: Long
 ) : View(activity) {
   private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-  private val backgroundColor = android.graphics.Color.rgb(114, 88, 232)
+  private val backgroundColor = android.graphics.Color.rgb(255, 255, 255)
   val markCenterX = markLeft + (pixels?.width ?: 0) / 2f
   val markCenterY = markTop + (pixels?.height ?: 0) / 2f
   override fun onDraw(canvas: Canvas) {
@@ -338,6 +338,8 @@ private class SofiaEarlySplashSurface(
     val scale = SofiaLaunchMotion.scaleAt(startedAt, now)
     canvas.save()
     canvas.scale(scale, scale, markCenterX, markCenterY)
+    // 0.3.139: a esfera gira enquanto cresce, no mesmo relogio da escala.
+    canvas.rotate(SofiaLaunchMotion.rotationAt(startedAt, now), markCenterX, markCenterY)
     // Never flash a fully opaque stationary S on the native handoff frame.
     // The purple surface stays opaque; only the pre-rendered letter fades in.
     val fade = ((now - startedAt).coerceAtLeast(0L).toFloat() /

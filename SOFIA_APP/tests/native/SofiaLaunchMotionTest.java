@@ -21,6 +21,18 @@ public class SofiaLaunchMotionTest {
       previous = current;
     }
     if (SofiaLaunchMotion.scaleAt(1000, 1001) - .70f > .00001f) throw new AssertionError("Abrupt entry");
+    // 0.3.139: the orb turns -30 -> 0 degrees on the same clock, never backwards.
+    near(SofiaLaunchMotion.rotationAt(1000, 1000), -30f);
+    near(SofiaLaunchMotion.rotationAt(1000, 1325), -15f);
+    near(SofiaLaunchMotion.rotationAt(1000, 1650), 0f);
+    near(SofiaLaunchMotion.rotationAt(1000, 9000), 0f);
+    near(SofiaLaunchMotion.rotationAt(0, 1400), 0f);
+    float angle = -30f;
+    for (long now = 1000; now <= 1650; now++) {
+      float current = SofiaLaunchMotion.rotationAt(1000, now);
+      if (current < angle - .00001f || current > 0f) throw new AssertionError("Rotation reversed");
+      angle = current;
+    }
     System.out.println("native motion passed");
   }
 }
