@@ -48,3 +48,9 @@ test('mensagem vinda da pagina e tratada como dado: URL final de fora, html curt
  assert.equal(p(JSON.stringify({kind:'ml-state',ok:false,code:'<script>alert(1)</script>'})).code,'STATE_NOT_FOUND');
  assert.equal(p('nao e json').ok,false);assert.equal(p(JSON.stringify({kind:'price',ok:true})).ok,false);
 });
+test('leitura do ML usa a versao de COMPUTADOR (formato validado); outras lojas seguem a regra delas',()=>{
+ const s=require('node:fs').readFileSync(require('node:path').join(__dirname,'../src/lib/price-reader.tsx'),'utf8');
+ assert.ok(s.includes("userAgent={job.kind === 'ml-state' || readerAgent(job.url) === 'desktop' ? DESKTOP_AGENT : USER_AGENT}"));
+ const d=require('node:fs').readFileSync(require('node:path').join(__dirname,'../src/lib/mercado-livre-device.ts'),'utf8');
+ assert.match(d,/'user-agent': 'Mozilla\/5\.0 \(Windows NT 10\.0/);
+});

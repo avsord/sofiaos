@@ -146,3 +146,8 @@ test('ML route: link curto resolvido no celular usa o destino final, que precisa
  r=await f.request({link:'https://mercadolivre.com/sec/1AbC23x',html:html(),finalUrl:'https://evil.example/p/MLB42258825'},f.token);
  assert.equal(r.body.ok,false);
 });
+test('ML route: falha da pagina do celular volta com o motivo exato entre colchetes (sem conteudo da pagina)',async t=>{
+ const f=await setup(t,async()=>assert.fail('servidor nao deve buscar'));
+ const r=await f.request({link:LINK,html:'<script id="__NORDIC_RENDERING_CTX__">_n.ctx.r={"appProps":{"pageProps":{"x":{"segredo":"VALOR"}}}}</script>'},f.token);
+ assert.equal(r.body.code,'STATE_NOT_FOUND');assert.match(r.body.message,/\[Estrutura da oferta não reconhecida \(.*pageProps:x/);assert.ok(!r.body.message.includes('VALOR'));
+});

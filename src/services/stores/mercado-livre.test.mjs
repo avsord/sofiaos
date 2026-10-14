@@ -329,3 +329,27 @@ test("HTML ORIGINAL enviado pelo usuário", {skip: !process.env.ML_HTML_PATH}, (
   assert.equal(a.extras.images.length, 5); assert.equal(a.extras.rating.count, 221);
   assert.equal(a.extras.otherOffers.length, 2); assert.equal(a.extras.lowestNewFromCents, 127700);
 });
+
+// ════════════════ 0.3.138: layouts sem o evento de rastreio ════════════════
+test("sem track: identidade por 2+ fontes da mesma página; preço do componente principal", () => {
+  const x = clone(); delete components(x).track;
+  const r = extract(wrap(x), URL_OK);
+  assert.equal(r.amountCents, 141283); assert.equal(r.itemId, "MLB5296520523");
+  assert.equal(r.catalogProductId, "MLB42258825"); assert.equal(r.identitySource, "page");
+  assert.equal(r.seller.id, "427963557");
+});
+test("sem track: fontes discordando = ITEM_MISMATCH; nenhuma fonte = motivo exato", () => {
+  const x = clone(); delete components(x).track; components(x).bookmark = {item_id: "MLB6460681458"};
+  error("ITEM_MISMATCH", () => extract(wrap(x), URL_OK));
+  const y = clone(); const c = components(y); delete c.track; delete c.main_actions; delete c.bookmark; delete c.share; delete c.buy_box_offers;
+  delete y.appProps.pageProps.initialState.filters;
+  assert.throws(() => extract(wrap(y), URL_OK), e => e.code === "STATE_NOT_FOUND" && /sem identificação/.test(e.message));
+});
+test("sem track: buy box (se existir) ainda confere o preço", () => {
+  const x = clone(); delete components(x).track; components(x).price.price.value = 999;
+  error("PRICE_CONFLICT", () => extract(wrap(x), URL_OK));
+});
+test("estrutura desconhecida: erro diz os NOMES das chaves (nunca valores)", () => {
+  assert.throws(() => extract('<script id="__NORDIC_RENDERING_CTX__">_n.ctx.r={"appProps":{"pageProps":{"x":{"segredo":"VALOR"}}}}</script>', URL_OK),
+    e => e.code === "STATE_NOT_FOUND" && /pageProps:x/.test(e.message) && !/VALOR/.test(e.message));
+});

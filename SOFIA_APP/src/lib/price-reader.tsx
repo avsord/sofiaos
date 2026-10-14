@@ -151,7 +151,9 @@ export function PriceReaderHost() {
         source={{uri: job.url}}
         injectedJavaScript={script}
         javaScriptEnabled
-        userAgent={readerAgent(job.url) === 'desktop' ? DESKTOP_AGENT : USER_AGENT}
+        // Mercado Livre: versao de COMPUTADOR, a mesma do HTML real em que o conversor foi
+        // validado. Com agente de celular o ML entrega a pagina mobile, com os dados em outro formato.
+        userAgent={job.kind === 'ml-state' || readerAgent(job.url) === 'desktop' ? DESKTOP_AGENT : USER_AGENT}
         // Página de loja tenta abrir o app dela (intent://, meli://, aliexpress://...).
         // A leitura é invisível: só http(s) carrega, o resto é recusado em silêncio.
         // IMPORTANTE: a biblioteca manda qualquer link FORA desta lista para Linking.openURL —

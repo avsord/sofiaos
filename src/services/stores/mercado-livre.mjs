@@ -333,18 +333,52 @@ function extractExtras(s, c, ev, actualId, amountCents) {
  *   allowCatalogWinner: aceita link /p/ sem anúncio e adota a oferta selecionada pela loja
  *   (itemSelectedBy="store_buy_box"). Use só no cadastro, com confirmação do usuário.
  */
+
+// Nomes (nunca valores) das chaves principais: diagnóstico sem expor conteúdo da página.
+function shapeOf(context) {
+  const keys = o => (o && typeof o === "object") ? Object.keys(o).slice(0, 25).join(",") : typeof o;
+  const st = context?.appProps?.pageProps?.initialState;
+  return "raiz:" + keys(context) + " | pageProps:" + keys(context?.appProps?.pageProps) + " | initialState:" + keys(st) + " | components:" + keys(st?.components);
+}
+/** Identidade sem o evento de rastreio: pelo menos DUAS fontes da pagina concordando,
+ * ou UMA que confira com o anuncio pedido no link. Preco continua vindo so do
+ * componente principal (e da buy box, se existir, conferida mais adiante). */
+function synthesizeEvent(s, c, wanted) {
+  const found = [];
+  const add = v => { if (isItemId(v)) found.push(itemId(v)); };
+  add(c.main_actions?.form?.item_id);
+  add(c.bookmark?.item_id);
+  const f = /^item_id:(MLB-?\d{6,16})$/i.exec(String(s.filters || ""));
+  if (f) add(f[1]);
+  try { if (c.share?.permalink) add(normalizeMercadoLivreLink(String(c.share.permalink)).itemId); } catch {}
+  const selected = Array.isArray(c.buy_box_offers?.items) ? c.buy_box_offers.items.filter(x => x?.selected === true) : [];
+  if (selected.length === 1) add(selected[0].item_id);
+  const unique = [...new Set(found)];
+  if (unique.length > 1) fail("ITEM_MISMATCH", "A página aponta para anúncios diferentes.");
+  if (!unique.length) fail("STATE_NOT_FOUND", "Página sem identificação do anúncio (" + Object.keys(c).slice(0, 25).join(",") + ").");
+  if (found.length < 2 && unique[0] !== wanted.itemId) fail("STATE_NOT_FOUND", "Identidade do anúncio não comprovada nesta página.");
+  const main = c.price?.price || {}, seller = c.seller_summary?.seller || {};
+  // Em página de catálogo, initialState.id é o produto de catálogo (diferente do anúncio).
+  return {item_id: unique[0], catalog_product_id: isItemId(s.id) && itemId(s.id) !== unique[0] ? itemId(s.id) : null,
+    price: main.value, currency_id: main.currency_id, seller_id: seller.id, has_stock: undefined, synthesized: true};
+}
+
 export function extractMercadoLivreHtml(html, inputUrl, {expectedSellerId, allowCatalogWinner = false} = {}) {
   const wanted = normalizeMercadoLivreLink(inputUrl, {allowCatalogOnly: allowCatalogWinner});
   const context = readNordicContext(html);
   const s = context?.appProps?.pageProps?.initialState;
   const c = s?.components;
-  const ev = c?.track?.melidata_event?.event_data;
-  if (!c || !ev) fail("STATE_NOT_FOUND", "Estrutura da oferta não reconhecida.");
+  if (!c) fail("STATE_NOT_FOUND", "Estrutura da oferta não reconhecida (" + shapeOf(context) + ").");
+  // O evento de rastreio (track) nem sempre vem (variações do layout). Sem ele, a
+  // identidade sai de outras partes da MESMA página, que precisam concordar entre si.
+  const ev = c.track?.melidata_event?.event_data || synthesizeEvent(s, c, wanted);
 
   const actualId = itemId(ev.item_id);
   if (wanted.itemId && actualId !== wanted.itemId) fail("ITEM_MISMATCH", "A página devolveu outro anúncio.");
-  if (itemId(c?.main_actions?.form?.item_id) !== actualId)
-    fail("ITEM_MISMATCH", "O botão de compra aponta para outro anúncio.");
+  if (c?.main_actions?.form?.item_id != null || !ev.synthesized) {
+    if (itemId(c?.main_actions?.form?.item_id) !== actualId)
+      fail("ITEM_MISMATCH", "O botão de compra aponta para outro anúncio.");
+  }
   if (c.bookmark?.item_id && itemId(c.bookmark.item_id) !== actualId)
     fail("ITEM_MISMATCH", "Identidade do anúncio inconsistente.");
 
@@ -421,6 +455,7 @@ export function extractMercadoLivreHtml(html, inputUrl, {expectedSellerId, allow
     inStock: typeof ev.has_stock === "boolean" ? ev.has_stock : null,
     layout: catalogProductId ? "pdp" : "item",
     source: "__NORDIC_RENDERING_CTX__",
+    identitySource: ev.synthesized ? "page" : "track",
     observedAt: null,      // preenchido por readMercadoLivre na coleta ao vivo; arquivo importado = null
     shippingAmount: null,  // frete depende de CEP/conta; não somado ao preço
     extras: extractExtras(s, c, ev, actualId, amountCents),

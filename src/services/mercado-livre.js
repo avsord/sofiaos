@@ -14,7 +14,9 @@ function fromDevice(m,b,pin,{expectedSellerId,allowCatalogWinner}){
   return {ok:true,reading:{...reading,observedAt:new Date().toISOString(),fetchedFrom:'device'}};
  }catch(e){
   const code=e&&e.code||'READER_ERROR',pol=m.ERROR_POLICY[code]||{};
-  return {ok:false,code,message:pol.msg||'Nao consegui ler o preco desta pagina. Preco anterior preservado.',keepLastPrice:true,retryable:!!pol.retryable,needsUserAction:!!pol.userAction};
+  // Motivo exato junto (texto do proprio conversor: nomes de chaves e regras, nunca conteudo da pagina).
+  const why=e&&typeof e.message==='string'?String(e.message).slice(0,400):'';
+  return {ok:false,code,message:(pol.msg||'Nao consegui ler o preco desta pagina. Preco anterior preservado.')+(why?' ['+why+']':''),keepLastPrice:true,retryable:!!pol.retryable,needsUserAction:!!pol.userAction};
  }
 }
 function safeNormalize(m,link){try{m.normalizeMercadoLivreLink(link,{allowCatalogOnly:true});return true;}catch{return false;}}
