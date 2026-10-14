@@ -353,3 +353,6 @@ test("estrutura desconhecida: erro diz os NOMES das chaves (nunca valores)", () 
   assert.throws(() => extract('<script id="__NORDIC_RENDERING_CTX__">_n.ctx.r={"appProps":{"pageProps":{"x":{"segredo":"VALOR"}}}}</script>', URL_OK),
     e => e.code === "STATE_NOT_FOUND" && /pageProps:x/.test(e.message) && !/VALOR/.test(e.message));
 });
+test("tela 'Abra o app' (openInApp) é reconhecida pelo nome", () => {
+  error("APP_INTERSTITIAL", () => extract('<script id="__NORDIC_RENDERING_CTX__">_n.ctx.r={"flags":{},"appProps":{"pageProps":{"openInApp":true,"deviceType":"desktop","appStoreLinks":{}}}}</script>', URL_OK));
+});

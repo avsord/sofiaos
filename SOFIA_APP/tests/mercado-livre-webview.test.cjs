@@ -28,7 +28,7 @@ test('readPrice/readLinks continuam recusando o ML; readMercadoLivreState regist
 test('script injetado: copia o bloco de dados e a URL final; detecta login/captcha; nada de preco interpretado',()=>{
  const src=reader.buildMercadoLivreStateScript();
  const posted=[];
- const state='_n.ctx.r={"appProps":{"pageProps":{"initialState":{"id":"MLB42258825"}}}};_n.ctx.r.assets=new Map([]);'+'x'.repeat(300);
+ const state='_n.ctx.r={"appProps":{"pageProps":{"initialState":{"id":"MLB42258825","components":{"price":{}}}}}};_n.ctx.r.assets=new Map([]);'+'x'.repeat(300);
  const env={location:{href:LINK,pathname:'/p/MLB42258825'},document:{getElementById:id=>id==='__NORDIC_RENDERING_CTX__'?{textContent:state}:null,body:{innerHTML:'<div>produto</div>'}},window:{ReactNativeWebView:{postMessage:m=>posted.push(m)}},setTimeout:(f)=>f()};
  env.window.location=env.location;
  vm.runInNewContext(src,env);
@@ -53,4 +53,40 @@ test('leitura do ML usa a versao de COMPUTADOR (formato validado); outras lojas 
  assert.ok(s.includes("userAgent={job.kind === 'ml-state' || readerAgent(job.url) === 'desktop' ? DESKTOP_AGENT : USER_AGENT}"));
  const d=require('node:fs').readFileSync(require('node:path').join(__dirname,'../src/lib/mercado-livre-device.ts'),'utf8');
  assert.match(d,/'user-agent': 'Mozilla\/5\.0 \(Windows NT 10\.0/);
+});
+
+// ---- 0.3.138: tela "Abra o app do Mercado Livre" (openInApp) no lugar do produto ----
+function runScript(env){const posted=[];env.window={ReactNativeWebView:{postMessage:m=>posted.push(m)}};env.window.location=env.location;
+ const store={};env.sessionStorage={getItem:k=>store[k]??null,setItem:(k,v)=>{store[k]=v;},removeItem:k=>{delete store[k];}};
+ let n=0;env.setTimeout=env.setTimeout||(f=>{if(++n<60)f();});
+ require('node:vm').runInNewContext(reader.buildMercadoLivreStateScript(),env);return {posted,store};}
+const INTERSTITIAL='_n.ctx.r={"appProps":{"pageProps":{"openInApp":true,"deviceType":"desktop","appStoreLinks":{},"authLinks":{},"header":{},"deeplink":"meli://item?id=MLB5296520523","webUrl":"https:\\u002F\\u002Fwww.mercadolivre.com.br\\u002Ffone-shokz\\u002Fp\\u002FMLB42258825?pdp_filters=item_id%3AMLB5296520523"}}};'+'z'.repeat(300);
+test('tela "Abra o app": segue o link do produto NA WEB (nunca meli://) e nao envia dados da tela intermediaria',()=>{
+ const loc={href:'https://www.mercadolivre.com.br/social/x?forceInApp=true',pathname:'/social/x'};
+ const {posted,store}=runScript({location:loc,document:{getElementById:id=>id==='__NORDIC_RENDERING_CTX__'?{textContent:INTERSTITIAL}:null,body:{innerHTML:'Abra o app'},querySelectorAll:()=>[]}});
+ assert.equal(posted.length,0,'nada enviado da tela intermediaria');
+ assert.equal(loc.href,'https://www.mercadolivre.com.br/fone-shokz/p/MLB42258825?pdp_filters=item_id%3AMLB5296520523');
+ assert.equal(store.sofiaMlHops,'1');
+ assert.equal(reader.allowNavigation({kind:'ml-state'},loc.href),true);assert.equal(reader.allowNavigation({kind:'ml-state'},'meli://item?id=MLB5296520523'),false);
+});
+test('tela "Abra o app" sem link do produto (ou depois de 2 saltos): falha clara APP_INTERSTITIAL',()=>{
+ const noLink=INTERSTITIAL.replace(/"webUrl":"[^"]*"/,'"x":1');
+ let r=runScript({location:{href:'https://www.mercadolivre.com.br/social/x',pathname:'/social/x'},document:{getElementById:()=>({textContent:noLink}),body:{innerHTML:''},querySelectorAll:()=>[]}});
+ assert.equal(reader.parseMercadoLivreStateMessage(r.posted[0]).code,'APP_INTERSTITIAL');
+});
+test('so aceita dados de pagina de PRODUTO (initialState + components)',()=>{
+ const product='_n.ctx.r={"appProps":{"pageProps":{"initialState":{"id":"MLB42258825","components":{"price":{}}}}}};'+'p'.repeat(300);
+ const r=runScript({location:{href:LINK,pathname:'/p/MLB42258825'},document:{getElementById:()=>({textContent:product}),body:{innerHTML:''},querySelectorAll:()=>[]}});
+ assert.equal(reader.parseMercadoLivreStateMessage(r.posted[0]).ok,true);
+ const other='_n.ctx.r={"appProps":{"pageProps":{"algo":1}}};'+'q'.repeat(300);
+ const r2=runScript({location:{href:LINK,pathname:'/p/MLB42258825'},document:{getElementById:()=>({textContent:other}),body:{innerHTML:''},querySelectorAll:()=>[]}});
+ assert.equal(reader.parseMercadoLivreStateMessage(r2.posted[0]).code,'STATE_NOT_FOUND','bloco que nao e de produto nao vai ao servidor');
+});
+test('endereco limpo: tira parametros de compartilhamento e preserva o anuncio escolhido',()=>{
+ const c=device.canonicalMercadoLivreUrl;
+ assert.equal(c('https://www.mercadolivre.com.br/fone-x/p/MLB42258825?matt_tool=1&forceInApp=true&pdp_filters=item_id:MLB5296520523#origin=share'),'https://www.mercadolivre.com.br/p/MLB42258825?pdp_filters=item_id%3AMLB5296520523');
+ assert.equal(c('https://www.mercadolivre.com.br/p/MLB42258825#wid=MLB5296520523&sid=share'),'https://www.mercadolivre.com.br/p/MLB42258825?pdp_filters=item_id%3AMLB5296520523');
+ assert.equal(c('http://produto.mercadolivre.com.br/MLB-4292609581-fone-_JM?matt_tool=9#position=3'),'https://produto.mercadolivre.com.br/MLB-4292609581-fone-_JM');
+ assert.equal(c('https://www.mercadolivre.com.br/fones/up/MLBU4015253503#wid=MLB4719125711'),'https://www.mercadolivre.com.br/up/MLBU4015253503?wid=MLB4719125711');
+ assert.equal(c('https://mercadolivre.com/sec/1AbC23x'),'https://mercadolivre.com/sec/1AbC23x','link curto fica como esta (o navegador resolve)');
 });

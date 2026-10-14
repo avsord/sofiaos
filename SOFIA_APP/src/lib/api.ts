@@ -1,5 +1,5 @@
 import type {MercadoLivreOptions, MercadoLivreResponse} from './mercado-livre-types';
-import {readMercadoLivrePageOnDevice} from './mercado-livre-device';
+import {readMercadoLivrePageOnDevice,canonicalMercadoLivreUrl} from './mercado-livre-device';
 import {AUTH_STORAGE_KEY,PREFS_STORAGE_KEY,takeStartupAuth,takeStartupPrefs,invalidateStartupAuth,invalidateStartupPrefs} from './startup-read-ahead';
 import {StartupSnapshot} from './startup-snapshot';
 import {encryptedStorage} from './encrypted-storage';
@@ -229,7 +229,7 @@ export class SofiaApi {
     // O Mercado Livre recusa a Railway (data center) e manda para login. O celular baixa a
     // pagina como TEXTO e o servidor so faz a extracao estrita. Se o celular nao conseguir,
     // cai no caminho antigo (servidor busca sozinho) — nunca WebView.
-    const page=await readMercadoLivrePageOnDevice(fetchUrl||link,signal);
+    const page=await readMercadoLivrePageOnDevice(fetchUrl||canonicalMercadoLivreUrl(link),signal);
     if(!page.ok&&page.code==='CANCELLED')return {ok:false,code:'CANCELLED',message:'Leitura cancelada.',keepLastPrice:true as const};
     const body=page.ok?{link,...params,html:page.html,finalUrl:page.finalUrl}:{link,...params};
     const r=await this.fetchRequest<MercadoLivreResponse>('/price-tracker/mercadolivre/read',body,'POST',40000,signal);

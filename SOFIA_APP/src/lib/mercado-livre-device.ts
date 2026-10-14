@@ -84,3 +84,22 @@ export async function readMercadoLivrePageOnDevice(url: string, signal?: AbortSi
   }
   try { return await fetchMercadoLivrePage(url, {signal}); } catch { return {ok: false, code: 'NETWORK'}; }
 }
+
+/** Endereco limpo do produto: sem parametros de compartilhamento/rastreio (eles
+ * costumam levar a tela "Abra o app do Mercado Livre"). Preserva o anuncio
+ * escolhido (pdp_filters / wid). Se nao reconhecer o formato, devolve o original. */
+export function canonicalMercadoLivreUrl(raw: string): string {
+  const url = String(raw || '').trim().replace(/^http:\/\//i, 'https://');
+  const m = /^https:\/\/((?:www\.|produto\.)?mercadolivre\.com\.br)(\/[^?#]*)?([?][^#]*)?(#.*)?$/i.exec(url);
+  if (!m) return url;
+  const host = m[1].toLowerCase(), path = decodeURIComponentSafe(m[2] || '/'), rest = (m[3] || '') + '&' + (m[4] || '').replace(/^#/, '');
+  const item = (/(?:pdp_filters=item_id(?::|%3A)|[?&#]wid=|[?&#]item_id=)(MLB-?\d{6,16})/i.exec('&' + rest) || [])[1];
+  const itemId = item ? 'MLB' + item.replace(/^MLB-?/i, '') : null;
+  const catalog = /\/p\/(MLB\d{6,16})(?:\/|$)/i.exec(path);
+  if (catalog) return 'https://www.mercadolivre.com.br/p/' + catalog[1].toUpperCase() + (itemId ? '?pdp_filters=item_id%3A' + itemId : '');
+  const up = /\/up\/(MLBU\d{6,16})(?:\/|$)/i.exec(path);
+  if (up) return 'https://www.mercadolivre.com.br/up/' + up[1].toUpperCase() + (itemId ? '?wid=' + itemId : '');
+  if (/^\/MLB-?\d{6,16}(?:-[^/]*)?\/?$/i.test(path)) return 'https://' + host + path;
+  return url;
+}
+function decodeURIComponentSafe(v: string) { try { return decodeURIComponent(v); } catch { return v; } }

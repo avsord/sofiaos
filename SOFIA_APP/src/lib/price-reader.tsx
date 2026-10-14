@@ -106,10 +106,19 @@ export function allowNavigation(job: {kind: Job['kind']} | null, url: string) {
 }
 /** Roda dentro da pagina: copia o <script id="__NORDIC_RENDERING_CTX__"> e a URL final. */
 export function buildMercadoLivreStateScript() {
+  // Aceita SO dados de pagina de produto (initialState + components). A tela
+  // "Abra o app do Mercado Livre" (openInApp) tambem tem bloco de dados: ai segue o
+  // link do produto NA WEB que vem nela (no maximo 2 saltos por leitura), nunca o app.
   return `(function(){var tries=0;function send(m){window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(JSON.stringify(m));}
+var hops=0;try{hops=+(sessionStorage.getItem('sofiaMlHops')||0);}catch(e){}
 function verify(){var p=location.pathname||'';return /\\/(jms|login|registration|account-verification|captcha|security|challenge)/i.test(p)||/recaptcha|captcha/i.test(document.body?document.body.innerHTML.slice(0,20000):'');}
-function tick(){var el=document.getElementById('__NORDIC_RENDERING_CTX__');
-if(el&&el.textContent&&el.textContent.length>200){send({kind:'ml-state',ok:true,html:'<script id="__NORDIC_RENDERING_CTX__">'+el.textContent+'</script>',finalUrl:location.href});return;}
+var PRODUCT=/https:\\/\\/(?:www\\.|produto\\.)?mercadolivre\\.com\\.br\\/[^"'\\s<>]*?(?:\\/p\\/MLB\\d{6,}|\\/MLB-?\\d{6,}|\\/up\\/MLBU\\d{6,})[^"'\\s<>]*/i;
+function productUrl(t){var u=String(t||'').replace(/\\\\u002F/gi,'/').replace(/\\\\\\//g,'/').replace(/&amp;/g,'&');var m=PRODUCT.exec(u);if(m)return m[0];
+var a=document.querySelectorAll?document.querySelectorAll('a[href]'):[];for(var i=0;i<a.length;i++){var h=a[i].href||'';if(PRODUCT.test(h)&&h.split('#')[0]!==location.href.split('#')[0])return h;}return null;}
+function tick(){var el=document.getElementById('__NORDIC_RENDERING_CTX__'),t=el&&el.textContent||'';
+if(t.length>200&&t.indexOf('"initialState"')>=0&&t.indexOf('"components"')>=0){try{sessionStorage.removeItem('sofiaMlHops');}catch(e){}send({kind:'ml-state',ok:true,html:'<script id="__NORDIC_RENDERING_CTX__">'+t+'</script>',finalUrl:location.href});return;}
+if(t.indexOf('"openInApp"')>=0){var u=productUrl(t);if(u&&hops<2&&u.split('#')[0]!==location.href.split('#')[0]){try{sessionStorage.setItem('sofiaMlHops',String(hops+1));}catch(e){}location.href=u;return;}
+if(++tries>40){send({kind:'ml-state',ok:false,code:'APP_INTERSTITIAL',finalUrl:location.href});return;}setTimeout(tick,250);return;}
 if(verify()){send({kind:'ml-state',ok:false,code:'VERIFICATION_REQUIRED',finalUrl:location.href});return;}
 if(++tries>40){send({kind:'ml-state',ok:false,code:'STATE_NOT_FOUND',finalUrl:location.href});return;}
 setTimeout(tick,250);}tick();})();true;`;

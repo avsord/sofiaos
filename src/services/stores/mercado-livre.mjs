@@ -38,6 +38,7 @@ export const ERROR_POLICY = Object.freeze({
   BLOCKED:               {retryable: true,  userAction: false, msg: "A loja recusou a consulta automática."},
   VERIFICATION_REQUIRED: {retryable: false, userAction: true,  msg: "A loja pediu login/verificação; não será contornado."},
   STATE_NOT_FOUND:       {retryable: true,  userAction: false, msg: "A página veio sem os dados do produto."},
+  APP_INTERSTITIAL:      {retryable: true,  userAction: false, msg: "O Mercado Livre mostrou a tela \"Abra o app\" em vez do produto."},
   INVALID_STATE:         {retryable: true,  userAction: false, msg: "Dados da página corrompidos."},
   UNAVAILABLE:           {retryable: true,  userAction: false, msg: "Sem estoque no momento."},
   PRICE_MISSING:         {retryable: true,  userAction: false, msg: "A página não mostrou preço."},
@@ -368,6 +369,8 @@ export function extractMercadoLivreHtml(html, inputUrl, {expectedSellerId, allow
   const context = readNordicContext(html);
   const s = context?.appProps?.pageProps?.initialState;
   const c = s?.components;
+  if (!c && context?.appProps?.pageProps?.openInApp !== undefined)
+    fail("APP_INTERSTITIAL", "O Mercado Livre mostrou a tela \"Abra o app\" em vez da página do produto.");
   if (!c) fail("STATE_NOT_FOUND", "Estrutura da oferta não reconhecida (" + shapeOf(context) + ").");
   // O evento de rastreio (track) nem sempre vem (variações do layout). Sem ele, a
   // identidade sai de outras partes da MESMA página, que precisam concordar entre si.

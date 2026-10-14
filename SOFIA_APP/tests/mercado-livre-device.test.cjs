@@ -42,7 +42,7 @@ test('modulo do celular nao usa WebView, Linking nem intent',()=>{
 test('api: le no celular (navegador primeiro, texto de reserva) e manda o bloco ao servidor; se tudo falhar, servidor busca como antes',()=>{
  const s=fs.readFileSync(path.join(__dirname,'../src/lib/api.ts'),'utf8');
  const part=s.slice(s.indexOf('  async readMercadoLivre('),s.indexOf('  monitorObservations('));
- assert.ok(part.includes('readMercadoLivrePageOnDevice(fetchUrl||link,signal)'));
+ assert.ok(part.includes('readMercadoLivrePageOnDevice(fetchUrl||canonicalMercadoLivreUrl(link),signal)'),'entra pelo endereco limpo do produto');
  assert.ok(part.includes('page.ok?{link,...params,html:page.html,finalUrl:page.finalUrl}:{link,...params}'));
  assert.ok(!part.includes('fetchUrl:'),'fetchUrl nao vai ao servidor (ele recusa campos desconhecidos)');
  assert.ok(part.includes("' (celular: '+page.code+')'"),'motivo do celular vai junto na mensagem de erro');
