@@ -106,21 +106,26 @@ export function allowNavigation(job: {kind: Job['kind']} | null, url: string) {
 }
 /** Roda dentro da pagina: copia o <script id="__NORDIC_RENDERING_CTX__"> e a URL final. */
 export function buildMercadoLivreStateScript() {
-  // Aceita SO dados de pagina de produto (initialState + components). A tela
-  // "Abra o app do Mercado Livre" (openInApp) tambem tem bloco de dados: ai segue o
-  // link do produto NA WEB que vem nela (no maximo 2 saltos por leitura), nunca o app.
+  // Le o OBJETO que o proprio Mercado Livre monta (window._n.ctx.r), nao palavras no texto:
+  //  - pageProps.initialState.components -> pagina de PRODUTO: envia o bloco.
+  //  - pageProps.openInApp                -> tela "Abra o app": segue o link web do produto
+  //    ou toca em "continuar no site"; no maximo 2 saltos; nunca meli://.
   return `(function(){var tries=0;function send(m){window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(JSON.stringify(m));}
 var hops=0;try{hops=+(sessionStorage.getItem('sofiaMlHops')||0);}catch(e){}
+function bump(){try{sessionStorage.setItem('sofiaMlHops',String(++hops));}catch(e){}}
+function pageProps(){try{var r=window._n&&window._n.ctx&&window._n.ctx.r;return r&&r.appProps&&r.appProps.pageProps||null;}catch(e){return null;}}
 function verify(){var p=location.pathname||'';return /\\/(jms|login|registration|account-verification|captcha|security|challenge)/i.test(p)||/recaptcha|captcha/i.test(document.body?document.body.innerHTML.slice(0,20000):'');}
 var PRODUCT=/https:\\/\\/(?:www\\.|produto\\.)?mercadolivre\\.com\\.br\\/[^"'\\s<>]*?(?:\\/p\\/MLB\\d{6,}|\\/MLB-?\\d{6,}|\\/up\\/MLBU\\d{6,})[^"'\\s<>]*/i;
-function productUrl(t){var u=String(t||'').replace(/\\\\u002F/gi,'/').replace(/\\\\\\//g,'/').replace(/&amp;/g,'&');var m=PRODUCT.exec(u);if(m)return m[0];
-var a=document.querySelectorAll?document.querySelectorAll('a[href]'):[];for(var i=0;i<a.length;i++){var h=a[i].href||'';if(PRODUCT.test(h)&&h.split('#')[0]!==location.href.split('#')[0])return h;}return null;}
-function tick(){var el=document.getElementById('__NORDIC_RENDERING_CTX__'),t=el&&el.textContent||'';
-if(t.length>200&&t.indexOf('"initialState"')>=0&&t.indexOf('"components"')>=0){try{sessionStorage.removeItem('sofiaMlHops');}catch(e){}send({kind:'ml-state',ok:true,html:'<script id="__NORDIC_RENDERING_CTX__">'+t+'</script>',finalUrl:location.href});return;}
-if(t.indexOf('"openInApp"')>=0){var u=productUrl(t);if(u&&hops<2&&u.split('#')[0]!==location.href.split('#')[0]){try{sessionStorage.setItem('sofiaMlHops',String(hops+1));}catch(e){}location.href=u;return;}
+function same(u){return String(u).split('#')[0]===location.href.split('#')[0];}
+function productUrl(pp){var t='';try{t=JSON.stringify(pp);}catch(e){}t=t.replace(/\\\\u002F/gi,'/').replace(/\\\\\\//g,'/');var m=PRODUCT.exec(t);if(m&&!same(m[0]))return m[0];
+var a=document.querySelectorAll?document.querySelectorAll('a[href]'):[];for(var i=0;i<a.length;i++){var h=a[i].href||'';if(PRODUCT.test(h)&&!same(h))return h;}return null;}
+function continueButton(){var els=document.querySelectorAll?document.querySelectorAll('a,button'):[];for(var i=0;i<els.length;i++){var tx=(els[i].textContent||'').trim();if(/^(agora n[\u00e3a]o|continuar( no (site|navegador))?|seguir no (site|navegador)|ver no site|ficar no site)$/i.test(tx))return els[i];}return null;}
+function tick(){var pp=pageProps(),el=document.getElementById('__NORDIC_RENDERING_CTX__'),t=el&&el.textContent||'';
+if(pp&&pp.initialState&&pp.initialState.components&&t.length>200){try{sessionStorage.removeItem('sofiaMlHops');}catch(e){}send({kind:'ml-state',ok:true,html:'<script id="__NORDIC_RENDERING_CTX__">'+t+'</script>',finalUrl:location.href});return;}
+if(pp&&pp.openInApp!==undefined){if(hops<2){var u=productUrl(pp);if(u){bump();location.href=u;return;}var b=continueButton();if(b){bump();try{b.click();}catch(e){}tries+=4;setTimeout(tick,800);return;}}
 if(++tries>40){send({kind:'ml-state',ok:false,code:'APP_INTERSTITIAL',finalUrl:location.href});return;}setTimeout(tick,250);return;}
 if(verify()){send({kind:'ml-state',ok:false,code:'VERIFICATION_REQUIRED',finalUrl:location.href});return;}
-if(++tries>40){send({kind:'ml-state',ok:false,code:'STATE_NOT_FOUND',finalUrl:location.href});return;}
+if(++tries>40){send({kind:'ml-state',ok:false,code:pp?'STATE_NOT_FOUND':'STATE_NOT_FOUND',finalUrl:location.href});return;}
 setTimeout(tick,250);}tick();})();true;`;
 }
 export function parseMercadoLivreStateMessage(raw: string): DevicePage {
@@ -157,7 +162,10 @@ export function PriceReaderHost() {
       style={{position: 'absolute', width: 2, height: 2, left: -10, top: -10, opacity: 0, overflow: 'hidden'}}>
       <WebView
         key={job.id}
-        source={{uri: job.url}}
+        // Mercado Livre: o Android manda em todo pedido do navegador embutido o cabecalho
+        // X-Requested-With com o nome do app; e assim que o ML descobre que esta "inWebview"
+        // e troca o produto pela tela "Abra o app". Vazio no pedido principal = nao se apresenta.
+        source={job.kind === 'ml-state' ? {uri: job.url, headers: {'X-Requested-With': '', 'Accept-Language': 'pt-BR,pt;q=0.9'}} : {uri: job.url}}
         injectedJavaScript={script}
         javaScriptEnabled
         // Mercado Livre: versao de COMPUTADOR, a mesma do HTML real em que o conversor foi
