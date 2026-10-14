@@ -150,16 +150,16 @@ class DeliveryTests(unittest.TestCase):
             'the real owner APK is ARM64-only and cannot install on the CI x86_64 emulator')
 
     def test_round3_production_r8_and_abi_boundaries_are_explicit(self):
-        """Only the user APK drops x86. A separate, disclosed QA twin feeds x86 smoke."""
+        """The user APK has ARM32+ARM64 but no x86; the QA twin provides x86 smoke."""
         workflow=(ROOT.parent/'.github/workflows/sofia-native-047-update.yml').read_text()
         release_build=workflow.split('    - name: Build standalone production APK\n',1)[1].split('    - name: Verify package, increasing version code',1)[0]
         fixture=workflow.split('    - name: Build full production shell with isolated transport for acceptance\n',1)[1].split('    - name: Seal exact production',1)[0]
         qa=workflow.split('    - name: Build signed emulator-only QA twin without altering ARM64 owner APK\n',1)[1].split('    - name: Build full production shell',1)[0]
         manual=self.workflow_job('manual_apk')
-        self.assertIn('-PreactNativeArchitectures=arm64-v8a\n',release_build)
+        self.assertIn('-PreactNativeArchitectures=armeabi-v7a,arm64-v8a\n',release_build)
         self.assertNotIn('-PreactNativeArchitectures=arm64-v8a,x86_64',release_build)
-        self.assertIn('-PreactNativeArchitectures=arm64-v8a,x86_64',fixture)
-        self.assertIn('-PreactNativeArchitectures=arm64-v8a,x86_64',qa)
+        self.assertIn('-PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86_64',fixture)
+        self.assertIn('-PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86_64',qa)
         self.assertIn('test -s app/build/outputs/mapping/release/mapping.txt',release_build)
         for setting in ('android.enableMinifyInReleaseBuilds=true','android.enableShrinkResourcesInReleaseBuilds=true'):
             self.assertIn(setting,release_build)

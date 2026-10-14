@@ -135,7 +135,7 @@ jobs:
         grep -q '@drawable/sofia_logo_foreground' android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
         cd android
         chmod +x gradlew
-        ./gradlew :app:assembleRelease --build-cache --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a
+        ./gradlew :app:assembleRelease --build-cache --no-daemon --max-workers=2 -PreactNativeArchitectures=armeabi-v7a,arm64-v8a
         test -s app/build/outputs/mapping/release/mapping.txt
       id: build
       if: steps.plan.outputs.release == 'true'
@@ -170,7 +170,7 @@ jobs:
       run: |
         set -euo pipefail
         cd android
-        ./gradlew :app:assembleRelease --build-cache --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a,x86_64
+        ./gradlew :app:assembleRelease --build-cache --no-daemon --max-workers=2 -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86_64
         cp app/build/outputs/apk/release/app-release.apk ../dist/QA-ONLY-manual-universal.apk
         cd ..
         python3 tools/verify-abi-equivalence.py
@@ -188,7 +188,7 @@ jobs:
         cp tests/fixtures/fluency-seed.tsx.fixture App.tsx
         npm run check
         cd android
-        ./gradlew :app:assembleRelease --build-cache --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a,x86_64
+        ./gradlew :app:assembleRelease --build-cache --no-daemon --max-workers=2 -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86_64
         cp app/build/outputs/apk/release/app-release.apk ../dist/QA-ONLY-fluency-seed.apk
         cd ..
         cp /tmp/sofia-r7-production-App.tsx App.tsx
@@ -205,7 +205,7 @@ jobs:
         cp tests/fixtures/calendar-performance.tsx.fixture App.tsx
         npm run check
         cd android
-        ./gradlew :app:assembleRelease --build-cache --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a,x86_64
+        ./gradlew :app:assembleRelease --build-cache --no-daemon --max-workers=2 -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86_64
         cp app/build/outputs/apk/release/app-release.apk /tmp/sofia-full-fixture.apk
         cp /tmp/sofia-full-fixture.apk ../dist/QA-ONLY-full-fixture.apk
         cd ..
