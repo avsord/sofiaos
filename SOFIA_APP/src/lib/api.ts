@@ -1,4 +1,5 @@
 import type {MercadoLivreOptions, MercadoLivreResponse} from './mercado-livre-types';
+import type {StoreConnectionsState} from './store-connections-types';
 import {readMercadoLivrePageOnDevice,canonicalMercadoLivreUrl} from './mercado-livre-device';
 import {AUTH_STORAGE_KEY,PREFS_STORAGE_KEY,takeStartupAuth,takeStartupPrefs,invalidateStartupAuth,invalidateStartupPrefs} from './startup-read-ahead';
 import {StartupSnapshot} from './startup-snapshot';
@@ -197,6 +198,17 @@ export class SofiaApi {
   async calendarStatus():Promise<CalendarState> { try{return await this.request<CalendarState>('/md/calendar/status');}catch(e){if((e as ApiError).status===404)return {configured:false,connected:false};throw e;} }
   driveBackup() { return this.request<{ok?:boolean;skipped?:boolean;bytes?:number}>('/md/drive/backup',{},'POST',120000); }
   calendarConnect() { return this.request<{url:string}>('/md/calendar/connect',{app:true}); }
+  // Conexoes de lojas (Price Tracker): o mesmo formato para todas as lojas.
+  storeConnections() { return this.request<StoreConnectionsState>('/price-tracker/connections'); }
+  private mlConnectedCache:{at:number;value:boolean}|null=null;
+  /** Lembrado por 5 min: evita uma consulta extra a cada leitura de preco. */
+  async mlAccountConnected(){
+    if(this.mlConnectedCache&&Date.now()-this.mlConnectedCache.at<300000)return this.mlConnectedCache.value;
+    try{const st=await this.storeConnections();const value=!!st.stores.find(x=>x.provider==='mercadolivre')?.connected;this.mlConnectedCache={at:Date.now(),value};return value;}
+    catch{return this.mlConnectedCache?.value??false;}
+  }
+  storeConnect(provider:string) { this.mlConnectedCache=null; return this.request<{url:string}>('/price-tracker/connections/'+provider+'/connect',{app:true}); }
+  storeDisconnect(provider:string) { this.mlConnectedCache=null; return this.request<{ok:boolean}>('/price-tracker/connections/'+provider+'/disconnect',{}); }
   calendarDisconnect() { return this.request<{ok:boolean}>('/md/calendar/disconnect',{}); }
   calendarSync() { return this.request<{ok:boolean}>('/md/calendar/sync',{},'POST',90000); }
   calendarSelect(id:string) { return this.request<{ok:boolean}>('/md/calendar/select',{id}); }
@@ -229,12 +241,14 @@ export class SofiaApi {
     // O Mercado Livre recusa a Railway (data center) e manda para login. O celular baixa a
     // pagina como TEXTO e o servidor so faz a extracao estrita. Se o celular nao conseguir,
     // cai no caminho antigo (servidor busca sozinho) — nunca WebView.
-    const page=await readMercadoLivrePageOnDevice(fetchUrl||canonicalMercadoLivreUrl(link),signal);
+    // Conta do Mercado Livre conectada: o servidor le pela API oficial e ignora a pagina.
+    // Ai o celular nem abre o navegador invisivel (que e o que demora e pede verificacao).
+    const page=await this.mlAccountConnected()?{ok:false as const,code:'API'}:await readMercadoLivrePageOnDevice(fetchUrl||canonicalMercadoLivreUrl(link),signal);
     if(!page.ok&&page.code==='CANCELLED')return {ok:false,code:'CANCELLED',message:'Leitura cancelada.',keepLastPrice:true as const};
     const body=page.ok?{link,...params,html:page.html,finalUrl:page.finalUrl}:{link,...params};
     const r=await this.fetchRequest<MercadoLivreResponse>('/price-tracker/mercadolivre/read',body,'POST',40000,signal);
     // Diagnostico: se o celular tambem falhou, o motivo dele vai junto (sem conteudo da pagina).
-    return !r.ok&&!page.ok?{...r,message:r.message+' (celular: '+page.code+')'}:r;
+    return !r.ok&&!page.ok&&page.code!=='API'?{...r,message:r.message+' (celular: '+page.code+')'}:r;
   }
   monitorObservations() { return this.request<{items: Record<string, any[]>}>('/md/monitors/observations'); }
   observations(id: string) { return this.request<{items: any[];status?:{last_at:string|null;last_error:string|null;next_at:string|null}}>('/workspace/entities/' + encodeURIComponent(id) + '/observations'); }

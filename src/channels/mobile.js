@@ -26,7 +26,7 @@ function makeMobileApi(runtime, deps) {
   const extra = makeApi45(runtime, { bodyJson, json });
   const chatSync = require('../services/chat-sync').makeChatSyncApi(store, { bodyJson, json, client: 'mobile' });
   const inAudio = new Set(), rateBuckets = new Map();
-  const mercadoLivre = require('../services/mercado-livre').makeMercadoLivreReader({workspace, ...runtime.mercadoLivreOptions});
+  const mercadoLivre = require('../services/mercado-livre').makeMercadoLivreReader({workspace, stores: runtime.stores, ...runtime.mercadoLivreOptions});
 
   // Shared SQLite storage for mobile capsule marks. No per-device dose history.
   store.db.exec('CREATE TABLE IF NOT EXISTS mobile_capsule_doses (owner TEXT NOT NULL,capsule_id TEXT NOT NULL,day TEXT NOT NULL,time TEXT NOT NULL,taken_at TEXT NOT NULL,title TEXT NOT NULL,dose_text TEXT NOT NULL,PRIMARY KEY(owner,capsule_id,day,time)) STRICT;');
@@ -191,7 +191,8 @@ function makeMobileApi(runtime, deps) {
     if (p === '/api/mobile/md/dashboard') {
       const allowedWidgets = ['monitoring', 'tasks', 'capsules'];
       if (m === 'GET') { const saved = runtime.google.kvGet('dashboard_widgets'); return send({ widgets: Array.isArray(saved) ? saved : ['monitoring', 'tasks'], saved: Array.isArray(saved) }); }
-      if (m === 'POST') { const b = await bodyJson(req, 4096); const widgets = Array.isArray(b.widgets) ? [...new Set(b.widgets.filter(w => allowedWidgets.includes(w)))] : null; if (!widgets) fail('BAD_WIDGETS', 'Lista de widgets inválida.'); runtime.google.kvSet('dashboard_widgets', widgets); return send({ widgets }); }
+      // O app salva a ordem com PATCH; antes so POST existia e o PATCH caia em "Esta rota do aplicativo nao existe" (widget de Capsulas sumia).
+      if (m === 'POST' || m === 'PATCH') { const b = await bodyJson(req, 4096); const widgets = Array.isArray(b.widgets) ? [...new Set(b.widgets.filter(w => allowedWidgets.includes(w)))] : null; if (!widgets) fail('BAD_WIDGETS', 'Lista de widgets inválida.'); runtime.google.kvSet('dashboard_widgets', widgets); return send({ widgets }); }
     }
     if (p.startsWith('/api/mobile/md/calendar/') || p === '/api/mobile/md/drive/backup') {
       const g = runtime.google, action = p.split('/').pop();
@@ -204,6 +205,16 @@ function makeMobileApi(runtime, deps) {
       if (action === 'select') { const b = await bodyJson(req, 2048); return send(g.select(String(b.id || ''))); }
       if (action === 'backup') return send(await g.backupToDrive(true));
       fail('NOT_FOUND', 'Operação desconhecida.', 404);
+    }
+    // Conexoes de lojas (Price Tracker): mesmo formato para todas; login da pessoa so onde a loja exige.
+    if (p === '/api/mobile/price-tracker/connections' && m === 'GET') return send(runtime.stores.status());
+    if (p.startsWith('/api/mobile/price-tracker/connections/') && m === 'POST') {
+      const [, provider, action] = /\/connections\/([a-z]+)\/([a-z]+)$/.exec(p) || [];
+      if (!provider || !action) fail('NOT_FOUND', 'Operacao desconhecida.', 404);
+      rate(session, 'stores', 20);
+      if (action === 'connect') { const b = await bodyJson(req, 1024).catch(() => ({})); return send(runtime.stores.connectUrl(provider, {app: !!b.app})); }
+      if (action === 'disconnect') return send(await runtime.stores.disconnect(provider));
+      fail('NOT_FOUND', 'Operacao desconhecida.', 404);
     }
     if (p === '/api/mobile/md/capsules/doses') {
       if (m === 'GET') {

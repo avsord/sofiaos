@@ -933,7 +933,9 @@ function PageViewer(props: {api: SofiaApi; monitor: Entity; store: StoreSeries; 
 function MercadoLivrePreview({api, monitor, store, onClose, onSaved}: {api: SofiaApi; monitor: Entity; store: StoreSeries; onClose: () => void; onSaved: () => Promise<void>}) {
   const c = useTheme(), controller = React.useRef<AbortController | null>(null);
   const [reading, setReading] = useState<MercadoLivreReading | null>(null), [status, setStatus] = useState(''), [busy, setBusy] = useState(false);
+  const [mlConnected, setMlConnected] = useState<boolean | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
+  useEffect(() => { api.storeConnections().then(st => setMlConnected(!!st.stores.find(x => x.provider === 'mercadolivre')?.connected)).catch(() => setMlConnected(null)); }, [api]);
   async function read() {
     controller.current?.abort(); const abort = new AbortController(); controller.current = abort;
     setBusy(true); setReading(null); setStatus('Consultando a Sofia, sem abrir o Mercado Livre…');
@@ -954,6 +956,7 @@ function MercadoLivrePreview({api, monitor, store, onClose, onSaved}: {api: Sofi
     <View style={{padding: 20, gap: 16}}>
       <Text style={{color: c.muted}}>A página é lida como texto. Nenhum navegador ou aplicativo da loja será aberto por esta consulta.</Text>
       {status ? <Text style={{color: c.text}}>{status}</Text> : null}
+      {!reading && !busy && status && mlConnected === false ? <View style={{backgroundColor: c.input, padding: 14, borderRadius: 14, gap: 6}}><Text style={{color: c.text, fontWeight: '700'}}>Conecte sua conta do Mercado Livre</Text><Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Com a conta conectada, a Sofia lê o preço pelo caminho oficial do Mercado Livre: sem página, sem verificação. É uma vez só, em Perfil → Lojas do Price Tracker.</Text></View> : null}
       {reading ? <><Text style={{color: c.text, fontSize: 19, fontWeight: '700'}}>{reading.title}</Text><Text style={{color: c.text}}>Vendedor: {reading.seller.name} · {reading.itemId}</Text><Text style={{color: c.text, fontSize: 28}}>{money(reading.amountCents / 100, 'BRL')}</Text><Text style={{color: c.muted}}>Preço sem frete. Lido em {new Date(reading.observedAt).toLocaleString('pt-BR')}.</Text><Button title="Confirmar esta leitura" loading={busy} onPress={() => void save()} /></> : <Button title="Ler preço no servidor" loading={busy} onPress={() => void read()} />}
     </View></View></MotionModal>;
 }

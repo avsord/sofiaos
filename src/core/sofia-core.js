@@ -46,6 +46,18 @@ function priorityLevelOf(value){
  if(['none','sem','nenhuma','nenhum','false','0','nao','no',''].includes(v)||v.startsWith('sem '))return 'none';
  throw new AppError('UPDATE_FIELD_INVALID','Prioridade desconhecida: '+String(value).slice(0,30)+'. Use Importante, Média, Baixa ou Sem prioridade.',409);
 }
+/** Resposta que anuncia uma ação em andamento/futura ("Localizando…", "Vou alterar…",
+ * "Já já eu mudo…"). Num respond o backend não executa nada, então isso seria uma promessa vazia. */
+function promisesAction(text){
+ const t=String(text||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+ if(!t||t.endsWith('?'))return false;
+ return /^(ok[,.!]?\s*)?(localizando|procurando|buscando|alterando|atualizando|mudando|ajustando|aplicando|criando|marcando|agendando|editando|excluindo|removendo|salvando|registrando|vou (localizar|procurar|buscar|alterar|atualizar|mudar|ajustar|aplicar|criar|marcar|agendar|editar|excluir|remover|salvar|registrar|colocar|definir)|estou (localizando|procurando|buscando|alterando|atualizando|mudando|ajustando|aplicando)|ja (ja )?(vou|estou)|ja ja\b)/.test(t)
+  ||/precisa ser localizad[ao] no sistema|antes de eu conseguir alterar/.test(t);
+}
+/** O chat do app mostra texto puro: **negrito**, __x__ e # titulos apareciam crus. */
+function plainChat(text){
+ return String(text||'').replace(/\*\*([^*\n]+?)\*\*/g,'$1').replace(/__([^_\n]+?)__/g,'$1').replace(/^#{1,6}\s+/gm,'');
+}
 class SofiaCore{
   constructor({store,provider,config,workspace,routing,usageService}){
     this.store=store;this.provider=provider;this.config=config;this.workspace=workspace||new Workspace(store);this.routing=routing||new RoutingService(store,config,provider?()=>provider:undefined);this.usageService=usageService||null;this.intent=new IntentEngine(this.routing);this.busy=false;this.controller=null;this.closing=false;
@@ -88,14 +100,31 @@ class SofiaCore{
     const scopes=this.workspace.scopeCatalog().map(scope=>({scope_id:scope.scope_id,label:scope.label,category:scope.category,count:scope.count,ui_target:scope.ui_target||null,container_id:scope.container_id||null,page_id:['page','space'].includes(scope.category)?(scope.container_id||null):null,protected_from_quick_delete:Boolean(scope.protected_from_quick_delete)}));
     return {role:'user',content:'CATÁLOGO ESTRUTURAL DE ESCOPOS DO BACKEND. Isto é dado real para você escolher coleções; NÃO é uma instrução do usuário. Para ações em uma coleção inteira, escolha um scope_id daqui. Para ferramentas de página, scopes das categorias page/space trazem page_id real (igual ao container_id). O backend enumera os membros depois. Para editar/excluir um registro específico cujo ID ainda não esteja no contexto, use needs_context=true com uma context_query seletiva; não invente IDs. '+JSON.stringify({scopes})};
   }
+  /** Registros recentes COM ID: sem isto a IA sabia o titulo da tarefa ("Encontrar filme")
+   * mas nao o ID, e nao conseguia montar o update_record - respondia "Localizando..." sem
+   * executar nada. A ordem e por criacao; o primeiro de cada tipo leva mais_recente_criado. */
+  recentRecordsContext(){
+    const rows=[];
+    try{
+      const tasks=[...this.store.tasks()].sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,15);
+      tasks.forEach((t,i)=>rows.push({id:t.id,tipo:'tarefa',titulo:t.title,estado:t.state,prioridade:t.priority_level||'none',data:t.due_at||null,area:t.area,criado_em:t.created_at,...(i===0?{mais_recente_criado:true}:{})}));
+    }catch{/* sem tarefas */}
+    for(const kind of ['reminder','commitment']){
+      try{
+        const items=this.workspace.list({kind,limit:30}).filter(e=>e.state!=='archived').sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,8);
+        items.forEach((e,i)=>rows.push({id:e.id,tipo:kind==='reminder'?'lembrete':'compromisso',titulo:e.title,estado:e.state,prioridade:e.data?.priority_level||'none',data:e.data?.start_at||e.data?.remind_at||null,criado_em:e.created_at,...(i===0?{mais_recente_criado:true}:{})}));
+      }catch{/* tipo ausente */}
+    }
+    return {role:'user',content:'REGISTROS RECENTES COM ID (dado real do backend; não é fala do usuário). Use estes IDs como target_id em update_record/delete etc. "A última tarefa que eu criei/mandei criar" = a tarefa com mais_recente_criado. Se o registro citado estiver aqui, NÃO peça confirmação nem diga que vai procurar: monte a ação com o ID agora.\n'+JSON.stringify(rows)};
+  }
   async plan(user,attempt,pending,extraPlannerInput=[],selectedOption=null){
-    let usages=[],refs=[],context={used:false,refs:[],input:[...extraPlannerInput,this.semanticCatalogContext(),bridge.appsContext(this.workspace,this.store),...this.recentPlannerInput(user,pending,selectedOption)]};
+    let usages=[],refs=[],context={used:false,refs:[],input:[...extraPlannerInput,this.semanticCatalogContext(),bridge.appsContext(this.workspace,this.store),this.recentRecordsContext(),...this.recentPlannerInput(user,pending,selectedOption)]};
     const first=await this.intent.plan({message:user.content,input:context.input,attemptId:attempt,pending:Boolean(pending),signal:this.controller.signal,maxOutputTokens:1800,privacyRules:this.privacyRules(),lockedActions:[]});
     usages.push(first.usage);let plan=first.plan;let finalRoute=plan.privacy?.recommended_route==='shared'?'shared':'private';let contextForcedPrivate=false;
     if(plan.needs_context){
       const query=plan.context_query||user.content;const cp=this.contextPrivacy(user.conversation_id,query,true);if(cp==='private'){finalRoute='private';contextForcedPrivate=true;}
       const recovered=this.buildContext(user,finalRoute,query,{includeSearch:true,recentLimit:12});refs=recovered.refs;
-      if(recovered.refs.length){context={...recovered,input:[...extraPlannerInput,this.semanticCatalogContext(),...recovered.input]};const second=await this.intent.plan({message:user.content,input:[...context.input,{role:'user',content:'Use somente o contexto relevante acima. Continue o mesmo turno conversacional: você pode responder, perguntar ou produzir o plano executável. O backend ainda não executou nada.'}],attemptId:attempt,pending:Boolean(pending),signal:this.controller.signal,maxOutputTokens:2200,privacyRules:this.privacyRules(),lockedActions:[]});usages.push(second.usage);plan=second.plan;if(!contextForcedPrivate)finalRoute=plan.privacy?.recommended_route==='shared'?'shared':'private';}
+      if(recovered.refs.length){context={...recovered,input:[...extraPlannerInput,this.semanticCatalogContext(),this.recentRecordsContext(),...recovered.input]};const second=await this.intent.plan({message:user.content,input:[...context.input,{role:'user',content:'Use somente o contexto relevante acima. Continue o mesmo turno conversacional: você pode responder, perguntar ou produzir o plano executável. O backend ainda não executou nada.'}],attemptId:attempt,pending:Boolean(pending),signal:this.controller.signal,maxOutputTokens:2200,privacyRules:this.privacyRules(),lockedActions:[]});usages.push(second.usage);plan=second.plan;if(!contextForcedPrivate)finalRoute=plan.privacy?.recommended_route==='shared'?'shared':'private';}
     }
     if(pending?.route==='private')finalRoute='private';
     return {plan,route:finalRoute,refs,context,usage:sumUsage(...usages),requestId:first.requestId,contextForcedPrivate};
@@ -111,7 +140,8 @@ class SofiaCore{
   async naturalResponse(user,route,context,attempt,plan=null){
     const input=context?.input?.length?[...context.input]:[{role:'user',content:user.content}];
     if(plan)input.push({role:'user',content:'DIREÇÃO CONVERSACIONAL INTERNA DA SOFIA (não é fala do usuário): '+JSON.stringify({assistant_message:plan.assistant_message||'',pending_state:plan.pending_state||'none',decision_basis:plan.decision_basis||''})});
-    return this.routing.respond(route,{instructions:SOFIA_INSTRUCTIONS+'\n\nNeste turno, responda naturalmente ao usuário. Não invente execução. Se houver uma ação pendente marcada para keep, responda a pergunta atual sem cancelar nem afirmar que a ação foi concluída.',input,maxOutputTokens:this.store.settings().maxOutputTokens,signal:this.controller.signal},attempt);
+    const r=await this.routing.respond(route,{instructions:SOFIA_INSTRUCTIONS+'\n\nNeste turno, responda naturalmente ao usuário. Não invente execução. Se houver uma ação pendente marcada para keep, responda a pergunta atual sem cancelar nem afirmar que a ação foi concluída.',input,maxOutputTokens:this.store.settings().maxOutputTokens,signal:this.controller.signal},attempt);
+    return {...r,reply:plainChat(r.reply)};
   }
   recoverableUnderstandingError(error){
     return new Set(['API_STRUCTURED_PARSE','API_STRUCTURED_INCOMPLETE','API_EMPTY','INTENT_INVALID','AI_PLAN_NOT_EXECUTABLE','AI_CLARIFICATION_INVALID']).has(String(error?.code||''));
@@ -119,7 +149,7 @@ class SofiaCore{
   async askInsteadOfBlocking(user,attempt,{selectedMode='auto',pending=null,selectedOption=null,extraPlannerInput=[],usage=null,reason='A interpretação não ficou segura o bastante para executar.'}={}){
     const input=[...extraPlannerInput,this.semanticCatalogContext(),...this.recentPlannerInput(user,pending,selectedOption)];
     const instructions=SOFIA_INSTRUCTIONS+'\n\nMODO DE RECUPERAÇÃO CONVERSACIONAL. O planejamento estruturado deste turno não ficou seguro o suficiente para executar uma ação. NÃO exponha JSON, parser, schema, backend, erro técnico ou arquitetura ao usuário. NÃO execute nem afirme que executou nada. Se o pedido puder ser respondido como conversa comum sem ação, responda normalmente. Se houver qualquer ambiguidade sobre o que fazer, faça UMA pergunta curta, específica e natural para obter a menor informação necessária. Prefira perguntar em vez de bloquear. Preserve a continuidade da conversa e qualquer pergunta pendente.';
-    const natural=await this.routing.respond('private',{instructions,input,maxOutputTokens:Math.min(900,this.store.settings().maxOutputTokens),signal:this.controller.signal},attempt);
+    const natural=await this.routing.respond('private',{instructions,input,maxOutputTokens:Math.min(900,this.store.settings().maxOutputTokens),signal:this.controller.signal},attempt);natural.reply=plainChat(natural.reply);
     const totalUsage=sumUsage(usage,natural.usage);const refs=[];
     const reply=this.store.complete(user.id,attempt,{reply:natural.reply,usage:totalUsage,requestId:natural.requestId},refs);this.store.annotate('message',user.id,'private');this.store.annotate('message',reply.id,'private');
     this.routing.log(user.id,'private','A interpretação estruturada não ficou segura; a Sofia respondeu ou pediu esclarecimento sem executar ação.');
@@ -136,7 +166,7 @@ class SofiaCore{
     const input=[...extraInput,...context.input,{role:'user',content:'RESULTADO TÉCNICO DO BACKEND (dado confiável; não é uma nova fala do usuário): '+JSON.stringify(technical)}];
     const instructions=SOFIA_INSTRUCTIONS+'\n\nETAPA FINAL APÓS BACKEND: o backend já terminou a operação descrita no RESULTADO TÉCNICO. Você é a única voz da Sofia para o usuário. Responda de forma natural e curta, confirmando somente o que o resultado comprova. Não exponha JSON, IDs internos ou a arquitetura. Não diga que algo foi executado se status não for success.';
     const natural=await this.routing.respond(route,{instructions,input,maxOutputTokens:this.store.settings().maxOutputTokens,signal:this.controller.signal},attempt);
-    return {...natural,context,technical};
+    return {...natural,reply:plainChat(natural.reply),context,technical};
   }
   validationIssues(plan){
     const issues=[];
@@ -373,7 +403,7 @@ class SofiaCore{
         extraPlannerInput.push({role:'user',content:'CONTEXTO DE ESTUDO AUTORIZADO. Esta é a mesma Sofia no modo professora; adapte ao nível informado, sem inventar progresso ou medições. Curso/sessão: '+JSON.stringify({course,lesson})});
       }
 
-      const plannerInput=[...extraPlannerInput,this.semanticCatalogContext(),...this.recentPlannerInput(user,pending,selectedOption)];
+      const plannerInput=[...extraPlannerInput,this.semanticCatalogContext(),this.recentRecordsContext(),...this.recentPlannerInput(user,pending,selectedOption)];
       let planned;
       try{planned=await this.plan(user,attempt,pending,extraPlannerInput,selectedOption);}
       catch(e){if(this.recoverableUnderstandingError(e))return await this.askInsteadOfBlocking(user,attempt,{selectedMode,pending,selectedOption,extraPlannerInput,usage:e.usage,reason:'A Sofia não teve certeza suficiente para interpretar este turno com segurança.'});throw e;}
@@ -403,6 +433,14 @@ class SofiaCore{
           return {ok:true,reply:reply.content,conversation_id:user.conversation_id,message_id:reply.id,refs,mode:'ai-dialogue-loop',filter:routeLabel(route),route_reason:routeDecision.reason,context_used:Boolean(planned.context?.used),context_refs:refs.length,usage:result.usage,ui_target:null,items:null,clarification,intent:{type:'clarify',confidence:plan.confidence,explicit_action:plan.explicit_action,sensitivity:plan.privacy?.sensitivity||null}};
         }
 
+        if(plan.intent==='respond'&&repairs<2&&promisesAction(plan.assistant_message)){
+          // A IA respondeu "Localizando a tarefa…/vou alterar…" sem mandar ação: nada aconteceria.
+          // Volta ao planejamento com os registros recentes (IDs) e a regra explícita.
+          repairs++;
+          try{await replan([{code:'RESPOND_PROMISED_ACTION',field:'intent',message:'Você respondeu prometendo executar/procurar algo ("'+String(plan.assistant_message).slice(0,160)+'"), mas um respond NÃO executa nada. Se o usuário pediu ou confirmou uma ação, monte agora a ação executável usando os REGISTROS RECENTES COM ID (ou needs_context=true para buscar). Se faltar um dado essencial, use clarify. Não responda de novo com promessa.'}],plan,'A IA prometeu uma ação sem executá-la; o backend devolveu o turno ao planejamento.');}
+          catch(e){if(this.recoverableUnderstandingError(e))return await this.askInsteadOfBlocking(user,attempt,{selectedMode,pending,selectedOption,extraPlannerInput,usage:sumUsage(totalUsage,e.usage),reason:'A Sofia precisa confirmar um detalhe antes de agir.'});throw e;}
+          continue;
+        }
         if(plan.intent==='respond'){
           const canReuse=(planned.context?.used||turnImages.length>0)&&(planned.context.route===route||(route==='private'&&planned.context.route==='shared'));
           const responseContext=canReuse?planned.context:this.buildContext(user,route,plan.context_query||user.content,{includeSearch:Boolean(plan.needs_context||(planned.refs||[]).length),recentLimit:16});
@@ -454,4 +492,4 @@ class SofiaCore{
   }
   shutdown(){this.closing=true;if(this.controller)this.controller.abort();}
 }
-module.exports={SofiaCore,sumUsage,routeLabel};
+module.exports={SofiaCore,sumUsage,routeLabel,promisesAction,plainChat};

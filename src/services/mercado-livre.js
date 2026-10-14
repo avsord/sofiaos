@@ -4,6 +4,23 @@ const failure=(code,message,retryable=false)=>({ok:false,code,message,keepLastPr
 let modulePromise;
 const MAX_DEVICE_HTML=4_000_000;
 const load=()=>modulePromise||(modulePromise=import('./stores/mercado-livre.mjs'));
+/** Leitura pela API oficial. Devolve null quando o link nao diz qual anuncio e (catalogo sem
+ * vendedor): ai os caminhos de pagina decidem. Erros da API viram falha no mesmo formato. */
+async function fromApi(m,stores,b,pin,{expectedSellerId}){
+ let itemId=pin?.itemId||null;
+ if(!itemId){try{const id=m.normalizeMercadoLivreLink(b.link);itemId=id.itemId;}catch(e){if(e&&e.code==='SHORT_LINK'&&b.finalUrl){try{itemId=m.normalizeMercadoLivreLink(b.finalUrl).itemId;}catch{}}}}
+ if(!itemId)return null;
+ try{
+  const reading=await stores.readMercadoLivre(itemId);
+  if(expectedSellerId!=null&&String(expectedSellerId)!==reading.seller.id)return {ok:false,code:'SELLER_MISMATCH',message:'O vendedor mudou; confirme antes de continuar o historico.',keepLastPrice:true,retryable:false,needsUserAction:true};
+  return {ok:true,reading};
+ }catch(e){
+  const code=e&&e.code||'ML_API';
+  if(code==='ML_NOT_CONNECTED')return null; // conta caiu no meio: pagina decide
+  const retryable=['RATE_LIMITED','ML_API','ML_TOKEN','UNAVAILABLE'].includes(code);
+  return {ok:false,code,message:(e&&e.message)||'A API do Mercado Livre nao respondeu. Preco anterior preservado.',keepLastPrice:true,retryable,needsUserAction:code==='ML_NOT_FOUND'};
+ }
+}
 function fromDevice(m,b,pin,{expectedSellerId,allowCatalogWinner}){
  // Qual anuncio a pagina TEM que conter: o fixado no acompanhamento; senao o destino final
  // (link curto ja resolvido no celular), desde que seja um link valido do Mercado Livre.
@@ -20,7 +37,7 @@ function fromDevice(m,b,pin,{expectedSellerId,allowCatalogWinner}){
  }
 }
 function safeNormalize(m,link){try{m.normalizeMercadoLivreLink(link,{allowCatalogOnly:true});return true;}catch{return false;}}
-function makeMercadoLivreReader({workspace,fetchImpl=globalThis.fetch,minIntervalMs=2500,maxPending=8,timeoutMs=15000}={}){
+function makeMercadoLivreReader({workspace,stores=null,fetchImpl=globalThis.fetch,minIntervalMs=2500,maxPending=8,timeoutMs=15000}={}){
  let limitPromise,pending=0;const accounts=new Set();
  const limiter=()=>limitPromise||(limitPromise=load().then(m=>m.createLimiter({concurrency:2,minIntervalMs})));
  function context(b){
@@ -54,8 +71,12 @@ function makeMercadoLivreReader({workspace,fetchImpl=globalThis.fetch,minInterva
     const pin=current?.pin;
     if(pin&&b.expectedSellerId!=null&&pin.sellerId!==String(b.expectedSellerId))return failure('SELLER_MISMATCH','O vendedor informado difere do acompanhamento.');
     const allowCatalogWinner=!b.monitorId&&b.allowCatalogWinner===true,expectedSellerId=pin?.sellerId||b.expectedSellerId;
-    const r=b.html!==undefined?fromDevice(m,b,pin,{expectedSellerId,allowCatalogWinner})
-     :await m.readMercadoLivre(pin?.normalizedUrl||b.link,{fetchImpl,timeoutMs,maxBytes:3_000_000,maxRedirects:4,signal,expectedSellerId,allowCatalogWinner});
+    // 1) API oficial, quando a conta do Mercado Livre esta conectada: sem navegador, sem
+    //    verificacao. Precisa saber QUAL anuncio: o fixado no acompanhamento ou o do link.
+    //    2) pagina baixada pelo celular. 3) servidor busca a pagina (reserva).
+    const apiRead=stores&&stores.mlConnected()?await fromApi(m,stores,b,pin,{expectedSellerId}):null;
+    const r=apiRead||(b.html!==undefined?fromDevice(m,b,pin,{expectedSellerId,allowCatalogWinner})
+     :await m.readMercadoLivre(pin?.normalizedUrl||b.link,{fetchImpl,timeoutMs,maxBytes:3_000_000,maxRedirects:4,signal,expectedSellerId,allowCatalogWinner}));
     if(signal?.aborted)return failure('CANCELLED','Leitura cancelada.');
     const after=context(b);if(after?.ok===false)return after;
     if(!r.ok)return {...r,detail:null}; // Do not expose raw HTML, cookies or network URLs.
