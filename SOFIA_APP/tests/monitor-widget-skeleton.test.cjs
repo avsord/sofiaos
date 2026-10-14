@@ -43,3 +43,9 @@ test('reflexo nao usa Svg/LinearGradient (0.3.137: custava tempo de abertura no 
  const shimmer=l.slice(l.indexOf('export function ShimmerGroup'));
  assert.ok(!/LinearGradient|<Svg|Defs|Stop/.test(shimmer),'shimmer deve usar so View/Animated.View');
 });
+test('cada bloco do esqueleto usa so 1 View animada (0.3.138: 3 segmentos por bloco ainda pesava no caminho critico)',()=>{
+ const l=read('src/components/Loading.tsx');
+ const block=l.slice(l.indexOf('export function ShimmerBlock'));
+ assert.equal((block.match(/<Animated\.View/g)||[]).length,1,'um unico Animated.View por bloco');
+ assert.ok(!/SEGMENT/.test(block),'sem dividir em 3 segmentos');
+});

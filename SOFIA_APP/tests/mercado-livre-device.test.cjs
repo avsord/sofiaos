@@ -39,12 +39,25 @@ test('modulo do celular nao usa WebView, Linking nem intent',()=>{
  const code=s.replace(/\/\*[\s\S]*?\*\//g,'').replace(/\/\/.*$/gm,'');
  assert.ok(!/react-native-webview|Linking|openURL|WebBrowser|IntentLauncher|from 'react-native'/.test(code));
 });
-test('api: tenta o celular primeiro e manda o bloco ao servidor; se o celular falhar, servidor busca como antes',()=>{
+test('api: le no celular (navegador primeiro, texto de reserva) e manda o bloco ao servidor; se tudo falhar, servidor busca como antes',()=>{
  const s=fs.readFileSync(path.join(__dirname,'../src/lib/api.ts'),'utf8');
  const part=s.slice(s.indexOf('  async readMercadoLivre('),s.indexOf('  monitorObservations('));
- assert.ok(part.includes('fetchMercadoLivrePage(fetchUrl||link,{signal})'));
- assert.ok(part.includes('page&&page.ok?{link,...params,html:page.html,finalUrl:page.finalUrl}:{link,...params}'));
+ assert.ok(part.includes('readMercadoLivrePageOnDevice(fetchUrl||link,signal)'));
+ assert.ok(part.includes('page.ok?{link,...params,html:page.html,finalUrl:page.finalUrl}:{link,...params}'));
  assert.ok(!part.includes('fetchUrl:'),'fetchUrl nao vai ao servidor (ele recusa campos desconhecidos)');
+ assert.ok(part.includes("' (celular: '+page.code+')'"),'motivo do celular vai junto na mensagem de erro');
+});
+test('ordem no celular: navegador registrado primeiro; sem navegador, texto; cancelamento respeitado',async()=>{
+ const calls=[];
+ dev.setMercadoLivrePageReader(async(u)=>{calls.push('browser');return {ok:true,html:BLOCK,finalUrl:u};});
+ let r=await dev.readMercadoLivrePageOnDevice(LINK);assert.equal(r.ok,true);assert.deepEqual(calls,['browser']);
+ dev.setMercadoLivrePageReader(async()=>({ok:false,code:'VERIFICATION_REQUIRED'}));
+ r=await dev.readMercadoLivrePageOnDevice('https://evil.example/x');assert.equal(r.ok,false);assert.equal(r.code,'UNSUPPORTED_HOST','texto de reserva ainda valida o host');
+ dev.setMercadoLivrePageReader(async()=>{throw Error('webview quebrou');});
+ r=await dev.readMercadoLivrePageOnDevice(LINK);assert.equal(r.ok,false);assert.notEqual(r.code,'CANCELLED','erro do navegador cai no texto de reserva, nao explode');
+ const c=new AbortController();c.abort();dev.setMercadoLivrePageReader(()=>assert.fail('cancelado nao le'));
+ assert.equal((await dev.readMercadoLivrePageOnDevice(LINK,c.signal)).code,'CANCELLED');
+ dev.setMercadoLivrePageReader(null);
 });
 test('coleta e atualizacao manual usam o endereco salvo do anuncio (vendedor fixado)',()=>{
  for(const f of ['src/lib/monitor-collector.ts','src/screens/Monitoring.tsx'])assert.ok(fs.readFileSync(path.join(__dirname,'..',f),'utf8').includes('fetchUrl: pinned?.normalizedUrl'),f);

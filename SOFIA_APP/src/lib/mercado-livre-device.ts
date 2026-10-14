@@ -64,3 +64,22 @@ export async function fetchMercadoLivrePage(
     signal?.removeEventListener?.('abort', stop);
   }
 }
+
+/** Leitor com navegador de verdade (WebView invisivel, JS ligado), registrado por
+ * price-reader.tsx quando o host esta montado. O Mercado Livre serve a pagina a um
+ * navegador anonimo (testado na aba anonima do Chrome), mas recusa pedidos de texto
+ * sem JavaScript — tanto do servidor quanto do celular. Por isso o navegador vem
+ * primeiro e o fetch de texto fica de reserva. */
+export type MercadoLivrePageReader = (url: string, signal?: AbortSignal) => Promise<DevicePage>;
+let pageReader: MercadoLivrePageReader | null = null;
+export function setMercadoLivrePageReader(reader: MercadoLivrePageReader | null) { pageReader = reader; }
+export function mercadoLivrePageReader() { return pageReader; }
+/** Navegador primeiro; texto de reserva. Nunca lanca. */
+export async function readMercadoLivrePageOnDevice(url: string, signal?: AbortSignal): Promise<DevicePage> {
+  if (signal?.aborted) return {ok: false, code: 'CANCELLED'};
+  if (pageReader) {
+    try { const r = await pageReader(url, signal); if (r.ok || r.code === 'CANCELLED') return r; } catch {}
+    if (signal?.aborted) return {ok: false, code: 'CANCELLED'};
+  }
+  try { return await fetchMercadoLivrePage(url, {signal}); } catch { return {ok: false, code: 'NETWORK'}; }
+}

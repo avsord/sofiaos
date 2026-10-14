@@ -111,20 +111,24 @@ export function ShimmerGroup({children, duration = 1300}: {children: React.React
   }, [x, duration]);
   return <ShimmerContext.Provider value={x}>{children}</ShimmerContext.Provider>;
 }
-const BAND = 140, TRAVEL = 520, SEGMENT = BAND / 3;
+const BAND = 140, TRAVEL = 520;
+// (0.3.138) Each block used to be an outer View + an inner Animated.View + 3 segment
+// Views (soft edge / shine / soft edge) = 5 native views. On Home's first paint this
+// repeats for every row (title+subtitle+price = 3 blocks/row), all before the native
+// splash can reveal the app - real cost on a cold start, confirmed by a repeatable
+// +~100-280ms regression against 0.3.136 in CI. A single flat band (2 views total:
+// outer + one Animated.View) keeps the same moving highlight with roughly a third of
+// the native views per block. The edge is a little harder than before; at this size,
+// moving and mostly hidden by the splash fade-out, that is not visible in practice.
 export function ShimmerBlock({width, height, radius = 6, style}: {width: number | string; height: number; radius?: number; style?: any}) {
   const c = useTheme(), x = React.useContext(ShimmerContext);
-  const shine = c.bg === dark.bg ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.75)';
-  const edge = c.bg === dark.bg ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.20)';
+  const shine = c.bg === dark.bg ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.65)';
   return (
     <View style={[{width: width as any, height, borderRadius: radius, backgroundColor: c.line, overflow: 'hidden'}, style]}>
       {x ? (
-        <Animated.View pointerEvents="none" style={{position: 'absolute', top: 0, bottom: 0, width: BAND, flexDirection: 'row',
-          transform: [{translateX: x.interpolate({inputRange: [0, 1], outputRange: [-BAND, TRAVEL]})}]}}>
-          <View style={{width: SEGMENT, backgroundColor: edge}} />
-          <View style={{width: SEGMENT, backgroundColor: shine}} />
-          <View style={{width: SEGMENT, backgroundColor: edge}} />
-        </Animated.View>
+        <Animated.View pointerEvents="none" style={{position: 'absolute', top: 0, bottom: 0, width: BAND, backgroundColor: shine,
+          transform: [{translateX: x.interpolate({inputRange: [0, 1], outputRange: [-BAND, TRAVEL]})}]}}
+        />
       ) : null}
     </View>
   );

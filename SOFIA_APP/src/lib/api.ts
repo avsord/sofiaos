@@ -1,5 +1,5 @@
 import type {MercadoLivreOptions, MercadoLivreResponse} from './mercado-livre-types';
-import {fetchMercadoLivrePage} from './mercado-livre-device';
+import {readMercadoLivrePageOnDevice} from './mercado-livre-device';
 import {AUTH_STORAGE_KEY,PREFS_STORAGE_KEY,takeStartupAuth,takeStartupPrefs,invalidateStartupAuth,invalidateStartupPrefs} from './startup-read-ahead';
 import {StartupSnapshot} from './startup-snapshot';
 import {encryptedStorage} from './encrypted-storage';
@@ -224,14 +224,17 @@ export class SofiaApi {
   financeImportCommit(items: ImportItem[], target: 'account' | 'card', targetId: string) { return this.request<{created: number; skipped: number}>('/md/finance/import/commit', {items, target, target_id: targetId}, 'POST', 60000); }
   financeBundle(window?: {from: string; to: string}) { return this.request<{items: Record<string, Entity[]>; carry?: Record<string, number>; window?: {from: string; to: string} | null; at: string}>('/md/finance' + (window ? '?from=' + window.from + '&to=' + window.to : ''), undefined, 'GET', 30000); }
   // POST read bypasses the write cache invalidation path. No token goes to the store.
-  async readMercadoLivre(link:string,options:MercadoLivreOptions={}) {
+  async readMercadoLivre(link:string,options:MercadoLivreOptions={}):Promise<MercadoLivreResponse> {
     const {signal,fetchUrl,...params}=options;
     // O Mercado Livre recusa a Railway (data center) e manda para login. O celular baixa a
     // pagina como TEXTO e o servidor so faz a extracao estrita. Se o celular nao conseguir,
     // cai no caminho antigo (servidor busca sozinho) — nunca WebView.
-    const page=await fetchMercadoLivrePage(fetchUrl||link,{signal}).catch(()=>null);
-    const body=page&&page.ok?{link,...params,html:page.html,finalUrl:page.finalUrl}:{link,...params};
-    return this.fetchRequest<MercadoLivreResponse>('/price-tracker/mercadolivre/read',body,'POST',40000,signal);
+    const page=await readMercadoLivrePageOnDevice(fetchUrl||link,signal);
+    if(!page.ok&&page.code==='CANCELLED')return {ok:false,code:'CANCELLED',message:'Leitura cancelada.',keepLastPrice:true as const};
+    const body=page.ok?{link,...params,html:page.html,finalUrl:page.finalUrl}:{link,...params};
+    const r=await this.fetchRequest<MercadoLivreResponse>('/price-tracker/mercadolivre/read',body,'POST',40000,signal);
+    // Diagnostico: se o celular tambem falhou, o motivo dele vai junto (sem conteudo da pagina).
+    return !r.ok&&!page.ok?{...r,message:r.message+' (celular: '+page.code+')'}:r;
   }
   monitorObservations() { return this.request<{items: Record<string, any[]>}>('/md/monitors/observations'); }
   observations(id: string) { return this.request<{items: any[];status?:{last_at:string|null;last_error:string|null;next_at:string|null}}>('/workspace/entities/' + encodeURIComponent(id) + '/observations'); }

@@ -11,7 +11,14 @@ test('2) link do Mercado Livre: texto de compartilhar, http, sem protocolo, link
  assert.equal(mon.extractProductUrl('produto.mercadolivre.com.br/MLB-123'),'https://produto.mercadolivre.com.br/MLB-123');
  assert.equal(mon.extractProductUrl('sem link aqui'),'');
 });
-test('4/8) leitura invisível nunca abre app nem site por fora',()=>{const s=read('src/lib/price-reader.tsx');assert.ok(s.includes("onShouldStartLoadWithRequest={(req: any) => /^https?:\\/\\//i.test(String(req?.url || ''))"));assert.ok(s.includes("&& !isMercadoLivreUrl(String(req?.url || ''))}"),'0.3.137: Mercado Livre nunca carrega na leitura invisível');assert.ok(s.includes('javaScriptCanOpenWindowsAutomatically={false}'));});
+test('4/8) leitura invisível nunca abre app nem site por fora',()=>{const s=read('src/lib/price-reader.tsx');
+ // 0.3.138: a regra vive em allowNavigation(): só http(s); leituras comuns nunca vão ao ML;
+ // a leitura do ML (ml-state) só navega dentro do próprio ML. meli://, intent:// e sites de fora: recusados.
+ assert.ok(s.includes("onShouldStartLoadWithRequest={(req: any) => allowNavigation(job, String(req?.url || ''))}"));
+ assert.ok(s.includes("if (!/^https?:\\/\\//i.test(u)) return false;"));
+ assert.ok(s.includes("if (job?.kind === 'ml-state') return ML_HOST.test(u);"));
+ assert.ok(s.includes("return !isMercadoLivreUrl(u);"));
+ assert.ok(s.includes('javaScriptCanOpenWindowsAutomatically={false}'));});
 test('3) "Ver mais" simples nas tarefas',()=>{assert.ok(read('src/screens/Home.tsx').includes(">Ver mais</Text>"));});
 test('5) a tela que entra não desenha com o active antigo (sem piscada)',()=>{assert.ok(read('src/lib/screen-loader.tsx').includes('active!==false||Object.is(deferredActive,active)'));});
 test('6) Conta Google em janela dentro do app que volta sozinha',()=>{const s=read('src/components/GoogleCalendarSettings.tsx');assert.ok(s.includes("WebBrowser.openAuthSessionAsync(url.toString(),'sofiaapp://google')"));assert.ok(read('src/lib/api.ts').includes("'/md/calendar/connect',{app:true}"));});
