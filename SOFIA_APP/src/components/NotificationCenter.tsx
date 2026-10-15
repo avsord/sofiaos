@@ -129,8 +129,11 @@ export async function refreshDigest(api:SofiaApi,force=false){
  try{const items=await buildDigest(api);digestStore.items=items;digestStore.at=Date.now();emitDigest();void AsyncStorage.setItem(DIGEST_KEY,JSON.stringify({items,at:digestStore.at})).catch(()=>{});}
  catch{/* mantém o último resumo */}finally{digestStore.running=false;}
 }
-function hideDigest(id:string){const today=new Date().toISOString().slice(0,10);digestStore.hidden={...Object.fromEntries(Object.entries(digestStore.hidden).filter(([,d])=>d===today)),[id]:today};emitDigest();void AsyncStorage.setItem(DIGEST_HIDDEN_KEY,JSON.stringify(digestStore.hidden)).catch(()=>{});}
-function useDigest(){const [,tick]=useState(0);useEffect(()=>{const l=()=>tick(v=>v+1);digestListeners.add(l);return()=>{digestListeners.delete(l);};},[]);const today=new Date().toISOString().slice(0,10);return digestStore.items.filter(d=>digestStore.hidden[d.id]!==today);}
+// 0.3.141: dispensar vale enquanto o aviso for o mesmo (mesmo título e texto), em qualquer dia.
+// Antes valia só pelo "dia" em UTC, e às 21h de Brasília o item voltava sozinho.
+export const digestSignature=(d:{title:string;text:string})=>d.title+'|'+d.text;
+function hideDigest(id:string){const item=digestStore.items.find(d=>d.id===id);if(!item)return;const keep=new Set(digestStore.items.map(d=>d.id));digestStore.hidden={...Object.fromEntries(Object.entries(digestStore.hidden).filter(([k])=>keep.has(k))),[id]:digestSignature(item)};emitDigest();void AsyncStorage.setItem(DIGEST_HIDDEN_KEY,JSON.stringify(digestStore.hidden)).catch(()=>{});}
+function useDigest(){const [,tick]=useState(0);useEffect(()=>{const l=()=>tick(v=>v+1);digestListeners.add(l);return()=>{digestListeners.delete(l);};},[]);return digestStore.items.filter(d=>digestStore.hidden[d.id]!==digestSignature(d));}
 /** Entrada suave: cresce de 0,94 para 1 e aparece, em vez de surgir seco. Só
  * anima o que chegou DEPOIS de o sino abrir; o que já estava pronto aparece junto com o painel. */
 function Appear({animate,children}:{animate:boolean;children:React.ReactNode}){
