@@ -34,9 +34,9 @@ test('0.3.139: abertura nativa desenha a esfera em fundo branco, crescendo e gir
   assert.ok(native.includes('getDrawable(R.drawable.sofia_launch_orb, activity.theme)'));
   assert.ok(!native.includes('R.drawable.sofia_launch_mark,'));
   assert.ok(native.includes('android.graphics.Color.rgb(255, 255, 255)'));
-  assert.ok(native.includes('canvas.rotate(SofiaLaunchMotion.rotationAt(startedAt, now), markCenterX, markCenterY)'));
+  assert.ok(!native.includes('canvas.rotate('),'0.3.140: logo parado, sem giro');
   const motion=read('plugins/native/SofiaLaunchMotion.java');
-  assert.ok(motion.includes('ROTATION_FROM_DEGREES = -30f'));
+  assert.ok(motion.includes('DURATION_MS = 1100L'),'escala lenta e organica');
   assert.ok(motion.includes('public static float rotationAt(long startedAt, long now)'));
 });
 

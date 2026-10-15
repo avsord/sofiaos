@@ -338,8 +338,7 @@ private class SofiaEarlySplashSurface(
     val scale = SofiaLaunchMotion.scaleAt(startedAt, now)
     canvas.save()
     canvas.scale(scale, scale, markCenterX, markCenterY)
-    // 0.3.139: a esfera gira enquanto cresce, no mesmo relogio da escala.
-    canvas.rotate(SofiaLaunchMotion.rotationAt(startedAt, now), markCenterX, markCenterY)
+    // 0.3.140: logo parado, so a escala lenta e organica (sem giro).
     // Never flash a fully opaque stationary S on the native handoff frame.
     // The purple surface stays opaque; only the pre-rendered letter fades in.
     val fade = ((now - startedAt).coerceAtLeast(0L).toFloat() /
