@@ -102,8 +102,8 @@ test('104 source-resolution surface preserves one animation clock without startu
  assert.ok(!native.includes('splash.iconAnimationStart?.let')); 
  assert.ok(!exit.includes('postOnAnimation'));
  assert.ok(!exit.includes('registerFrameCommitCallback'));
- assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
- assert.ok(exit.includes('surface.postDelayed({ complete() }, 180L)'));
+ assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(150L)'));
+ assert.ok(exit.includes('surface.postDelayed({ complete() }, 240L)'));
  const complete=exit.slice(exit.indexOf('val complete ='),exit.indexOf('record(activity, "FADE_START")'));
  assert.ok(complete.includes('if (!finished)'));
  assert.ok(complete.indexOf('finished = true')<complete.indexOf('disposeSurface()'));

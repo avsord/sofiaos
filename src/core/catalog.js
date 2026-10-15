@@ -1917,6 +1917,7 @@ const CATALOG={
       { "key": "events", "label": "Linha do tempo", "type": "textarea", "max": 8000 },
       { "key": "checked_at", "label": "Consultado em", "type": "text", "max": 40 },
       { "key": "error", "label": "Motivo da falha", "type": "text", "max": 160 },
+      { "key": "blocked_until", "label": "Consulta pausada até", "type": "text", "max": 40 },
       { "key": "note", "label": "Observação", "type": "text", "max": 300 }
     ]
   },

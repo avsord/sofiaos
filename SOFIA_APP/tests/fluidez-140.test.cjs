@@ -16,12 +16,6 @@ test('0.3.140: chat - da para digitar com mensagem selecionada; mensagem nova en
   assert.ok(chat.includes("Animated.timing(entry,{toValue:1,duration:220,easing:Easing.out(Easing.cubic),useNativeDriver:true})"));
   assert.ok(chat.includes("const fresh=React.useRef(Date.now()-new Date(message.created_at).getTime()<4000).current;"),'historico carrega parado');
 });
-test('0.3.140: Inicio volta ao topo so depois de 30 s seguidos fora dele',()=>{
-  const home=read('src/screens/Home.tsx');
-  assert.ok(home.includes('export const HOME_RETURN_TO_TOP_MS=30000;'));
-  assert.ok(home.includes("if(awayTimer.current){clearTimeout(awayTimer.current);awayTimer.current=null;}\n   if(resetOnReturn.current){resetOnReturn.current=false;homeScroll.current?.scrollTo({y:0,animated:false});}"),'voltar antes dos 30 s cancela a contagem');
-  assert.ok(home.includes('<ScrollView ref={homeScroll}'));
-});
 test('0.3.140: rotinas em grupos (a area do registro e o grupo; sem campo novo no servidor)',()=>{
   const r=read('src/screens/Routines.tsx');
   assert.ok(r.includes("export function groupName(area:unknown)"));

@@ -86,7 +86,7 @@ test('086 finite system S does not extend the native Home handoff or restart an 
  assert.ok(logo.includes('android:windowSplashScreenAnimationDuration')); 
  assert.ok(logo.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_empty</item>'));
  const launch=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
- assert.ok(launch.includes('surface.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(launch.includes('surface.animate().alpha(0f).setDuration(150L)'));
  assert.ok(!launch.includes('Animatable'));
 });
 test('068 photo preloads without blocking Home; menu prewarm yields to navigation',()=>{
@@ -157,7 +157,7 @@ test('102 early Canvas retains its mark during the single alpha fade',()=>{
  assert.ok(overlay.indexOf('decor.overlay.add(surface)')<overlay.indexOf('exitSystemSplash = { success ->'));
  assert.ok(overlay.includes('SofiaLaunchMotion.scaleAt(startedAt, now)'));
  assert.ok(!overlay.includes('.scaleX('));
- assert.ok(overlay.includes('surface.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(overlay.includes('surface.animate().alpha(0f).setDuration(150L)'));
  assert.ok(!app.includes('<LaunchSAnimation'));
  assert.ok(loader.includes('export const DeferredScreen=React.memo('));
  assert.ok(loader.includes('keys.every(key=>Object.is(left[key],right[key]))'));
@@ -218,8 +218,8 @@ test('102 early prepared surface leaves within the unchanged startup timing gate
  const smoke=fs.readFileSync(path.join(root,'tools/manual-apk-smoke.py'),'utf8');
  const exit=native.slice(native.indexOf('exitSystemSplash = { success ->'),native.indexOf('when (transition.splashReady())'));
  assert.ok(exit.includes('splash.remove()'));
- assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(95L)'));
- assert.ok(exit.includes('surface.postDelayed({ complete() }, 180L)'));
+ assert.ok(exit.includes('surface.animate().alpha(0f).setDuration(150L)'));
+ assert.ok(exit.includes('surface.postDelayed({ complete() }, 240L)'));
  assert.ok(exit.includes('record(activity, "FADE_DONE")'));
  assert.ok(!exit.includes('setUpdateListener'));
  assert.ok(!exit.includes('icon?.animate()?.alpha(0f)'));
@@ -252,7 +252,7 @@ test('107 native S handoff starts at matching 70% scale without OEM clock jump',
  assert.ok(overlay.includes('val motionStart = now'));
  assert.ok(!overlay.includes('splash.iconAnimationStart?.let'));
  assert.ok(overlay.includes('SofiaLaunchMotion.scaleAt(startedAt, now)'));
- assert.ok(overlay.includes('surface.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(overlay.includes('surface.animate().alpha(0f).setDuration(150L)'));
  assert.ok(overlay.includes('if (login || (home && (signals and 8) != 0)) {'));
  const app=JSON.parse(fs.readFileSync(path.join(root,'app.json'),'utf8')).expo;
  const plugin=app.plugins.find(row=>Array.isArray(row)&&row[0]==='expo-build-properties');
@@ -298,5 +298,5 @@ test('108 native splash icon is fully invisible, overlay fades the only S on eve
  assert.ok(native.includes('activity.resources.getDrawable(R.drawable.sofia_launch_orb'));
  assert.ok(native.includes('paint.alpha = (255f * fade).toInt()'));
  assert.ok(motion.includes('S_FADE_IN_MS = 140L'));
- assert.ok(native.includes('surface.animate().alpha(0f).setDuration(95L)'));
+ assert.ok(native.includes('surface.animate().alpha(0f).setDuration(150L)'));
 });

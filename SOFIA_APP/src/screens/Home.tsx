@@ -1,4 +1,5 @@
 import {noteFluencyMovement} from '../lib/fluency';
+import {useReturnToTop} from '../lib/return-to-top';
 import {useRenderCost} from '../lib/render-cost';
 import {readHomeRows} from '../lib/home-rows';
 import {scheduleIdleTask} from '../lib/idle-task';
@@ -30,7 +31,6 @@ import {MonitorWidget} from '../components/MonitorWidget';
 import {productsFrom,onCollector,collectorState} from '../lib/monitor-collector';
 import {widgetRows,validWidgetRows,type MonitorWidgetRow} from '../lib/monitoring';
 import {MONITOR_WIDGET_PATH} from '../lib/startup-snapshot';
-export const HOME_RETURN_TO_TOP_MS=30000;
 export const HOME_WIDGET_IDS=['monitoring','tasks','capsules','reminders','packages'];
 export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisible=true,onGestureLock,onOpenCapsules,onOpenMonitoring,onOpenTasks,onOpenModule,onDiscussTask}:{onOpenModule?:(id:string)=>void;onDiscussTask?:(task:Task)=>void;onOpenCapsules?:()=>void;onOpenMonitoring?:()=>void;onOpenTasks?:()=>void;onGestureLock?:(locked:boolean)=>void;api:SofiaApi;bootstrap:Bootstrap;navigate:(tab:Tab)=>void;onOpenAgenda?:(date:string,id?:string,create?:boolean)=>void;active?:boolean;launchVisible?:boolean}){useRenderCost('home');
  const [agendaDraft,setAgendaDraft]=useState<Partial<Entity>|null>(null),[agendaCatalog,setAgendaCatalog]=useState<Catalog|null>(()=>api.cached<Catalog>('/workspace/catalog')||null);
@@ -42,18 +42,8 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
   const cancel=scheduleIdleTask(()=>{void api.catalog().then(cat=>{if(alive)startTransition(()=>setAgendaCatalog(cat));}).catch(()=>{});});
   return()=>{alive=false;cancel();};
  },[api,active,launchVisible,agendaCatalog]);
- // 0.3.140: depois de 30 s seguidos fora do Inicio, a pagina volta ao topo na proxima visita.
- // Ir e voltar antes disso nao conta: a contagem so vale se a pessoa nao voltou mesmo.
- const homeScroll=useRef<ScrollView>(null),awayTimer=useRef<ReturnType<typeof setTimeout>|null>(null),resetOnReturn=useRef(false);
- useEffect(()=>{
-  if(active){
-   if(awayTimer.current){clearTimeout(awayTimer.current);awayTimer.current=null;}
-   if(resetOnReturn.current){resetOnReturn.current=false;homeScroll.current?.scrollTo({y:0,animated:false});}
-   return;
-  }
-  awayTimer.current=setTimeout(()=>{awayTimer.current=null;resetOnReturn.current=true;},HOME_RETURN_TO_TOP_MS);
-  return()=>{if(awayTimer.current){clearTimeout(awayTimer.current);awayTimer.current=null;}};
- },[active]);
+ // 0.3.145: volta ao topo ainda escondido, depois de 10 s seguidos fora (ver return-to-top.ts).
+ const homeScroll=useReturnToTop(active);
  function createHomeCommitment(day:string){setAgendaDraft({kind:'commitment',title:'',data:{home_day:day}});}
  const [detail,setDetail]=useState<Task|null>(null),[detailOpen,setDetailOpen]=useState(false);
  const openTask=(task:Task)=>{setDetail(task);setDetailOpen(true);};

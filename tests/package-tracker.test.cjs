@@ -32,3 +32,22 @@ test('outras transportadoras: registro fica sem consulta automatica, sem erro',a
   const w=fakeWorkspace(items);const t=new PackageTracker(w,{fetchImpl:async()=>{throw Error('nao deve chamar');}});
   const r=await t.refresh(items[0]);assert.equal(r.changed,false);assert.equal(items[0].data.carrier,'cainiao');assert.match(items[0].data.error,/Correios/);assert.equal(w.notices.length,0);
 });
+
+test('0.3.145: 403 do app dos Correios vira mensagem clara e pausa a consulta automatica por 24 h',async()=>{
+  const {BLOCKED_MSG}=require('../src/services/package-tracker');
+  const items=[{id:'p3',kind:'package',title:'Camera',state:'active',revision:1,data:{code:'AP594818996BR',carrier:'correios',events:'[]'}}];
+  const w=fakeWorkspace(items);let calls=0;
+  const t=new PackageTracker(w,{env:{},fetchImpl:async()=>{calls++;return {ok:false,status:403,json:async()=>({})};}});
+  const r=await t.refresh(items[0]);assert.equal(r.error,BLOCKED_MSG);assert.ok(Date.parse(items[0].data.blocked_until)>Date.now()+23*3600000);
+  await t.checkAll();assert.equal(calls,1,'nao insiste enquanto pausado');
+});
+test('0.3.145: com credenciais da API oficial, usa token + srorastro e le a mesma linha do tempo',async()=>{
+  const items=[{id:'p4',kind:'package',title:'Camera',state:'active',revision:1,data:{code:'AP594818996BR',carrier:'correios',events:'[]'}}];
+  const w=fakeWorkspace(items);const urls=[];
+  const t=new PackageTracker(w,{env:{CORREIOS_API_USER:'u',CORREIOS_API_KEY:'k'},fetchImpl:async(url,opt)=>{urls.push(url);
+    if(url.endsWith('/token/v1/autentica'))return {ok:true,json:async()=>({token:'T',expiraEm:new Date(Date.now()+3600000).toISOString()})};
+    assert.equal(opt.headers.Authorization,'Bearer T');
+    return {ok:true,json:async()=>({objetos:[{codObjeto:'AP594818996BR',eventos:[{dtHrCriado:'2026-10-15T09:00:00',descricao:'Objeto postado',unidade:{endereco:{cidade:'Curitiba',uf:'PR'}}}]}]})};}});
+  const r=await t.refresh(items[0]);assert.equal(r.changed,true);assert.equal(items[0].data.status,'Objeto postado');
+  assert.ok(urls.some(u=>u.includes('/srorastro/v1/objetos/AP594818996BR')));assert.ok(!urls.some(u=>u.includes('proxyapp')));
+});

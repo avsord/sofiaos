@@ -41,7 +41,7 @@ export function Packages({api,active,onBack}:{api:SofiaApi;active:boolean;onBack
  }
  async function refresh(item:Entity,silent=false){
   setBusy(true);if(!silent)setError('');
-  try{const r=await api.refreshPackage(item.id);records.merge(r.item);if(viewing?.id===item.id)setViewing(r.item);if(!silent&&r.error)setError('Não foi possível consultar agora: '+r.error);}
+  try{const r=await api.refreshPackage(item.id);records.merge(r.item);if(viewing?.id===item.id)setViewing(r.item);if(!silent&&r.error)setError(/fecharam a consulta/.test(r.error)?r.error:'Não foi possível consultar agora: '+r.error);}
   catch(e){if(!silent)setError(errorText(e));}finally{setBusy(false);}
  }
  function archive(item:Entity){Alert.alert('Remover encomenda?',`“${item.title}” sai da lista (fica no histórico).`,[{text:'Cancelar'},{text:'Remover',style:'destructive',onPress:()=>{setBusy(true);api.saveEntity({...item,state:'archived',revision:item.revision}).then(saved=>{records.merge(saved);setViewing(null);}).catch(e=>setError(errorText(e))).finally(()=>setBusy(false));}}]);}

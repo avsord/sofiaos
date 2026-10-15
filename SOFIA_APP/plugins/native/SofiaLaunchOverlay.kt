@@ -127,10 +127,12 @@ object SofiaLaunchOverlay {
                 Unit
               }
               record(activity, "FADE_START")
-              surface.animate().alpha(0f).setDuration(95L)
-                .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
+              // 0.3.145: fade mais perceptivel entre a abertura e o app (95 -> 150 ms, saida
+              // desacelerada). O teste do GitHub exige fade_to_done <= 250 ms.
+              surface.animate().alpha(0f).setDuration(150L)
+                .setInterpolator(android.view.animation.DecelerateInterpolator(1.5f))
                 .withEndAction { complete() }.start()
-              surface.postDelayed({ complete() }, 180L)
+              surface.postDelayed({ complete() }, 240L)
             }
             Unit
           }

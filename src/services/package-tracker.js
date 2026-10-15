@@ -35,29 +35,50 @@ function parseCorreios(payload, code) {
   })).filter(e => e.status);
   return { status: events[0] ? events[0].status : 'Sem eventos ainda', events, found: true };
 }
+// 0.3.145: o endpoint do app dos Correios (proxyapp) foi fechado e responde 403 para todos.
+// Caminho oficial: API "SRO Rastro" dos Correios (Meu Correios / contrato). Se a Railway tiver
+// CORREIOS_API_USER e CORREIOS_API_KEY, a Sofia usa a API oficial; senao, tenta o proxyapp e,
+// no 403, explica e espera 24 h antes de tentar de novo (sem martelar os Correios).
+const BLOCKED_MSG = 'Os Correios fecharam a consulta automática gratuita. Toque em "Abrir rastreio oficial".';
 class PackageTracker {
-  constructor(workspace, options = {}) { this.w = workspace; this.fetch = options.fetchImpl || global.fetch; this.timer = null; this.timeoutMs = options.timeoutMs || 15000; }
+  constructor(workspace, options = {}) { this.w = workspace; this.fetch = options.fetchImpl || global.fetch; this.timer = null; this.timeoutMs = options.timeoutMs || 15000; this.env = options.env || process.env; this.token = null; }
+  officialConfigured() { return !!(this.env.CORREIOS_API_USER && this.env.CORREIOS_API_KEY); }
+  async officialToken() {
+    if (this.token && this.token.until > Date.now() + 60000) return this.token.value;
+    const basic = Buffer.from(this.env.CORREIOS_API_USER + ':' + this.env.CORREIOS_API_KEY).toString('base64');
+    const res = await this.fetch('https://api.correios.com.br/token/v1/autentica', { method: 'POST', headers: { Authorization: 'Basic ' + basic, Accept: 'application/json' } });
+    if (!res.ok) throw new Error('Correios recusaram as credenciais da API (' + res.status + ').');
+    const j = await res.json(); const until = Date.parse(j.expiraEm || '') || Date.now() + 30 * 60000;
+    this.token = { value: j.token, until }; return j.token;
+  }
+  async fetchOfficial(code) {
+    const token = await this.officialToken();
+    const res = await this.fetch('https://api.correios.com.br/srorastro/v1/objetos/' + encodeURIComponent(normalizeCode(code)) + '?resultado=T', { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
+    if (!res.ok) throw new Error('API oficial dos Correios respondeu ' + res.status + '.');
+    return parseCorreios(await res.json(), code);
+  }
   async fetchCorreios(code) {
     const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), this.timeoutMs);
     try {
       const res = await this.fetch('https://proxyapp.correios.com.br/v1/sro-rastro/' + encodeURIComponent(normalizeCode(code)), {
         headers: { 'User-Agent': 'Dart/2.8 (dart:io)', Accept: 'application/json', 'Accept-Language': 'pt-BR' }, signal: ctrl.signal });
+      if (res.status === 403 || res.status === 401) throw Object.assign(new Error(BLOCKED_MSG), { blocked: true });
       if (!res.ok) throw new Error('Correios responderam ' + res.status + '.');
       return parseCorreios(await res.json(), code);
     } finally { clearTimeout(t); }
   }
   async lookup(carrier, code) {
-    if (carrier === 'correios') return this.fetchCorreios(code);
+    if (carrier === 'correios') return this.officialConfigured() ? this.fetchOfficial(code) : this.fetchCorreios(code);
     return { status: 'Acompanhamento automático só para Correios por enquanto', events: [], found: false, unsupported: true };
   }
   /** Atualiza um registro; devolve {item, changed}. Nunca lança por falha da transportadora. */
   async refresh(item) {
     const d = { ...(item.data || {}) }, code = normalizeCode(d.code), carrier = d.carrier || detectCarrier(code);
-    let result, error = '';
-    try { result = await this.lookup(carrier, code); } catch (e) { error = String(e && e.message || e).slice(0, 160); }
+    let result, error = '', blocked = false;
+    try { result = await this.lookup(carrier, code); } catch (e) { error = String(e && e.message || e).slice(0, 160); blocked = !!(e && e.blocked); }
     const now = new Date().toISOString();
     if (!result) {
-      const saved = this.w.save({ ...item, data: { ...d, carrier, checked_at: now, error } }, item.id);
+      const saved = this.w.save({ ...item, data: { ...d, carrier, checked_at: now, error, blocked_until: blocked ? new Date(Date.now() + 24 * 3600000).toISOString() : '' } }, item.id);
       return { item: saved, changed: false, error };
     }
     const previous = (() => { try { return JSON.parse(d.events || '[]'); } catch { return []; } })();
@@ -78,7 +99,8 @@ class PackageTracker {
     return this.refresh(item);
   }
   async checkAll() {
-    const items = this.w.list({ kind: 'package', limit: 500 }).filter(x => x.state === 'active');
+    const now = Date.now();
+    const items = this.w.list({ kind: 'package', limit: 500 }).filter(x => x.state === 'active' && !(Date.parse(x.data && x.data.blocked_until || '') > now));
     let changed = 0;
     for (const item of items) { try { if ((await this.refresh(item)).changed) changed++; } catch { /* segue para a próxima */ } }
     return changed;
@@ -90,4 +112,4 @@ class PackageTracker {
   }
   stop() { if (this.timer) clearInterval(this.timer); this.timer = null; }
 }
-module.exports = { PackageTracker, detectCarrier, carrierLabel, officialUrl, normalizeCode, parseCorreios, CARRIERS };
+module.exports = { BLOCKED_MSG, PackageTracker, detectCarrier, carrierLabel, officialUrl, normalizeCode, parseCorreios, CARRIERS };
