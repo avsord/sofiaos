@@ -148,6 +148,8 @@ export class SofiaApi {
       throw new ApiError('Sem conexão com a Sofia. Verifique a internet e tente novamente.', 'NETWORK', 0);
     } finally { clearTimeout(timer); signal?.removeEventListener('abort',cancel); }
   }
+  /** Encomendas (0.3.142): consulta a transportadora agora e devolve o registro atualizado. */
+  refreshPackage(id: string) { return this.request<{item: Entity; changed: boolean; error: string}>('/packages/refresh', { id }); }
   login(email: string, password: string, device: string) { return this.request<Auth>('/auth/login', { email: email.trim(), password, device_name: device }); }
   bootstrap() { return this.request<Bootstrap>('/bootstrap'); }
   logout() { return this.request<{ok: boolean}>('/auth/logout', {}); }

@@ -1904,6 +1904,22 @@ const CATALOG={
     ],
     "description": "Quando um e-mail novo bate com a regra, a Sofia guarda e avisa."
   },
+  "package": {
+    "label": "Encomenda",
+    "group": "flow",
+    "defaultPrivacy": "private",
+    "states": ["active", "delivered", "archived"],
+    "fields": [
+      { "key": "code", "label": "Código de rastreio", "type": "text", "max": 40 },
+      { "key": "carrier", "label": "Transportadora", "type": "text", "max": 40 },
+      { "key": "status", "label": "Último status", "type": "text", "max": 160 },
+      { "key": "last_event_at", "label": "Último evento em", "type": "text", "max": 40 },
+      { "key": "events", "label": "Linha do tempo", "type": "textarea", "max": 8000 },
+      { "key": "checked_at", "label": "Consultado em", "type": "text", "max": 40 },
+      { "key": "error", "label": "Motivo da falha", "type": "text", "max": 160 },
+      { "key": "note", "label": "Observação", "type": "text", "max": 300 }
+    ]
+  },
   "mail_hit": {
     "label": "E-mail encontrado",
     "group": "mail",

@@ -348,6 +348,8 @@ function makeMobileApi(runtime, deps) {
       if (!b.start_at || !Number.isFinite(Date.parse(b.start_at))) fail('INVALID_DATE', 'Data e hora inválidas.');
       return send({ item: workspace.save({ kind: 'commitment', title: cleanText(b.title, 'Título', 200), area: 'Pessoal', privacy: 'private', data: { start_at: new Date(b.start_at).toISOString(), end_at: '', location: '' } }) });
     }
+    // Encomendas: atualizar agora (consulta a transportadora e devolve o registro atualizado).
+    if (p === '/api/mobile/packages/refresh' && m === 'POST') { const b = await bodyJson(req, 2048); const r = await runtime.packages.refreshOne(String(b.id || '')); return send({ item: r.item, changed: r.changed, error: r.error }); }
     if (p === '/api/mobile/notifications' && m === 'GET') return send({ items: workspace.notifications(), push_enabled: false });
     match = p.match(/^\/api\/mobile\/notifications\/([\w-]+)\/read$/);
     if (match && m === 'POST') { workspace.markRead(validId(match[1])); return send({ ok: true }); }

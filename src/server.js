@@ -34,6 +34,7 @@ async function startServer(options={}) {
     process.on('unhandledRejection', error => console.error('[Sofia] Falha assíncrona ignorada para não derrubar o servidor:', String(error && error.message || error).slice(0, 200)));
     runtime.scheduler.start();
     runtime.mailWatch.start();
+    runtime.packages.start();
     runtime.google.start();
     timer=setInterval(()=>{if(!runtime.core.busy){runtime.backups.daily();runtime.backups.prune();}},60000);timer.unref();
     const address=server.address(),port=address&&typeof address==='object'?address.port:PORT;
