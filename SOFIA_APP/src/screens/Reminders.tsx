@@ -13,7 +13,9 @@ import {Icon} from '../components/Icon';
 // 0.3.141: app Lembretes. Usa o registro "reminder" que a Agenda ja conhece: o aviso no
 // celular sai pelo mesmo agendador da Agenda (api.saveEntity avisa agendaChanged).
 const pad=(n:number)=>String(n).padStart(2,'0');
-export function defaultRemindAt(now=new Date()){const d=new Date(now.getTime()+60*60*1000);d.setMinutes(0,0,0);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;}
+// 0.3.146: o servidor exige data, hora E fuso; sem fuso, o lembrete nao salvava se a pessoa
+// nao mexesse no campo "Quando". toISOString() leva o fuso (UTC, 'Z'), como o DateTimeField.
+export function defaultRemindAt(now=new Date()){const d=new Date(now.getTime()+60*60*1000);d.setMinutes(0,0,0);return d.toISOString();}
 export function remindLabel(value:unknown,now=new Date()){
  const t=Date.parse(String(value||''));if(!Number.isFinite(t))return 'Sem horário';
  const d=new Date(t),sameDay=(a:Date,b:Date)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
@@ -43,6 +45,7 @@ export function Reminders({api,active,onBack}:{api:SofiaApi;active:boolean;onBac
   try{
    const d={...(editing.data||{})};d.remind_at=String(d.remind_at||'');d.message=String(d.message||'');d.location=String(d.location||'');
    if(!Number.isFinite(Date.parse(d.remind_at)))throw Error('Escolha quando lembrar.');
+   if(!/(Z|[+-]\d\d:?\d\d)$/.test(d.remind_at))d.remind_at=new Date(Date.parse(d.remind_at)).toISOString();
    const saved=await api.saveEntity({...editing,kind:'reminder',title:editing.title.trim(),content:String(editing.content||''),area:editing.area||'Lembretes',privacy:'private',state:editing.state||'active',tags:editing.tags||[],data:d});
    records.merge(saved);setEditing(null);
   }catch(e){setError(errorText(e));}finally{setBusy(false);}

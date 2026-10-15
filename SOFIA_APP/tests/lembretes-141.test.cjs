@@ -20,7 +20,8 @@ test('0.3.141: Lembretes - atrasados, proximos e concluidos; rotulo de quando',(
   assert.deepEqual(g.late.map(i=>i.id),['a']);assert.deepEqual(g.upcoming.map(i=>i.id),['b']);assert.deepEqual(g.done.map(i=>i.id),['c']);
   assert.equal(mod.remindLabel('2026-10-16T09:30',now),'Amanhã às 09:30');
   assert.equal(mod.remindLabel('2026-10-15T09:00',now),'Hoje, passou às 09:00');
-  assert.match(mod.defaultRemindAt(now),/^2026-10-15T13:00$/);
+  assert.equal(new Date(mod.defaultRemindAt(now)).getTime(),new Date(2026,9,15,13,0,0).getTime());
+  assert.match(mod.defaultRemindAt(now),/Z$/,'sempre com fuso: o servidor recusa horario sem fuso');
 });
 test('0.3.141: chat - responder citando e data flutuante ao rolar',()=>{
   const chat=read('src/screens/Chat.tsx');

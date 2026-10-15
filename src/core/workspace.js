@@ -6,9 +6,15 @@ const {OWNER}=require('../memory/store');
 const {AppError,now,id,cleanText,rejectSecrets,normalize}=require('./util');
 const AREAS=['Pessoal','Sofia OS','AVSORD','AVSORD Studio','AVSORD Technology','Enjoy The Void','Estudos','Assets','Geral'];
 const PRIV=['private','local','shared','public'];
+const SYSTEM_KEYS={mail_account:['last_uid','uid_validity','last_check','last_error','secret_set'],package:['status','events','checked_at','ok_at','error','blocked_until','last_event_at']};
 function parse(row){if(!row)return row;return {...row,data:JSON.parse(row.data),tags:JSON.parse(row.tags)};}
 function dateISO(v,field='Data'){if(!v)return '';if(!/^\d{4}-\d{2}-\d{2}$/.test(v)||!Number.isFinite(Date.parse(v+'T12:00:00Z'))||new Date(v+'T12:00:00Z').toISOString().slice(0,10)!==v)throw new AppError('BAD_DATE',field+': informe uma data válida.');return v;}
-function dateTime(v,field='Data'){if(!v)return '';if(typeof v!=='string'||!/(?:Z|[+-]\d\d:\d\d)$/.test(v)||!Number.isFinite(Date.parse(v)))throw new AppError('BAD_DATE',field+': inclua data, hora e fuso.');return new Date(v).toISOString();}
+// 0.3.146: horario sem fuso ("2026-10-15T10:00", vindo do chat ou do app) e lido no fuso da
+// Sofia (America/Sao_Paulo) em vez de ser recusado - a pessoa nao precisa informar fuso.
+const SOFIA_TZ='America/Sao_Paulo';
+function tzOffsetMs(utcMs,tz){const p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:tz,hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).formatToParts(new Date(utcMs)).map(x=>[x.type,x.value]));return Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second)-utcMs;}
+function localToUtc(v,tz=SOFIA_TZ){const m=/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/.exec(v);if(!m)return null;const naive=Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+(m[6]||0));let t=naive-tzOffsetMs(naive,tz);t=naive-tzOffsetMs(t,tz);return Number.isFinite(t)?new Date(t).toISOString():null;}
+function dateTime(v,field='Data'){if(!v)return '';if(typeof v==='string'&&!/(?:Z|[+-]\d\d:?\d\d)$/.test(v.trim())){const z=localToUtc(v.trim());if(z)return z;}if(typeof v!=='string'||!/(?:Z|[+-]\d\d:?\d\d)$/.test(v.trim())||!Number.isFinite(Date.parse(v)))throw new AppError('BAD_DATE',field+': inclua data e hora.');return new Date(v).toISOString();}
 function tags(v){const list=Array.isArray(v)?v:(typeof v==='string'?v.split(','):[]);if(list.length>20)throw new AppError('TAGS_LIMIT','Use até 20 labels.');return [...new Set(list.map(t=>cleanText(String(t),'Label',60)).filter(Boolean))];}
 function url(v){if(!v)return '';let u;try{u=new URL(v);}catch{throw new AppError('BAD_URL','Informe um link completo http(s).');}if(!['http:','https:'].includes(u.protocol)||u.username||u.password)throw new AppError('BAD_URL','Não use credenciais ou outro protocolo no link.');return u.toString();}
 class Workspace {
@@ -122,7 +128,9 @@ class Workspace {
      if(data.installments!==''&&(!Number.isInteger(data.installments)||data.installments<1||data.installments>72))throw new AppError('BAD_INSTALLMENTS','Parcelas entre 1 e 72.');
    }
    if(kind==='fin_budget'&&(!data.category||data.limit===''||data.limit<=0))throw new AppError('BAD_BUDGET','Escolha a categoria e o limite mensal.');
-   if(kind==='fin_goal'&&(data.target===''||data.target<=0))throw new AppError('BAD_GOAL','Informe o valor do objetivo.');
+   // 0.3.146: a reserva (Dinheiro guardado) nao precisa de meta final, prazo ou compra especifica.
+   if(kind==='fin_goal'&&data.role!=='reserve'&&(data.target===''||data.target<=0))throw new AppError('BAD_GOAL','Informe o valor do objetivo.');
+   if(kind==='fin_reserve_move'&&(!(Number(data.amount)>0)||!['in','out'].includes(data.direction)||!data.goal_id))throw new AppError('BAD_RESERVE_MOVE','Informe o valor e se é para guardar ou retirar.');
    if(kind==='routine'&&state==='active'){
      if(!data.frequency||!data.time||!data.starts_on||!data.delivery)throw new AppError('ROUTINE_INCOMPLETE','Defina frequência, horário, início e entrega antes de ativar.');
      if(data.frequency==='weekly'&&(!Number.isInteger(data.weekday)||data.weekday>6))throw new AppError('BAD_WEEKDAY','Dia da semana: 0 a 6.');
@@ -141,7 +149,13 @@ class Workspace {
    return {kind,title,content,area,privacy,state:finalState,data,tags:labels};
  }
  event(type,entityId,event,area,summary){this.db.prepare('INSERT INTO events VALUES(?,?,?,?,?,?,?)').run(id(),type,entityId,event,area,summary.slice(0,500),now());}
- save(input,entityId){const old=entityId?this.get(entityId):null;if(old&&input.revision!==old.revision)throw new AppError('REVISION_CONFLICT','Este registro mudou em outra aba. Reabra antes de salvar.',409);
+ // 0.3.146: campos que so a propria Sofia escreve em segundo plano (horario da ultima
+ // verificacao do e-mail, ponto de leitura, status da encomenda...). Se a revisao mudou SO por
+ // eles, o salvamento da pessoa segue: os campos dela valem e os automaticos ficam como estao
+ // no servidor. Se outra pessoa/dispositivo mudou um campo de verdade, o conflito continua.
+ systemOnlyChange(kind,input,old){const keys=SYSTEM_KEYS[kind];if(!keys||!input||!old)return false;const base=input.base_data;if(!base||typeof base!=='object')return false;const cur=old.data||{};for(const k of new Set([...Object.keys(cur),...Object.keys(base)])){if(keys.includes(k))continue;if(JSON.stringify(cur[k])!==JSON.stringify(base[k]))return false;}return ['title','content','area','state','privacy'].every(f=>input['base_'+f]===undefined||input['base_'+f]===old[f]);}
+ save(input,entityId){const old=entityId?this.get(entityId):null;if(old&&input.revision!==old.revision){if(this.systemOnlyChange(old.kind,input,old)){const keys=SYSTEM_KEYS[old.kind],data={...(input.data||{})};for(const k of keys)if(k in (old.data||{}))data[k]=old.data[k];input={...input,data,revision:old.revision};}else throw new AppError('REVISION_CONFLICT','Este registro mudou em outro aparelho. Suas alterações não foram perdidas: reabra para conferir e salve de novo.',409);}
+ delete input.base_data;delete input.base_title;delete input.base_content;delete input.base_area;delete input.base_state;delete input.base_privacy;
    const v=this.validate(input,old);const inherited=this.s.privacyOf('message',input.source_id||old?.source_id);if(inherited==='local')v.privacy='local';else if(!input.privacy&&inherited==='shared'&&!CATALOG[v.kind].private)v.privacy='shared';else if(!input.privacy&&inherited==='private')v.privacy='private';const key=entityId||id(),revision=(old?.revision||0)+1,stamp=now();
    return this.s.tx(()=>{
      if(old)this.db.prepare('UPDATE entities SET title=?,content=?,area=?,tags=?,privacy=?,state=?,data=?,revision=?,updated_at=? WHERE id=?').run(v.title,v.content,v.area,JSON.stringify(v.tags),v.privacy,v.state,JSON.stringify(v.data),revision,stamp,key);
@@ -194,9 +208,14 @@ class Workspace {
    return this.db.prepare(query).all(area,area,limit,offset);
  }
  notify(category,title,body,entityId,importance='info',dedup=null){this.db.prepare('INSERT OR IGNORE INTO notifications VALUES(?,?,?,?,?,?,?, ?,?)').run(id(),category,title,body,entityId||null,importance,'unread',dedup,now());}
- notifications(){return this.db.prepare("SELECT n.*,COALESCE(e.area,'Geral') AS area FROM notifications n LEFT JOIN entities e ON e.id=n.entity_id ORDER BY n.created_at DESC,n.rowid DESC LIMIT 300").all();}
- markRead(key){this.db.prepare("UPDATE notifications SET state='read' WHERE id=?").run(key);return {ok:true};}
- clearNotification(key){if(key==='all'){const r=this.db.prepare('DELETE FROM notifications').run();return {ok:true,removed:Number(r.changes)||0};}const r=this.db.prepare('DELETE FROM notifications WHERE id=?').run(key);return {ok:true,removed:Number(r.changes)||0};}
+ // 0.3.146: aviso apagado vira 'dismissed' (nao DELETE). Com o INSERT OR IGNORE por dedup,
+ // apagar a linha deixava o mesmo aviso ser criado de novo e "voltar". Apagar so remove o
+ // aviso, nunca o compromisso, tarefa ou capsula de origem.
+ notifications(){return this.db.prepare("SELECT n.*,COALESCE(e.area,'Geral') AS area FROM notifications n LEFT JOIN entities e ON e.id=n.entity_id WHERE n.state!='dismissed' ORDER BY n.created_at DESC,n.rowid DESC LIMIT 300").all();}
+ noticePage(offset=0,limit=100){offset=Math.max(0,Number(offset)||0);const items=this.db.prepare("SELECT n.*,COALESCE(e.area,'Geral') AS area FROM notifications n LEFT JOIN entities e ON e.id=n.entity_id WHERE n.state!='dismissed' ORDER BY n.created_at DESC,n.rowid DESC LIMIT ? OFFSET ?").all(limit+1,offset);const unread=this.db.prepare("SELECT COUNT(*) AS c FROM notifications WHERE state='unread'").get().c;return {items:items.slice(0,limit),next_offset:items.length>limit?offset+limit:null,unread:Number(unread)||0};}
+ markRead(key){this.db.prepare("UPDATE notifications SET state='read' WHERE id=? AND state='unread'").run(key);return {ok:true};}
+ markAllRead(){const r=this.db.prepare("UPDATE notifications SET state='read' WHERE state='unread'").run();return {ok:true,updated:Number(r.changes)||0};}
+ clearNotification(key){const r=key==='all'?this.db.prepare("UPDATE notifications SET state='dismissed' WHERE state!='dismissed'").run():this.db.prepare("UPDATE notifications SET state='dismissed' WHERE id=?").run(key);return {ok:true,removed:Number(r.changes)||0};}
  syncJob(e){const active=e.state==='active'&&(e.kind==='routine'||e.data.method==='json');this.db.prepare('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,0) ON CONFLICT(entity_id,kind) DO UPDATE SET state=excluded.state,next_at=CASE WHEN jobs.state<>excluded.state THEN excluded.next_at ELSE jobs.next_at END,interval_minutes=excluded.interval_minutes').run(id(),e.id,e.kind,active?'active':'paused',active?now():null,null,null,e.kind==='monitor'?e.data.interval_minutes:1);}
  observations(key){if(this.get(key).kind!=='monitor')throw new AppError('BAD_KIND','Não é um monitor.');return this.db.prepare('SELECT * FROM observations WHERE monitor_id=? ORDER BY observed_at ASC,rowid ASC').all(key);}
  observe(key,b){const mon=this.get(key);if(mon.kind!=='monitor')throw new AppError('BAD_KIND','Não é um monitor.');

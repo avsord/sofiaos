@@ -435,10 +435,23 @@ export function allReadings(p: ProductSeries): Array<{t: number; store: string; 
  * e aparecer no primeiro quadro, antes de qualquer consulta à rede. */
 export type MonitorWidgetRow = {id: string; title: string; color: string; currency: string; atLow: boolean; lastAt: number | null;
   price: number | null; store: string | null; change: number | null};
+/** 0.3.146: o Inicio mostra a OFERTA PRINCIPAL que a pessoa escolheu (loja principal), nao a mais
+ * barata do momento. As outras lojas continuam acompanhadas, so nao aparecem no widget. Se a
+ * principal ainda nao tem nenhuma leitura, mostra a melhor oferta com a loja indicada. */
+export function primaryNow(p: ProductSeries): {price: number; store: Store; change: number | null} | null {
+  const primary = p.stores.find(s => s.primary);
+  const pts = primary ? primary.points : [];
+  if (primary && pts.length) {
+    const last = pts[pts.length - 1].v; let prev: number | null = null;
+    for (let i = pts.length - 2; i >= 0; i--) if (pts[i].v !== last) { prev = pts[i].v; break; }
+    return {price: last, store: primary, change: prev ? (last - prev) / prev * 100 : null};
+  }
+  return p.now ? {price: p.now.price, store: p.now.store, change: p.change} : null;
+}
 export function widgetRows(list: ProductSeries[]): MonitorWidgetRow[] {
-  return [...list].sort((a, b) => Number(b.atLow) - Number(a.atLow) || (b.lastAt ?? 0) - (a.lastAt ?? 0)).map(p => ({
+  return [...list].sort((a, b) => Number(b.atLow) - Number(a.atLow) || (b.lastAt ?? 0) - (a.lastAt ?? 0)).map(p => { const n = primaryNow(p); return {
     id: p.monitor.id, title: String(p.monitor.title || ''), color: p.color, currency: p.currency, atLow: p.atLow, lastAt: p.lastAt,
-    price: p.now ? p.now.price : null, store: p.now ? p.now.store.name : null, change: p.change}));
+    price: n ? n.price : null, store: n ? n.store.name : null, change: n ? n.change : null}; });
 }
 /** Aceita só o formato atual (cache de versão antiga ou corrompido vira "sem cache"). */
 export function validWidgetRows(v: unknown): MonitorWidgetRow[] | null {

@@ -31,9 +31,10 @@ export function NotificationProvider({api,enabled,children,scope='',onOpen}:{api
  async function read(n:Notice){if(n.id.startsWith('local:')){local.read(n.id);return;}try{await api.markRead(n.id);setItems(old=>old.map(x=>x.id===n.id?{...x,state:'read'}:x));if(n.state==='unread')setUnread(v=>Math.max(0,v-1));await refresh();}catch(e){setError(errorText(e));}}
  async function readAll(){
   local.readAll();const pending=items.filter(n=>n.state==='unread');
-  if(!pending.length){setUnread(0);return;}
+  if(!pending.length&&unread===0){setUnread(0);return;}
   setItems(old=>old.map(n=>n.state==='unread'?{...n,state:'read'}:n));setUnread(0);setError('');
-  try{for(let i=0;i<pending.length;i+=8)await Promise.all(pending.slice(i,i+8).map(n=>api.markRead(n.id)));await refresh();}
+  // 0.3.146: global no servidor; servidor antigo (sem a rota) cai no modo item a item.
+  try{try{await api.markAllRead();}catch(e){if((e as {status?:number}).status!==404)throw e;for(let i=0;i<pending.length;i+=8)await Promise.all(pending.slice(i,i+8).map(n=>api.markRead(n.id)));}await refresh();}
   catch(e){setError(errorText(e));await refresh();}
  }
  async function clear(n:Notice){if(n.id.startsWith('local:')){local.dismiss(n.id);return;}try{await api.clearNotification(n.id);setItems(old=>old.filter(x=>x.id!==n.id));if(n.state==='unread')setUnread(v=>Math.max(0,v-1));await refresh();}catch(e){setError(errorText(e));}}
@@ -47,8 +48,10 @@ export const AREA_STYLE:Record<string,{icon:string;color:string}>={'Agenda':{ico
 const AREA_SHORT:Record<string,string>={'Monitoramento de produtos':'Preços'};
 export function relativeTime(iso:string,now=Date.now()){const t=Date.parse(iso);if(!Number.isFinite(t))return '';const m=Math.round((now-t)/60000);if(m<1)return 'agora';if(m<60)return 'há '+m+' min';const h=Math.round(m/60);if(h<24)return 'há '+h+' h';const d=Math.round(h/24);return d===1?'ontem':d<7?'há '+d+' dias':new Date(t).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}).replace('.','');}
 const SWIPE_OUT=90;
-/** Arrastar para a esquerda e soltar apaga o aviso (igual à gaveta do Android). Toque continua abrindo. */
-function Swipeable({children,onDismiss,label}:{children:React.ReactNode|((dismiss:()=>void)=>React.ReactNode);onDismiss:()=>void;label:string}){
+/** Arrastar para a esquerda e soltar apaga o aviso (igual à gaveta do Android). Toque continua abrindo.
+ * 0.3.146: arrastar para a DIREITA marca como lida (o aviso volta ao lugar; nao apaga). Ja lida: nada muda. */
+const SWIPE_READ=80;
+function Swipeable({children,onDismiss,onRead,label}:{children:React.ReactNode|((dismiss:()=>void)=>React.ReactNode);onDismiss:()=>void;onRead?:()=>void;label:string}){
  const c=useTheme(),x=useRef(new Animated.Value(0)).current,collapse=useRef(new Animated.Value(1)).current,[gone,setGone]=useState(false),[closing,setClosing]=useState(false),width=useRef(360),height=useRef(0);
  // Sai pela esquerda e DEPOIS a altura fecha suave: os avisos de baixo sobem
  // acompanhando, como no iPhone, em vez de pularem de uma vez (corte seco).
@@ -61,20 +64,21 @@ function Swipeable({children,onDismiss,label}:{children:React.ReactNode|((dismis
   onMoveShouldSetPanResponderCapture:(_,g)=>Math.abs(g.dx)>10&&Math.abs(g.dx)>Math.abs(g.dy)*1.3,
   onPanResponderTerminationRequest:()=>false,
   onShouldBlockNativeResponder:()=>true,
-  onPanResponderMove:(_,g)=>x.setValue(Math.min(0,g.dx)),
-  onPanResponderRelease:(_,g)=>{if(g.dx<-SWIPE_OUT||g.vx<-0.8)dismiss();else Animated.spring(x,{toValue:0,useNativeDriver:true,bounciness:6}).start();},
+  onPanResponderMove:(_,g)=>x.setValue(onRead?Math.max(-width.current,Math.min(SWIPE_READ*1.4,g.dx)):Math.min(0,g.dx)),
+  onPanResponderRelease:(_,g)=>{if(g.dx<-SWIPE_OUT||g.vx<-0.8)dismiss();else{if(onRead&&g.dx>SWIPE_READ)onRead();Animated.spring(x,{toValue:0,useNativeDriver:true,bounciness:6}).start();}},
   onPanResponderTerminate:()=>Animated.spring(x,{toValue:0,useNativeDriver:true}).start(),
  }),[x,dismiss]);
  if(gone)return null;
  return <Animated.View onLayout={e=>{width.current=e.nativeEvent.layout.width;if(!closing)height.current=e.nativeEvent.layout.height;}}
   style={closing?{height:collapse.interpolate({inputRange:[0,1],outputRange:[0,height.current||64]}),opacity:collapse,marginBottom:collapse.interpolate({inputRange:[0,1],outputRange:[0,4]}),overflow:'hidden'}:{marginBottom:4}}
-  accessibilityActions={[{name:'delete',label:'Apagar '+label}]} onAccessibilityAction={e=>{if(e.nativeEvent.actionName==='delete')dismiss();}}>
-  <View style={{position:'absolute',top:0,bottom:0,left:0,right:0,borderRadius:16,backgroundColor:'#ff6b7a',alignItems:'flex-end',justifyContent:'center',paddingRight:18}}><Text style={{color:'#fff',fontWeight:'700',fontSize:12}}>Apagar</Text></View>
+  accessibilityActions={onRead?[{name:'delete',label:'Apagar '+label},{name:'read',label:'Marcar como lida'}]:[{name:'delete',label:'Apagar '+label}]} onAccessibilityAction={e=>{if(e.nativeEvent.actionName==='delete')dismiss();if(e.nativeEvent.actionName==='read')onRead?.();}}>
+  <Animated.View style={{position:'absolute',top:0,bottom:0,left:0,right:0,borderRadius:16,backgroundColor:'#ff6b7a',alignItems:'flex-end',justifyContent:'center',paddingRight:18,opacity:x.interpolate({inputRange:[-1,0],outputRange:[1,0],extrapolate:'clamp'})}}><Text style={{color:'#fff',fontWeight:'700',fontSize:12}}>Apagar</Text></Animated.View>
+  {onRead?<Animated.View style={{position:'absolute',top:0,bottom:0,left:0,right:0,borderRadius:16,backgroundColor:'#2fc58b',alignItems:'flex-start',justifyContent:'center',paddingLeft:18,opacity:x.interpolate({inputRange:[0,1],outputRange:[0,1],extrapolate:'clamp'})}}><Text style={{color:'#fff',fontWeight:'700',fontSize:12}}>✓ Lida</Text></Animated.View>:null}
   <Animated.View {...pan.panHandlers} style={{transform:[{translateX:x}],backgroundColor:c.bg,borderRadius:16}}>{typeof children==='function'?children(dismiss):children}</Animated.View>
  </Animated.View>;
 }
 export const NoticeRow=React.memo(function NoticeRow({item}:{item:Notice}){const c=useTheme(),notices=useNotifications(),area=noticeArea(item),st=AREA_STYLE[area]||AREA_STYLE.Outros,unread=item.state==='unread';
- return <Swipeable label={item.title} onDismiss={()=>void notices.clear(item)}>{dismiss=><Pressable accessibilityRole="button" accessibilityLabel={'Abrir: '+item.title} onPress={()=>notices.open(item)} style={{flexDirection:'row',gap:12,paddingVertical:12,paddingHorizontal:10,borderRadius:16,backgroundColor:unread?st.color+'12':c.bg}}>
+ return <Swipeable label={item.title} onDismiss={()=>void notices.clear(item)} onRead={unread?()=>void notices.read(item):undefined}>{dismiss=><Pressable accessibilityRole="button" accessibilityLabel={'Abrir: '+item.title} onPress={()=>notices.open(item)} style={{flexDirection:'row',gap:12,paddingVertical:12,paddingHorizontal:10,borderRadius:16,backgroundColor:unread?st.color+'12':c.bg}}>
   <View style={{width:38,height:38,borderRadius:19,backgroundColor:st.color+'26',alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:18}}>{st.icon}</Text></View>
   <View style={{flex:1,gap:3}}>
    <View style={{flexDirection:'row',alignItems:'center',gap:6}}>{unread?<View style={{width:8,height:8,borderRadius:4,backgroundColor:st.color}}/>:null}<Text numberOfLines={2} style={{flex:1,color:c.text,fontSize:14,fontWeight:unread?'700':'500'}}>{item.title}</Text></View>
@@ -159,7 +163,7 @@ export function NotificationList({grouped=false,firstPaint=false}:{grouped?:bool
  const chip=(value:string,label:string,count?:number)=><Pressable key={value} accessibilityRole="button" accessibilityState={{selected:filter===value}} onPress={()=>setFilter(value)} style={{flexDirection:'row',alignItems:'center',gap:5,paddingHorizontal:11,paddingVertical:6,borderRadius:99,backgroundColor:filter===value?c.accent:c.input}}><Text style={{color:filter===value?c.onAccent:c.text,fontSize:12,fontWeight:'600'}}>{label}</Text>{count?<Text style={{color:filter===value?'#ffffffcc':c.muted,fontSize:11}}>{count}</Text>:null}</Pressable>;
  return <View style={{gap:10}}>
   <BellDigest/>
-  {n.localOnly?<Text style={{color:c.muted,fontSize:11,lineHeight:17}}>Servidor atual: até 300 avisos recentes. A limpeza global aguarda a atualização do servidor; marcar como lida é sincronizado.</Text>:null}
+
   {n.error?<ErrorBanner text={n.error} onRetry={()=>void n.refresh()}/>:null}
   {n.items.length?<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:8}}>{chip('all','Todas',n.items.length)}{n.unread?chip('unread','Não lidas',n.unread):null}{areas.map(([a,count])=>chip(a,(AREA_STYLE[a]||AREA_STYLE.Outros).icon+' '+(AREA_SHORT[a]||a),count))}</ScrollView>:null}
   {!shown.length?<View style={{alignItems:'center',paddingVertical:24,gap:6}}><Text style={{fontSize:28}}>{n.loading?'⏳':'✨'}</Text><Text style={{color:c.muted}}>{n.loading?'Carregando…':filter==='all'?'Tudo em dia. Sem notificações.':'Nada aqui neste filtro.'}</Text></View>:null}

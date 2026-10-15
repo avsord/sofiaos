@@ -36,7 +36,7 @@ export function PackagesWidget({api,active,onOpen}:{api:SofiaApi;active:boolean;
  useEffect(()=>{if(active)void records.load();},[active,api]);
  const g=splitPackages(records.items.filter(i=>i.state!=='archived')),list=g.active.slice(0,4);
  return <View style={{gap:16}}>
-  <Header title="Encomendas" count={g.active.length} icon="list" label="Abrir app Encomendas" onOpen={onOpen}/>
+  <Header title="Encomendas" count={g.active.length} icon="box" label="Abrir app Encomendas" onOpen={onOpen}/>
   {records.error?<ErrorBanner text={records.error} onRetry={()=>void records.load()}/>:null}
   {!records.loaded&&!records.error?<Text style={{color:c.muted}}>Carregando encomendas…</Text>:list.length?<View style={{backgroundColor:c.surface,borderRadius:18,paddingHorizontal:14,borderWidth:1,borderColor:c.line}}>
    {list.map((item,i)=><Pressable key={item.id} accessibilityRole="button" accessibilityLabel={'Encomenda '+item.title} onPress={onOpen} style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:13,borderBottomWidth:i<list.length-1?1:0,borderColor:c.line}}>

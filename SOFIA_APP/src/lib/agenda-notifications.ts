@@ -22,6 +22,8 @@ export function notificationPlan(items:AgendaItem[],now=new Date()){
  const end=new Date(now.getFullYear()+2,now.getMonth(),now.getDate()),planned:{id:string;title:string;body:string;date:Date;day:string;entityId:string}[]=[];
  for(const item of items){
   if(item.tags?.includes('sofia-notify-v1:off'))continue;
+  // 0.3.146: feriado do calendario de feriados (Google) aparece na Agenda, mas nao avisa.
+  if(/holiday@group\.v\.calendar/i.test(String((item.data as {calendar_id?:string})?.calendar_id||'')))continue;
   const ahead=Math.max(0,Math.min(525600,Number(item.data.remind_minutes)||0))*60000,from=new Date(now.getTime()+ahead),to=readRepeat(item).frequency==='none'?new Date(8640000000000000):new Date(end.getTime()+ahead);
   for(const event of occurrences(item,from,to)){const start=eventStart(event),date=new Date((start.length===10?new Date(start+'T09:00:00').getTime():Date.parse(start))-ahead);if(date<=now)continue;planned.push({id:item.id+':'+date.getTime(),entityId:item.id,title:item.title,body:event.data.location||'Seu compromisso na agenda da Sofia.',date,day:localDateKey(start)});}
  }

@@ -13,6 +13,8 @@ test('link do Mercado Livre do dono vira o anúncio direto, sem rastreio, e abre
 });
 test('produto: três pontinhos no topo com Atualizar, Trocar link, Outras lojas e Excluir',()=>{
  const s=read('src/screens/Monitoring.tsx');assert.ok(s.includes('<IconButton name="more" label="Opções do produto"'));
- for(const t of ["'Atualizar preços agora'",'label="Trocar o link principal"','label="Encontrar em outras lojas"','label="Excluir produto"'])assert.ok(s.includes(t),t);
+ for(const t of ["'Atualizar preços agora'",'label="Trocar o link principal"','label="Adicionar outra loja (colar link)"','label="Excluir produto"'])assert.ok(s.includes(t),t);
+ // 0.3.146: a busca automatica "Encontrar em outras lojas" saiu; colar link de loja continua.
+ assert.ok(!s.includes('label="Encontrar em outras lojas"'));assert.ok(!s.includes("label: 'Procurar'"));
 });
 test('apagar aviso não mostra mais "aguarda a atualização do servidor"',()=>{assert.ok(!read('src/lib/legacy-md.ts').includes('aguarda a atualização do servidor. Nenhum aviso foi apagado'));});

@@ -14,6 +14,7 @@ import {relativeTime} from '../components/NotificationCenter';
 import {Spinner, LoadingLines} from '../components/Loading';
 import {parseBill, parseMoney, todayISO, toAccount} from '../lib/finance';
 import {money} from '../lib/monitoring';
+import {openInGmail} from '../lib/open-gmail';
 
 type Tab = 'hits' | 'rules' | 'accounts';
 const PROVIDERS: Array<{value: string; label: string; help: string; link?: string}> = [
@@ -45,6 +46,46 @@ function Field({label, value, onChange, placeholder, secure = false, email = fal
   return <View style={{gap: 6}}><Text style={{fontSize: 12, color: c.muted}}>{label}</Text><TextInput accessibilityLabel={label} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={c.muted} secureTextEntry={secure} autoCapitalize="none" autoCorrect={false} keyboardType={email ? 'email-address' : 'default'} style={{fontSize: 15, color: c.text, borderWidth: 1, borderColor: c.line, borderRadius: 12, padding: 12, backgroundColor: c.input}} /></View>;
 }
 
+// ---------- 0.3.146: selecao por grupo/conta ----------
+export type MailSelection = {type: 'all'} | {type: 'group'; name: string} | {type: 'account'; id: string};
+let lastSelection: MailSelection = {type: 'all'};
+export function groupNames(accounts: Entity[]) { return [...new Set(accounts.map(a => String(a.data?.group || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR')); }
+export function selectionAccounts(sel: MailSelection, accounts: Entity[]) {
+  const list = sel.type === 'all' ? accounts : sel.type === 'group' ? accounts.filter(a => String(a.data?.group || '').trim() === sel.name) : accounts.filter(a => a.id === sel.id);
+  return new Set(list.map(a => a.id));
+}
+export function selectionLabel(sel: MailSelection, accounts: Entity[]) {
+  if (sel.type === 'group') return accounts.some(a => String(a.data?.group || '').trim() === sel.name) ? sel.name : 'Todas as contas';
+  if (sel.type === 'account') { const a = accounts.find(x => x.id === sel.id); return a ? String(a.data?.address || 'Conta') : 'Todas as contas'; }
+  return 'Todas as contas';
+}
+function SelectionSheet({api, accounts, selection, onSelect, onClose, onChanged}: {api: SofiaApi; accounts: Entity[]; selection: MailSelection; onSelect: (v: MailSelection) => void; onClose: () => void; onChanged: () => void}) {
+  const c = useTheme(), groups = groupNames(accounts), loose = accounts.filter(a => !String(a.data?.group || '').trim());
+  const [renaming, setRenaming] = useState(''), [name, setName] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const isSel = (v: MailSelection) => JSON.stringify(v) === JSON.stringify(selection);
+  // Renomear/excluir grupo so muda o campo "grupo" das contas: nao mexe no endereco, nao desconecta e nao apaga e-mails.
+  async function setGroupOf(list: Entity[], value: string) {
+    setBusy(true); setError('');
+    try { for (const a of list) await api.saveEntity({...a, data: {...a.data, group: value}, base_data: a.data, base_title: a.title} as any); onChanged(); }
+    catch (e) { setError(errorText(e)); } finally { setBusy(false); }
+  }
+  const row = (label: string, v: MailSelection, sub = '', indent = 0) => <Pressable key={label + JSON.stringify(v)} accessibilityRole="button" accessibilityState={{selected: isSel(v)}} onPress={() => onSelect(v)} style={{paddingVertical: 12, paddingLeft: 12 + indent, paddingRight: 12, borderRadius: 12, backgroundColor: isSel(v) ? c.accentSoft : 'transparent', flexDirection: 'row', alignItems: 'center', gap: 8}}><Text style={{flex: 1, color: isSel(v) ? c.accent : c.text, fontWeight: indent ? '500' : '700'}}>{label}</Text>{sub ? <Text style={{color: c.muted, fontSize: 12}}>{sub}</Text> : null}</Pressable>;
+  return <Sheet visible onClose={onClose} label="Fechar seleção de contas">
+    <ScrollView style={{maxHeight: 620}} contentContainerStyle={{gap: 4}} keyboardShouldPersistTaps="handled">
+      <Text style={{fontSize: 18, fontWeight: '800', color: c.text, marginBottom: 6}}>Mostrar e-mails de</Text>
+      {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
+      {row('Todas as contas', {type: 'all'}, accounts.length + ' conta(s)')}
+      {groups.map(g => { const list = accounts.filter(a => String(a.data?.group || '').trim() === g); return <View key={g} style={{gap: 2, marginTop: 6}}>
+        {renaming === g ? <View style={{flexDirection: 'row', gap: 8, alignItems: 'center'}}><View style={{flex: 1}}><Field label={'Novo nome para ' + g} value={name} onChange={setName} placeholder={g} /></View><IconButton name="check" label="Salvar nome do grupo" disabled={busy || !name.trim()} onPress={() => { void setGroupOf(list, name.trim().slice(0, 60)).then(() => { if (selection.type === 'group' && selection.name === g) onSelect({type: 'group', name: name.trim().slice(0, 60)}); setRenaming(''); }); }} /></View>
+        : <View style={{flexDirection: 'row', alignItems: 'center'}}><View style={{flex: 1}}>{row(g, {type: 'group', name: g}, list.length + ' conta(s)')}</View><IconButton name="edit" label={'Renomear grupo ' + g} onPress={() => { setRenaming(g); setName(g); }} /><IconButton name="trash" label={'Excluir grupo ' + g} disabled={busy} onPress={() => Alert.alert('Excluir grupo “' + g + '”?', 'As contas continuam conectadas e nenhum e-mail é apagado; elas só ficam sem grupo.', [{text: 'Cancelar'}, {text: 'Excluir grupo', style: 'destructive', onPress: () => { void setGroupOf(list, '').then(() => { if (selection.type === 'group' && selection.name === g) onSelect({type: 'all'}); }); }}])} /></View>}
+        {list.map(a => row(String(a.data?.address || 'Conta'), {type: 'account', id: a.id}, '', 18))}
+      </View>; })}
+      {loose.length ? <View style={{gap: 2, marginTop: 6}}><Text style={{color: c.muted, fontSize: 12, paddingHorizontal: 12, paddingTop: 6}}>Sem grupo</Text>{loose.map(a => row(String(a.data?.address || 'Conta'), {type: 'account', id: a.id}, '', 18))}</View> : null}
+      <Text style={{color: c.muted, fontSize: 11, lineHeight: 17, marginTop: 10}}>Para criar um grupo ou mover uma conta, abra a conta em Contas e escolha o grupo.</Text>
+    </ScrollView>
+  </Sheet>;
+}
+
 export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onBack: () => void}) {
   useRenderCost('apps:mail');
   const c = useTheme(), insets = useSafeAreaInsets();
@@ -52,17 +93,32 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
   const [error, setError] = useState(''), [checking, setChecking] = useState(false), [info, setInfo] = useState('');
   const [addAccount, setAddAccount] = useState<Entity | 'new' | null>(null), [ruleSheet, setRuleSheet] = useState<Entity | Partial<Entity> | null>(null), [open, setOpen] = useState<Entity | null>(null);
   const [onlyImportant, setOnlyImportant] = useState(false);
+  // 0.3.146: grupos de contas criados pela pessoa (Profissional, Pessoal, Minha loja...).
+  // O titulo vira seletor: todas as contas, um grupo ou uma conta. A lista e os contadores seguem a selecao.
+  const [selection, setSelectionState] = useState<MailSelection>(lastSelection), [picker, setPicker] = useState(false);
+  const setSelection = (v: MailSelection) => { lastSelection = v; setSelectionState(v); };
   const load = useCallback(async () => {
     try { const [a, r, h] = await Promise.all([listAll(api, 'mail_account'), listAll(api, 'mail_rule'), listAll(api, 'mail_hit')]); setAccounts(a.filter(x => x.state !== 'archived')); setRules(r.filter(x => x.state !== 'archived')); setHits(h.filter(x => x.state !== 'archived').sort((x, y) => String(y.data.received_at).localeCompare(String(x.data.received_at)))); setError(''); }
     catch (e) { setError(errorText(e)); setAccounts(a => a || []); }
   }, [api]);
   useEffect(() => { if (active) void load(); }, [active, load]);
-  async function check() {
-    setChecking(true); setInfo('');
-    try { const r = await api.mailCheck(); setInfo(r.skipped ? 'Uma verificação já está em andamento.' : `${r.scanned} e-mails novos lidos · ${r.hits} bateram com as regras${r.errors.length ? ' · ' + r.errors.length + ' conta(s) com erro' : ''}.`); await load(); }
+  // 0.3.146: "verificando", "concluido sem resultado" e "falha de acesso" sao estados diferentes.
+  async function check(rescanDays = 0) {
+    setChecking(true); setInfo(rescanDays ? `Reavaliando os últimos ${rescanDays} dias…` : 'Verificando as contas…');
+    try {
+      const r = await api.mailCheck('', rescanDays);
+      const failed = r.errors.map(e => ((accounts || []).find(a => a.id === e.account)?.data?.address || 'Conta') + ': ' + e.error);
+      setInfo(r.skipped ? 'Uma verificação já está em andamento. Tente de novo em instantes.'
+        : (failed.length && !r.scanned ? 'Falha de acesso — ' + failed.join(' · ')
+        : `Verificação concluída: ${r.scanned} e-mail(s) ${rescanDays ? 'reavaliados' : 'novos'} · ${r.hits} bateram com as regras${failed.length ? ' · Falha de acesso — ' + failed.join(' · ') : ''}.`));
+      await load();
+    }
     catch (e) { setInfo(errorText(e)); } finally { setChecking(false); }
   }
-  const unread = hits.filter(h => h.state === 'new').length, shown = hits.filter(h => !onlyImportant || h.data.important);
+  const inSel = selectionAccounts(selection, accounts || []);
+  const scoped = hits.filter(h => inSel.has(String(h.data.account_id)));
+  const unread = scoped.filter(h => h.state === 'new').length, shown = scoped.filter(h => !onlyImportant || h.data.important);
+  const groups = groupNames(accounts || []);
   const accountName = (id: string) => accounts?.find(a => a.id === id)?.data.address || '';
 
   return (
@@ -70,7 +126,7 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
       <View style={{flex: 1, backgroundColor: c.bg}}>
         <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 14, paddingBottom: 6}}>
           <IconButton name="back" label="Voltar aos apps" onPress={onBack} />
-          <View style={{flex: 1, paddingHorizontal: 4}}><Text style={{fontSize: 11, letterSpacing: 1.2, color: c.muted, fontWeight: '600'}}>A SOFIA DE OLHO NO QUE IMPORTA</Text><Text style={{fontSize: 24, fontWeight: '800', color: c.text}}>E-mails</Text></View>
+          <View style={{flex: 1, paddingHorizontal: 4}}><Text style={{fontSize: 11, letterSpacing: 1.2, color: c.muted, fontWeight: '600'}}>A SOFIA DE OLHO NO QUE IMPORTA</Text><Pressable accessibilityRole="button" accessibilityLabel={'Mostrando: ' + selectionLabel(selection, accounts || []) + '. Trocar'} onPress={() => setPicker(true)} disabled={!accounts?.length}><Text numberOfLines={1} style={{fontSize: 24, fontWeight: '800', color: c.text}}>{accounts?.length ? selectionLabel(selection, accounts) + ' ▾' : 'E-mails'}</Text></Pressable></View>
           <IconButton name="refresh" label="Verificar agora" disabled={checking || !accounts?.length} onPress={() => void check()} />
         </View>
         <View style={{paddingHorizontal: 16, paddingBottom: 8}}>
@@ -123,7 +179,7 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
                 {accounts.map(a => (
                   <Pressable key={a.id} onPress={() => setAddAccount(a)} style={{padding: 14, borderRadius: 16, backgroundColor: c.surface, borderWidth: 1, borderColor: a.data.last_error ? '#ff6b7a88' : c.line, gap: 4}}>
                     <Text style={{color: c.text, fontWeight: '700'}}>{a.data.address}</Text>
-                    <Text style={{color: c.muted, fontSize: 12}}>{PROVIDERS.find(p => p.value === a.data.provider)?.label} · {a.state === 'paused' ? 'pausada' : a.data.secret_set ? 'conectada' : 'falta a senha de app'}{a.data.last_check ? ' · lida ' + relativeTime(String(a.data.last_check)) : ''}</Text>
+                    <Text style={{color: c.muted, fontSize: 12}}>{PROVIDERS.find(p => p.value === a.data.provider)?.label}{a.data.group ? ' · ' + a.data.group : ''} · {a.state === 'paused' ? 'pausada' : a.data.provider === 'gmail_google' ? 'pela Conta Google' : a.data.secret_set ? 'conectada' : 'falta a senha de app'}{a.data.last_check ? ' · lida ' + relativeTime(String(a.data.last_check)) : ''}</Text>
                     {a.data.last_error ? <Text style={{color: c.danger, fontSize: 12}}>{a.data.last_error}</Text> : null}
                   </Pressable>
                 ))}
@@ -131,8 +187,9 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
             )}
           </ScrollView>
         )}
-        {addAccount ? <AccountSheet api={api} account={addAccount === 'new' ? null : addAccount} onClose={() => setAddAccount(null)} onDone={() => { setAddAccount(null); void load(); }} /> : null}
-        {ruleSheet ? <RuleSheet api={api} rule={ruleSheet} accounts={accounts || []} onClose={() => setRuleSheet(null)} onDone={() => { setRuleSheet(null); void load(); }} /> : null}
+        {addAccount ? <AccountSheet groups={groups} api={api} account={addAccount === 'new' ? null : addAccount} onClose={() => setAddAccount(null)} onDone={() => { setAddAccount(null); void load(); }} /> : null}
+        {ruleSheet ? <RuleSheet api={api} rule={ruleSheet} accounts={accounts || []} onClose={() => setRuleSheet(null)} onDone={() => { setRuleSheet(null); void load(); void check(14); }} /> : null}
+        {picker && accounts ? <SelectionSheet api={api} accounts={accounts} selection={selection} onSelect={v => { setSelection(v); setPicker(false); }} onClose={() => setPicker(false)} onChanged={() => void load()} /> : null}
         <Sheet visible={!!open} onClose={() => setOpen(null)} label="Fechar e-mail">
           {open ? (
             <View style={{gap: 10}}>
@@ -140,7 +197,8 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
               <Text style={{color: c.text}}>{open.data.from_name} <Text style={{color: c.muted}}>&lt;{open.data.from_addr}&gt;</Text></Text>
               <Text style={{color: c.muted, fontSize: 12}}>{new Date(String(open.data.received_at)).toLocaleString('pt-BR')} · {accountName(open.data.account_id)}</Text>
               <Text style={{color: c.text, lineHeight: 21}}>{open.data.snippet}</Text>
-              <Text style={{color: c.muted, fontSize: 12}}>Encontrado pela regra: {open.data.rule_names}. Abra seu app de e-mail para ler a mensagem inteira.</Text>
+              <Text style={{color: c.muted, fontSize: 12}}>Encontrado pela regra: {open.data.rule_names}.</Text>
+              <Button title="Abrir no Gmail" onPress={() => { const addr = String((accounts || []).find(a => a.id === open.data.account_id)?.data?.address || ''); void openInGmail(open, addr).then(ok => { if (!ok) setInfo('Não foi possível abrir o Gmail neste celular.'); }); }} />
               <BillFromMail api={api} hit={open} onDone={() => setOpen(null)} />
               <Pressable onPress={() => { const id = open.id; setOpen(null); void api.deleteEntity(id).then(load).catch(() => {}); }} style={{paddingVertical: 12}}><Text style={{color: c.danger}}>Tirar da lista</Text></Pressable>
             </View>
@@ -151,23 +209,28 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
   );
 }
 
-function AccountSheet({api, account, onClose, onDone}: {api: SofiaApi; account: Entity | null; onClose: () => void; onDone: () => void}) {
+function AccountSheet({api, account, onClose, onDone, groups = []}: {api: SofiaApi; account: Entity | null; onClose: () => void; onDone: () => void; groups?: string[]}) {
   const c = useTheme();
   const [provider, setProvider] = useState(String(account?.data.provider || 'gmail_google')), [address, setAddress] = useState(String(account?.data.address || ''));
   const [google, setGoogle] = useState<{connected: boolean; gmail: boolean; email: string} | null>(null);
   useEffect(() => { let live = true; void api.calendarStatus().then(s => { if (live) { setGoogle({connected: !!s.connected, gmail: !!s.gmail?.connected, email: String(s.email || '')}); if (!account && s.email) setAddress(a => a || String(s.email)); } }).catch(() => { if (live) setGoogle({connected: false, gmail: false, email: ''}); }); return () => { live = false; }; }, [api, account]);
   const viaGoogle = provider === 'gmail_google';
   const [host, setHost] = useState(String(account?.data.host || '')), [port, setPort] = useState(account?.data.port ? String(account.data.port) : '993');
+  const [group, setGroup] = useState(String(account?.data.group || '')), [groupDraft, setGroupDraft] = useState('');
   const [password, setPassword] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [ok, setOk] = useState('');
   const p = PROVIDERS.find(x => x.value === provider)!;
   async function connect() {
     setBusy(true); setError(''); setOk('');
     try {
-      const data = {provider, address: address.trim().toLowerCase(), host: provider === 'imap' ? host.trim() : '', port: provider === 'imap' ? Number(port) || 993 : ''};
-      const saved = account ? await api.saveEntity({...account, title: data.address, data: {...account.data, ...data}}) : await api.saveEntity({kind: 'mail_account', title: data.address, content: '', area: 'Pessoal', state: 'active', privacy: 'private', tags: [], data});
+      const data = {provider, address: address.trim().toLowerCase(), host: provider === 'imap' ? host.trim() : '', port: provider === 'imap' ? Number(port) || 993 : '', group: group.trim()};
+      // 0.3.146: base_data deixa o servidor aceitar o salvamento quando so a verificacao automatica
+      // mudou a conta enquanto o formulario estava aberto (antes: "mudou em outra aba").
+      const saved = account ? await api.saveEntity({...account, title: data.address, data: {...account.data, ...data}, base_data: account.data, base_title: account.title} as any) : await api.saveEntity({kind: 'mail_account', title: data.address, content: '', area: 'Pessoal', state: 'active', privacy: 'private', tags: [], data});
       if (viaGoogle) {
         if (!google?.connected || !google.gmail) { setError(!google?.connected ? 'Conecte primeiro a Conta Google em Perfil → Conta Google. Depois volte aqui.' : 'Em Perfil → Conta Google, desconecte e conecte de novo para liberar o Gmail. Depois volte aqui.'); return; }
+        // "Salvar e testar" mostra o resultado real do teste (antes: dizia "Conectado" mesmo com erro na conta).
         const r = await api.mailCheck(saved.id);
+        if (r.errors.length) { setError('Conta salva como Conta Google, mas o teste falhou: ' + r.errors[0].error); return; }
         setOk('Conectado pela Conta Google! ' + (r.scanned ? r.scanned + ' e-mails dos últimos 2 dias conferidos.' : 'A Sofia passa a ler os e-mails novos.')); setTimeout(onDone, 1400); return;
       }
       if (password.trim()) {
@@ -185,6 +248,11 @@ function AccountSheet({api, account, onClose, onDone}: {api: SofiaApi; account: 
           <Text style={{fontSize: 18, fontWeight: '800', color: c.text}}>{account ? 'Conta de e-mail' : 'Conectar e-mail'}</Text>
           <Chips value={provider} onChange={setProvider} options={PROVIDERS.map(x => ({value: x.value, label: x.label}))} />
           <Field label="Seu e-mail" value={address} onChange={setAddress} placeholder="voce@gmail.com" email />
+          <Text style={{fontSize: 12, color: c.muted}}>Grupo (opcional)</Text>
+          <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
+            {['', ...new Set([...groups, group].filter(Boolean))].map(g => <Pressable key={g || 'nenhum'} accessibilityRole="button" accessibilityState={{selected: group === g}} onPress={() => setGroup(g)} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, borderWidth: 1, borderColor: group === g ? c.accent : c.line, backgroundColor: group === g ? c.accentSoft : 'transparent'}}><Text style={{color: group === g ? c.accent : c.text, fontSize: 13}}>{g || 'Sem grupo'}</Text></Pressable>)}
+          </View>
+          <View style={{flexDirection: 'row', gap: 8, alignItems: 'center'}}><View style={{flex: 1}}><Field label="Novo grupo" value={groupDraft} onChange={setGroupDraft} placeholder="Ex.: Profissional, Minha loja" /></View><IconButton name="plus" label="Criar grupo" disabled={!groupDraft.trim()} onPress={() => { setGroup(groupDraft.trim().slice(0, 60)); setGroupDraft(''); }} /></View>
           {viaGoogle ? null : provider === 'imap' ? <View style={{flexDirection: 'row', gap: 10}}><View style={{flex: 3}}><Field label="Servidor IMAP" value={host} onChange={setHost} placeholder="imap.seudominio.com" /></View><View style={{flex: 1}}><Field label="Porta" value={port} onChange={setPort} /></View></View> : null}
           <View style={{padding: 12, borderRadius: 14, backgroundColor: c.accentSoft, gap: 6}}>
             <Text style={{color: c.text, fontSize: 13, lineHeight: 19}}>{p.help}</Text>

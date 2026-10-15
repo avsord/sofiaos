@@ -4,7 +4,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const root=path.join(__dirname,'..'),read=f=>fs.readFileSync(path.join(root,f),'utf8');
 test('0.3.142: Encomendas entra nos apps, usa o registro package e atualiza pelo servidor',()=>{
   const w=read('src/screens/Workspace.tsx'),p=read('src/screens/Packages.tsx'),api=read('src/lib/api.ts');
-  assert.ok(w.includes("{id:'packages',title:'Encomendas',caption:'Rastreio que avisa quando muda',icon:'list'}"));
+  assert.ok(w.includes("{id:'packages',title:'Encomendas',caption:'Rastreio que avisa quando muda',icon:'box'}"));
   assert.ok(w.includes("<Packages api={api} active={active&&module==='packages'}"));
   assert.ok(p.includes("useWorkspaceRecords(api,'package','',true)"));
   assert.ok(api.includes("refreshPackage(id: string) { return this.request<{item: Entity; changed: boolean; error: string}>('/packages/refresh', { id }); }"));

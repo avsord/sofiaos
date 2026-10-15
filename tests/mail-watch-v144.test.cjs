@@ -98,3 +98,29 @@ test('Gmail pela Conta Google sem a permissão do Gmail: erro claro pedindo para
  const acc=w.save({kind:'mail_account',title:'Gmail',area:'Pessoal',data:{provider:'gmail_google',address:'pedro@gmail.com'}});
  await mw.checkAll();assert.match(w.get(acc.id).data.last_error,/conecte a Conta Google de novo/);
 });
+
+test('0.3.146: regra nova reavalia e-mails ja lidos (ex.: "boleto" que ja estava na caixa) sem duplicar nem perder o ponto de leitura',async t=>{
+ const {core,config}=fixture(t);const w=core.workspace;
+ const msgs=[mail(20,'Cobranca Online','cobranca@loja.com.br','Seu boleto vence amanha'),mail(21,'Ana','ana@empresa.com','Reuniao')];
+ const srv=fakeServer(msgs);const mw=new MailWatcher(w,config,{client:srv.client});
+ const acc=w.save({kind:'mail_account',title:'G',area:'Pessoal',data:{provider:'gmail',address:'p@gmail.com'}});mw.setSecret(acc.id,'x');
+ w.save({kind:'mail_rule',title:'Ana',area:'Pessoal',data:{field:'from',contains:'ana@empresa.com'}});
+ await mw.checkAll();assert.equal(w.list({kind:'mail_hit'}).length,1);assert.equal(w.get(acc.id).data.last_uid,21);
+ // regra criada depois: a verificacao normal nao veria o boleto antigo
+ w.save({kind:'mail_rule',title:'Contas e faturas',area:'Pessoal',data:{field:'any',contains:'fatura, boleto, vencimento, pagamento'}});
+ const normal=await mw.checkAll();assert.equal(normal.scanned,0);
+ const re=await mw.checkAll(undefined,14);assert.equal(re.hits,2,'as duas mensagens batem com alguma regra');
+ const hits=w.list({kind:'mail_hit'});assert.equal(hits.length,2,'a do boleto entra; a da Ana nao duplica');
+ assert.ok(hits.some(h=>/Contas e faturas/.test(h.data.rule_names)&&/boleto/i.test(h.title)));
+ assert.equal(w.get(acc.id).data.last_uid,21,'reavaliar nao mexe no ponto de leitura');
+});
+test('0.3.146: mensagem ja registrada por uma regra ganha o nome da outra regra que tambem bate',async t=>{
+ const {core,config}=fixture(t);const w=core.workspace;
+ const srv=fakeServer([mail(30,'Banco','avisos@banco.com','Fatura disponivel')]);const mw=new MailWatcher(w,config,{client:srv.client});
+ const acc=w.save({kind:'mail_account',title:'G',area:'Pessoal',data:{provider:'gmail',address:'p@gmail.com'}});mw.setSecret(acc.id,'x');
+ w.save({kind:'mail_rule',title:'Banco',area:'Pessoal',data:{field:'from',contains:'avisos@banco.com'}});
+ await mw.checkAll();
+ w.save({kind:'mail_rule',title:'Faturas',area:'Pessoal',data:{field:'subject',contains:'fatura'}});
+ await mw.checkAll(undefined,7);
+ const hits=w.list({kind:'mail_hit'});assert.equal(hits.length,1);assert.match(hits[0].data.rule_names,/Banco/);assert.match(hits[0].data.rule_names,/Faturas/);
+});

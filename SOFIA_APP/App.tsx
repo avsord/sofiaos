@@ -215,4 +215,8 @@ function LocalLaunchGate(){
  if(!startup)return error?<View nativeID="sofia-launch-error" style={{flex:1,padding:24,justifyContent:'center',backgroundColor:'#F7F6FA'}}><ErrorBanner text={error}/><Button title="Tentar novamente" onPress={()=>setAttempt(n=>n+1)}/></View>:null;
  return <Shell startup={startup}/>;
 }
+// 0.3.146: ao sair da Sofia, o campo com foco era restaurado na volta e o Android reabria o
+// teclado (ate em Apps, sem campo em edicao) - e a tela subia e descia com ele. Ao ir para o
+// segundo plano, solta o foco e fecha o teclado; o texto digitado continua no campo.
+AppState.addEventListener('change',state=>{if(state!=='active'){try{const {TextInput}=require('react-native');const f=TextInput.State?.currentlyFocusedInput?.();if(f)TextInput.State.blurTextInput(f);}catch{}Keyboard.dismiss();}});
 export default function App(){return <AppBoundary><SafeAreaProvider initialMetrics={initialWindowMetrics}><LocalLaunchGate/></SafeAreaProvider></AppBoundary>;}

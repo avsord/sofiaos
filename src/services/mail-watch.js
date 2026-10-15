@@ -120,7 +120,9 @@ class MailWatcher {
     return r;
   }
 
-  async checkAll(only) {
+  /** 0.3.146: rescanDays > 0 reavalia os ultimos N dias (regra nova ou editada), sem mexer no
+   * marcador de leitura; as mensagens ja registradas so ganham as regras novas, sem duplicar. */
+  async checkAll(only, rescanDays = 0) {
     if (this.busy) return {skipped: true};
     this.busy = true;
     const report = {accounts: 0, scanned: 0, hits: 0, errors: []};
@@ -129,7 +131,7 @@ class MailWatcher {
       const rules = this.w.list({kind: 'mail_rule', limit: 200}).filter(r => r.state === 'active');
       for (const account of accounts) {
         report.accounts++;
-        try { const r = await this.checkAccount(account, rules); report.scanned += r.scanned; report.hits += r.hits; }
+        try { const r = await this.checkAccount(account, rules, rescanDays); report.scanned += r.scanned; report.hits += r.hits; }
         catch (e) {
           report.errors.push({account: account.id, error: String(e.message).slice(0, 160)});
           try { const a = this.w.get(account.id); this.w.save({revision: a.revision, data: {...a.data, last_error: String(e.message).slice(0, 300), last_check: now()}}, a.id); } catch { /* conta removida no meio */ }
@@ -142,15 +144,15 @@ class MailWatcher {
   /** Gmail pela conexão Google que já existe (OAuth, escopo gmail.readonly):
    * nenhuma senha de app. Lê só remetente, assunto e o trecho que o próprio
    * Gmail fornece (snippet) das mensagens novas da Caixa de Entrada. */
-  async checkGmailApi(account, rules) {
+  async checkGmailApi(account, rules, rescanDays = 0) {
     const g = this.google;
     const link = g && g.link && g.link();
     if (!link || !link.refresh) throw new AppError('GOOGLE_NOT_CONNECTED', 'Conecte a Conta Google em Perfil → Conta Google.');
     if (!/gmail\.readonly/.test(link.scopes || '')) throw new AppError('GMAIL_SCOPE', 'Desconecte e conecte a Conta Google de novo para liberar a leitura do Gmail.');
     const API = 'https://gmail.googleapis.com/gmail/v1/users/me/messages';
     // last_uid guarda, para o Gmail, o horário (em SEGUNDOS) da última mensagem lida: o limite de número do servidor é 1e10.
-    const since = (Number(account.data.last_uid) || 0) * 1000;
-    const q = since ? 'in:inbox after:' + Math.floor(since / 1000) : 'in:inbox newer_than:2d';
+    const since = rescanDays ? 0 : (Number(account.data.last_uid) || 0) * 1000;
+    const q = rescanDays ? 'in:inbox newer_than:' + Math.min(60, Math.max(1, Math.floor(rescanDays))) + 'd' : since ? 'in:inbox after:' + Math.floor(since / 1000) : 'in:inbox newer_than:2d';
     const list = await g.call('GET', API + '?maxResults=80&q=' + encodeURIComponent(q));
     let scanned = 0, hits = 0, newest = since;
     for (const ref of (list.messages || []).slice(0, 80)) {
@@ -166,12 +168,13 @@ class MailWatcher {
       if (matched.length) { hits++; this.record(account, mail, matched); }
     }
     const a = this.w.get(account.id);
-    this.w.save({revision: a.revision, data: {...a.data, last_uid: Math.floor((newest || Date.now()) / 1000), last_check: now(), last_error: '', secret_set: true}}, account.id);
+    const keep = rescanDays ? Number(a.data.last_uid) || Math.floor((newest || Date.now()) / 1000) : Math.floor((newest || Date.now()) / 1000);
+    this.w.save({revision: a.revision, data: {...a.data, last_uid: keep, last_check: now(), last_error: '', secret_set: true}}, account.id);
     return {scanned, hits};
   }
 
-  async checkAccount(account, rules) {
-    if (account.data.provider === 'gmail_google') return this.checkGmailApi(account, rules);
+  async checkAccount(account, rules, rescanDays = 0) {
+    if (account.data.provider === 'gmail_google') return this.checkGmailApi(account, rules, rescanDays);
     const pass = this.secret(account.id);
     if (!pass) throw new AppError('MAIL_SECRET', 'Falta a senha de app desta conta.');
     const opts = this.server(account); opts.auth.pass = pass;
@@ -180,8 +183,9 @@ class MailWatcher {
     try {
       const box = await client.mailboxOpen('INBOX', {readOnly: true});
       const validity = String(box.uidValidity || '');
-      const fresh = !maxUid || String(account.data.uid_validity || '') !== validity;
-      const since = new Date(Date.now() - FIRST_LOOKBACK_DAYS * 864e5);
+      const keepUid = maxUid;
+      const fresh = !!rescanDays || !maxUid || String(account.data.uid_validity || '') !== validity;
+      const since = new Date(Date.now() - (rescanDays || FIRST_LOOKBACK_DAYS) * 864e5);
       const uids = (await client.search(fresh ? {since} : {uid: (maxUid + 1) + ':*'}, {uid: true})) || [];
       const pick = uids.filter(u => fresh || u > maxUid).sort((a, b) => a - b).slice(-MAX_PER_CHECK);
       if (pick.length) {
@@ -197,14 +201,19 @@ class MailWatcher {
       if (!pick.length && fresh && uids.length) maxUid = Math.max(maxUid, ...uids);
       if (fresh && !uids.length && box.uidNext) maxUid = Math.max(maxUid, Number(box.uidNext) - 1);
       const a = this.w.get(account.id);
-      this.w.save({revision: a.revision, data: {...a.data, last_uid: maxUid, uid_validity: validity, last_check: now(), last_error: ''}}, account.id);
+      this.w.save({revision: a.revision, data: {...a.data, last_uid: rescanDays && keepUid ? Math.max(keepUid, maxUid) : maxUid, uid_validity: validity, last_check: now(), last_error: ''}}, account.id);
     } finally { await client.logout().catch(() => {}); }
     return {scanned, hits};
   }
 
   record(account, mail, rules) {
     const {rejectSecrets} = require('../core/util');
-    if (this.w.list({kind: 'mail_hit', q: mail.key, limit: 5}).some(h => h.data.message_key === mail.key)) return;
+    const existing = this.w.list({kind: 'mail_hit', q: mail.key, limit: 5}).find(h => h.data.message_key === mail.key);
+    if (existing) {
+      const names = String(existing.data.rule_names || '').split(', ').filter(Boolean), add = rules.map(r => r.title).filter(t => !names.includes(t));
+      if (add.length) this.w.save({revision: existing.revision, data: {...existing.data, rule_names: names.concat(add).join(', ').slice(0, 300)}}, existing.id);
+      return;
+    }
     const snippet = safeText(clean(mail.text, SNIPPET), rejectSecrets), subject = safeText(mail.subject, rejectSecrets);
     const important = rules.some(r => r.data.important);
     const hit = this.w.save({kind: 'mail_hit', title: subject.slice(0, 240), area: 'Pessoal', privacy: 'private', state: 'new',

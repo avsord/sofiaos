@@ -1778,9 +1778,66 @@ const CATALOG={
         "label": "Cor",
         "type": "text",
         "max": 20
+      },
+      {
+        "key": "role",
+        "label": "Papel",
+        "type": "select",
+        "options": [
+          "goal",
+          "reserve"
+        ]
+      },
+      {
+        "key": "monthly_plan",
+        "label": "Aporte mensal planejado",
+        "type": "number"
       }
     ],
-    "description": "Meta de economia com acompanhamento do quanto falta."
+    "description": "Meta de economia com acompanhamento do quanto falta. Com papel 'reserve', é o Dinheiro guardado (valor separado para preservar)."
+  },
+  "fin_reserve_move": {
+    "label": "Movimento da reserva",
+    "group": "finance",
+    "defaultPrivacy": "private",
+    "states": [
+      "active",
+      "archived"
+    ],
+    "fields": [
+      {
+        "key": "goal_id",
+        "label": "Reserva",
+        "type": "text",
+        "max": 80
+      },
+      {
+        "key": "direction",
+        "label": "Sentido",
+        "type": "select",
+        "options": [
+          "in",
+          "out"
+        ]
+      },
+      {
+        "key": "amount",
+        "label": "Valor",
+        "type": "number"
+      },
+      {
+        "key": "date",
+        "label": "Data",
+        "type": "date"
+      },
+      {
+        "key": "note",
+        "label": "Observação",
+        "type": "text",
+        "max": 200
+      }
+    ],
+    "description": "Guardar ou retirar dinheiro da reserva: muda o destino do dinheiro, não é receita nem despesa e não altera o saldo das contas."
   },
   "mail_account": {
     "label": "Conta de e-mail",
@@ -1810,6 +1867,12 @@ const CATALOG={
         "label": "E-mail",
         "type": "text",
         "max": 200
+      },
+      {
+        "key": "group",
+        "label": "Grupo",
+        "type": "text",
+        "max": 60
       },
       {
         "key": "host",
@@ -1918,6 +1981,7 @@ const CATALOG={
       { "key": "checked_at", "label": "Consultado em", "type": "text", "max": 40 },
       { "key": "error", "label": "Motivo da falha", "type": "text", "max": 160 },
       { "key": "blocked_until", "label": "Consulta pausada até", "type": "text", "max": 40 },
+      { "key": "ok_at", "label": "Última atualização com sucesso", "type": "text", "max": 40 },
       { "key": "note", "label": "Observação", "type": "text", "max": 300 }
     ]
   },

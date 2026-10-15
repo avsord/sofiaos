@@ -48,16 +48,16 @@ const states:Record<string,string>={active:'Ativo',archived:'Arquivado',idea:'Id
 const translated=(v:string)=>states[v]||v;
 const modules:{id:string;title:string;caption:string;icon:IconName;kinds?:string[];group?:string}[]=[
  {id:'capsules',title:'Cápsulas',caption:'Doses diárias e lembretes',icon:'capsule'},
- {id:'routines',title:'Rotinas',caption:'Hábitos e cuidados recorrentes',icon:'refresh'},
+ {id:'routines',title:'Rotinas',caption:'Hábitos e cuidados recorrentes',icon:'cycle'},
  {id:'reminders',title:'Lembretes',caption:'Avisos na hora certa',icon:'bell'},
- {id:'packages',title:'Encomendas',caption:'Rastreio que avisa quando muda',icon:'list'},
- {id:'tasks',title:'Tarefas',caption:'A fazer e prioridades',icon:'check'},
- {id:'lists',title:'Listas',caption:'Pessoais, mercado e compras',icon:'list',kinds:['list_collection','list_item','shopping_item','purchase_group','purchase']},
+ {id:'packages',title:'Encomendas',caption:'Rastreio que avisa quando muda',icon:'box'},
+ {id:'tasks',title:'Tarefas',caption:'A fazer e prioridades',icon:'checklist'},
+ {id:'lists',title:'Listas',caption:'Pessoais, mercado e compras',icon:'cart',kinds:['list_collection','list_item','shopping_item','purchase_group','purchase']},
  {id:'library',title:'Biblioteca',caption:'Leituras, referências e arquivos',icon:'book',group:'library'},
  {id:'study',title:'Estudos',caption:'Cursos, aulas e progresso',icon:'edit',group:'study'},
- {id:'monitor',title:'Price Tracker',caption:'Preços que você acompanha',icon:'monitor'},
+ {id:'monitor',title:'Price Tracker',caption:'Preços que você acompanha',icon:'tag'},
  {id:'finance',title:'Finanças',caption:'Contas, cartões e orçamentos',icon:'wallet'},
- {id:'mail',title:'E-mails',caption:'A Sofia de olho no que importa',icon:'send'},
+ {id:'mail',title:'E-mails',caption:'A Sofia de olho no que importa',icon:'mail'},
  {id:'flow',title:'Projetos e rotina',caption:'Planos, compromissos e ações',icon:'calendar',group:'flow'},
  {id:'knowledge',title:'Notas',caption:'Conhecimento da sua Sofia',icon:'edit',group:'knowledge'},
  {id:'all',title:'Todos os registros',caption:'Estudos, projetos, rotina e biblioteca',icon:'grid'}

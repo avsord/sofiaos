@@ -191,7 +191,7 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
 
         {adding ? <AddProduct api={api} used={(products || []).map(p => p.color)} existing={products || []} onClose={() => setAdding(false)}
           onCreated={id => { setAdding(false); void load().then(() => setOpenId(id)); }} /> : null}
-        {open ? <ProductDetail api={api} product={open} issues={col.issues} running={col.running} onClose={() => setOpenId(null)} onChanged={load} onDeleted={() => { setOpenId(null); void load(); }} /> : null}
+        {open ? <ProductDetail others={(products || []).filter(p => p.monitor.id !== open.monitor.id).map(p => p.monitor)} api={api} product={open} issues={col.issues} running={col.running} onClose={() => setOpenId(null)} onChanged={load} onDeleted={() => { setOpenId(null); void load(); }} /> : null}
       </View>
     </InternalBackGesture>
   );
@@ -253,7 +253,7 @@ function AddProduct({api, used, existing, onClose, onCreated}: {api: SofiaApi; u
     setBusy(true); setError('');
     try {
       const saved = await api.saveEntity({kind: 'monitor', title: name.slice(0, 200), content: '', area: 'Pessoal', state: 'active', privacy: 'private', tags: [],
-        data: {method: 'product', variant: name.slice(0, 200), preferred_url: url, source_urls: '', discover: true, currency: 'BRL', interval_minutes: 360, new_low: true, line_color: color,
+        data: {method: 'product', variant: name.slice(0, 200), preferred_url: url, source_urls: '', discover: false, currency: 'BRL', interval_minutes: 360, new_low: true, line_color: color,
           ...(picked ? {reader_memory: JSON.stringify({[url]: picked.origins.slice(0, 4)})} : {}), ...(mlReading ? {source_identities: JSON.stringify({[url]: identityOf(mlReading)})} : {})}});
       if (picked) await recordPrice(api, saved, url, picked.amount, '', [], '', mlReading).catch(() => undefined);
       onCreated(saved.id);
@@ -342,8 +342,8 @@ const VERDICT_ICON: Record<string, string> = {great: '🏆', good: '👍', norma
 const dateShort = (t: number) => new Date(t).toLocaleDateString('pt-BR', {day: '2-digit', month: 'short'}).replace('.', '');
 const dateTime = (t: number) => new Date(t).toLocaleString('pt-BR', {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'}).replace('.', '');
 
-function ProductDetail({api, product, issues, running, onClose, onChanged, onDeleted}:
-  {api: SofiaApi; product: ProductSeries; issues: Record<string, StoreIssue>; running: boolean; onClose: () => void; onChanged: () => Promise<void>; onDeleted: () => void}) {
+function ProductDetail({api, product, issues, running, onClose, onChanged, onDeleted, others = []}:
+  {api: SofiaApi; product: ProductSeries; issues: Record<string, StoreIssue>; running: boolean; onClose: () => void; onChanged: () => Promise<void>; onDeleted: () => void; others?: Entity[]}) {
   const c = useTheme();
   const [monitor, setMonitor] = useState<Entity>(product.monitor), [win, setWin] = useState<Window>('30d'), [tab, setTab] = useState<DetailTab>('summary');
   const [saving, setSaving] = useState(''), [error, setError] = useState(''), [storeSheet, setStoreSheet] = useState(false);
@@ -351,7 +351,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
   const [menu, setMenu] = useState<StoreSeries | null>(null), [rename, setRename] = useState(product.monitor.title), [target, setTarget] = useState('');
   const [relink, setRelink] = useState<{store: StoreSeries; text: string; error: string} | null>(null), [productMenu, setProductMenu] = useState(false);
   const [viewer, setViewer] = useState<StoreSeries | null>(null);
-  const [showAll, setShowAll] = useState(false), [storeFocus, setStoreFocus] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false), [storeFocus, setStoreFocus] = useState<string | null>(null), [showOthers, setShowOthers] = useState(false), [moving, setMoving] = useState<StoreSeries | null>(null);
   useEffect(() => { setMonitor(product.monitor); }, [product.monitor]);
   const alerts = alertsOf(monitor);
   useEffect(() => { setTarget(alerts.target ? String(alerts.target).replace('.', ',') : ''); }, [monitor.id]); // eslint-disable-line
@@ -554,11 +554,15 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
                   <View style={{flexDirection: 'row', gap: 14, flexWrap: 'wrap'}}>{product.stores.map(s => <Legend key={s.url} color={colorOfStore(s)} text={s.name} />)}</View>
                 </View>
                 <Section title="Lojas" hint="Toque numa loja para ver a análise dela. Segure para mais opções.">
-                  {stores.map((s, i) => storeRow(s, i, true))}
+                  {/* 0.3.146: a oferta principal (escolhida por voce) e a que aparece no Inicio; as outras
+                      ficam recolhidas aqui e continuam sendo acompanhadas normalmente. */}
+                  {stores.filter(s => s.primary).map((s, i) => storeRow(s, i, true))}
+                  {stores.some(s => !s.primary) ? <Pressable accessibilityRole="button" accessibilityState={{expanded: showOthers}} onPress={() => setShowOthers(v => !v)} style={{paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 6}}><Text style={{color: c.accent, fontWeight: '700'}}>{showOthers ? 'Esconder' : 'Ver'} outras ofertas ({stores.filter(s => !s.primary).length})</Text><Text style={{color: c.muted, fontSize: 11}}>· acompanhadas, fora do Início</Text></Pressable> : null}
+                  {showOthers ? stores.filter(s => !s.primary).map((s, i) => storeRow(s, i + 1, true)) : null}
                   <Pressable accessibilityRole="button" onPress={() => setStoreSheet(true)}
                     style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderStyle: 'dashed', borderColor: c.accent}}>
                     <Icon name="plus" size={16} color={c.accent} />
-                    <Text style={{color: c.accent, fontWeight: '700'}}>Encontrar em outras lojas</Text>
+                    <Text style={{color: c.accent, fontWeight: '700'}}>Adicionar outra loja</Text>
                   </Pressable>
                 </Section>
               </>
@@ -646,15 +650,23 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <Sheet visible={!!menu} onClose={() => setMenu(null)} label="Fechar opções da loja">
-        {menu ? (
+      <Sheet visible={!!menu || !!moving} onClose={() => { setMenu(null); setMoving(null); }} label="Fechar opções da loja">
+        {moving ? (
+          <View style={{gap: 6}}>
+            <Text style={{fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 6}}>Mover {moving.name} para…</Text>
+            <Text style={{fontSize: 12, color: c.muted, marginBottom: 4}}>A oferta sai deste produto e passa a ser acompanhada no escolhido. Só mova se for exatamente o mesmo produto.</Text>
+            {others.map(o => <SheetItem key={o.id} label={String(o.title || 'Produto')} onPress={() => { const u = moving.url, target = o; setMoving(null); void (async () => { try { await api.saveEntity({...target, data: {...target.data, source_urls: addSource(target, u)}}); await patch(removeSource(monitor, u), {}, 'Oferta movida'); } catch (e) { setError(errorText(e)); } })(); }} />)}
+            <SheetItem label="Cancelar" onPress={() => setMoving(null)} />
+          </View>
+        ) : menu ? (
           <View style={{gap: 6}}>
             <Text style={{fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 6}}>{menu.name}</Text>
             <SheetItem label="Abrir na loja" onPress={() => { const u = menu.url; setMenu(null); void Linking.openURL(u); }} />
             <SheetItem label="Ler o preço agora" onPress={() => { setMenu(null); readNow(); }} />
             <SheetItem label={isMercadoLivreUrl(menu.url) ? "Ler pelo servidor" : "Ver a página que a Sofia lê"} onPress={() => { const s = menu; setMenu(null); setViewer(s); }} />
             <SheetItem label="Trocar o link" onPress={() => { const s = menu; setMenu(null); setRelink({store: s, text: s.url, error: ''}); }} />
-            {!menu.primary ? <SheetItem label="Tornar loja principal" onPress={() => { const u = menu.url; setMenu(null); void patch(makePrimary(monitor, u)); }} /> : null}
+            {!menu.primary ? <SheetItem label="Tornar oferta principal (a do Início)" onPress={() => { const u = menu.url; setMenu(null); void patch(makePrimary(monitor, u)); }} /> : null}
+            {product.stores.length > 1 && others.length ? <SheetItem label="Mover para outro produto" onPress={() => { const s = menu; setMenu(null); setMoving(s); }} /> : null}
             {product.stores.length > 1 ? <SheetItem danger label="Remover esta loja" onPress={() => { const u = menu.url; setMenu(null); void patch(removeSource(monitor, u)); }} />
               : <Text style={{fontSize: 12, color: c.muted, paddingVertical: 8}}>Esta é a única loja. Para parar, use “Parar de acompanhar” nos ajustes.</Text>}
           </View>
@@ -676,7 +688,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
           <Text style={{fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 6}} numberOfLines={1}>{monitor.title}</Text>
           <SheetItem label={running ? 'Lendo os preços…' : 'Atualizar preços agora'} onPress={() => { setProductMenu(false); if (!running) readNow(); }} />
           {product.stores[0] ? <SheetItem label="Trocar o link principal" onPress={() => { setProductMenu(false); const s = product.stores.find(x => x.primary) || product.stores[0]; setRelink({store: s, text: s.url, error: ''}); }} /> : null}
-          <SheetItem label="Encontrar em outras lojas" onPress={() => { setProductMenu(false); setStoreSheet(true); }} />
+          <SheetItem label="Adicionar outra loja (colar link)" onPress={() => { setProductMenu(false); setStoreSheet(true); }} />
           <SheetItem danger label="Excluir produto" onPress={() => { setProductMenu(false); remove(); }} />
         </View>
       </Sheet>
@@ -829,7 +841,7 @@ type Found = {status: 'idle' | 'searching' | 'done' | 'none' | 'error'; links: S
 function AddStores({api, monitor, onClose, onAdded}: {api: SofiaApi; monitor: Entity; onClose: () => void; onAdded: (urls: string[]) => Promise<void>}) {
   const c = useTheme();
   const stores = storesOf(monitor), targets = useMemo(() => searchTargetsFor(stores), [monitor.data.preferred_url, monitor.data.source_urls]); // eslint-disable-line
-  const [tab, setTab] = useState<'search' | 'paste'>(targets.length ? 'search' : 'paste');
+  const [tab, setTab] = useState<'search' | 'paste'>('paste');
   const [terms, setTerms] = useState(searchTerms(monitor.title)), [found, setFound] = useState<Record<string, Found>>({});
   const [selected, setSelected] = useState<string[]>([]), [url, setUrl] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const searching = Object.values(found).some(f => f.status === 'searching');
@@ -857,9 +869,8 @@ function AddStores({api, monitor, onClose, onAdded}: {api: SofiaApi; monitor: En
   return (
     <MotionModal visible animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{flex: 1, backgroundColor: c.bg}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Header title="Encontrar em outras lojas" onClose={onClose} />
+        <Header title="Adicionar outra loja" onClose={onClose} />
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 18, gap: 16, paddingBottom: 120}}>
-          <Chips value={tab} onChange={setTab} options={[{value: 'search' as const, label: 'Procurar'}, {value: 'paste' as const, label: 'Colar link'}]} />
           {tab === 'search' ? (
             !targets.length ? <Text style={{color: c.muted}}>Você já tem todas as lojas que a Sofia sabe procurar. Use “Colar link” para outras.</Text> : (
             <>

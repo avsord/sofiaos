@@ -25,7 +25,7 @@ export class LegacyMdAdapter{
  async supports():Promise<boolean>{
   if(this.supported!==null&&Date.now()-this.probedAt<300000)return this.supported;
   if(this.pending)return this.pending;
-  this.pending=(async()=>{try{const d=await this.call<{page_order?:boolean}>('/md/capabilities');this.supported=d.page_order===true;}
+  this.pending=(async()=>{try{const d=await this.call<{page_order?:boolean;notifications?:boolean}>('/md/capabilities');this.supported=d.page_order===true;this.noticesNative=d.notifications===true;}
    catch(e){if((e as {status?:number}).status!==404)throw e;this.supported=false;}this.probedAt=Date.now();return this.supported;})();
   try{return await this.pending;}finally{this.pending=null;}
  }
@@ -43,6 +43,9 @@ export class LegacyMdAdapter{
   const old={...this.order};plan.siblings.forEach((p,i)=>{this.order[p.id]=(i+1)*1024;});try{await this.persist();}catch(e){this.order=old;throw e;}
   return {items:plan.siblings.map(p=>{const value=p.id===moved.id?moved:p;return {...value,data:{...value.data,sort_order:this.order[p.id]}};})};
  }
- async notices(offset=0){if(await this.supports())return this.call<{items:Notice[];next_offset:number|null;unread:number}>('/md/notifications?offset='+offset);await this.load();if(offset===0)this.snapshot=(await this.call<{items:Notice[]}>('/notifications')).items;const items=this.snapshot.filter(n=>!this.dismissed.has(n.id));return {items:items.slice(offset,offset+100),next_offset:items.length>offset+100?offset+100:null,unread:items.filter(n=>n.state==='unread').length};}
+ // 0.3.146: o servidor tem a lista paginada propria (sem os apagados e com o total real de nao lidas).
+ noticesNative=false;
+ async notices(offset=0){if(await this.supports()||this.noticesNative)return this.call<{items:Notice[];next_offset:number|null;unread:number}>('/md/notifications?offset='+offset);await this.load();if(offset===0)this.snapshot=(await this.call<{items:Notice[]}>('/notifications')).items;const items=this.snapshot.filter(n=>!this.dismissed.has(n.id));return {items:items.slice(offset,offset+100),next_offset:items.length>offset+100?offset+100:null,unread:items.filter(n=>n.state==='unread').length};}
  async clear(id:string){return this.call<{ok:boolean}>('/md/notifications/'+encodeURIComponent(id),{},'DELETE');}
+ async readAll(){return this.call<{ok:boolean;updated:number}>('/md/notifications/read-all',{});}
 }

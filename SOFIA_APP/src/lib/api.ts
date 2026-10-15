@@ -1,3 +1,11 @@
+// 0.3.146: quando o app foi para o segundo plano (para saber se uma falha foi so interrupcao).
+// AppState e carregado sob demanda: os testes carregam este modulo fora do React Native.
+let lastBackgroundAt=0;
+const appState=(()=>{try{return require('react-native').AppState as {currentState:string;addEventListener:(e:string,f:(s:string)=>void)=>{remove:()=>void}};}catch{return null;}})();
+try{appState?.addEventListener('change',state=>{if(state!=='active')lastBackgroundAt=Date.now();});}catch{}
+export function wentToBackgroundSince(t:number){return lastBackgroundAt>=t||(!!appState&&appState.currentState!=='active');}
+export function waitForActive(maxMs=15000){if(!appState||appState.currentState==='active')return Promise.resolve();return new Promise<void>(resolve=>{let sub:{remove:()=>void}|null=null;const done=()=>{sub?.remove();clearTimeout(timer);resolve();};sub=appState.addEventListener('change',s=>{if(s==='active')done();});const timer=setTimeout(done,maxMs);});}
+export function isChatSend(path:string,method:string){return method==='POST'&&/^\/(chat|conversations|messages)/.test(path)&&!path.startsWith('/chat-sync');}
 import type {MercadoLivreOptions, MercadoLivreResponse} from './mercado-livre-types';
 import type {StoreConnectionsState} from './store-connections-types';
 import {readMercadoLivrePageOnDevice,canonicalMercadoLivreUrl} from './mercado-livre-device';
@@ -116,9 +124,16 @@ export class SofiaApi {
     try{return await this.fetchOnce<T>(path,body,method,timeout,signal);}
     catch(error){
       const e=error as ApiError;
-      // Leitura que caiu porque o servidor estava reiniciando ou ocupado: tenta de novo uma vez, em silêncio.
-      if(method==='GET'&&(e.status===502||e.status===503||e.status===504||e.code==='TIMEOUT')&&Date.now()-started<timeout){
-        await new Promise(r=>setTimeout(r,1200));
+      // 0.3.146: requisicao que "caiu" porque o app foi para o segundo plano (Gmail, navegador,
+      // tela bloqueada) nao e falha da Sofia nem falta de internet. Leitura: espera o app voltar
+      // e repete uma vez, em silencio. Escrita: vira INTERRUPTED, com texto da propria operacao.
+      const interrupted=wentToBackgroundSince(started);
+      if(interrupted&&method!=='GET'&&(e.code==='TIMEOUT'||e.code==='NETWORK')&&!isChatSend(path,method)){noteApiFailure(path,method,e,Date.now()-started);throw new ApiError('A operação foi interrompida quando o app saiu da tela. Confira se ela foi concluída antes de repetir.','INTERRUPTED',0);}
+      // Leitura que caiu porque o servidor estava reiniciando, ocupado, demorou ou o app saiu da tela: tenta de novo uma vez, em silêncio.
+      // (Antes a nova tentativa so valia se o erro viesse antes do prazo - um TIMEOUT nunca repetia.)
+      if(method==='GET'&&!signal?.aborted&&(e.status===502||e.status===503||e.status===504||e.code==='TIMEOUT'||(e.code==='NETWORK'&&interrupted))){
+        await waitForActive();
+        await new Promise(r=>setTimeout(r,interrupted?300:1200));
         try{return await this.fetchOnce<T>(path,body,method,timeout,signal);}catch(again){noteApiFailure(path,method,again as ApiError,Date.now()-started);throw again;}
       }
       noteApiFailure(path,method,e,Date.now()-started);throw error;
@@ -144,7 +159,8 @@ export class SofiaApi {
     } catch (error) {
       if(signal?.aborted)throw new ApiError('Leitura cancelada.','CANCELLED',0);
       if (error instanceof ApiError) throw error;
-      if (controller.signal.aborted) throw new ApiError('A conexão demorou. Recarregue antes de reenviar: sua mensagem pode ter chegado.', 'TIMEOUT', 0);
+      // 0.3.146: o aviso de "mensagem pode ter chegado" e so do envio do chat; as outras operacoes dizem o que demorou.
+      if (controller.signal.aborted) throw new ApiError(isChatSend(path, method) ? 'A conexão demorou. Recarregue antes de reenviar: sua mensagem pode ter chegado.' : 'A Sofia demorou para responder. Tente de novo.', 'TIMEOUT', 0);
       throw new ApiError('Sem conexão com a Sofia. Verifique a internet e tente novamente.', 'NETWORK', 0);
     } finally { clearTimeout(timer); signal?.removeEventListener('abort',cancel); }
   }
@@ -222,6 +238,8 @@ export class SofiaApi {
   agenda(month?:string) { return this.request<{items: AgendaItem[];refresh_pending?:boolean}>('/agenda'+(month?'?month='+encodeURIComponent(month):'')); }
   createEvent(title: string, start_at: string) { return this.request<{item: AgendaItem}>('/agenda', { title, start_at }); }
   notifications() { return this.request<{items: Notice[]; push_enabled: boolean}>('/notifications'); }
+  /** 0.3.146: marcar TODAS como lidas no servidor (nao so as carregadas). */
+  markAllRead() { return this.md.readAll(); }
   markRead(id: string) { return this.request<{ok: boolean}>('/notifications/' + encodeURIComponent(id) + '/read', {}); }
   profile(name: string) { return this.request<{profile: Profile}>('/profile', {name}, 'PATCH'); }
   catalog() { return this.request<Catalog>('/workspace/catalog'); }
@@ -256,7 +274,8 @@ export class SofiaApi {
   observations(id: string) { return this.request<{items: any[];status?:{last_at:string|null;last_error:string|null;next_at:string|null}}>('/workspace/entities/' + encodeURIComponent(id) + '/observations'); }
   mailSecret(id: string, password: string) { return this.request<{ok: boolean; messages: number}>('/mail/accounts/' + encodeURIComponent(id) + '/secret', {password}, 'POST', 45000); }
   mailForget(id: string) { return this.request<{ok: boolean}>('/mail/accounts/' + encodeURIComponent(id) + '/forget', {}); }
-  mailCheck(accountId = '') { return this.request<{accounts: number; scanned: number; hits: number; errors: {account: string; error: string}[]; skipped?: boolean}>('/mail/check', {account_id: accountId}, 'POST', 120000); }
+  /** rescanDays > 0 reavalia os ultimos dias (regra nova/editada) sem mexer no ponto de leitura. */
+  mailCheck(accountId = '', rescanDays = 0) { return this.request<{accounts: number; scanned: number; hits: number; errors: {account: string; error: string}[]; skipped?: boolean}>('/mail/check', {account_id: accountId, rescan_days: rescanDays}, 'POST', 120000); }
   observe(id: string, input: object) { return this.request<any>('/workspace/entities/' + encodeURIComponent(id) + '/observations', input); }
   integrations() { return this.request<{items: {name:string;key:string;status:string;description:string;connect_url?:string}[]}>('/workspace/integrations'); }
   audioSource(path: string) {

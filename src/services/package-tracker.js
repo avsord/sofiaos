@@ -86,7 +86,7 @@ class PackageTracker {
     const changed = result.found && result.events.length && (!previous.length || key(result.events[0]) !== key(previous[0]));
     const delivered = result.events.some(e => DELIVERED.test(e.status));
     const saved = this.w.save({ ...item, state: delivered ? 'delivered' : item.state === 'archived' ? 'archived' : 'active',
-      data: { ...d, carrier, status: result.status, last_event_at: result.events[0] ? result.events[0].at : d.last_event_at || '', events: JSON.stringify(result.events.slice(0, 60)), checked_at: now, error: result.found ? '' : result.status } }, item.id);
+      data: { ...d, carrier, status: result.status, last_event_at: result.events[0] ? result.events[0].at : d.last_event_at || '', events: JSON.stringify(result.events.slice(0, 60)), checked_at: now, ok_at: result.found ? now : d.ok_at || '', error: result.found ? '' : result.status } }, item.id);
     if (changed) {
       const top = result.events[0];
       this.w.notify('package', (delivered ? '📦 Entregue: ' : '📦 ') + (item.title || code), top.status + (top.local ? ' · ' + top.local : ''), saved.id, delivered ? 'opportunity' : 'info', 'package:' + saved.id + ':' + key(top));

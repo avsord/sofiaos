@@ -3,6 +3,12 @@ import Svg, { Path } from 'react-native-svg';
 const paths = {
  capsule:'M5 13l8-8a4.24 4.24 0 0 1 6 6l-8 8a4.24 4.24 0 0 1-6-6zM9 9l6 6',
  filter:'M4 6h16M7 12h10M10 18h4',
+ box:'M3 7l9-4 9 4v10l-9 4-9-4V7zm0 0l9 4 9-4M12 11v10M7.5 5l9 4',
+ checklist:'M4 6l1.5 1.5L8 5M4 12l1.5 1.5L8 11M4 18l1.5 1.5L8 17M11 6h9M11 12h9M11 18h9',
+ cart:'M3 4h2l2.5 11h11L21 8H6.5M9 20a1 1 0 1 0 2 0 1 1 0 0 0-2 0m7 0a1 1 0 1 0 2 0 1 1 0 0 0-2 0',
+ cycle:'M20 11a8 8 0 0 0-14.5-4.5L4 8m0-4v4h4M4 13a8 8 0 0 0 14.5 4.5L20 16m0 4v-4h-4',
+ mail:'M3 5h18v14H3V5zm0 1l9 7 9-7',
+ tag:'M3 3h8l10 10-8 8L3 11V3zm4 4h.01',
  more:'M5 12h.01M12 12h.01M19 12h.01',camera:'M3 7h4l2-3h6l2 3h4v14H3V7zm5 7a4 4 0 1 0 8 0 4 4 0 0 0-8 0',clip:'M8 12l7-7a4 4 0 0 1 6 6L10 22a6 6 0 0 1-8-8L13 3',
  settings:'M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1 1-3zm-1 9a4 4 0 1 0 8 0 4 4 0 0 0-8 0',
  undo:'M3 10h10a7 7 0 0 1 7 7v3M3 10l6-6M3 10l6 6', redo:'M21 10H11a7 7 0 0 0-7 7v3M21 10l-6-6M21 10l-6 6', image:'M3 3h18v18H3V3zm0 13 6-6 6 6 3-3 3 3M15 7h1', copy:'M8 8h13v13H8V8zM3 16V3h13',

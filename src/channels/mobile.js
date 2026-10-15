@@ -138,11 +138,11 @@ function makeMobileApi(runtime, deps) {
       if (match && m === 'POST') { const b = await bodyJson(req, 4096); return send(await runtime.mailWatch.saveSecretAndTest(match[1], b.password)); }
       match = p.match(/^\/api\/mobile\/mail\/accounts\/([\w-]+)\/forget$/);
       if (match && m === 'POST') { runtime.mailWatch.dropSecret(match[1]); return send({ok: true}); }
-      if (p === '/api/mobile/mail/check' && m === 'POST') { const b = await bodyJson(req, 1024); return send(await runtime.mailWatch.checkAll(b.account_id ? String(b.account_id) : undefined)); }
+      if (p === '/api/mobile/mail/check' && m === 'POST') { const b = await bodyJson(req, 1024); return send(await runtime.mailWatch.checkAll(b.account_id ? String(b.account_id) : undefined, Math.min(60, Math.max(0, Number(b.rescan_days) || 0)))); }
       fail('NOT_FOUND', 'Operação de e-mail desconhecida.', 404);
     }
     // Capacidades e rotas /md que o app já chamava e o servidor não tinha.
-    if (p === '/api/mobile/md/capabilities' && m === 'GET') return send({ page_order: false, calendar: runtime.google.configured(), google: runtime.google.configured(), drive_backup: runtime.google.configured(), dashboard_widgets: true, mail_watch: true, mercado_livre_html: true });
+    if (p === '/api/mobile/md/capabilities' && m === 'GET') return send({ page_order: false, calendar: runtime.google.configured(), google: runtime.google.configured(), drive_backup: runtime.google.configured(), dashboard_widgets: true, mail_watch: true, mercado_livre_html: true, notifications: true });
     // Desempenho: todas as leituras de preço numa resposta só (antes era um pedido por produto).
     if (p === '/api/mobile/md/monitors/observations' && m === 'GET') {
       const out = {};
@@ -155,7 +155,7 @@ function makeMobileApi(runtime, deps) {
     // saldo inicial e todos os cálculos continuam certos sem precisar do histórico inteiro.
     if (p === '/api/mobile/md/finance' && m === 'GET') {
       const out = {};
-      for (const kind of ['fin_account', 'fin_card', 'fin_tx', 'fin_budget', 'fin_goal']) {
+      for (const kind of ['fin_account', 'fin_card', 'fin_tx', 'fin_budget', 'fin_goal', 'fin_reserve_move']) {
         const list = [];
         for (let offset = 0; offset < 50000; offset += 500) { const page = workspace.list({ kind, limit: 500, offset }); list.push(...page); if (page.length < 500) break; }
         out[kind] = list;
@@ -354,6 +354,9 @@ function makeMobileApi(runtime, deps) {
     match = p.match(/^\/api\/mobile\/notifications\/([\w-]+)\/read$/);
     if (match && m === 'POST') { workspace.markRead(validId(match[1])); return send({ ok: true }); }
     // Apagar aviso no servidor (um, ou 'all'): antes o app dizia que isso 'aguardava atualização do servidor'.
+    // 0.3.146: lista paginada (sem os apagados) com o total real de nao lidas, e "marcar tudo" global.
+    if (p === '/api/mobile/md/notifications' && m === 'GET') return send(workspace.noticePage(new URL(req.url, 'http://x').searchParams.get('offset')));
+    if (p === '/api/mobile/md/notifications/read-all' && m === 'POST') { await bodyJson(req, 256).catch(() => ({})); return send(workspace.markAllRead()); }
     match = p.match(/^\/api\/mobile\/md\/notifications\/([\w-]+)$/);
     if (match && m === 'DELETE') return send(workspace.clearNotification(match[1] === 'all' ? 'all' : validId(match[1])));
     if (p === '/api/mobile/profile' && m === 'PATCH') {

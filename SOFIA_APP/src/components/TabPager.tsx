@@ -3,7 +3,7 @@ import {useRenderCost} from '../lib/render-cost';
 import {noteFluencyInput,type FluencyMode} from '../lib/fluency';
 import {MountTimer} from './MountTimer';
 import React,{forwardRef,useCallback,useImperativeHandle,useLayoutEffect,useMemo,useRef,useState} from 'react';
-import {Animated,ScrollView,View,StyleSheet,Platform} from 'react-native';
+import {Animated,AppState,ScrollView,View,StyleSheet,Platform} from 'react-native';
 import type {LayoutChangeEvent,NativeScrollEvent,NativeSyntheticEvent} from 'react-native';
 import type {Tab} from '../lib/types';
 import type {MenuMotion} from '../lib/menu-motion';
@@ -75,6 +75,9 @@ export const TabPager = forwardRef<TabPagerHandle,Props>(function TabPager({acti
   useLayoutEffect(() => {if(size.current>0)motion.resize(size.current,selection.current.current());motion.reset(selection.current.current());},[motion]);
   useLayoutEffect(() => {if(activeTab!==selection.current.current())goTo(activeTab);},[activeTab,goTo]);
   useLayoutEffect(() => {if (!enabled) {selection.current.cancelDrag();align();}},[enabled,align]);
+  // 0.3.146: gesto interrompido pelo segundo plano (bloquear a tela, abrir o Gmail no meio do
+  // arrasto) deixava duas abas pela metade na volta. Ao voltar, cancela o arrasto e encaixa na aba atual.
+  useLayoutEffect(() => {const sub=AppState?.addEventListener?.('change',state=>{if(state==='active'){selection.current.cancelDrag();aligned.current=null;align();clearPreview();}});return()=>sub?.remove();},[align]);
   const layout = useCallback((event: LayoutChangeEvent) => {
     const next=event.nativeEvent.layout.width;
     if(Number.isFinite(next) && next>0 && next!==size.current) {

@@ -60,7 +60,7 @@ export function Packages({api,active,onBack}:{api:SofiaApi;active:boolean;onBack
    {section('A caminho',groups.active)}
    {section('Entregues',groups.delivered)}
    {!records.loaded&&!records.error?<Text style={{color:c.muted,padding:18}}>Carregando encomendas…</Text>:null}
-   {records.loaded&&!groups.active.length&&!groups.delivered.length?<Empty icon="list" title="Sua primeira encomenda" body="Cole o código de rastreio (ex.: AA123456789BR) e dê um nome. A Sofia consulta a transportadora e avisa a cada mudança."/>:null}
+   {records.loaded&&!groups.active.length&&!groups.delivered.length?<Empty icon="box" title="Sua primeira encomenda" body="Cole o código de rastreio (ex.: AA123456789BR) e dê um nome. A Sofia consulta a transportadora e avisa a cada mudança."/>:null}
    <Text style={{color:c.muted,fontSize:11,lineHeight:18,paddingHorizontal:4}}>Correios são consultados automaticamente a cada 2 horas. Para outras transportadoras, a Sofia guarda o código e abre o rastreio oficial com um toque.</Text>
   </ScrollView>
   <Sheet visible={!!editing} onClose={()=>{if(!busy)setEditing(null);}} label="Fechar encomenda">
@@ -78,7 +78,8 @@ export function Packages({api,active,onBack}:{api:SofiaApi;active:boolean;onBack
    {viewing?<View style={{gap:14,paddingBottom:18}}>
     <View style={{flexDirection:'row',alignItems:'center'}}><View style={{flex:1}}><Text style={{color:c.text,fontSize:22,fontWeight:'700'}}>{viewing.title}</Text><Text style={{color:c.muted,fontSize:12}}>{CARRIER_LABEL[String(viewing.data?.carrier)]||'Transportadora'} · {String(viewing.data?.code||'')}</Text></View><IconButton name="close" label="Fechar linha do tempo" onPress={()=>setViewing(null)}/></View>
     {viewing.data?.error?<Text style={{color:c.danger,fontSize:12}}>Última consulta falhou: {String(viewing.data.error)}</Text>:null}
-    {viewing.data?.checked_at?<Text style={{color:c.muted,fontSize:11}}>Consultado em {whenLabel(String(viewing.data.checked_at))}</Text>:null}
+    {viewing.data?.ok_at?<Text style={{color:c.muted,fontSize:11}}>Última atualização com sucesso: {whenLabel(String(viewing.data.ok_at))}</Text>:<Text style={{color:c.muted,fontSize:11}}>Ainda sem nenhuma atualização com sucesso.</Text>}
+    {viewing.data?.checked_at?<Text style={{color:c.muted,fontSize:11}}>Última tentativa: {whenLabel(String(viewing.data.checked_at))}</Text>:null}
     <ScrollView style={{maxHeight:360}} contentContainerStyle={{gap:10}}>
      {events.length?events.map((e,i)=><View key={i} style={{flexDirection:'row',gap:12}}><View style={{alignItems:'center'}}><View style={{width:12,height:12,borderRadius:6,backgroundColor:i===0?c.accent:c.line,marginTop:4}}/>{i<events.length-1?<View style={{width:2,flex:1,backgroundColor:c.line,marginTop:2}}/>:null}</View><View style={{flex:1,paddingBottom:8}}><Text style={{color:i===0?c.text:c.muted,fontWeight:i===0?'700':'500',fontSize:14}}>{e.status}</Text><Text style={{color:c.muted,fontSize:11}}>{whenLabel(e.at)}{e.local?' · '+e.local:''}</Text></View></View>):<Text style={{color:c.muted,fontSize:13}}>Ainda sem eventos. Toque em Atualizar agora ou abra o rastreio oficial.</Text>}
     </ScrollView>
