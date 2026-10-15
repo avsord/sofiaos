@@ -10,10 +10,12 @@ test('Início não chama .filter direto na lista de widgets',()=>{
  assert.ok((home.match(/Array\.isArray\(/g)||[]).length>=2);
 });
 test('o mesmo cálculo do estado inicial sobrevive a cache nulo, vazio, sem campo e válido',()=>{
- const init=cached=>(()=>{const w=cached?.widgets;return Array.isArray(w)?w.filter(x=>['monitoring','tasks','capsules'].includes(x)):null;})()||['monitoring','tasks'];
+ const HOME_WIDGET_IDS=['monitoring','tasks','capsules','reminders','packages'];
+ const init=cached=>(()=>{const w=cached?.widgets;return Array.isArray(w)?w.filter(x=>HOME_WIDGET_IDS.includes(x)):null;})()||['monitoring','tasks'];
  assert.deepEqual(init({widgets:null}),['monitoring','tasks']);
  assert.deepEqual(init(undefined),['monitoring','tasks']);
  assert.deepEqual(init({}),['monitoring','tasks']);
  assert.deepEqual(init({widgets:['capsules','x']}),['capsules']);
- assert.ok(home.includes("(()=>{const w=api.cached<{widgets:string[]|null}>('/md/dashboard')?.widgets;return Array.isArray(w)?w.filter(x=>['monitoring','tasks','capsules'].includes(x)):null;})()||"),'o teste espelha o código real');
+ assert.deepEqual(init({widgets:['reminders','packages','x']}),['reminders','packages']);
+ assert.ok(home.includes("(()=>{const w=api.cached<{widgets:string[]|null}>('/md/dashboard')?.widgets;return Array.isArray(w)?w.filter(x=>HOME_WIDGET_IDS.includes(x)):null;})()||"),'o teste espelha o código real');
 });

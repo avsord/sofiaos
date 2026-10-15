@@ -189,7 +189,7 @@ function makeMobileApi(runtime, deps) {
       return send(require('../services/bank-import').commit(workspace, { items: b.items, target: b.target === 'card' ? 'card' : 'account', target_id: String(b.target_id || ''), privacy: 'private', source_id: null }));
     }
     if (p === '/api/mobile/md/dashboard') {
-      const allowedWidgets = ['monitoring', 'tasks', 'capsules'];
+      const allowedWidgets = ['monitoring', 'tasks', 'capsules', 'reminders', 'packages'];
       if (m === 'GET') { const saved = runtime.google.kvGet('dashboard_widgets'); return send({ widgets: Array.isArray(saved) ? saved : ['monitoring', 'tasks'], saved: Array.isArray(saved) }); }
       // O app salva a ordem com PATCH; antes so POST existia e o PATCH caia em "Esta rota do aplicativo nao existe" (widget de Capsulas sumia).
       if (m === 'POST' || m === 'PATCH') { const b = await bodyJson(req, 4096); const widgets = Array.isArray(b.widgets) ? [...new Set(b.widgets.filter(w => allowedWidgets.includes(w)))] : null; if (!widgets) fail('BAD_WIDGETS', 'Lista de widgets inválida.'); runtime.google.kvSet('dashboard_widgets', widgets); return send({ widgets }); }
