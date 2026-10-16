@@ -267,7 +267,7 @@ function Field({label, value, onChange, placeholder, numeric = false, big = fals
   return (
     <View style={{gap: 6}}>
       <Text style={{fontSize: 12, color: c.muted}}>{label}</Text>
-      <TextInput accessibilityLabel={label} value={value} onChangeText={v => onChange(isMoneyField ? formatMoneyInput(v) : v)} onBlur={() => { if (isMoneyField) onChange(finishMoneyInput(value)); }} placeholder={placeholder} placeholderTextColor={c.muted} keyboardType={numeric ? 'decimal-pad' : 'default'}
+      <TextInput accessibilityLabel={label} value={value} onChangeText={v => onChange(isMoneyField ? formatMoneyInput(v, value) : v)} onBlur={() => { if (isMoneyField) onChange(finishMoneyInput(value)); }} placeholder={placeholder} placeholderTextColor={c.muted} keyboardType={numeric ? 'decimal-pad' : 'default'}
         style={{fontSize: big ? 30 : 15, fontWeight: big ? '800' : '400', color: c.text, borderWidth: 1, borderColor: c.line, borderRadius: 12, padding: 12, backgroundColor: c.input}} />
     </View>
   );
@@ -303,7 +303,7 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone}: {api: SofiaA
     return <View style={{gap: 6}}>
       <Text style={{color: c.muted, fontSize: 12}}>{label}</Text>
       <TextInput accessibilityLabel={label} value={value}
-        onChangeText={v => onChange(monetary ? formatMoneyInput(v) : v)}
+        onChangeText={v => onChange(monetary ? formatMoneyInput(v, value) : v)}
         onBlur={() => { if (monetary) onChange(finishMoneyInput(value)); }}
         placeholder={placeholder} placeholderTextColor={c.muted} keyboardType={monetary ? 'decimal-pad' : 'default'}
         style={{fontSize: 16, color: c.text, borderWidth: 1, borderColor: c.line, borderRadius: 12, padding: 12, backgroundColor: c.surface}} />
@@ -676,7 +676,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved}: {api: SofiaA
           ) : null}
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
             <Text style={{color: headText + 'cc', fontSize: 22}}>R$</Text>
-            <TextInput accessibilityLabel="Valor" value={amount} onChangeText={v => setAmount(formatMoneyInput(v))} onBlur={() => setAmount(v => finishMoneyInput(v))} placeholder="0,00" placeholderTextColor={headText + '88'} keyboardType="decimal-pad" autoFocus={!editing}
+            <TextInput accessibilityLabel="Valor" value={amount} onChangeText={v => setAmount(old => formatMoneyInput(v, old))} onBlur={() => setAmount(v => finishMoneyInput(v))} placeholder="0,00" placeholderTextColor={headText + '88'} keyboardType="decimal-pad" autoFocus={!editing}
               style={{flex: 1, color: headText, fontSize: 38, fontWeight: '800', padding: 0}} />
           </View>
         </View>
@@ -984,7 +984,7 @@ function ManageSheet({api, d, onClose, reload}: {api: SofiaApi; d: Data; onClose
 }
 function AccountCardSheet({api, d, edit, onClose, onSaved}: {api: SofiaApi; d: Data; edit: {type: 'account'; item: Account | null} | {type: 'card'; item: Card | null}; onClose: () => void; onSaved: () => void}) {
   const c = useTheme(), isCard = edit.type === 'card', acc = edit.type === 'account' ? edit.item : null, card = edit.type === 'card' ? edit.item : null;
-  const [name, setName] = useState(edit.item?.name || ''), [type, setType] = useState(acc?.type || 'corrente'), [initial, setInitial] = useState(acc ? finishMoneyInput(String(acc.initial).replace('.', ',')) : '');
+  const [name, setName] = useState(edit.item?.name || ''), [type, setType] = useState(acc?.type || 'corrente'), [initial, setInitial] = useState(acc ? finishMoneyInput(String(acc.entity.data.initial_balance || '0').replace('.', ',')) : '');
   const [include, setInclude] = useState(acc?.include ?? true), [color, setColor] = useState(edit.item?.color || FIN_COLORS[isCard ? 2 : d.accounts.length % FIN_COLORS.length]);
   const [limit, setLimit] = useState(card ? finishMoneyInput(String(card.limit).replace('.', ',')) : ''), [closing, setClosing] = useState(card ? String(card.closing) : ''), [due, setDue] = useState(card ? String(card.due) : '');
   const [payFrom, setPayFrom] = useState(card?.accountId || d.accounts[0]?.id || ''), [error, setError] = useState(''), [busy, setBusy] = useState(false);
