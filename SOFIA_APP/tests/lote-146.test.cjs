@@ -31,10 +31,16 @@ test('Price Tracker: sem busca automatica de lojas; Inicio mostra a oferta princ
   assert.ok(p.includes('label="Mover para outro produto"'));
   assert.ok(lib.includes('export function primaryNow(p: ProductSeries)'));
 });
-test('financas: guardado e para usar dentro do cartao de saldo, retirada confirmada',()=>{
+test('financas: resumo sem valor redundante, reserva compacta e detalhamento acessivel',()=>{
   const f=read('src/screens/Finance.tsx');
-  // 0.3.147: guardado dentro do cartao original (mesmo estilo de Receitas/Despesas), sem blocos grandes
-  assert.ok(f.includes('🔒 Guardado'));assert.ok(f.includes('>Para usar<'));assert.ok(!f.includes('function MoneyBlocks('));
+  assert.ok(f.includes('Reserva separada'));
+  assert.ok(f.includes('Abrir detalhes e ações da reserva'));
+  assert.ok(!f.includes('>Para usar<'),'reserva deixa de competir com o saldo principal');
+  assert.ok(!f.includes('function MoneyBlocks('),'não restaurar blocos grandes duplicados');
   assert.ok(f.includes("<Text style={{flex: 1, color: c.onAccent + 'cc', fontSize: 13}}>Saldo geral</Text>"));
+  for (const label of ['Saldo geral nas contas','Fora da reserva','Despesas previstas do mês','Livre após despesas previstas','Guardar dinheiro','Retirar da reserva','Ajustar aporte mensal']) assert.ok(f.includes(label),label);
   assert.ok(f.includes("Alert.alert('Retirar da reserva?'"),'retirada confirmada');
+  assert.ok(f.includes('onChangeText={v => setAmount(formatMoneyInput(v))}'),'lançamento recebe máscara enquanto digita');
+  assert.ok(f.includes('onBlur={() => setAmount(v => finishMoneyInput(v))}'),'lançamento termina com centavos visíveis');
+  assert.ok(f.includes("label.includes('(R$)')"),'demais campos monetários recebem máscara sem afetar os dias de fatura');
 });
