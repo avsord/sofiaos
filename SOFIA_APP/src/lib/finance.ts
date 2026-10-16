@@ -263,6 +263,30 @@ export function parseMoney(text: string): number | null {
   return Number.isFinite(v) ? round2(v) : null;
 }
 
+/** Máscara brasileira durante a digitação: agrupa milhares sem mudar a ordem digitada.
+ * A vírgula é o separador decimal explícito (ponto do teclado decimal também é aceito).
+ * Nunca converte o texto em centavos automaticamente: "191146" são 191.146 reais. */
+export function formatMoneyInput(text: string): string {
+  const raw = String(text ?? '').replace(/[^\d.,-]/g, '');
+  if (!raw) return '';
+  const sign = raw.startsWith('-') ? '-' : '';
+  const clean = raw.replace(/-/g, '');
+  const comma = clean.lastIndexOf(','), dot = clean.lastIndexOf('.');
+  const decimalAt = comma >= 0 ? comma : dot >= 0 && clean.slice(dot + 1).replace(/\D/g, '').length <= 2 ? dot : -1;
+  const whole = (decimalAt >= 0 ? clean.slice(0, decimalAt) : clean).replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+  const fraction = decimalAt >= 0 ? clean.slice(decimalAt + 1).replace(/\D/g, '').slice(0, 2) : '';
+  const grouped = (whole || '0').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return sign + grouped + (decimalAt >= 0 ? ',' + fraction : '');
+}
+/** No fim da edição, mostra os centavos sem arredondamentos invisíveis no campo. */
+export function finishMoneyInput(text: string): string {
+  const value = parseMoney(text);
+  if (value === null) return '';
+  const cents = Math.round(Math.abs(value) * 100);
+  const whole = String(Math.floor(cents / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return (value < 0 ? '-' : '') + whole + ',' + String(cents % 100).padStart(2, '0');
+}
+
 // ---------- Ligações com outros apps ----------
 /** Lê valor e vencimento de um texto de cobrança (assunto + trecho do e-mail).
  * Só sugere: a pessoa confere antes de salvar. */
