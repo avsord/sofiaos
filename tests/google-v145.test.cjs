@@ -294,3 +294,20 @@ test('compromisso travado para sempre porque o Google recusa editar aquele tipo 
  assert.equal(w.get(e.id).data.google_readonly,true);
  g.fail=null;const r2=await svc.sync();assert.equal(r2.sent,0,'agora é só-leitura: nunca mais tenta reenviar');
 });
+
+test('0.3.148: "Bad Request" de UM compromisso nao vira erro da conta: corpo valido, nova tentativa simples, motivo guardado e sem insistir',async t=>{
+ const {svc,core,g}=await connected(t);const w=core.workspace;
+ // dia inteiro com fim igual ao inicio (o Google exige fim exclusivo, depois do inicio): agora sai corrigido
+ w.save({kind:'commitment',title:'BK 10 ANOS CASTELOS E RUÍNAS',area:'Pessoal',data:{calendar_all_day:true,calendar_date_start:'2026-11-07',calendar_date_end:'2026-11-07',calendar_provider:'google'}});
+ let r=await svc.sync();assert.equal(r.sent,1);
+ assert.deepEqual(g.events.primary.find(e=>e.summary==='BK 10 ANOS CASTELOS E RUÍNAS').end,{date:'2026-11-08'});
+ // um compromisso que o Google recusa sempre: vai para "item_errors", nao para o erro da conta
+ const ruim=w.save({kind:'commitment',title:'Recusado',area:'Pessoal',data:{start_at:'2026-11-10T13:00:00.000Z',calendar_provider:'google',remind_minutes:15}});
+ let tries=0;g.fail=(m,p)=>m==='POST'&&/events$/.test(p)?(tries++,{status:400,message:'Bad Request'}):null;
+ r=await svc.sync();
+ assert.equal(tries,2,'tentou com tudo e depois so com titulo e horario');
+ const st=await svc.status();assert.ok(!st.error,'sem banner de erro da conta');assert.equal(st.item_errors[0].title,'Recusado');assert.match(st.item_errors[0].reason,/Bad Request/);
+ assert.equal(w.get(ruim.id).data.sync_state,'error');
+ tries=0;await svc.sync();assert.equal(tries,0,'nao reenvia a mesma versao a cada sincronizacao');
+ g.fail=null;
+});

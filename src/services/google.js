@@ -140,7 +140,7 @@ class GoogleService {
       if ((res.status === 429 || res.status >= 500) && attempt < 3) { await new Promise(r => setTimeout(r, 400 * 2 ** attempt)); continue; }
       if (res.status === 204) return {};
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { const e = new AppError('GOOGLE_API', 'Google: ' + (data.error?.message || res.status), res.status === 410 ? 410 : 502); e.googleStatus = res.status; throw e; }
+      if (!res.ok) { const why = data.error?.errors?.[0], detail = why && why.message && why.message !== data.error?.message ? why.message : why?.reason || ''; const e = new AppError('GOOGLE_API', 'Google: ' + (data.error?.message || res.status) + (detail ? ' (' + detail + ')' : ''), res.status === 410 ? 410 : 502); e.googleStatus = res.status; e.googleReason = why?.reason || ''; throw e; }
       return data;
     }
   }
@@ -172,7 +172,7 @@ class GoogleService {
     if (last) warnings.push(`Última sincronização: ${last.imported} recebidos do Google, ${last.created} novos, ${last.updated} atualizados, ${last.sent} enviados, ${last.removed} removidos${last.skipped ? ', ' + last.skipped + ' ignorados' : ''}.`);
     if (calendars.some(c => c.id !== (cal?.id) && c.selected)) warnings.push('Os outros calendários visíveis no seu Google também aparecem na Sofia, somente para leitura.');
     return {...base, syncing: this.busy, email: l.email, last_sync: l.last_sync, error: l.last_error || undefined, calendar_id: cal?.id || 'primary', calendar_name: cal?.summary || 'Principal',
-      calendars, warnings, conflicts: l.conflicts || [], history: (l.history || []).slice(0, 10),
+      calendars, warnings, conflicts: l.conflicts || [], item_errors: l.item_errors || [], history: (l.history || []).slice(0, 10),
       gmail: {connected: /gmail\.readonly/.test(l.scopes || '')},
       drive: {connected: /drive\.file/.test(l.scopes || ''), last_backup: l.drive?.last_backup, last_backup_error: l.drive?.last_error, backups: l.drive?.count || 0, folder: 'Sofia OS/Backups', folders: l.drive?.folders ? Object.keys(l.drive.folders) : [], attachments: this.attachmentStats(), voices: this.voiceStats(), pages: l.drive?.pages_exported || 0}};
   }
@@ -265,11 +265,18 @@ class GoogleService {
     return next;
   }
   eventBody(e) {
-    const d = e.data, allDay = !!d.calendar_all_day && d.calendar_date_start;
-    const start = allDay ? {date: d.calendar_date_start} : {dateTime: d.start_at, timeZone: TZ};
-    const end = allDay ? {date: d.calendar_date_end || plusDays(d.calendar_date_start, 1)} : {dateTime: d.end_at || new Date(Date.parse(d.start_at) + 3600000).toISOString(), timeZone: TZ};
-    return {summary: e.title, description: e.content || undefined, location: d.location || undefined, start, end,
-      reminders: d.remind_minutes !== '' && d.remind_minutes != null ? {useDefault: false, overrides: [{method: 'popup', minutes: Number(d.remind_minutes)}]}
+    // 0.3.148: o Google responde "Bad Request" se o fim nao vier DEPOIS do inicio (dia inteiro: o fim
+    // e exclusivo), se o lembrete nao for numero entre 0 e 40320, ou com data/hora invalida.
+    const d = e.data, allDay = !!d.calendar_all_day && /^\d{4}-\d{2}-\d{2}$/.test(String(d.calendar_date_start || ''));
+    const startMs = Date.parse(d.start_at || ''), endMs = Date.parse(d.end_at || '');
+    const startDate = allDay ? String(d.calendar_date_start) : '';
+    const endDate = allDay ? (/^\d{4}-\d{2}-\d{2}$/.test(String(d.calendar_date_end || '')) && String(d.calendar_date_end) > startDate ? String(d.calendar_date_end) : plusDays(startDate, 1)) : '';
+    if (!allDay && !Number.isFinite(startMs)) throw Object.assign(new AppError('GOOGLE_BAD_EVENT', 'compromisso sem data e hora válidas', 422), {skipEvent: true});
+    const start = allDay ? {date: startDate} : {dateTime: new Date(startMs).toISOString(), timeZone: TZ};
+    const end = allDay ? {date: endDate} : {dateTime: new Date(Number.isFinite(endMs) && endMs > startMs ? endMs : startMs + 3600000).toISOString(), timeZone: TZ};
+    const minutes = Number(d.remind_minutes), hasReminder = d.remind_minutes !== '' && d.remind_minutes != null && Number.isFinite(minutes) && minutes >= 0;
+    return {summary: String(e.title || 'Compromisso').slice(0, 1000), description: e.content ? String(e.content).slice(0, 8000) : undefined, location: d.location ? String(d.location).slice(0, 1000) : undefined, start, end,
+      reminders: hasReminder ? {useDefault: false, overrides: [{method: 'popup', minutes: Math.min(40320, Math.round(minutes))}]}
         // PATCH mescla objetos: mandar só {useDefault:true} num evento que JÁ tem lembretes próprios
         // vira "useDefault + overrides" e o Google recusa ("Cannot specify both default reminders and
         // overrides"). Mandar overrides vazio limpa os próprios e deixa só o padrão.
@@ -287,7 +294,8 @@ class GoogleService {
         const d = e.data;
         if (d.calendar_provider !== 'google' || d.google_readonly || (!d.start_at && !d.calendar_date_start) || e.state === 'cancelled') continue;
         const target = d.calendar_id || calId, isNew = !d.external_event_id;
-        if (!isNew && e.revision <= (Number(d.google_rev) || 0)) continue;
+        // Ja enviado (ou recusado pelo Google) nesta versao: nao reenvia; editar o compromisso tenta de novo.
+        if ((!isNew || d.sync_state === 'error') && e.revision <= (Number(d.google_rev) || 0)) continue;
         await breathe();
         try {
           const url = CAL + '/calendars/' + encodeURIComponent(target) + '/events' + (isNew ? '' : '/' + encodeURIComponent(d.external_event_id));
@@ -296,9 +304,9 @@ class GoogleService {
           catch (err) {
             // Rede de segurança: se o Google ainda reclamar de lembretes, reenvia sem mexer neles
             // (o horário/título/descrição é o que importa; lembrete não pode travar o resto).
-            if (!/default reminders and overrides|reminders/i.test(String(err.message))) throw err;
-            const {reminders, ...semLembretes} = this.eventBody(e);
-            ev = await this.call(isNew ? 'POST' : 'PATCH', url, semLembretes);
+            if (/default reminders and overrides|reminders/i.test(String(err.message))) { const {reminders, ...semLembretes} = this.eventBody(e); ev = await this.call(isNew ? 'POST' : 'PATCH', url, semLembretes); }
+            else if (err.googleStatus === 400) { const b = this.eventBody(e); ev = await this.call(isNew ? 'POST' : 'PATCH', url, {summary: b.summary, start: b.start, end: b.end}); }
+            else throw err;
           }
           this.w.save({revision: e.revision, data: {...cleanData(e.kind, d), calendar_id: target, external_event_id: ev.id, google_etag: ev.etag || '', sync_state: 'synced', google_rev: e.revision + 1}}, e.id);
           report.sent++;
@@ -307,6 +315,12 @@ class GoogleService {
           // vindos do calendário principal. Em vez de tentar de novo para sempre, marca como
           // só-leitura agora mesmo — resolve sozinho, sem esperar a próxima sincronização completa.
           if (/not valid for t|cannot be (updated|modified)|read-?only/i.test(String(err.message))) { try { this.w.save({revision: e.revision, data: {...cleanData(e.kind, d), google_readonly: true, google_rev: e.revision + 1}}, e.id); } catch { /* tenta de novo na próxima */ } }
+          else if (err.googleStatus === 400 || err.skipEvent) {
+            // Problema DESTE compromisso (nao da conta): guarda o motivo nele e para de reenviar a mesma versao.
+            const why = String(err.message).replace(/^Google: /, '').slice(0, 160);
+            try { this.w.save({revision: e.revision, data: {...cleanData(e.kind, d), sync_state: 'error', google_rev: e.revision + 1}}, e.id); } catch { /* tenta na proxima */ }
+            report.itemErrors.push({id: e.id, title: e.title.slice(0, 60), reason: why});
+          }
           else report.errors.push('Enviar "' + e.title.slice(0, 40) + '": ' + String(err.message).slice(0, 80));
         }
       }
@@ -317,7 +331,7 @@ class GoogleService {
     if (this.busy) return {ok: true, skipped: true};
     const l = this.link(); if (!l?.refresh) throw new AppError('GOOGLE_NOT_CONNECTED', 'Conta Google não conectada.', 409);
     this.busy = true;
-    const report = {at: now(), imported: 0, created: 0, updated: 0, sent: 0, removed: 0, skipped: 0, conflicts: [], errors: [], full: false, calendars: 0, ms: 0};
+    const report = {at: now(), imported: 0, created: 0, updated: 0, sent: 0, removed: 0, skipped: 0, conflicts: [], errors: [], itemErrors: [], full: false, calendars: 0, ms: 0};
     const t0 = Date.now();
     try {
       const calendars = await this.calendars();
@@ -330,7 +344,7 @@ class GoogleService {
       }
       await this.pushLocal(main.id, report);
       report.ms = Date.now() - t0;
-      link = {...this.link(), sync: link.sync, calendars, last_sync: now(), last_error: report.errors.length ? report.errors[0] : '', conflicts: report.conflicts.slice(0, 50),
+      link = {...this.link(), sync: link.sync, calendars, last_sync: now(), last_error: report.errors.length ? report.errors[0] : '', item_errors: report.itemErrors.slice(0, 20), conflicts: report.conflicts.slice(0, 50),
         history: [{...report, conflicts: report.conflicts.length, errors: report.errors.slice(0, 5)}, ...((this.link() || {}).history || [])].slice(0, 20)};
       this.saveLink(link);
       return {ok: true, ...report, conflicts: report.conflicts.length};
