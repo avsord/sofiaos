@@ -334,21 +334,27 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone}: {api: SofiaA
 }
 
 // ============================ RESUMO ============================
-function HomeTab({d, month, api, reload, onTx, onTab, onAccount, onManage}: {d: Data; month: string; api: SofiaApi; reload: () => Promise<void>; onTx: (t: Partial<Tx>) => void; onTab: (t: Tab) => void; onAccount: (id: string) => void; onManage: () => void}) {
+function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBill}: {d: Data; month: string; api: SofiaApi; reload: () => Promise<void>; onTx: (t: Partial<Tx>) => void; onTab: (t: Tab) => void; accountId: string; isPrimary: boolean; onBill: (t?: Tx) => void}) {
   const c = useTheme(), today = todayISO();
   // Contas pesadas só quando os dados ou o mês mudam (não a cada toque, como esconder valores).
-  const {s, total, forecast, dues, budgets} = useMemo(() => ({s: monthSummary(d.txs, month), total: totalBalance(d.accounts, d.txs), forecast: forecastBalance(d.accounts, d.txs, month, d.cards),
-    dues: upcoming(d.txs, d.cards, today, 10), budgets: budgetProgress(d.budgets, d.txs, month).slice(0, 3)}), [d, month, today]);
+  const {s, total, forecast, dues} = useMemo(() => ({s: monthSummary(d.txs, month), total: totalBalance(d.accounts, d.txs), forecast: forecastBalance(d.accounts, d.txs, month, d.cards),
+    dues: manualDues(d.txs, accountId, today, 10)}), [d, accountId, month, today]);
   const [hide, setHide] = useState(false), [reserveSheet, setReserveSheet] = useState<'setup' | 'in' | 'out' | 'plan' | null>(null);
   const show = (v: number) => hide ? 'R$ •••••' : money(v);
-  const reserve = reserveOf(d.goals);
-  const split = useMemo(() => reserve ? moneySplit(reserve, d.moves || [], d.accounts, d.txs, d.cards, month, today) : null, [reserve, d, month, today]);
+  const reserve = isPrimary ? reserveOf(d.goals) : null;
+  const split = useMemo(() => reserve ? moneySplit(reserve, d.moves || [], d.accounts, d.txs, d.cards, month, today, manualDues(d.txs,accountId,today,45)) : null, [reserve, d, accountId, month, today]);
   // Reserva em linha discreta no cartão original; o detalhamento dos valores fica sob demanda.
   const [reserveMenu, setReserveMenu] = useState(false);
   return (
     <>
       {reserveSheet ? <ReserveSheet api={api} kind={reserveSheet} reserve={reserve} split={split} onClose={() => setReserveSheet(null)} onDone={async () => { setReserveSheet(null); await reload(); }} /> : null}
-      <View style={{backgroundColor: c.accent, borderRadius: 24, padding: 18, gap: 14}}>
+      {isPrimary ? <Pressable accessibilityRole="button" accessibilityLabel="Gerenciar dinheiro guardado" onPress={() => split ? setReserveMenu(true) : setReserveSheet('setup')}
+        style={{backgroundColor:'#e99334',borderTopLeftRadius:24,borderTopRightRadius:24,paddingTop:14,paddingHorizontal:20,paddingBottom:25,marginBottom:-19,flexDirection:'row',alignItems:'center',gap:10}}>
+        <Icon name="shield" size={16} color="#3c270e" />
+        <Text style={{color:'#3c270e',fontWeight:'700',fontSize:13,flex:1}}>Guardado</Text>
+        <Text style={{color:'#3c270e',fontWeight:'800',fontSize:18}}>{split ? show(split.saved) : 'Configurar ›'}</Text>
+      </Pressable> : null}
+      <View style={{backgroundColor: c.accent, borderRadius: 24, padding: 18, gap: 14, elevation: 2}}>
         <View style={{flexDirection: 'row', alignItems: 'center'}}>
           <Text style={{flex: 1, color: c.onAccent + 'cc', fontSize: 13}}>Saldo geral</Text>
           <Pressable accessibilityLabel={hide ? 'Mostrar valores' : 'Esconder valores'} onPress={() => setHide(h => !h)}><Icon name="eye" size={18} color={c.onAccent + 'cc'} /></Pressable>
@@ -359,37 +365,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, onAccount, onManage}: {d: 
           <View style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 14, padding: 10}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↑ Receitas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.income)}</Text></View>
           <View style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 14, padding: 10}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↓ Despesas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.expense)}</Text></View>
         </View>
-        {split ? (
-          <View style={{borderTopWidth: 1, borderColor: c.onAccent + '36', paddingTop: 12, gap: 9}}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Abrir detalhes e ações da reserva" onPress={() => setReserveMenu(true)}
-              style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-              <View style={{width: 36, height: 36, borderRadius: 12, backgroundColor: c.onAccent + '22', alignItems: 'center', justifyContent: 'center'}}>
-                <Icon name="shield" size={18} color={c.onAccent} />
-              </View>
-              <View style={{flex: 1, gap: 2}}>
-                <Text style={{color: c.onAccent, fontWeight: '800', fontSize: 13}}>Reserva separada</Text>
-                <Text style={{color: c.onAccent + 'bb', fontSize: 11}}>Dinheiro que você decidiu preservar</Text>
-              </View>
-              <View style={{alignItems: 'flex-end', gap: 3}}>
-                <Text style={{color: c.onAccent, fontWeight: '800', fontSize: 18}}>{show(split.saved)}</Text>
-                <Text style={{color: c.onAccent + 'bb', fontSize: 11}}>Gerenciar ›</Text>
-              </View>
-            </Pressable>
-            {split.planned > 0 ? (
-              <View style={{gap: 5, paddingLeft: 46}}>
-                <View style={{flexDirection: 'row', justifyContent: 'space-between', gap: 8}}>
-                  <Text style={{color: c.onAccent + 'bb', fontSize: 11}}>Aporte de {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
-                  <Text style={{color: c.onAccent, fontSize: 11, fontWeight: '600'}}>{show(split.realized)} / {show(split.planned)}</Text>
-                </View>
-                <View style={{height: 5, backgroundColor: c.onAccent + '30', borderRadius: 99, overflow: 'hidden'}}>
-                  <View style={{width: `${Math.min(100, Math.max(0, split.realized / split.planned * 100))}%` as `${number}%`, backgroundColor: c.onAccent, height: '100%', borderRadius: 99}} />
-                </View>
-              </View>
-            ) : null}
-          </View>
-        ) : <Pressable accessibilityRole="button" onPress={() => setReserveSheet('setup')} style={{paddingTop: 6}}>
-          <Text style={{color: c.onAccent + 'dd', fontSize: 12, textDecorationLine: 'underline'}}>＋ Criar reserva separada</Text>
-        </Pressable>}
+
       </View>
       <Sheet visible={reserveMenu} onClose={() => setReserveMenu(false)} label="Fechar detalhes da reserva">
         <View style={{gap: 14, paddingBottom: 12}}>
@@ -416,19 +392,9 @@ function HomeTab({d, month, api, reload, onTx, onTab, onAccount, onManage}: {d: 
       </Sheet>
 
       <Card_>
-        <Title text="Contas a pagar e receber" action="Ver lançamentos" onAction={() => onTab('txs')} />
-        {dues.length ? dues.map(due => <DueRow key={due.id} due={due} d={d} api={api} reload={reload} onTx={onTx} />) : <Text style={{color: c.muted, fontSize: 13}}>Nada vencendo nos próximos 10 dias. 🎉</Text>}
-      </Card_>
-
-      <Card_>
-        <Title text="Contas" action="Gerenciar" onAction={onManage} />
-        {d.accounts.filter(a => !a.archived).map(a => (
-          <Pressable key={a.id} onPress={() => onAccount(a.id)} style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
-            <View style={{width: 36, height: 36, borderRadius: 12, backgroundColor: a.color, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: '#fff', fontWeight: '800'}}>{a.name.charAt(0)}</Text></View>
-            <View style={{flex: 1}}><Text style={{color: c.text, fontWeight: '600'}}>{a.name}</Text><Text style={{color: c.muted, fontSize: 11}}>{ACCOUNT_TYPES.find(t => t.value === a.type)?.label}{!a.include ? ' · fora do saldo geral' : ''}</Text></View>
-            <Text style={{color: c.text, fontWeight: '700'}}>{show(accountBalance(a, d.txs))}</Text>
-          </Pressable>
-        ))}
+        <Title text="Próximos vencimentos" action="Ver pendentes" onAction={() => onTab('bills')} />
+        {dues.length ? dues.map(due => <DueRow key={due.id} due={due} d={d} api={api} reload={reload} onTx={t => onBill(t as Tx)} />) : <Text style={{color: c.muted, fontSize: 13}}>Nenhum boleto ou dívida cadastrado para os próximos 10 dias.</Text>}
+        <Pressable accessibilityRole="button" onPress={() => onBill()} style={{alignSelf:'flex-start',paddingVertical:5}}><Text style={{color:c.accent,fontSize:13,fontWeight:'700'}}>＋ Adicionar vencimento</Text></Pressable>
       </Card_>
 
       {d.cards.filter(x => !x.archived).length ? (
@@ -452,14 +418,11 @@ function HomeTab({d, month, api, reload, onTx, onTab, onAccount, onManage}: {d: 
         </Card_>
       ) : null}
 
-      {budgets.length ? (
-        <Card_>
-          <Title text="Orçamentos do mês" action="Planejamento" onAction={() => onTab('plan')} />
-          {budgets.map(b => <BudgetRow key={b.budget.id} p={b} />)}
-        </Card_>
-      ) : (
-        <Pressable onPress={() => onTab('plan')}><Card_ style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{fontSize: 22}}>🎯</Text><Text style={{flex: 1, color: c.text}}>Defina limites por categoria e acompanhe quanto ainda pode gastar.</Text><Icon name="chevron" size={18} color={c.muted} /></Card_></Pressable>
-      )}
+      <View style={{gap:12,paddingTop:4}}>
+        <Title text="Entradas e saídas" />
+        <Text style={{fontSize:12,color:c.muted}}>Extrato da conta selecionada, sem boletos que ainda não foram pagos.</Text>
+        <TxTab d={d} month={month} accountFilter="" setAccountFilter={() => undefined} onTx={onTx} api={api} reload={reload} />
+      </View>
     </>
   );
 }
@@ -518,7 +481,7 @@ function BudgetRow({p}: {p: ReturnType<typeof budgetProgress>[number]}) {
 // ============================ LANÇAMENTOS ============================
 function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {d: Data; month: string; accountFilter: string; setAccountFilter: (v: string) => void; onTx: (t: Partial<Tx>) => void; api: SofiaApi; reload: () => Promise<void>}) {
   const c = useTheme(), [kind, setKind] = useState<'all' | TxKind>('all'), [q, setQ] = useState(''), [status, setStatus] = useState<'all' | 'pending'>('all');
-  const list = monthTxs(d.txs, month).filter(t => (kind === 'all' || t.kind === kind) && (!accountFilter || t.accountId === accountFilter || t.toAccountId === accountFilter || t.cardId === accountFilter)
+  const list = monthTxs(d.txs, month).filter(t => (!t.manualDue || t.paid) && (kind === 'all' || t.kind === kind) && (!accountFilter || t.accountId === accountFilter || t.toAccountId === accountFilter || t.cardId === accountFilter)
     && (status === 'all' || (!t.paid && !t.cardId)) && (!q.trim() || (t.desc + ' ' + t.category).toLowerCase().includes(q.trim().toLowerCase())));
   const days = useMemo(() => { const m = new Map<string, Tx[]>(); for (const t of list) { if (!m.has(t.date)) m.set(t.date, []); m.get(t.date)!.push(t); } return [...m.entries()]; }, [list]);
   const sum = list.reduce((s, t) => s + (t.kind === 'income' ? t.amount : t.kind === 'expense' ? -t.amount : 0), 0);
@@ -538,7 +501,7 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
         <Chips value={status} onChange={setStatus} options={[{value: 'all' as const, label: 'Tudo'}, {value: 'pending' as const, label: 'Só pendentes'}]} />
         {filterName ? <Pressable onPress={() => setAccountFilter('')} style={{paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99, backgroundColor: c.accentSoft}}><Text style={{color: c.accent, fontWeight: '600', fontSize: 12}}>{filterName} ✕</Text></Pressable> : null}
       </View>
-      <Text style={{color: c.muted, fontSize: 12}}>{list.length} lançamentos · resultado {money(sum)}</Text>
+      <Text style={{color: c.muted, fontSize: 12}}>{list.length} movimentações · resultado {money(sum)}</Text>
       {!days.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>Nenhum lançamento neste mês com esses filtros.</Text> : days.map(([date, items]) => (
         <View key={date} style={{gap: 6}}>
           <Text style={{color: c.muted, fontSize: 12, fontWeight: '600'}}>{weekday(date)}</Text>
