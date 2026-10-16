@@ -23,7 +23,7 @@ import {money} from '../lib/monitoring';
 import {
   EXPENSE_CATEGORIES, INCOME_CATEGORIES, ACCOUNT_TYPES, FIN_COLORS, categoryOf, toAccount, toCard, toTx, toBudget, toGoal, monthOf, addMonths, monthLabel, todayISO,
   invoiceMonth, cardInvoices, cardUsed, installmentPlan, accountBalance, totalBalance, forecastBalance, monthTxs, monthSummary, byCategory, budgetProgress,
-  trend, balanceSeries, upcoming, goalProgress, parseMoney, addDays,
+  trend, balanceSeries, upcoming, goalProgress, parseMoney, formatMoneyInput, finishMoneyInput, addDays,
 } from '../lib/finance';
 import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove} from '../lib/finance';
 import {moneySplit, reserveOf, toReserveMove} from '../lib/finance';
@@ -202,11 +202,11 @@ function Onboarding({api, onDone}: {api: SofiaApi; onDone: () => Promise<void>})
   );
 }
 function Field({label, value, onChange, placeholder, numeric = false, big = false}: {label: string; value: string; onChange: (v: string) => void; placeholder?: string; numeric?: boolean; big?: boolean}) {
-  const c = useTheme();
+  const c = useTheme(), isMoneyField = numeric && label.includes('(R$)');
   return (
     <View style={{gap: 6}}>
       <Text style={{fontSize: 12, color: c.muted}}>{label}</Text>
-      <TextInput accessibilityLabel={label} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={c.muted} keyboardType={numeric ? 'decimal-pad' : 'default'}
+      <TextInput accessibilityLabel={label} value={value} onChangeText={v => onChange(isMoneyField ? formatMoneyInput(v) : v)} onBlur={() => { if (isMoneyField) onChange(finishMoneyInput(value)); }} placeholder={placeholder} placeholderTextColor={c.muted} keyboardType={numeric ? 'decimal-pad' : 'default'}
         style={{fontSize: big ? 30 : 15, fontWeight: big ? '800' : '400', color: c.text, borderWidth: 1, borderColor: c.line, borderRadius: 12, padding: 12, backgroundColor: c.input}} />
     </View>
   );
@@ -215,7 +215,7 @@ function Field({label, value, onChange, placeholder, numeric = false, big = fals
 // ============================ 0.3.146: GUARDADO x DIA A DIA ============================
 function ReserveSheet({api, kind, reserve, split, onClose, onDone}: {api: SofiaApi; kind: 'setup' | 'in' | 'out' | 'plan'; reserve: Goal | null; split: ReturnType<typeof moneySplit> | null; onClose: () => void; onDone: () => Promise<void>}) {
   const c = useTheme();
-  const [name, setName] = useState(reserve?.name || 'Dinheiro guardado'), [amount, setAmount] = useState(''), [plan, setPlan] = useState(reserve ? String(reserve.entity?.data?.monthly_plan || '') : ''), [note, setNote] = useState('');
+  const [name, setName] = useState(reserve?.name || 'Dinheiro guardado'), [amount, setAmount] = useState(''), [plan, setPlan] = useState(reserve?.entity?.data?.monthly_plan ? finishMoneyInput(String(reserve.entity.data.monthly_plan).replace('.', ',')) : ''), [note, setNote] = useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const title = kind === 'setup' ? 'Separar o dinheiro guardado' : kind === 'in' ? 'Guardar dinheiro' : kind === 'out' ? 'Retirar da reserva' : 'Ajustar aporte mensal';
   async function save() {
@@ -237,7 +237,17 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone}: {api: SofiaA
     } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
   function confirmOut() { Alert.alert('Retirar da reserva?', 'Esse valor deixa de ser dinheiro guardado e passa para o dia a dia. É uma retirada consciente, registrada no histórico.', [{text: 'Cancelar'}, {text: 'Retirar', style: 'destructive', onPress: () => void save()}]); }
-  const input = (label: string, value: string, onChange: (v: string) => void, placeholder = '') => <View style={{gap: 6}}><Text style={{color: c.muted, fontSize: 12}}>{label}</Text><TextInput accessibilityLabel={label} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={c.muted} keyboardType={label.startsWith('Valor') || label.startsWith('Já') || label.startsWith('Aporte') ? 'decimal-pad' : 'default'} style={{fontSize: 16, color: c.text, borderWidth: 1, borderColor: c.line, borderRadius: 12, padding: 12, backgroundColor: c.surface}} /></View>;
+  const input = (label: string, value: string, onChange: (v: string) => void, placeholder = '') => {
+    const monetary = /^(Valor|Já guardado|Aporte)/.test(label);
+    return <View style={{gap: 6}}>
+      <Text style={{color: c.muted, fontSize: 12}}>{label}</Text>
+      <TextInput accessibilityLabel={label} value={value}
+        onChangeText={v => onChange(monetary ? formatMoneyInput(v) : v)}
+        onBlur={() => { if (monetary) onChange(finishMoneyInput(value)); }}
+        placeholder={placeholder} placeholderTextColor={c.muted} keyboardType={monetary ? 'decimal-pad' : 'default'}
+        style={{fontSize: 16, color: c.text, borderWidth: 1, borderColor: c.line, borderRadius: 12, padding: 12, backgroundColor: c.surface}} />
+    </View>;
+  };
   return <Sheet visible onClose={onClose} label={'Fechar ' + title}>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 14, paddingBottom: 18}}>
       <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>{title}</Text>
@@ -271,9 +281,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, onAccount, onManage}: {d: 
   const show = (v: number) => hide ? 'R$ •••••' : money(v);
   const reserve = reserveOf(d.goals);
   const split = useMemo(() => reserve ? moneySplit(reserve, d.moves || [], d.accounts, d.txs, d.cards, month, today) : null, [reserve, d, month, today]);
-  // 0.3.147: volta o cartao de saldo original. O dinheiro guardado entra DENTRO dele, no mesmo
-  // estilo das caixinhas de Receitas/Despesas: "Guardado" e "Para usar" (dia a dia livre apos
-  // os compromissos). Tocar abre as acoes (guardar, retirar, ajustar aporte).
+  // Reserva em linha discreta no cartão original; o detalhamento dos valores fica sob demanda.
   const [reserveMenu, setReserveMenu] = useState(false);
   return (
     <>
@@ -289,16 +297,59 @@ function HomeTab({d, month, api, reload, onTx, onTab, onAccount, onManage}: {d: 
           <View style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 14, padding: 10}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↑ Receitas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.income)}</Text></View>
           <View style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 14, padding: 10}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↓ Despesas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.expense)}</Text></View>
         </View>
-        {split ? <Pressable accessibilityRole="button" accessibilityLabel="Opções do dinheiro guardado" onPress={() => setReserveMenu(true)} style={{flexDirection: 'row', gap: 10}}>
-          <View style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 14, padding: 10}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>🔒 Guardado</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(split.saved)}</Text>{split.planned > 0 ? <Text style={{color: c.onAccent + 'aa', fontSize: 10}}>{split.missing > 0 ? 'faltam ' + show(split.missing) + ' no mês' : 'aporte do mês ok'}</Text> : null}</View>
-          <View style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 14, padding: 10}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>Para usar</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(split.free)}</Text><Text style={{color: c.onAccent + 'aa', fontSize: 10}}>{split.shortfall > 0 ? 'falta ' + show(split.shortfall) + ' p/ as contas' : 'depois das contas do mês'}</Text></View>
-        </Pressable> : <Pressable accessibilityRole="button" onPress={() => setReserveSheet('setup')}><Text style={{color: c.onAccent + 'cc', fontSize: 12, textDecorationLine: 'underline'}}>🔒 Separar o dinheiro guardado</Text></Pressable>}
+        {split ? (
+          <View style={{borderTopWidth: 1, borderColor: c.onAccent + '36', paddingTop: 12, gap: 9}}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Abrir detalhes e ações da reserva" onPress={() => setReserveMenu(true)}
+              style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+              <View style={{width: 36, height: 36, borderRadius: 12, backgroundColor: c.onAccent + '22', alignItems: 'center', justifyContent: 'center'}}>
+                <Icon name="shield" size={18} color={c.onAccent} />
+              </View>
+              <View style={{flex: 1, gap: 2}}>
+                <Text style={{color: c.onAccent, fontWeight: '800', fontSize: 13}}>Reserva separada</Text>
+                <Text style={{color: c.onAccent + 'bb', fontSize: 11}}>Dinheiro que você decidiu preservar</Text>
+              </View>
+              <View style={{alignItems: 'flex-end', gap: 3}}>
+                <Text style={{color: c.onAccent, fontWeight: '800', fontSize: 18}}>{show(split.saved)}</Text>
+                <Text style={{color: c.onAccent + 'bb', fontSize: 11}}>Gerenciar ›</Text>
+              </View>
+            </Pressable>
+            {split.planned > 0 ? (
+              <View style={{gap: 5, paddingLeft: 46}}>
+                <View style={{flexDirection: 'row', justifyContent: 'space-between', gap: 8}}>
+                  <Text style={{color: c.onAccent + 'bb', fontSize: 11}}>Aporte de {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
+                  <Text style={{color: c.onAccent, fontSize: 11, fontWeight: '600'}}>{show(split.realized)} / {show(split.planned)}</Text>
+                </View>
+                <View style={{height: 5, backgroundColor: c.onAccent + '30', borderRadius: 99, overflow: 'hidden'}}>
+                  <View style={{width: `${Math.min(100, Math.max(0, split.realized / split.planned * 100))}%` as `${number}%`, backgroundColor: c.onAccent, height: '100%', borderRadius: 99}} />
+                </View>
+              </View>
+            ) : null}
+          </View>
+        ) : <Pressable accessibilityRole="button" onPress={() => setReserveSheet('setup')} style={{paddingTop: 6}}>
+          <Text style={{color: c.onAccent + 'dd', fontSize: 12, textDecorationLine: 'underline'}}>＋ Criar reserva separada</Text>
+        </Pressable>}
       </View>
-      <Sheet visible={reserveMenu} onClose={() => setReserveMenu(false)} label="Fechar opções do dinheiro guardado">
-        <View style={{gap: 4, paddingBottom: 12}}>
-          <Text style={{fontSize: 18, fontWeight: '800', color: c.text, marginBottom: 4}}>Dinheiro guardado</Text>
-          {split ? <Text style={{color: c.muted, fontSize: 12, lineHeight: 18, marginBottom: 6}}>Guardado {show(split.saved)} · dia a dia {show(split.daily)} · comprometido {show(split.committed)}. O dinheiro continua nas suas contas; a separação é só na Sofia.</Text> : null}
-          {[['Guardar dinheiro', 'in'], ['Retirar da reserva', 'out'], ['Ajustar aporte mensal', 'plan']].map(([label, k]) => <Pressable key={k} accessibilityRole="button" onPress={() => { setReserveMenu(false); setReserveSheet(k as 'in' | 'out' | 'plan'); }} style={{paddingVertical: 14}}><Text style={{color: k === 'out' ? BAD : c.text, fontSize: 15}}>{label}</Text></Pressable>)}
+      <Sheet visible={reserveMenu} onClose={() => setReserveMenu(false)} label="Fechar detalhes da reserva">
+        <View style={{gap: 14, paddingBottom: 12}}>
+          <Text style={{fontSize: 18, fontWeight: '800', color: c.text}}>Sua reserva</Text>
+          {split ? <>
+            <Text style={{fontSize: 29, fontWeight: '800', color: c.text}}>{show(split.saved)}</Text>
+            <Text style={{fontSize: 12, lineHeight: 18, color: c.muted}}>Esse dinheiro está incluído no saldo geral. A separação organiza o que você pretende preservar, mas não bloqueia nem transfere valores no banco.</Text>
+            <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 10}}>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Saldo geral nas contas</Text><Text style={{color: c.text, fontWeight: '700'}}>{show(split.total)}</Text></View>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Fora da reserva</Text><Text style={{color: split.daily < 0 ? BAD : c.text, fontWeight: '700'}}>{show(split.daily)}</Text></View>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Despesas previstas do mês</Text><Text style={{color: c.text, fontWeight: '700'}}>{show(split.committed)}</Text></View>
+              <View style={{height: 1, backgroundColor: c.line}} />
+              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '700', fontSize: 12}}>Livre após despesas previstas</Text><Text style={{color: split.free < 0 ? BAD : GOOD, fontWeight: '800'}}>{show(split.free)}</Text></View>
+            </View>
+            {split.daily < 0 ? <Text style={{color: BAD, fontSize: 12}}>Sua reserva está maior que o saldo geral das contas. Confira os valores antes de gastar.</Text> : null}
+          </> : null}
+          {[['Guardar dinheiro', 'in'], ['Retirar da reserva', 'out'], ['Ajustar aporte mensal', 'plan']].map(([label, k]) => (
+            <Pressable key={k} accessibilityRole="button" onPress={() => { setReserveMenu(false); setReserveSheet(k as 'in' | 'out' | 'plan'); }}
+              style={{paddingVertical: 13, borderBottomWidth: 1, borderColor: c.line}}>
+              <Text style={{color: k === 'out' ? BAD : c.text, fontSize: 15, fontWeight: '600'}}>{label}  ›</Text>
+            </Pressable>
+          ))}
         </View>
       </Sheet>
 
@@ -459,7 +510,7 @@ function TxRow({t, d, first, onPress, api, reload}: {t: Tx; d: Data; first: bool
 function TxEditor({api, d, tx, onClose, onSaved}: {api: SofiaApi; d: Data; tx: Partial<Tx>; onClose: () => void; onSaved: () => void}) {
   const c = useTheme(), editing = !!tx.entity && !tx.virtual;
   const [kind, setKind] = useState<TxKind>(tx.kind || 'expense');
-  const [amount, setAmount] = useState(tx.amount ? String(tx.amount).replace('.', ',') : ''), [desc, setDesc] = useState(tx.desc || '');
+  const [amount, setAmount] = useState(tx.amount ? finishMoneyInput(String(tx.amount).replace('.', ',')) : ''), [desc, setDesc] = useState(tx.desc || '');
   const [category, setCategory] = useState(tx.category || ''), [date, setDate] = useState(tx.date || todayISO());
   const firstAccount = d.accounts.find(a => !a.archived)?.id || '';
   const [source, setSource] = useState(tx.cardId || tx.accountId || firstAccount), [to, setTo] = useState(tx.toAccountId || d.accounts.find(a => !a.archived && a.id !== firstAccount)?.id || '');
@@ -522,7 +573,7 @@ function TxEditor({api, d, tx, onClose, onSaved}: {api: SofiaApi; d: Data; tx: P
           ) : null}
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
             <Text style={{color: headText + 'cc', fontSize: 22}}>R$</Text>
-            <TextInput accessibilityLabel="Valor" value={amount} onChangeText={setAmount} placeholder="0,00" placeholderTextColor={headText + '88'} keyboardType="decimal-pad" autoFocus={!editing}
+            <TextInput accessibilityLabel="Valor" value={amount} onChangeText={v => setAmount(formatMoneyInput(v))} onBlur={() => setAmount(v => finishMoneyInput(v))} placeholder="0,00" placeholderTextColor={headText + '88'} keyboardType="decimal-pad" autoFocus={!editing}
               style={{flex: 1, color: headText, fontSize: 38, fontWeight: '800', padding: 0}} />
           </View>
         </View>
@@ -690,7 +741,7 @@ function AmountSheet({title, onClose, onSave}: {title: string; onClose: () => vo
   );
 }
 function BudgetSheet({api, budget, used, onClose, onSaved}: {api: SofiaApi; budget: Budget | null; used: string[]; onClose: () => void; onSaved: () => void}) {
-  const c = useTheme(), [cat, setCat] = useState(budget?.category || ''), [limit, setLimit] = useState(budget ? String(budget.limit).replace('.', ',') : ''), [error, setError] = useState(''), [busy, setBusy] = useState(false);
+  const c = useTheme(), [cat, setCat] = useState(budget?.category || ''), [limit, setLimit] = useState(budget ? finishMoneyInput(String(budget.limit).replace('.', ',')) : ''), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   return (
     <Sheet visible onClose={onClose} label="Fechar orçamento">
       <ScrollView style={{maxHeight: 520}} contentContainerStyle={{gap: 12}}>
@@ -707,7 +758,7 @@ function BudgetSheet({api, budget, used, onClose, onSaved}: {api: SofiaApi; budg
   );
 }
 function GoalSheet({api, goal, onClose, onSaved}: {api: SofiaApi; goal: Goal | null; onClose: () => void; onSaved: () => void}) {
-  const c = useTheme(), [name, setName] = useState(goal?.name || ''), [target, setTarget] = useState(goal ? String(goal.target).replace('.', ',') : ''), [saved, setSaved] = useState(goal ? String(goal.saved).replace('.', ',') : '');
+  const c = useTheme(), [name, setName] = useState(goal?.name || ''), [target, setTarget] = useState(goal ? finishMoneyInput(String(goal.target).replace('.', ',')) : ''), [saved, setSaved] = useState(goal ? finishMoneyInput(String(goal.saved).replace('.', ',')) : '');
   const [deadline, setDeadline] = useState(goal?.deadline || ''), [color, setColor] = useState(goal?.color || FIN_COLORS[1]), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   return (
     <Sheet visible onClose={onClose} label="Fechar objetivo">
@@ -819,9 +870,9 @@ function ManageSheet({api, d, onClose, reload}: {api: SofiaApi; d: Data; onClose
 }
 function AccountCardSheet({api, d, edit, onClose, onSaved}: {api: SofiaApi; d: Data; edit: {type: 'account'; item: Account | null} | {type: 'card'; item: Card | null}; onClose: () => void; onSaved: () => void}) {
   const c = useTheme(), isCard = edit.type === 'card', acc = edit.type === 'account' ? edit.item : null, card = edit.type === 'card' ? edit.item : null;
-  const [name, setName] = useState(edit.item?.name || ''), [type, setType] = useState(acc?.type || 'corrente'), [initial, setInitial] = useState(acc ? String(acc.initial).replace('.', ',') : '');
+  const [name, setName] = useState(edit.item?.name || ''), [type, setType] = useState(acc?.type || 'corrente'), [initial, setInitial] = useState(acc ? finishMoneyInput(String(acc.initial).replace('.', ',')) : '');
   const [include, setInclude] = useState(acc?.include ?? true), [color, setColor] = useState(edit.item?.color || FIN_COLORS[isCard ? 2 : d.accounts.length % FIN_COLORS.length]);
-  const [limit, setLimit] = useState(card ? String(card.limit).replace('.', ',') : ''), [closing, setClosing] = useState(card ? String(card.closing) : ''), [due, setDue] = useState(card ? String(card.due) : '');
+  const [limit, setLimit] = useState(card ? finishMoneyInput(String(card.limit).replace('.', ',')) : ''), [closing, setClosing] = useState(card ? String(card.closing) : ''), [due, setDue] = useState(card ? String(card.due) : '');
   const [payFrom, setPayFrom] = useState(card?.accountId || d.accounts[0]?.id || ''), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   async function save() {
     if (!name.trim()) { setError('Dê um nome.'); return; }
