@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View} from 'react-native';
+import {ActivityIndicator, Alert, BackHandler, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Svg, {Path, Rect, Line} from 'react-native-svg';
 import {useTheme, light} from '../lib/theme';
@@ -23,14 +23,15 @@ import {money} from '../lib/monitoring';
 import {
   EXPENSE_CATEGORIES, INCOME_CATEGORIES, ACCOUNT_TYPES, FIN_COLORS, categoryOf, toAccount, toCard, toTx, toBudget, toGoal, monthOf, addMonths, monthLabel, todayISO,
   invoiceMonth, cardInvoices, cardUsed, installmentPlan, accountBalance, totalBalance, forecastBalance, monthTxs, monthSummary, byCategory, budgetProgress,
-  trend, balanceSeries, upcoming, goalProgress, parseMoney, formatMoneyInput, finishMoneyInput, addDays,
+  trend, balanceSeries, upcoming, manualDues, transactionsForAccount, financeInsights, goalProgress, parseMoney, formatMoneyInput, finishMoneyInput, addDays,
 } from '../lib/finance';
 import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove} from '../lib/finance';
 import {moneySplit, reserveOf, toReserveMove} from '../lib/finance';
+import {syncFinanceDueNotifications} from '../lib/finance-notifications';
 
 const GOOD = '#2fc58b', BAD = '#ff6b7a', WARN = '#ffb547';
 type Data = {accounts: Account[]; cards: Card[]; txs: Tx[]; budgets: Budget[]; goals: Goal[]; moves: ReserveMove[]};
-type Tab = 'home' | 'txs' | 'cards' | 'plan' | 'reports';
+type Tab = 'home' | 'txs' | 'bills' | 'cards' | 'plan' | 'reports';
 const KINDS = ['fin_account', 'fin_card', 'fin_tx', 'fin_budget', 'fin_goal', 'fin_reserve_move'] as const;
 const dateBR = (d: string) => d ? d.slice(8, 10) + '/' + d.slice(5, 7) : '';
 const weekday = (d: string) => new Date(d + 'T12:00:00Z').toLocaleDateString('pt-BR', {weekday: 'long', day: '2-digit', month: 'long', timeZone: 'UTC'});
@@ -109,6 +110,26 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
   const [tab, setTab] = useState<Tab>('home'), [month, setMonth] = useState(monthOf(todayISO()));
   const [editing, setEditing] = useState<Partial<Tx> | null>(null), [manage, setManage] = useState(false);
   const [accountFilter, setAccountFilter] = useState<string>('');
+  const [selectedAccount, setSelectedAccount] = useState(''), [accountPicker, setAccountPicker] = useState(false);
+  const [billEditor, setBillEditor] = useState<Tx | 'new' | null>(null), [notificationWarning, setNotificationWarning] = useState('');
+  const [tabHistory, setTabHistory] = useState<Tab[]>([]);
+  const navigateFinance = useCallback((next: Tab) => {
+    if (next === tab) return;
+    setTabHistory(h => [...h, tab].slice(-16)); setTab(next);
+  },[tab]);
+  const backFinance = useCallback(() => {
+    if (billEditor) {setBillEditor(null);return;}
+    if (accountPicker) {setAccountPicker(false);return;}
+    if (editing) {setEditing(null);return;}
+    if (manage) {setManage(false);return;}
+    if (tabHistory.length) {setTab(tabHistory[tabHistory.length - 1]);setTabHistory(h => h.slice(0,-1));return;}
+    onBack();
+  },[billEditor,accountPicker,editing,manage,tabHistory,onBack]);
+  useEffect(() => {
+    if (!active) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {backFinance();return true;});
+    return () => sub.remove();
+  },[active,backFinance]);
   const window = financeWindow(month, tab), windowKey = window.from + '..' + window.to, loaded = useRef<string>('');
   const reload = useCallback(async () => {
     setLoading(true);
@@ -127,26 +148,54 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
   }, [active, reload, api, windowKey]);
 
   const d = data;
-  const newTx = (kind: TxKind = 'expense') => setEditing({kind, date: todayISO(), paid: true});
+  const primary = useMemo(() => {
+    const activeAccounts = d?.accounts.filter(a => !a.archived) || [];
+    return activeAccounts.find(a => /^conta principal$/i.test(a.name.trim()))
+      || activeAccounts.slice().sort((a,b) => String(a.entity.created_at || '').localeCompare(String(b.entity.created_at || '')))[0];
+  },[d]);
+  const account = d?.accounts.find(a => a.id === selectedAccount && !a.archived) || primary;
+  const accountId = account?.id || '';
+  const isPrimary = !primary || accountId === primary.id;
+  const scoped = useMemo(() => {
+    if (!d || !account) return d;
+    return {...d, accounts: [{...account, include: true}], cards: d.cards.filter(card => card.accountId === account.id && !card.archived),
+      txs: transactionsForAccount(d.txs,d.cards,account.id)};
+  },[d,accountId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const newTx = (kind: TxKind = 'expense') => setEditing({kind, date: todayISO(), accountId, paid: true});
+  useEffect(() => {
+    if (!active || !d) return;
+    let valid = true;
+    void syncFinanceDueNotifications(d.txs, api.owner).then(w => {if(valid)setNotificationWarning(w);});
+    return () => {valid=false;};
+  },[active,api,d]);
 
   return (
-    <InternalBackGesture enabled={active && !editing && !manage} onBack={onBack}>
+    <InternalBackGesture enabled={active && !editing && !manage && !billEditor && !accountPicker} onBack={backFinance}>
       <View style={{flex: 1, backgroundColor: c.bg}}>
         <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 14, paddingBottom: 4}}>
-          <IconButton name="back" label="Voltar aos apps" onPress={onBack} />
+          <IconButton name="back" label="Voltar à tela anterior" onPress={backFinance} />
           <View style={{flex: 1, paddingHorizontal: 4}}>
             <Text style={{fontSize: 11, letterSpacing: 1.2, color: c.muted, fontWeight: '600'}}>SEU DINHEIRO, SEM SUSTO</Text>
             <Text style={{fontSize: 24, fontWeight: '800', color: c.text}}>Finanças</Text>
           </View>
           <IconButton name="settings" label="Contas e cartões" onPress={() => setManage(true)} />
         </View>
+        {d?.accounts.length ? <View style={{paddingHorizontal: 20, paddingTop: 6, paddingBottom: 8}}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Selecionar conta financeira" onPress={() => setAccountPicker(true)}
+            style={{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:c.surface,borderColor:c.line,borderWidth:1,borderRadius:15,paddingHorizontal:13,paddingVertical:10}}>
+            <View style={{width:10,height:10,borderRadius:5,backgroundColor:account?.color||c.accent}} />
+            <View style={{flex:1,gap:2}}><Text style={{fontWeight:'800',color:c.text,fontSize:14}}>{account?.name||'Selecionar conta'}</Text>
+            <Text style={{color:c.muted,fontSize:11}}>{isPrimary?'Conta principal':'Conta secundária · painel independente'}</Text></View>
+            <Icon name="chevron" size={18} color={c.muted} />
+          </Pressable>
+        </View> : null}
         <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4}}>
           <IconButton name="back" label="Mês anterior" size={36} onPress={() => setMonth(m => addMonths(m, -1))} />
           <Pressable onPress={() => setMonth(monthOf(todayISO()))}><Text style={{fontSize: 16, fontWeight: '700', color: c.text, minWidth: 150, textAlign: 'center'}}>{monthLabel(month)}</Text></Pressable>
           <Pressable accessibilityLabel="Próximo mês" onPress={() => setMonth(m => addMonths(m, 1))} style={{width: 36, height: 36, alignItems: 'center', justifyContent: 'center', transform: [{rotate: '180deg'}]}}><Icon name="back" size={20} color={c.text} /></Pressable>
         </View>
         <View style={{paddingHorizontal: 16, paddingBottom: 8}}>
-          <Chips scroll value={tab} onChange={setTab} options={[{value: 'home' as Tab, label: 'Resumo'}, {value: 'txs' as Tab, label: 'Lançamentos'}, {value: 'cards' as Tab, label: 'Cartões'}, {value: 'plan' as Tab, label: 'Planejamento'}, {value: 'reports' as Tab, label: 'Relatórios'}]} />
+          <Chips scroll value={tab} onChange={navigateFinance} options={[{value: 'home' as Tab, label: 'Resumo'}, {value: 'bills' as Tab, label: 'Pendentes'}, {value: 'cards' as Tab, label: 'Cartões'}, {value: 'reports' as Tab, label: 'Relatórios'}]} />
         </View>
 
         {!d ? <View style={{flex: 1, padding: 16, gap: 14}}>{error ? <View style={{padding: 20, gap: 12}}><Text style={{color: c.danger}}>{error}</Text><Button title="Tentar de novo" secondary onPress={() => void reload()} /></View> : <View style={{gap: 6}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Spinner size={16} stroke={1.8} /><Text style={{color: c.muted, fontSize: 13}}>Carregando suas finanças</Text></View><LoadingLines rows={5} /></View>}</View> : !d.accounts.length ? (
@@ -154,11 +203,10 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
         ) : (
           <ScrollView contentContainerStyle={{padding: 16, paddingBottom: insets.bottom + 110, gap: 14}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>
             {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
-            {tab === 'home' ? <HomeTab d={d} month={month} api={api} reload={reload} onTx={setEditing} onTab={setTab} onAccount={id => { setAccountFilter(id); setTab('txs'); }} onManage={() => setManage(true)} />
-              : tab === 'txs' ? <TxTab d={d} month={month} accountFilter={accountFilter} setAccountFilter={setAccountFilter} onTx={setEditing} api={api} reload={reload} />
-              : tab === 'cards' ? <CardsTab d={d} api={api} reload={reload} onTx={setEditing} onManage={() => setManage(true)} />
-              : tab === 'plan' ? <PlanTab d={d} month={month} api={api} reload={reload} />
-              : <ReportsTab d={d} month={month} />}
+            {tab === 'home' ? <HomeTab d={scoped || d} month={month} api={api} reload={reload} onTx={setEditing} onTab={navigateFinance} accountId={accountId} isPrimary={isPrimary} onBill={() => setBillEditor('new')} />
+              : tab === 'bills' ? <PendingTab d={scoped || d} api={api} month={month} accountId={accountId} warning={notificationWarning} onBill={setBillEditor} reload={reload} />
+              : tab === 'cards' ? <CardsTab d={scoped || d} api={api} reload={reload} onTx={setEditing} onManage={() => setManage(true)} />
+              : <ReportsTab d={scoped || d} month={month} />}
           </ScrollView>
         )}
 
@@ -169,8 +217,22 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
           </View>
         ) : null}
 
-        {editing && d ? <TxEditor api={api} d={d} tx={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} /> : null}
+        {editing && d ? <TxEditor api={api} d={d} tx={editing} defaultAccountId={accountId} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} /> : null}
+        {billEditor && d ? <BillEditor api={api} tx={billEditor === 'new' ? null : billEditor} accountId={accountId} onClose={() => setBillEditor(null)} onSaved={() => {setBillEditor(null);void reload();}} /> : null}
         {manage && d ? <ManageSheet api={api} d={d} onClose={() => setManage(false)} reload={reload} /> : null}
+        <Sheet visible={accountPicker} onClose={() => setAccountPicker(false)} label="Fechar seletor de contas">
+          <View style={{gap:14,paddingBottom:12}}>
+            <Text style={{fontSize:19,fontWeight:'800',color:c.text}}>Qual conta quer acompanhar?</Text>
+            <Text style={{fontSize:12,color:c.muted}}>Cada conta mostra apenas o próprio saldo, entradas, saídas, faturas e pendências.</Text>
+            {d?.accounts.filter(a=>!a.archived).map(a=><Pressable key={a.id} accessibilityRole="button" accessibilityState={{selected:a.id===accountId}} onPress={()=>{setSelectedAccount(a.id);setTab('home');setTabHistory([]);setAccountPicker(false);}}
+              style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:13,borderBottomWidth:1,borderColor:c.line}}>
+              <View style={{width:12,height:12,borderRadius:6,backgroundColor:a.color}} />
+              <View style={{flex:1}}><Text style={{color:c.text,fontSize:15,fontWeight:'700'}}>{a.name}</Text><Text style={{color:c.muted,fontSize:11}}>{a.id===primary?.id?'Principal':'Secundária'}</Text></View>
+              <Text style={{color:c.text,fontWeight:'700'}}>{money(accountBalance(a,d.txs))}</Text>
+            </Pressable>)}
+            <Button title="Gerenciar ou adicionar conta" secondary onPress={()=>{setAccountPicker(false);setManage(true);}} />
+          </View>
+        </Sheet>
       </View>
     </InternalBackGesture>
   );
@@ -507,12 +569,12 @@ function TxRow({t, d, first, onPress, api, reload}: {t: Tx; d: Data; first: bool
 }
 
 // ============================ EDITOR ============================
-function TxEditor({api, d, tx, onClose, onSaved}: {api: SofiaApi; d: Data; tx: Partial<Tx>; onClose: () => void; onSaved: () => void}) {
+function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved}: {api: SofiaApi; d: Data; tx: Partial<Tx>; defaultAccountId?: string; onClose: () => void; onSaved: () => void}) {
   const c = useTheme(), editing = !!tx.entity && !tx.virtual;
   const [kind, setKind] = useState<TxKind>(tx.kind || 'expense');
   const [amount, setAmount] = useState(tx.amount ? finishMoneyInput(String(tx.amount).replace('.', ',')) : ''), [desc, setDesc] = useState(tx.desc || '');
   const [category, setCategory] = useState(tx.category || ''), [date, setDate] = useState(tx.date || todayISO());
-  const firstAccount = d.accounts.find(a => !a.archived)?.id || '';
+  const firstAccount = (defaultAccountId && d.accounts.some(a=>a.id===defaultAccountId&&!a.archived) ? defaultAccountId : d.accounts.find(a => !a.archived)?.id) || '';
   const [source, setSource] = useState(tx.cardId || tx.accountId || firstAccount), [to, setTo] = useState(tx.toAccountId || d.accounts.find(a => !a.archived && a.id !== firstAccount)?.id || '');
   const [paid, setPaid] = useState(tx.paid ?? true), [repeat, setRepeat] = useState<'none' | 'monthly' | 'installments'>(tx.recurrence && tx.recurrence !== 'none' ? 'monthly' : 'none');
   const [parts, setParts] = useState(3), [busy, setBusy] = useState(false), [error, setError] = useState('');
