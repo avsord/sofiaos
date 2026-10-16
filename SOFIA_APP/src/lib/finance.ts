@@ -264,7 +264,7 @@ export function manualDues(txs: Tx[], accountId = '', today = todayISO(), days =
 export type FinanceInsight = {tone: 'good' | 'attention' | 'neutral'; text: string};
 export function financeInsights(txs: Tx[], month: string): FinanceInsight[] {
   // Conselhos só com dados realmente registrados; sem inventar gastos, projeções ou culpa.
-  const settled = txs.filter(t => t.paid && !t.virtual);
+  const settled = txs.filter(t => !t.virtual && ((t.paid) || (t.kind === 'expense' && !!t.cardId)) && (!t.manualDue || t.paid));
   const monthPaid = monthTxs(settled, month);
   const count = monthPaid.filter(t => t.kind === 'income' || t.kind === 'expense').length;
   if (!count) return [{tone:'neutral',text:'Ainda não há receitas ou despesas confirmadas suficientes para analisar este mês.'}];
@@ -304,13 +304,17 @@ export function parseMoney(text: string): number | null {
 /** Máscara brasileira durante a digitação: agrupa milhares sem mudar a ordem digitada.
  * A vírgula é o separador decimal explícito (ponto do teclado decimal também é aceito).
  * Nunca converte o texto em centavos automaticamente: "191146" são 191.146 reais. */
-export function formatMoneyInput(text: string): string {
+export function formatMoneyInput(text: string, previous = ''): string {
   const raw = String(text ?? '').replace(/[^\d.,-]/g, '');
   if (!raw) return '';
   const sign = raw.startsWith('-') ? '-' : '';
   const clean = raw.replace(/-/g, '');
   const comma = clean.lastIndexOf(','), dot = clean.lastIndexOf('.');
-  const decimalAt = comma >= 0 ? comma : dot >= 0 && clean.slice(dot + 1).replace(/\D/g, '').length <= 2 ? dot : -1;
+  // Diferenciar ponto decimal digitado de ponto de milhar gerado pela máscara.
+  // Ao apagar "1.234" para "1.23", não transformar 123 reais em R$ 1,23.
+  const pastedDecimal = !previous && dot >= 0 && (clean.match(/\./g) || []).length === 1
+    && clean.slice(dot + 1).length <= 2;
+  const decimalAt = comma >= 0 ? comma : dot >= 0 && (clean.endsWith('.') || pastedDecimal) ? dot : -1;
   const whole = (decimalAt >= 0 ? clean.slice(0, decimalAt) : clean).replace(/\D/g, '').replace(/^0+(?=\d)/, '');
   const fraction = decimalAt >= 0 ? clean.slice(decimalAt + 1).replace(/\D/g, '').slice(0, 2) : '';
   const grouped = (whole || '0').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
