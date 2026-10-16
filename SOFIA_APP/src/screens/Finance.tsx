@@ -333,6 +333,85 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone}: {api: SofiaA
   </Sheet>;
 }
 
+// ============================ PENDENTES MANUAIS ============================
+function PendingTab({d,api,month,accountId,warning,onBill,reload}: {d:Data;api:SofiaApi;month:string;accountId:string;warning:string;onBill:(t:Tx|'new')=>void;reload:()=>Promise<void>}) {
+  const c=useTheme(),today=todayISO(),list=useMemo(()=>manualDues(d.txs,accountId,today,120),[d,accountId,today]);
+  const total=list.reduce((sum,row)=>sum+row.amount,0);
+  return <>
+    <Card_>
+      <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
+        <View style={{flex:1,gap:5}}><Text style={{fontSize:17,fontWeight:'800',color:c.text}}>Boletos e dívidas</Text>
+        <Text style={{fontSize:12,color:c.muted,lineHeight:18}}>Cadastre cada vencimento manualmente. Compras e extratos não criam pendências.</Text></View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Cadastrar conta a pagar" onPress={()=>onBill('new')} style={{backgroundColor:c.accent,paddingHorizontal:13,paddingVertical:11,borderRadius:12}}>
+          <Text style={{color:c.onAccent,fontSize:13,fontWeight:'800'}}>＋ Nova</Text>
+        </Pressable>
+      </View>
+      <View style={{borderTopWidth:1,borderColor:c.line,paddingTop:12,flexDirection:'row',justifyContent:'space-between'}}>
+        <Text style={{color:c.muted,fontSize:12}}>{list.length} pendentes cadastradas</Text>
+        <Text style={{color:c.text,fontWeight:'800'}}>{money(total)}</Text>
+      </View>
+      {warning ? <Text style={{fontSize:12,color:WARN}}>{warning}</Text> : null}
+    </Card_>
+    <Card_>
+      <Title text="A vencer e atrasadas" />
+      {list.length ? list.map(due=><DueRow key={due.id} due={due} d={d} api={api} reload={reload} onTx={t=>onBill(t as Tx)} />)
+        : <Text style={{color:c.muted,fontSize:13,lineHeight:20}}>Nenhum vencimento manual nos próximos 120 dias. Adicione boletos, contas ou dívidas com a data em que deseja ser lembrado.</Text>}
+      <Text style={{fontSize:11,color:c.muted}}>Os avisos locais são programados para as 9h do dia de vencimento, com a permissão de notificações do Android. Marcar como pago tira o item dos pendentes e o inclui no extrato.</Text>
+    </Card_>
+  </>;
+}
+function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;accountId:string;onClose:()=>void;onSaved:()=>void}) {
+  const c=useTheme(),existing=!!tx?.entity&&!tx?.virtual;
+  const [name,setName]=useState(tx?.desc||''),[amount,setAmount]=useState(tx?.amount?finishMoneyInput(String(tx.amount).replace('.',',')):'');
+  const [date,setDate]=useState(tx?.date||todayISO()),[category,setCategory]=useState(tx?.category||'Contas');
+  const [repeat,setRepeat]=useState(tx?.recurrence==='monthly'?'monthly':'none');
+  const [error,setError]=useState(''),[busy,setBusy]=useState(false);
+  async function save() {
+    const value=parseMoney(amount);
+    if(!name.trim()){setError('Informe qual conta ou dívida precisa pagar.');return;}
+    if(!value||value<=0){setError('Informe o valor a pagar.');return;}
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T12:00:00Z'))){setError('Selecione uma data de vencimento válida.');return;}
+    if(!accountId){setError('Selecione uma conta financeira primeiro.');return;}
+    setBusy(true);setError('');
+    try{
+      const data={
+        kind:'expense',amount:value,date,category,account_id:tx?.accountId||accountId,
+        paid:false,card_id:'',to_account_id:'',
+        recurrence:tx?.virtual?'none':repeat,
+        series_id:tx?.seriesId||'',
+        import_id:existing?String(tx?.entity?.data?.import_id||''): 'sofia-pendencia:'+uid(),
+      };
+      await saveEntity(api,'fin_tx',name.trim(),data,existing?tx?.entity:undefined);
+      onSaved();
+    }catch(e){setError(errorText(e));}finally{setBusy(false);}
+  }
+  function erase() {
+    if(!tx?.entity||tx.virtual)return;
+    Alert.alert('Excluir vencimento?', 'Esse cadastro será apagado. Lançamentos já pagos de meses anteriores não serão excluídos.', [
+      {text:'Cancelar',style:'cancel'},
+      {text:'Excluir',style:'destructive',onPress:()=>{setBusy(true);void api.deleteEntity(tx.entity!.id).then(onSaved).catch(e=>setError(errorText(e))).finally(()=>setBusy(false));}}
+    ]);
+  }
+  return <Sheet visible onClose={onClose} label="Fechar cadastro de vencimento">
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap:13,paddingBottom:24}}>
+      <Text style={{fontSize:20,fontWeight:'800',color:c.text}}>{existing?'Editar vencimento':'Novo vencimento'}</Text>
+      <Text style={{fontSize:13,lineHeight:19,color:c.muted}}>Este registro só afeta o saldo depois que você confirmar o pagamento. Não vem automaticamente do extrato bancário.</Text>
+      <Field label="Conta a pagar" value={name} onChange={setName} placeholder="Ex.: Boleto de energia, dívida, aluguel" />
+      <Field label="Valor (R$)" value={amount} onChange={setAmount} numeric placeholder="0,00" />
+      <DateTimeField label="Vencimento" value={date} onChange={v=>v&&setDate(v)} dateOnly allowClear={false} />
+      <Text style={{color:c.muted,fontSize:12}}>Categoria</Text>
+      <Chips scroll value={category} onChange={setCategory} options={['Contas','Moradia','Saúde','Impostos','Outros'].map(x=>({value:x,label:x}))}/>
+      <Text style={{color:c.muted,fontSize:12}}>Repetição</Text>
+      <Chips value={repeat} onChange={setRepeat} options={[{value:'none',label:'Só esta vez'},{value:'monthly',label:'Todo mês'}]}/>
+      {tx?.virtual?<Text style={{color:c.muted,fontSize:12}}>Esta ocorrência pertence a uma série mensal. Editá-la cria uma exceção, preservando a série.</Text>:null}
+      {error?<Text style={{color:BAD,fontSize:13}}>{error}</Text>:null}
+      <Button title="Salvar vencimento" loading={busy} onPress={()=>void save()} />
+      {existing?<Pressable accessibilityRole="button" accessibilityLabel="Excluir vencimento" onPress={erase} style={{alignItems:'center',paddingVertical:12}}>
+        <Text style={{color:BAD,fontWeight:'700'}}>Excluir vencimento</Text></Pressable>:null}
+    </ScrollView>
+  </Sheet>;
+}
+
 // ============================ RESUMO ============================
 function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBill}: {d: Data; month: string; api: SofiaApi; reload: () => Promise<void>; onTx: (t: Partial<Tx>) => void; onTab: (t: Tab) => void; accountId: string; isPrimary: boolean; onBill: (t?: Tx) => void}) {
   const c = useTheme(), today = todayISO();
