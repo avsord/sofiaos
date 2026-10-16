@@ -49,7 +49,7 @@ test('Financas: cartao "Saldo geral", botao Nova despesa, cabecalho do lancament
   const fin = fs.readFileSync(path.join(__dirname, '../src/screens/Finance.tsx'), 'utf8');
   for (const t of [
     'color: c.onAccent, fontSize: 32',
-    "color: c.onAccent, fontSize: 22, fontWeight: '800'}}>\u2212",
+    "<Text style={{color: c.onAccent, fontSize: 28, fontWeight: '400', marginTop: -2}}>＋</Text>",
     "headText = head === c.accent ? c.onAccent : '#fff'",
     'selectedTabText = head === c.accent ? light.accent : head',
     'color: kind === k ? selectedTabText : headText',

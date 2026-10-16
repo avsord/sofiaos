@@ -160,6 +160,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
     return {...d, accounts: [{...account, include: true}], cards: d.cards.filter(card => card.accountId === account.id && !card.archived),
       txs: transactionsForAccount(d.txs,d.cards,account.id)};
   },[d,accountId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [newMenu, setNewMenu] = useState(false);
   const newTx = (kind: TxKind = 'expense') => setEditing({kind, date: todayISO(), accountId, paid: true});
   useEffect(() => {
     if (!active || !d) return;
@@ -174,24 +175,22 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
         <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 14, paddingBottom: 4}}>
           <IconButton name="back" label="Voltar à tela anterior" onPress={backFinance} />
           <View style={{flex: 1, paddingHorizontal: 4}}>
-            <Text style={{fontSize: 11, letterSpacing: 1.2, color: c.muted, fontWeight: '600'}}>SEU DINHEIRO, SEM SUSTO</Text>
             <Text style={{fontSize: 24, fontWeight: '800', color: c.text}}>Finanças</Text>
           </View>
           <IconButton name="settings" label="Contas e cartões" onPress={() => setManage(true)} />
         </View>
-        {d?.accounts.length ? <View style={{paddingHorizontal: 20, paddingTop: 6, paddingBottom: 8}}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Selecionar conta financeira" onPress={() => setAccountPicker(true)}
-            style={{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:c.surface,borderColor:c.line,borderWidth:1,borderRadius:15,paddingHorizontal:13,paddingVertical:10}}>
-            <View style={{width:10,height:10,borderRadius:5,backgroundColor:account?.color||c.accent}} />
-            <View style={{flex:1,gap:2}}><Text style={{fontWeight:'800',color:c.text,fontSize:14}}>{account?.name||'Selecionar conta'}</Text>
-            <Text style={{color:c.muted,fontSize:11}}>{isPrimary?'Conta principal':'Conta secundária · painel independente'}</Text></View>
-            <Icon name="chevron" size={18} color={c.muted} />
-          </Pressable>
-        </View> : null}
-        <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4}}>
-          <IconButton name="back" label="Mês anterior" size={36} onPress={() => setMonth(m => addMonths(m, -1))} />
-          <Pressable onPress={() => setMonth(monthOf(todayISO()))}><Text style={{fontSize: 16, fontWeight: '700', color: c.text, minWidth: 150, textAlign: 'center'}}>{monthLabel(month)}</Text></Pressable>
-          <Pressable accessibilityLabel="Próximo mês" onPress={() => setMonth(m => addMonths(m, 1))} style={{width: 36, height: 36, alignItems: 'center', justifyContent: 'center', transform: [{rotate: '180deg'}]}}><Icon name="back" size={20} color={c.text} /></Pressable>
+        {/* 0.3.152: conta e mes na mesma linha, compactos (antes eram dois blocos grandes) */}
+        <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 2, paddingBottom: 6, gap: 8}}>
+          {d?.accounts.length ? <Pressable accessibilityRole="button" accessibilityLabel={'Conta: ' + (account?.name || 'selecionar') + '. Trocar'} onPress={() => setAccountPicker(true)}
+            style={{flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: c.surface, borderColor: c.line, borderWidth: 1, borderRadius: 99, paddingHorizontal: 12, paddingVertical: 8}}>
+            <View style={{width: 9, height: 9, borderRadius: 5, backgroundColor: account?.color || c.accent}} />
+            <Text numberOfLines={1} style={{flexShrink: 1, fontWeight: '700', color: c.text, fontSize: 13}}>{account?.name || 'Selecionar conta'}</Text>
+            <Text style={{color: c.muted, fontSize: 11}}>▾</Text>
+          </Pressable> : <View style={{flex: 1}} />}
+          <View style={{flex: 1}} />
+          <IconButton name="back" label="Mês anterior" size={32} onPress={() => setMonth(m => addMonths(m, -1))} />
+          <Pressable accessibilityLabel="Voltar ao mês atual" onPress={() => setMonth(monthOf(todayISO()))}><Text style={{fontSize: 14, fontWeight: '700', color: c.text, minWidth: 104, textAlign: 'center'}}>{monthLabel(month)}</Text></Pressable>
+          <Pressable accessibilityLabel="Próximo mês" onPress={() => setMonth(m => addMonths(m, 1))} style={{width: 32, height: 32, alignItems: 'center', justifyContent: 'center', transform: [{rotate: '180deg'}]}}><Icon name="back" size={18} color={c.text} /></Pressable>
         </View>
         <View style={{paddingHorizontal: 16, paddingBottom: 8}}>
           <Chips scroll value={tab} onChange={navigateFinance} options={[{value: 'home' as Tab, label: 'Resumo'}, {value: 'bills' as Tab, label: 'Pendentes'}, {value: 'cards' as Tab, label: 'Cartões'}, {value: 'reports' as Tab, label: 'Relatórios'}]} />
@@ -209,12 +208,21 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
           </ScrollView>
         )}
 
-        {d && d.accounts.length ? (
-          <View style={{position: 'absolute', right: 18, bottom: insets.bottom + 22, flexDirection: 'row', gap: 10}}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Nova receita" onPress={() => newTx('income')} style={{width: 52, height: 52, borderRadius: 26, backgroundColor: GOOD, alignItems: 'center', justifyContent: 'center', elevation: 6}}><Text style={{color: '#fff', fontSize: 22, fontWeight: '800'}}>+</Text></Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="Nova despesa" onPress={() => newTx('expense')} style={{height: 52, paddingHorizontal: 20, borderRadius: 26, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, elevation: 6}}><Text style={{color: c.onAccent, fontSize: 22, fontWeight: '800'}}>−</Text><Text style={{color: c.onAccent, fontWeight: '700'}}>Despesa</Text></Pressable>
-          </View>
-        ) : null}
+        {d && d.accounts.length ? <>
+          {/* 0.3.152: um unico botao + (antes eram dois botoes grandes sobre o extrato) */}
+          <Pressable accessibilityRole="button" accessibilityLabel="Novo lançamento" onPress={() => setNewMenu(true)}
+            style={{position: 'absolute', right: 18, bottom: insets.bottom + 20, width: 56, height: 56, borderRadius: 28, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', elevation: 6}}>
+            <Text style={{color: c.onAccent, fontSize: 28, fontWeight: '400', marginTop: -2}}>＋</Text>
+          </Pressable>
+          <Sheet visible={newMenu} onClose={() => setNewMenu(false)} label="Fechar novo lançamento">
+            <View style={{gap: 4, paddingBottom: 12}}>
+              <Text style={{fontSize: 18, fontWeight: '800', color: c.text, marginBottom: 6}}>Novo lançamento</Text>
+              {([['expense', '↓ Despesa', BAD], ['income', '↑ Receita', GOOD], ['transfer', '⇄ Transferência entre contas', c.accent]] as const).map(([k, label, color]) =>
+                <Pressable key={k} accessibilityRole="button" onPress={() => { setNewMenu(false); newTx(k as TxKind); }} style={{paddingVertical: 15, borderBottomWidth: 1, borderColor: c.line}}><Text style={{color, fontSize: 16, fontWeight: '700'}}>{label}</Text></Pressable>)}
+              <Pressable accessibilityRole="button" onPress={() => { setNewMenu(false); setBillEditor('new'); }} style={{paddingVertical: 15}}><Text style={{color: c.text, fontSize: 16, fontWeight: '700'}}>⏰ Conta a pagar ou receber</Text></Pressable>
+            </View>
+          </Sheet>
+        </> : null}
 
         {editing && d ? <TxEditor api={api} d={d} tx={editing} defaultAccountId={accountId} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} /> : null}
         {billEditor && d ? <BillEditor api={api} tx={billEditor === 'new' ? null : billEditor} accountId={accountId} onClose={() => setBillEditor(null)} onSaved={() => {setBillEditor(null);void reload();}} /> : null}
@@ -454,11 +462,6 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
         </View>
 
       </View>
-      {/* 0.3.151: feedback curto da Sofia sobre o mes desta conta (o completo fica em Relatorios) */}
-      {tips.length ? <Pressable accessibilityRole="button" accessibilityLabel="Ver a análise completa em Relatórios" onPress={() => onTab('reports')} style={{backgroundColor: c.surface, borderRadius: 18, padding: 14, gap: 6, borderWidth: 1, borderColor: c.line}}>
-        <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}><SofiaLogo size={22} /><Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 14}}>A Sofia sobre o seu mês</Text><Text style={{color: c.accent, fontSize: 12, fontWeight: '700'}}>Ver mais ›</Text></View>
-        {tips.slice(0, 2).map((t, i) => <Text key={i} style={{color: t.tone === 'attention' ? WARN : t.tone === 'good' ? GOOD : c.muted, fontSize: 13, lineHeight: 19}}>{t.tone === 'good' ? '✓ ' : t.tone === 'attention' ? '! ' : '• '}<Text style={{color: c.text}}>{t.text}</Text></Text>)}
-      </Pressable> : null}
       <Sheet visible={reserveMenu} onClose={() => setReserveMenu(false)} label="Fechar detalhes da reserva">
         <View style={{gap: 14, paddingBottom: 12}}>
           <Text style={{fontSize: 18, fontWeight: '800', color: c.text}}>Sua reserva</Text>
@@ -483,38 +486,23 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
         </View>
       </Sheet>
 
-      <Card_>
-        <Title text="Próximos vencimentos" action="Ver pendentes" onAction={() => onTab('bills')} />
-        {dues.length ? dues.map(due => <DueRow key={due.id} due={due} d={d} api={api} reload={reload} onTx={t => onBill(t as Tx)} />) : <Text style={{color: c.muted, fontSize: 13}}>Nenhum boleto ou dívida cadastrado para os próximos 10 dias.</Text>}
-        <Pressable accessibilityRole="button" onPress={() => onBill()} style={{alignSelf:'flex-start',paddingVertical:5}}><Text style={{color:c.accent,fontSize:13,fontWeight:'700'}}>＋ Adicionar vencimento</Text></Pressable>
-      </Card_>
+      {/* 0.3.152: vencimentos proximos viram uma linha so (o detalhe fica em Pendentes); cartoes ficam na aba Cartoes */}
+      {dues.length ? <Pressable accessibilityRole="button" accessibilityLabel="Ver pendentes" onPress={() => onTab('bills')}
+        style={{flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.surface, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: dues.some(x => x.late) ? BAD : c.line}}>
+        <Text style={{fontSize: 16}}>⏰</Text>
+        <Text style={{flex: 1, color: c.text, fontSize: 13}}>{dues.some(x => x.late) ? 'Há conta atrasada' : dues.length === 1 ? '1 vencimento nos próximos 10 dias' : dues.length + ' vencimentos nos próximos 10 dias'}</Text>
+        <Text style={{color: c.text, fontWeight: '700', fontSize: 13}}>{show(dues.reduce((sum, x) => sum + x.amount, 0))}</Text><Text style={{color: c.muted}}>›</Text>
+      </Pressable> : null}
 
-      {d.cards.filter(x => !x.archived).length ? (
-        <Card_>
-          <Title text="Cartões" action="Ver faturas" onAction={() => onTab('cards')} />
-          {d.cards.filter(x => !x.archived).map(card => {
-            const inv = cardInvoices(card, d.txs).find(i => i.month === invoiceMonth(card, todayISO()));
-            const used = cardUsed(card, d.txs);
-            return (
-              <View key={card.id} style={{gap: 6}}>
-                <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-                  <View style={{width: 10, height: 10, borderRadius: 5, backgroundColor: card.color}} />
-                  <Text style={{flex: 1, color: c.text, fontWeight: '600'}}>{card.name}</Text>
-                  <Text style={{color: c.text, fontWeight: '700'}}>{show(inv?.total || 0)}</Text>
-                </View>
-                <Bar pct={card.limit ? used / card.limit : 0} color={card.color} />
-                <Text style={{color: c.muted, fontSize: 11}}>Fatura atual fecha {dateBR(inv?.close || '')}, vence {dateBR(inv?.due || '')} · disponível {show(Math.max(0, card.limit - used))}</Text>
-              </View>
-            );
-          })}
-        </Card_>
-      ) : null}
-
-      <View style={{gap:12,paddingTop:4}}>
-        <Title text="Entradas e saídas" />
-        <Text style={{fontSize:12,color:c.muted}}>Extrato da conta selecionada, sem boletos que ainda não foram pagos.</Text>
+      <View style={{gap: 10, paddingTop: 2}}>
         <TxTab d={d} month={month} accountFilter="" setAccountFilter={() => undefined} onTx={onTx} api={api} reload={reload} />
       </View>
+      {/* 0.3.151: feedback curto da Sofia sobre o mes desta conta (o completo fica em Relatorios) */}
+      {tips.length ? <Pressable accessibilityRole="button" accessibilityLabel="Ver a análise completa em Relatórios" onPress={() => onTab('reports')} style={{backgroundColor: c.surface, borderRadius: 18, padding: 14, gap: 6, borderWidth: 1, borderColor: c.line}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}><SofiaLogo size={22} /><Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 14}}>A Sofia sobre o seu mês</Text><Text style={{color: c.accent, fontSize: 12, fontWeight: '700'}}>Ver mais ›</Text></View>
+        {tips.slice(0, 2).map((t, i) => <Text key={i} style={{color: t.tone === 'attention' ? WARN : t.tone === 'good' ? GOOD : c.muted, fontSize: 13, lineHeight: 19}}>{t.tone === 'good' ? '✓ ' : t.tone === 'attention' ? '! ' : '• '}<Text style={{color: c.text}}>{t.text}</Text></Text>)}
+      </Pressable> : null}
+
     </>
   );
 }
@@ -578,14 +566,17 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
   const days = useMemo(() => { const m = new Map<string, Tx[]>(); for (const t of list) { if (!m.has(t.date)) m.set(t.date, []); m.get(t.date)!.push(t); } return [...m.entries()]; }, [list]);
   const sum = list.reduce((s, t) => s + (t.kind === 'income' ? t.amount : t.kind === 'expense' ? -t.amount : 0), 0);
   const filterName = d.accounts.find(a => a.id === accountFilter)?.name || d.cards.find(x => x.id === accountFilter)?.name;
-  const [importing, setImporting] = useState(false);
+  const [importing, setImporting] = useState(false), [tools, setTools] = useState(false);
   return (
     <>
-      <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
-        <Text style={{fontSize: 12, color: c.muted}}>Extrato do banco ou do cartão (OFX ou CSV)</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Importar extrato" onPress={() => setImporting(true)} style={{paddingVertical: 6, paddingHorizontal: 12, borderRadius: 99, backgroundColor: c.accentSoft}}><Text style={{color: c.accent, fontWeight: '700', fontSize: 13}}>Importar extrato</Text></Pressable>
+      {/* 0.3.152: historico direto sob os cartoes; busca, filtros e importacao ficam recolhidos */}
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
+        <Text style={{flex: 1, fontSize: 18, fontWeight: '800', color: c.text}}>Histórico</Text>
+        <IconButton name="filter" label={tools ? 'Esconder busca e filtros' : 'Buscar e filtrar'} onPress={() => setTools(v => !v)} />
+        <IconButton name="plus" label="Importar extrato (OFX ou CSV)" onPress={() => setImporting(true)} />
       </View>
       {importing ? <ImportSheet api={api} d={d} onClose={() => setImporting(false)} onDone={async () => { setImporting(false); await reload(); }} /> : null}
+      {tools || q || kind !== 'all' || status !== 'all' ? <View style={{gap: 10}}>
       <TextInput accessibilityLabel="Buscar lançamento" value={q} onChangeText={setQ} placeholder="Buscar por descrição ou categoria" placeholderTextColor={c.muted}
         style={{borderWidth: 1, borderColor: c.line, borderRadius: 14, padding: 12, color: c.text, backgroundColor: c.surface}} />
       <Chips scroll value={kind} onChange={setKind} options={[{value: 'all' as const, label: 'Todos'}, {value: 'expense' as const, label: 'Despesas'}, {value: 'income' as const, label: 'Receitas'}, {value: 'transfer' as const, label: 'Transferências'}, {value: 'card_payment' as const, label: 'Faturas'}]} />
@@ -593,8 +584,9 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
         <Chips value={status} onChange={setStatus} options={[{value: 'all' as const, label: 'Tudo'}, {value: 'pending' as const, label: 'Só pendentes'}]} />
         {filterName ? <Pressable onPress={() => setAccountFilter('')} style={{paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99, backgroundColor: c.accentSoft}}><Text style={{color: c.accent, fontWeight: '600', fontSize: 12}}>{filterName} ✕</Text></Pressable> : null}
       </View>
-      <Text style={{color: c.muted, fontSize: 12}}>{list.length} movimentações · resultado {money(sum)}</Text>
-      {!days.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>Nenhum lançamento neste mês com esses filtros.</Text> : days.map(([date, items]) => (
+      </View> : null}
+      {list.length ? <Text style={{color: c.muted, fontSize: 12}}>{list.length} movimentações no mês · resultado {money(sum)}</Text> : null}
+      {!days.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>{q || kind !== 'all' || status !== 'all' ? 'Nenhum lançamento com esses filtros.' : 'Nenhum lançamento neste mês. Toque em ＋ para registrar.'}</Text> : days.map(([date, items]) => (
         <View key={date} style={{gap: 6}}>
           <Text style={{color: c.muted, fontSize: 12, fontWeight: '600'}}>{weekday(date)}</Text>
           <Card_ style={{padding: 8, gap: 0}}>{items.map((t, i) => <TxRow key={t.id} t={t} d={d} first={i === 0} onPress={() => onTx(t)} api={api} reload={reload} />)}</Card_>
