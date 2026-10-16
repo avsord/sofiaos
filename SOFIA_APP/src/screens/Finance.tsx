@@ -150,8 +150,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
   const d = data;
   const primary = useMemo(() => {
     const activeAccounts = d?.accounts.filter(a => !a.archived) || [];
-    return activeAccounts.find(a => /^conta principal$/i.test(a.name.trim()))
-      || activeAccounts.slice().sort((a,b) => String(a.entity.created_at || '').localeCompare(String(b.entity.created_at || '')))[0];
+    return activeAccounts.find(a => /^conta principal$/i.test(a.name.trim())) || activeAccounts[0];
   },[d]);
   const account = d?.accounts.find(a => a.id === selectedAccount && !a.archived) || primary;
   const accountId = account?.id || '';
@@ -203,7 +202,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
         ) : (
           <ScrollView contentContainerStyle={{padding: 16, paddingBottom: insets.bottom + 110, gap: 14}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>
             {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
-            {tab === 'home' ? <HomeTab d={scoped || d} month={month} api={api} reload={reload} onTx={setEditing} onTab={navigateFinance} accountId={accountId} isPrimary={isPrimary} onBill={() => setBillEditor('new')} />
+            {tab === 'home' ? <HomeTab d={scoped || d} month={month} api={api} reload={reload} onTx={setEditing} onTab={navigateFinance} accountId={accountId} isPrimary={isPrimary} onBill={t => setBillEditor(t || 'new')} />
               : tab === 'bills' ? <PendingTab d={scoped || d} api={api} month={month} accountId={accountId} warning={notificationWarning} onBill={setBillEditor} reload={reload} />
               : tab === 'cards' ? <CardsTab d={scoped || d} api={api} reload={reload} onTx={setEditing} onManage={() => setManage(true)} />
               : <ReportsTab d={scoped || d} month={month} />}
