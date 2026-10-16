@@ -97,7 +97,7 @@ test('pendências são manuais e separadas de extratos, com recorrência e conta
  const other=tx('Empresa',{kind:'expense',amount:950,date:'2026-10-19',account_id:'Poupança',paid:false,import_id:'sofia-pendencia:enterprise'});
  const monthly=tx('Aluguel',{kind:'expense',amount:1200,date:'2026-09-03',account_id:'Nubank',paid:false,import_id:'sofia-pendencia:rent',recurrence:'monthly'});
  const selected=f.manualDues([bill,automatic,other,monthly],'Nubank','2026-10-16',10);
- eq(selected.map(t=>[t.title,t.amount,t.date]),[['Boleto',350,'2026-10-22']]);
+ eq(selected.map(t=>[t.title,t.amount,t.date]),[['Aluguel',1200,'2026-09-03'],['Aluguel',1200,'2026-10-03'],['Boleto',350,'2026-10-22']]);
  assert.ok(selected.some(t=>t.title==='Boleto') && !selected.some(t=>t.title==='Importado'));
  assert.ok(!selected.some(t=>t.title==='Empresa'),'outro titular nao deve aparecer');
  const november=f.manualDues([monthly],'Nubank','2026-11-01',15);
