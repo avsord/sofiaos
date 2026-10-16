@@ -900,12 +900,21 @@ function Donut({slices, size = 170}: {slices: Array<{value: number; color: strin
 }
 function ReportsTab({d, month}: {d: Data; month: string}) {
   const c = useTheme(), [kind, setKind] = useState<'expense' | 'income'>('expense');
+  const tips = useMemo(()=>financeInsights(d.txs,month),[d,month]);
   const cats = useMemo(() => byCategory(d.txs, month, kind), [d, month, kind]), total = cats.reduce((s, x) => s + x.total, 0);
   const {t6, s, prev, bal} = useMemo(() => ({t6: trend(d.txs, month, 6), s: monthSummary(d.txs, month), prev: monthSummary(d.txs, addMonths(month, -1)), bal: balanceSeries(d.accounts, d.txs, month)}), [d, month]);
   const max = Math.max(1, ...t6.flatMap(x => [x.income, x.expense]));
   const [w, setW] = useState(0);
   return (
     <>
+      <Card_>
+        <Title text="Análise da Sofia" />
+        <Text style={{fontSize:12,color:c.muted,lineHeight:18}}>Sugestões baseadas somente nas entradas e saídas confirmadas da conta selecionada. Registros incompletos podem mudar a análise.</Text>
+        {tips.map((tip,i)=><View key={i} style={{flexDirection:'row',gap:9,alignItems:'flex-start'}}>
+          <View style={{width:7,height:7,borderRadius:4,marginTop:7,backgroundColor:tip.tone==='good'?GOOD:tip.tone==='attention'?WARN:c.muted}} />
+          <Text style={{flex:1,color:c.text,fontSize:13,lineHeight:19}}>{tip.text}</Text>
+        </View>)}
+      </Card_>
       <Card_>
         <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, fontSize: 16, fontWeight: '700', color: c.text}}>Por categoria</Text><Chips value={kind} onChange={setKind} options={[{value: 'expense' as const, label: 'Despesas'}, {value: 'income' as const, label: 'Receitas'}]} /></View>
         <View style={{alignItems: 'center', justifyContent: 'center'}}>
@@ -951,6 +960,7 @@ function ReportsTab({d, month}: {d: Data; month: string}) {
 // ============================ CONTAS E CARTÕES ============================
 function ManageSheet({api, d, onClose, reload}: {api: SofiaApi; d: Data; onClose: () => void; reload: () => Promise<void>}) {
   const c = useTheme(), [edit, setEdit] = useState<{type: 'account'; item: Account | null} | {type: 'card'; item: Card | null} | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   return (
     <MotionModal visible animationType="slide" onRequestClose={onClose}>
       <View style={{flex: 1, backgroundColor: c.bg}}>
@@ -964,7 +974,8 @@ function ManageSheet({api, d, onClose, reload}: {api: SofiaApi; d: Data; onClose
           </Card_>
           <Card_>
             <Title text="Cartões de crédito" action="+ Cartão" onAction={() => setEdit({type: 'card', item: null})} />
-            {d.cards.length ? d.cards.map(x => <Pressable key={x.id} onPress={() => setEdit({type: 'card', item: x})} style={{flexDirection: 'row', alignItems: 'center', gap: 10, opacity: x.archived ? 0.5 : 1}}><View style={{width: 12, height: 12, borderRadius: 6, backgroundColor: x.color}} /><Text style={{flex: 1, color: c.text}}>{x.name}</Text><Text style={{color: c.muted, fontSize: 12}}>fecha {x.closing} · vence {x.due}</Text></Pressable>) : <Text style={{color: c.muted}}>Nenhum cartão.</Text>}
+            {d.cards.filter(x=>!x.archived || showArchived).length ? d.cards.filter(x=>!x.archived || showArchived).map(x => <Pressable key={x.id} onPress={() => setEdit({type: 'card', item: x})} style={{flexDirection: 'row', alignItems: 'center', gap: 10, opacity: x.archived ? 0.5 : 1}}><View style={{width: 12, height: 12, borderRadius: 6, backgroundColor: x.color}} /><Text style={{flex: 1, color: c.text}}>{x.name}</Text><Text style={{color: c.muted, fontSize: 12}}>{x.archived ? 'removido · ' : ''}fecha {x.closing} · vence {x.due}</Text></Pressable>) : <Text style={{color: c.muted}}>Nenhum cartão.</Text>}
+            {d.cards.some(x=>x.archived)?<Pressable accessibilityRole="button" onPress={()=>setShowArchived(v=>!v)}><Text style={{color:c.accent,fontSize:12}}>{showArchived?'Ocultar cartões removidos':'Mostrar cartões removidos'}</Text></Pressable>:null}
           </Card_>
         </ScrollView>
       </View>
@@ -995,6 +1006,28 @@ function AccountCardSheet({api, d, edit, onClose, onSaved}: {api: SofiaApi; d: D
     } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
   const archived = edit.item?.archived;
+  async function removeCard() {
+    if(!card)return;
+    setBusy(true);setError('');
+    try {
+      // O resumo mensal recebe apenas uma janela de lançamentos.
+      // Consultar a coleção completa evita apagar um cartão com faturas antigas.
+      let used=false,exhaustive=false;
+      for(let offset=0;offset<20000;offset+=100){
+        const result=await api.entities('fin_tx','',offset);
+        if(result.items.some(e=>String(e.data?.card_id||'')===card.id)){used=true;break;}
+        if(result.items.length<100){exhaustive=true;break;}
+      }
+      const mustArchive=used||!exhaustive;
+      Alert.alert(mustArchive?'Remover cartão e preservar histórico?':'Excluir cartão?',
+        mustArchive?'O cartão sai da lista. Compras, pagamentos e faturas anteriores continuam salvos.':'Nenhum lançamento está vinculado a este cartão. Excluir definitivamente?',[
+        {text:'Cancelar',style:'cancel'},
+        {text:mustArchive?'Remover cartão':'Excluir definitivamente',style:'destructive',onPress:()=>{setBusy(true);void (mustArchive
+          ? saveEntity(api,'fin_card',card.name,{},card.entity,'archived')
+          : api.deleteEntity(card.id)).then(onSaved).catch(e=>setError(errorText(e))).finally(()=>setBusy(false));}}
+      ]);
+    }catch(e){setError(errorText(e));}finally{setBusy(false);}
+  }
   return (
     <Sheet visible onClose={onClose} label="Fechar edição">
       <ScrollView style={{maxHeight: 600}} contentContainerStyle={{gap: 12}} keyboardShouldPersistTaps="handled">
@@ -1018,6 +1051,7 @@ function AccountCardSheet({api, d, edit, onClose, onSaved}: {api: SofiaApi; d: D
         {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
         <Button title="Salvar" loading={busy} onPress={() => void save()} />
         {edit.item ? <Pressable onPress={async () => { try { await saveEntity(api, isCard ? 'fin_card' : 'fin_account', edit.item!.name, {}, edit.item!.entity, archived ? 'active' : 'archived'); onSaved(); } catch (e) { setError(errorText(e)); } }} style={{alignItems: 'center', padding: 10}}><Text style={{color: archived ? c.accent : c.danger}}>{archived ? 'Reativar' : 'Arquivar (o histórico fica)'}</Text></Pressable> : null}
+        {card && !card.archived ? <Pressable accessibilityRole="button" accessibilityLabel="Excluir cartão" disabled={busy} onPress={()=>void removeCard()} style={{alignItems:'center',padding:12}}><Text style={{color:BAD,fontWeight:'800'}}>Excluir cartão</Text></Pressable>:null}
       </ScrollView>
     </Sheet>
   );
