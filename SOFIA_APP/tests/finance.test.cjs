@@ -73,9 +73,56 @@ test('valor digitado em reais vira número sem surpresa',()=>{
  eq(['89,90','R$ 1.234,56','1234.56','1.500','12.5','','abc'].map(f.parseMoney),[89.9,1234.56,1234.56,1500,12.5,null,null]);
 });
 
+test('campos monetários formatam milhares ao digitar e vírgula com centavos ao terminar sem alterar o valor',()=>{
+  eq(['1','1911','191146','191146,5','191146,56','1.234,56','1234.5','1.234.567','0,05',''].map(f.formatMoneyInput),
+    ['1','1.911','191.146','191.146,5','191.146,56','1.234,56','1.234,5','1.234.567','0,05','']);
+  eq(['191.146','191.146,5','1.234,56','0,05',''].map(f.finishMoneyInput),
+    ['191.146,00','191.146,50','1.234,56','0,05','']);
+  assert.equal(f.parseMoney(f.finishMoneyInput(f.formatMoneyInput('191146'))),191146);
+  assert.equal(f.parseMoney(f.finishMoneyInput(f.formatMoneyInput('1234,56'))),1234.56);
+  assert.equal(f.parseMoney(f.finishMoneyInput(f.formatMoneyInput('0,05'))),0.05);
+  assert.equal(f.formatMoneyInput('12.345,'),'12.345,');
+});
+
 test('e-mail de cobrança: lê valor e vencimento, sem inventar quando não há',()=>{
  eq(f.parseBill('Sua fatura Nubank chegou: R$ 1.234,56 — vencimento 15/10/2026','2026-10-11'),{amount:1234.56,due:'2026-10-15'});
  eq(f.parseBill('Boleto Enel R$ 189,90 vence em 05/11','2026-10-11'),{amount:189.9,due:'2026-11-05'});
  eq(f.parseBill('Conta de dezembro: vence 10/01 · total R$ 99,00','2026-12-20'),{amount:99,due:'2027-01-10'});
  eq(f.parseBill('Seu pedido foi enviado','2026-10-11'),{amount:null,due:null});
+});
+
+test('pendências são manuais e separadas de extratos, com recorrência e conta própria',()=>{
+ const bill=tx('Boleto',{kind:'expense',amount:350,date:'2026-10-22',account_id:'Nubank',paid:false,import_id:'sofia-pendencia:energy'});
+ const automatic=tx('Importado',{kind:'expense',amount:60,date:'2026-10-20',account_id:'Nubank',paid:false,import_id:'bank:123'});
+ const other=tx('Empresa',{kind:'expense',amount:950,date:'2026-10-19',account_id:'Poupança',paid:false,import_id:'sofia-pendencia:enterprise'});
+ const monthly=tx('Aluguel',{kind:'expense',amount:1200,date:'2026-09-03',account_id:'Nubank',paid:false,import_id:'sofia-pendencia:rent',recurrence:'monthly'});
+ const selected=f.manualDues([bill,automatic,other,monthly],'Nubank','2026-10-16',10);
+ eq(selected.map(t=>[t.title,t.amount,t.date]),[['Aluguel',1200,'2026-09-03'],['Aluguel',1200,'2026-10-03'],['Boleto',350,'2026-10-22']]);
+ assert.ok(selected.some(t=>t.title==='Boleto') && !selected.some(t=>t.title==='Importado'));
+ assert.ok(!selected.some(t=>t.title==='Empresa'),'outro titular nao deve aparecer');
+ const november=f.manualDues([monthly],'Nubank','2026-11-01',15);
+ assert.ok(november.some(t=>t.date==='2026-11-03' && t.tx.virtual),'o lembrete mensal se repete');
+ assert.equal(f.accountBalance(acc,[bill,automatic]),1000,'nenhuma pendência reduz o saldo sem pagamento');
+});
+test('seletor isola históricos pessoais e empresa, inclusive cartões da conta',()=>{
+ const mine=tx('Mercado',{kind:'expense',amount:40,date:'2026-10-02',account_id:'Nubank'});
+ const hers=tx('Esposa',{kind:'expense',amount:90,date:'2026-10-04',account_id:'Poupança'});
+ const cardTx=tx('Notebook',{kind:'expense',amount:300,date:'2026-10-03',card_id:'Visa',paid:false});
+ const mineOnly=f.transactionsForAccount([mine,hers,cardTx],[card],'Nubank');
+ eq(mineOnly.map(x=>x.desc),['Mercado','Notebook']);
+ assert.equal(f.totalBalance([acc],mineOnly),960);
+ eq(f.transactionsForAccount([mine,hers,cardTx],[card],'Poupança').map(x=>x.desc),['Esposa']);
+});
+test('orientação financeira usa lançamentos reais, não pendências que ainda não ocorreram',()=>{
+ const arr=[tx('sal',{kind:'income',amount:1500,date:'2026-10-01',account_id:'Nubank'}),tx('alimento',{kind:'expense',amount:1100,date:'2026-10-02',account_id:'Nubank',category:'Alimentação'}),tx('boleto futuro',{kind:'expense',amount:3000,date:'2026-10-26',account_id:'Nubank',paid:false,import_id:'sofia-pendencia:later'})];
+ const tips=f.financeInsights(arr,'2026-10');
+ assert.ok(tips.some(x=>x.tone==='good'&&x.text.includes('dentro das receitas')));
+ assert.ok(tips.some(x=>x.text.includes('Alimentação')));
+ assert.ok(!tips.some(x=>x.text.includes('superaram as receitas')),'pendencia futura nao cria aconselhamento falso');
+});
+test('máscara em português preserva milhares após apagar',()=>{
+ assert.equal(f.formatMoneyInput('1.23','1.234'),'123');
+ assert.equal(f.formatMoneyInput('1.00','1.000'),'100');
+ assert.equal(f.formatMoneyInput('1.234.','1.234'),'1.234,');
+ assert.equal(f.formatMoneyInput('1.234,5','1.234,'),'1.234,5');
 });

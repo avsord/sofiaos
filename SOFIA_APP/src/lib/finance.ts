@@ -10,7 +10,7 @@ export type Card = {id: string; name: string; limit: number; closing: number; du
 export type Tx = {
   id: string; kind: TxKind; desc: string; amount: number; date: string; category: string; accountId: string; toAccountId: string; cardId: string;
   invoice: string; paid: boolean; seriesId: string; installment: number; installments: number; recurrence: Recurrence; recurrenceEnd: string;
-  virtual?: boolean; entity?: Entity;
+  virtual?: boolean; manualDue?: boolean; entity?: Entity;
 };
 export type Budget = {id: string; category: string; limit: number; entity: Entity};
 export type Goal = {id: string; name: string; target: number; saved: number; deadline: string; color: string; done: boolean; entity: Entity};
@@ -74,7 +74,7 @@ export function toTx(e: Entity): Tx {
   return {id: e.id, kind: (d.kind || 'expense') as TxKind, desc: e.title, amount: num(d.amount), date: String(d.date || ''), category: String(d.category || ''),
     accountId: String(d.account_id || ''), toAccountId: String(d.to_account_id || ''), cardId: String(d.card_id || ''), invoice: String(d.invoice_month || ''),
     paid: !!d.paid, seriesId: String(d.series_id || ''), installment: num(d.installment), installments: num(d.installments), recurrence: (d.recurrence || 'none') as Recurrence,
-    recurrenceEnd: String(d.recurrence_end || ''), entity: e};
+    recurrenceEnd: String(d.recurrence_end || ''), manualDue: String(d.import_id || '').startsWith('sofia-pendencia:'), entity: e};
 }
 export function toBudget(e: Entity): Budget { return {id: e.id, category: String(e.data?.category || e.title), limit: num(e.data?.limit), entity: e}; }
 export function toGoal(e: Entity): Goal {
@@ -242,6 +242,44 @@ export function upcoming(txs: Tx[], cards: Card[], today = todayISO(), days = 7)
   return list.sort((a, b) => a.date.localeCompare(b.date));
 }
 
+
+/** Uma conta selecionada é um painel isolado: não mistura saldo ou histórico da esposa/empresa.
+ * Cobranças de cartões entram na conta que paga a fatura, sem duplicar transferências. */
+export function transactionsForAccount(txs: Tx[], cards: Card[], accountId: string): Tx[] {
+  const linked = new Set(cards.filter(c => c.accountId === accountId).map(c => c.id));
+  return txs.filter(t => t.accountId === accountId || t.toAccountId === accountId || (!!t.cardId && linked.has(t.cardId)));
+}
+/** Pendências são cadastradas manualmente na Sofia (fin_tx.import_id=sofia-pendencia:*).
+ * Compras de extrato e despesas lançadas não criam lembretes automaticamente. */
+export function manualDues(txs: Tx[], accountId = '', today = todayISO(), days = 40): Due[] {
+  const until = addDays(today, days), months: string[] = [];
+  for (let m = monthOf(today); m <= monthOf(until); m = addMonths(m, 1)) months.push(m);
+  const seen = new Set<string>();
+  return [...txs, ...months.flatMap(m => expandRecurring(txs, m))]
+    .filter(t => t.manualDue && !t.paid && t.kind === 'expense' && !t.cardId && (!accountId || t.accountId === accountId) && t.date <= until)
+    .filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; })
+    .map(t => ({id: t.id, title: t.desc, amount: t.amount, date: t.date, kind: 'pagar' as const, late: t.date < today, tx: t}))
+    .sort((a,b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
+}
+export type FinanceInsight = {tone: 'good' | 'attention' | 'neutral'; text: string};
+export function financeInsights(txs: Tx[], month: string): FinanceInsight[] {
+  // Conselhos só com dados realmente registrados; sem inventar gastos, projeções ou culpa.
+  const settled = txs.filter(t => !t.virtual && ((t.paid) || (t.kind === 'expense' && !!t.cardId)) && (!t.manualDue || t.paid));
+  const monthPaid = monthTxs(settled, month);
+  const count = monthPaid.filter(t => t.kind === 'income' || t.kind === 'expense').length;
+  if (!count) return [{tone:'neutral',text:'Ainda não há receitas ou despesas confirmadas suficientes para analisar este mês.'}];
+  const summary = monthSummary(settled, month);
+  const insights: FinanceInsight[] = [];
+  if (summary.income > 0 && summary.expense <= summary.income) insights.push({tone:'good',text:'As despesas registradas ficaram dentro das receitas recebidas neste mês.'});
+  else if (summary.income > 0 && summary.expense > summary.income) insights.push({tone:'attention',text:'As despesas superaram as receitas registradas. Revise os gastos antes de assumir novas contas.'});
+  const cats = byCategory(settled, month, 'expense', false);
+  if (cats.length > 0 && cats[0].pct >= .40 && cats[0].total > 0) insights.push({tone:'attention',text:'A categoria '+cats[0].category.name+' concentra '+Math.round(cats[0].pct * 100)+'% dos gastos do mês. Vale conferir se isso era esperado.'});
+  const prior = monthSummary(settled, addMonths(month, -1));
+  if (prior.expense > 0 && summary.expense > prior.expense * 1.2) insights.push({tone:'attention',text:'As despesas registradas cresceram mais de 20% em relação ao mês anterior.'});
+  if (!insights.length) insights.push({tone:'neutral',text:'Continue registrando entradas e saídas para a Sofia identificar tendências com mais segurança.'});
+  return insights;
+}
+
 // ---------- Objetivos ----------
 export function goalProgress(g: Goal, today = todayISO()): {pct: number; left: number; perMonth: number | null} {
   const left = Math.max(0, round2(g.target - g.saved)), pct = g.target ? Math.min(1, g.saved / g.target) : 0;
@@ -261,6 +299,34 @@ export function parseMoney(text: string): number | null {
   else if (ld > -1 && t.length - ld - 1 === 3 && (t.match(/\./g) || []).length >= 1) t = t.replace(/\./g, '');
   const v = Number(t);
   return Number.isFinite(v) ? round2(v) : null;
+}
+
+/** Máscara brasileira durante a digitação: agrupa milhares sem mudar a ordem digitada.
+ * A vírgula é o separador decimal explícito (ponto do teclado decimal também é aceito).
+ * Nunca converte o texto em centavos automaticamente: "191146" são 191.146 reais. */
+export function formatMoneyInput(text: string, previous = ''): string {
+  const raw = String(text ?? '').replace(/[^\d.,-]/g, '');
+  if (!raw) return '';
+  const sign = raw.startsWith('-') ? '-' : '';
+  const clean = raw.replace(/-/g, '');
+  const comma = clean.lastIndexOf(','), dot = clean.lastIndexOf('.');
+  // Diferenciar ponto decimal digitado de ponto de milhar gerado pela máscara.
+  // Ao apagar "1.234" para "1.23", não transformar 123 reais em R$ 1,23.
+  const pastedDecimal = !previous && dot >= 0 && (clean.match(/\./g) || []).length === 1
+    && clean.slice(dot + 1).length <= 2;
+  const decimalAt = comma >= 0 ? comma : dot >= 0 && (clean.endsWith('.') || pastedDecimal) ? dot : -1;
+  const whole = (decimalAt >= 0 ? clean.slice(0, decimalAt) : clean).replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+  const fraction = decimalAt >= 0 ? clean.slice(decimalAt + 1).replace(/\D/g, '').slice(0, 2) : '';
+  const grouped = (whole || '0').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return sign + grouped + (decimalAt >= 0 ? ',' + fraction : '');
+}
+/** No fim da edição, mostra os centavos sem arredondamentos invisíveis no campo. */
+export function finishMoneyInput(text: string): string {
+  const value = parseMoney(text);
+  if (value === null) return '';
+  const cents = Math.round(Math.abs(value) * 100);
+  const whole = String(Math.floor(cents / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return (value < 0 ? '-' : '') + whole + ',' + String(cents % 100).padStart(2, '0');
 }
 
 // ---------- Ligações com outros apps ----------
@@ -294,7 +360,7 @@ export function toReserveMove(e: Entity): ReserveMove {
 }
 export function reserveOf(goals: Goal[]): Goal | null { return goals.find(g => g.entity?.data?.role === 'reserve') || null; }
 export type MoneySplit = {total: number; saved: number; daily: number; committed: number; free: number; planned: number; realized: number; missing: number; shortfall: number};
-export function moneySplit(reserve: Goal, moves: ReserveMove[], accounts: Account[], txs: Tx[], cards: Card[], month: string, today = todayISO()): MoneySplit {
+export function moneySplit(reserve: Goal, moves: ReserveMove[], accounts: Account[], txs: Tx[], cards: Card[], month: string, today = todayISO(), manualBills?: Due[]): MoneySplit {
   const mine = moves.filter(m => m.goalId === reserve.id && m.entity?.state !== 'archived');
   const net = mine.reduce((s, m) => s + (m.direction === 'in' ? m.amount : -m.amount), 0);
   const saved = round2((Number(reserve.saved) || 0) + net);
@@ -302,7 +368,8 @@ export function moneySplit(reserve: Goal, moves: ReserveMove[], accounts: Accoun
   const daily = round2(total - saved);
   const monthEnd = dayIn(month, daysIn(month));
   const days = Math.max(0, Math.round((Date.parse(monthEnd + 'T12:00:00Z') - Date.parse(today + 'T12:00:00Z')) / 864e5));
-  const committed = round2(upcoming(txs, cards, today, days).filter(d => d.kind !== 'receber' && d.date <= monthEnd).reduce((s, d) => s + d.amount, 0));
+  const commitments = manualBills === undefined ? upcoming(txs, cards, today, days) : manualBills;
+  const committed = round2(commitments.filter(d => d.kind !== 'receber' && d.date <= monthEnd).reduce((s, d) => s + d.amount, 0));
   const planned = Number(reserve.entity?.data?.monthly_plan) || 0;
   const realized = round2(mine.filter(m => m.direction === 'in' && monthOf(m.date) === month).reduce((s, m) => s + m.amount, 0));
   return {total, saved, daily, committed, free: round2(daily - committed), planned, realized, missing: round2(Math.max(0, planned - realized)), shortfall: round2(Math.max(0, committed - daily))};

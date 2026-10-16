@@ -166,6 +166,22 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - **Avisos com app fechado**: `expo-background-task` (`src/lib/background-notify.ts`), sem Firebase.
 - Sino: arrastar para apagar, resumo "Pede atenção agora" pré-carregado, tocar leva ao app certo.
 
+### 7.4 Finanças — entrada monetária e apresentação da reserva (dono, 16/10/2026)
+- Valores digitados em reais mostram pontos de milhares enquanto se digita, vírgula para centavos quando informados e duas casas decimais ao concluir. Não usar máscara de centavos por dígito: a sequência `191146` deve significar R$ 191.146,00, não R$ 1.911,46. Permitir digitar `191146,35` para R$ 191.146,35. A função de conversão persistida para número continua igual.
+- Preservar o cartão original "Saldo geral" (soma das contas, incluindo guardado), receita, despesa e previsão. O cartão não terá segundo bloco "Para usar" ao lado de Guardado, pois cria redundância visual.
+- O Guardado aparece como uma linha compacta "Reserva separada" dentro do saldo, com valor e progresso mensal opcional, tocável. Detalhes e ações originais ficam em sheet: saldo geral, fora da reserva, despesas previstas, livre após compromissos; guardar, retirar com confirmação e ajustar aporte.
+- Não omitir a distinção matemática: saldo geral inclui reserva; `livre` desconta guardado e compromissos. Separação é visual/contábil no app, não bloqueio ou transferência bancária. Preservar entidades `fin_goal` e `fin_reserve_move` e dados existentes.
+
+### 7.4 Finanças — separação por conta e vencimentos (16/10/2026)
+- A página principal de Finanças exibe a conta escolhida; seletor no topo permite contas pessoais, da esposa e da empresa. Não somar saldos ou gastos entre titulares sem seleção explícita; manter registros e contas anteriores.
+- Conta principal conserva saldo geral, previsões e reserva guardada: faixa laranja levemente atrás do cartão roxo com valor de guardado; contas secundárias apresentam os próprios valores apenas quando selecionadas. Reserva é separação contábil, não transferência bancária nem despesa.
+- Navegação interna respeita histórico: gesto pela borda, seta e botão de voltar Android retornam à página de Finanças anterior antes de sair para Apps.
+- Resumo inclui extrato com entradas/saídas e filtros; remover abas Lançamentos e Planejamento do menu, sem apagar os registros antigos de orçamentos, objetivos ou transações. A aba Pendentes contém boletos e dívidas cadastrados manualmente (não derivados do extrato), com vencimentos, repetições, pagamento e avisos locais Android.
+- Excluir cartão: quando não houver movimento vinculado, exclusão definitiva com confirmação; havendo registros, arquivar e esconder da lista preservando faturas, compras e histórico, com opção de reativar.
+- Relatórios mostram análise conservadora dos valores efetivamente registrados por conta; não simular aconselhamento financeiro nem inferir gastos que não constam do histórico.
+- Toda máscara monetária usa separação pt-BR e evita transformar milhares em centavos ao apagar um caractere. A carteira não armazena senhas de banco nem faz transferências reais.
+- Implementação desta rodada está em candidato 0.3.150, ainda não é aprovação de atualização OTA.
+
 ## 8. Regras que não se quebram
 
 - Preservar assinatura, package `com.avsord.sofiaapp`, versionCode crescente,
@@ -190,6 +206,11 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Todo commit que muda o app aumenta a versão (app.json, package.json, package-lock.json em 2 pontos, src/lib/update.ts, 2 testes e RELEASE_<versão>.md). O CI não numera sozinho: sem isso o APK sai com a versão anterior e não é reconhecido como atualização.
 
 ## 9. Pendências (atualizar a cada rodada)
+
+- **Finanças 0.3.150:** executar checks e CI Android, testar no aparelho a troca de conta, gesto voltar, datas/avisos Android com app fechado, baixa sem duplicidade, render da faixa laranja, cartas ocultadas e restauráveis e extratos de contas diferentes. Candidato não aprovado para OTA; quando os testes falharem, corrigir sem apagar dados ou desabilitar validações.
+
+
+- **Financeiro 0.3.149 (16/10):** validar no celular o número "191146" → "191.146,00" após terminar, centavos com vírgula e ponto do teclado, edição/reabertura de lançamentos, reserva com/s/ aporte, e instalação por cima da 0.3.148. Candidato manual não implica publicação no atualizador.
 
 - **Mercado Livre — integração HTML:** patch local pronto; obter escrita no GitHub e promover o conjunto completo; confirmar backup/volume antes do deploy do backend; rodar suíte completa/typecheck do app com dependências do lock; testar HTTP real na Railway e Android com receptor de intents. Nenhum preço ao vivo nem ausência de abertura de outro app foi comprovado em aparelho físico nesta rodada. HTML original é dado privado e não entra no repositório.
 
@@ -221,6 +242,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
    12 h, filtro privado preservado em updates.
 
 ## 10. Diário de rodadas (só acrescentar; uma linha por rodada)
+- 16/10/2026 · 0.3.150 · candidato manual em elaboração: selector de conta, reserva sobreposta, resumo com extrato, Pendentes manuais + notificações Android, exclusão segura de cartões e análise por conta. Sem alterar dados existentes no backend ou liberar OTA; validação CI/celular pendente.
+
 - 13/10/2026 · candidato 0.3.137 / código 142, patch local, sem PR: leitor ML unificado com rota autenticada, cancelamento, fila limitada, identidade estável e integração Android sem fallback. Validações e limitações constam de `LEIA-ME.md` e relatórios do pacote de entrega. Sem deploy nem APK gerado nesta sessão.
 - 12/10/2026 · R24: Conta Google (Agenda completa + backup no Drive), avisos com app fechado, e-mail → conta a pagar, "Comprei" → despesa, leituras de preço num pedido só, agenda sem teto de 500, chave de e-mail com migração, versão oficial pedida ao CI ([approved-apk]).
 
@@ -249,6 +272,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 | 2026-10-11 | 0.3.115 | patch do arquiteto | Memória exata das conversões de fuso na recorrência da agenda; medição de agenda:expand, agenda:priority, home:expand, home:priority, composer:recorder | Local: tsc e npm test verdes; 6 testes novos, equivalência com a versão anterior em 264 combinações e 7 fusos; defeitos de chave reprovados. Confirmar com relatório do celular |
 | 2026-10-11 | 0.3.116 | patch do arquiteto | Gravador de áudio criado só no 1º toque no microfone e consultado só enquanto grava; ciclo de vida próprio | Local: tsc e npm test verdes; 8 testes novos com o Composer real, o antigo reprova 7 e 3 defeitos reintroduzidos são pegos. Relatório 0.3.115: agenda:expand 0,6 ms (hipótese desmentida), composer:recorder 148,8 ms |
 | 2026-10-11 | 0.3.117 | patch do arquiteto | Esqueleto imediato + montagem em transição; fila ociosa quieta na abertura; sync da Conversa só com usuário parado; medição de toda renderização | Local: tsc e npm test 491/491; 6 testes novos; mutações A/B reprovadas. Celular pendente |
+| 2026-10-16 | 0.3.149 | PR desta rodada | Finanças: máscara monetária brasileira, reserva compacta sem caixinha redundante, detalhes e ações preservados | Código + testes em branch isolada; CI, APK e validação física a conferir. OTA não autorizado. |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 
