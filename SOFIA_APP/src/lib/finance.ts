@@ -304,7 +304,7 @@ export function parseMoney(text: string): number | null {
 /** Máscara brasileira durante a digitação: agrupa milhares sem mudar a ordem digitada.
  * A vírgula é o separador decimal explícito (ponto do teclado decimal também é aceito).
  * Nunca converte o texto em centavos automaticamente: "191146" são 191.146 reais. */
-export function formatMoneyInput(text: string, previous = ''): string {
+export function formatMoneyInput(text: string, previous: string | number = ''): string {
   const raw = String(text ?? '').replace(/[^\d.,-]/g, '');
   if (!raw) return '';
   const sign = raw.startsWith('-') ? '-' : '';
@@ -312,7 +312,9 @@ export function formatMoneyInput(text: string, previous = ''): string {
   const comma = clean.lastIndexOf(','), dot = clean.lastIndexOf('.');
   // Diferenciar ponto decimal digitado de ponto de milhar gerado pela máscara.
   // Ao apagar "1.234" para "1.23", não transformar 123 reais em R$ 1,23.
-  const pastedDecimal = !previous && dot >= 0 && (clean.match(/\./g) || []).length === 1
+  // Array.map(fn) also passes a numeric index as arg 2: ignore that, while the
+  // editor supplies the previous field value as a string.
+  const pastedDecimal = !(typeof previous === 'string' ? previous : '') && dot >= 0 && (clean.match(/\./g) || []).length === 1
     && clean.slice(dot + 1).length <= 2;
   const decimalAt = comma >= 0 ? comma : dot >= 0 && (clean.endsWith('.') || pastedDecimal) ? dot : -1;
   const whole = (decimalAt >= 0 ? clean.slice(0, decimalAt) : clean).replace(/\D/g, '').replace(/^0+(?=\d)/, '');
