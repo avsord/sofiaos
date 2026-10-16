@@ -24,15 +24,21 @@ export async function syncFinanceDueNotifications(txs: Tx[], owner: string, now 
   const desired: Notifications.NotificationRequestInput[] = [];
   for (const due of items) {
     const [year,month,day] = due.date.split('-').map(Number);
-    const date = new Date(year,month-1,day,9,0,0);
-    if (date.getTime() <= now.getTime()) continue;
-    const signature=JSON.stringify([NOTIFICATION_SIGNATURE_VERSION,due.title,due.amount,due.date]);
-    desired.push({
-      identifier:PREFIX + key + ':' + due.id,
-      content:{title:'Conta vence hoje: '+due.title,body:'Valor: R$ '+due.amount.toFixed(2).replace('.',',')+'. Abra Finanças → Pendentes para confirmar o pagamento.',sound:'default',
-        data:{sofiaFinanceDue:true,scope:key,entityId:due.tx?.entity?.id||'',signature}},
-      trigger:{type:Notifications.SchedulableTriggerInputTypes.DATE,date,channelId:CHANNEL}
-    });
+    const receive = due.kind === 'receber', valor = 'R$ '+due.amount.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    // 0.3.151: aviso no dia (9h) e, se escolhido, alguns dias antes; tambem para contas a receber.
+    const before = Math.max(0, Math.min(15, Number(due.tx?.remindDays) || 0));
+    for (const offset of before ? [before, 0] : [0]) {
+      const date = new Date(year,month-1,day-offset,9,0,0);
+      if (date.getTime() <= now.getTime()) continue;
+      const when = offset ? (offset === 1 ? 'amanhã' : 'em '+offset+' dias') : 'hoje';
+      const signature=JSON.stringify([NOTIFICATION_SIGNATURE_VERSION,due.title,due.amount,due.date,offset,receive]);
+      desired.push({
+        identifier:PREFIX + key + ':' + due.id + (offset ? ':-' + offset : ''),
+        content:{title:(receive ? 'Recebimento previsto ' : 'Conta vence ') + when + ': ' + due.title,body:'Valor: '+valor+'. Abra Finanças → Pendentes para confirmar '+(receive ? 'o recebimento.' : 'o pagamento.'),sound:'default',
+          data:{sofiaFinanceDue:true,scope:key,entityId:due.tx?.entity?.id||'',signature}},
+        trigger:{type:Notifications.SchedulableTriggerInputTypes.DATE,date,channelId:CHANNEL}
+      });
+    }
   }
   try { await enqueueNotifications(()=>reconcileNotificationRequests(Notifications,PREFIX,desired,()=>epoch===generation));return ''; }
   catch(e){return notificationFailure(e);}

@@ -16,7 +16,7 @@ import {Sheet} from '../components/Sheet';
 import {InternalBackGesture} from '../components/InternalBackGesture';
 import {DateTimeField} from '../components/DateTimeField';
 import {Icon} from '../components/Icon';
-import {Button, IconButton} from '../components/UI';
+import {Button, IconButton, SofiaLogo} from '../components/UI';
 import {PriceChart} from '../components/PriceChart';
 import {Spinner, LoadingLines} from '../components/Loading';
 import {money} from '../lib/monitoring';
@@ -26,7 +26,7 @@ import {
   trend, balanceSeries, upcoming, manualDues, transactionsForAccount, financeInsights, goalProgress, parseMoney, formatMoneyInput, finishMoneyInput, addDays,
 } from '../lib/finance';
 import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove} from '../lib/finance';
-import {moneySplit, reserveOf, toReserveMove} from '../lib/finance';
+import {moneySplit, reserveOf, reserveFor, toReserveMove} from '../lib/finance';
 import {syncFinanceDueNotifications} from '../lib/finance-notifications';
 
 const GOOD = '#2fc58b', BAD = '#ff6b7a', WARN = '#ffb547';
@@ -274,7 +274,7 @@ function Field({label, value, onChange, placeholder, numeric = false, big = fals
 }
 
 // ============================ 0.3.146: GUARDADO x DIA A DIA ============================
-function ReserveSheet({api, kind, reserve, split, onClose, onDone}: {api: SofiaApi; kind: 'setup' | 'in' | 'out' | 'plan'; reserve: Goal | null; split: ReturnType<typeof moneySplit> | null; onClose: () => void; onDone: () => Promise<void>}) {
+function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = ''}: {accountId?: string; api: SofiaApi; kind: 'setup' | 'in' | 'out' | 'plan'; reserve: Goal | null; split: ReturnType<typeof moneySplit> | null; onClose: () => void; onDone: () => Promise<void>}) {
   const c = useTheme();
   const [name, setName] = useState(reserve?.name || 'Dinheiro guardado'), [amount, setAmount] = useState(''), [plan, setPlan] = useState(reserve?.entity?.data?.monthly_plan ? finishMoneyInput(String(reserve.entity.data.monthly_plan).replace('.', ',')) : ''), [note, setNote] = useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
@@ -285,7 +285,7 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone}: {api: SofiaA
       if (kind === 'setup') {
         const saved = parseMoney(amount) ?? 0, monthly = parseMoney(plan) ?? 0;
         if (saved < 0 || monthly < 0) throw Error('Use valores positivos.');
-        await api.saveEntity({kind: 'fin_goal', title: name.trim() || 'Dinheiro guardado', content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {role: 'reserve', saved, monthly_plan: monthly, target: '', deadline: '', color: GOOD}});
+        await api.saveEntity({kind: 'fin_goal', title: name.trim() || 'Dinheiro guardado', content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {role: 'reserve', saved, monthly_plan: monthly, target: '', deadline: '', color: GOOD, account_id: accountId || ''}});
       } else if (kind === 'plan' && reserve) {
         const monthly = parseMoney(plan) ?? 0;
         await api.saveEntity({...reserve.entity, data: {...reserve.entity.data, monthly_plan: monthly}});
@@ -339,7 +339,7 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload}: {d:Data;api:S
   return <>
     <Card_>
       <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
-        <View style={{flex:1,gap:5}}><Text style={{fontSize:17,fontWeight:'800',color:c.text}}>Boletos e dívidas</Text>
+        <View style={{flex:1,gap:5}}><Text style={{fontSize:17,fontWeight:'800',color:c.text}}>A pagar e a receber</Text>
         <Text style={{fontSize:12,color:c.muted,lineHeight:18}}>Cadastre cada vencimento manualmente. Compras e extratos não criam pendências.</Text></View>
         <Pressable accessibilityRole="button" accessibilityLabel="Cadastrar conta a pagar" onPress={()=>onBill('new')} style={{backgroundColor:c.accent,paddingHorizontal:13,paddingVertical:11,borderRadius:12}}>
           <Text style={{color:c.onAccent,fontSize:13,fontWeight:'800'}}>＋ Nova</Text>
@@ -355,7 +355,7 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload}: {d:Data;api:S
       <Title text="A vencer e atrasadas" />
       {list.length ? list.map(due=><DueRow key={due.id} due={due} d={d} api={api} reload={reload} onTx={t=>onBill(t as Tx)} />)
         : <Text style={{color:c.muted,fontSize:13,lineHeight:20}}>Nenhum vencimento manual nos próximos 120 dias. Adicione boletos, contas ou dívidas com a data em que deseja ser lembrado.</Text>}
-      <Text style={{fontSize:11,color:c.muted}}>Os avisos locais são programados para as 9h do dia de vencimento, com a permissão de notificações do Android. Marcar como pago tira o item dos pendentes e o inclui no extrato.</Text>
+      <Text style={{fontSize:11,color:c.muted}}>Os avisos locais saem às 9h do vencimento (e, se você escolher, alguns dias antes), com a permissão de notificações do Android. Confirmar o pagamento ou o recebimento tira o item dos pendentes e o inclui no extrato.</Text>
     </Card_>
   </>;
 }
@@ -364,17 +364,19 @@ function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;
   const [name,setName]=useState(tx?.desc||''),[amount,setAmount]=useState(tx?.amount?finishMoneyInput(String(tx.amount).replace('.',',')):'');
   const [date,setDate]=useState(tx?.date||todayISO()),[category,setCategory]=useState(tx?.category||'Contas');
   const [repeat,setRepeat]=useState(tx?.recurrence==='monthly'?'monthly':'none');
+  // 0.3.151: tambem contas a receber, e aviso alguns dias antes (alem do aviso no dia)
+  const [flow,setFlow]=useState<'expense'|'income'>(tx?.kind==='income'?'income':'expense'),[before,setBefore]=useState(String(tx?.remindDays||0));
   const [error,setError]=useState(''),[busy,setBusy]=useState(false);
   async function save() {
     const value=parseMoney(amount);
-    if(!name.trim()){setError('Informe qual conta ou dívida precisa pagar.');return;}
-    if(!value||value<=0){setError('Informe o valor a pagar.');return;}
+    if(!name.trim()){setError(flow==='income'?'Informe o que você vai receber.':'Informe qual conta ou dívida precisa pagar.');return;}
+    if(!value||value<=0){setError(flow==='income'?'Informe o valor a receber.':'Informe o valor a pagar.');return;}
     if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T12:00:00Z'))){setError('Selecione uma data de vencimento válida.');return;}
     if(!accountId){setError('Selecione uma conta financeira primeiro.');return;}
     setBusy(true);setError('');
     try{
       const data={
-        kind:'expense',amount:value,date,category,account_id:tx?.accountId||accountId,
+        kind:flow,amount:value,date,category,account_id:tx?.accountId||accountId,remind_days:Number(before)||0,
         paid:false,card_id:'',to_account_id:'',
         recurrence:tx?.virtual?'none':repeat,
         series_id:tx?.seriesId||'',
@@ -395,16 +397,20 @@ function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap:13,paddingBottom:24}}>
       <Text style={{fontSize:20,fontWeight:'800',color:c.text}}>{existing?'Editar vencimento':'Novo vencimento'}</Text>
       <Text style={{fontSize:13,lineHeight:19,color:c.muted}}>Este registro só afeta o saldo depois que você confirmar o pagamento. Não vem automaticamente do extrato bancário.</Text>
-      <Field label="Conta a pagar" value={name} onChange={setName} placeholder="Ex.: Boleto de energia, dívida, aluguel" />
+      <Chips value={flow} onChange={setFlow} options={[{value:'expense',label:'A pagar'},{value:'income',label:'A receber'}]}/>
+      <Field label={flow==='income'?'Conta a receber':'Conta a pagar'} value={name} onChange={setName} placeholder={flow==='income'?'Ex.: Freela, aluguel recebido, reembolso':'Ex.: Boleto de energia, dívida, aluguel'} />
       <Field label="Valor (R$)" value={amount} onChange={setAmount} numeric placeholder="0,00" />
       <DateTimeField label="Vencimento" value={date} onChange={v=>v&&setDate(v)} dateOnly allowClear={false} />
       <Text style={{color:c.muted,fontSize:12}}>Categoria</Text>
       <Chips scroll value={category} onChange={setCategory} options={['Contas','Moradia','Saúde','Impostos','Outros'].map(x=>({value:x,label:x}))}/>
       <Text style={{color:c.muted,fontSize:12}}>Repetição</Text>
       <Chips value={repeat} onChange={setRepeat} options={[{value:'none',label:'Só esta vez'},{value:'monthly',label:'Todo mês'}]}/>
+      <Text style={{color:c.muted,fontSize:12}}>Avisar</Text>
+      <Chips value={before} onChange={setBefore} options={[{value:'0',label:'No dia'},{value:'1',label:'1 dia antes'},{value:'3',label:'3 dias antes'},{value:'7',label:'7 dias antes'}]}/>
+      <Text style={{color:c.muted,fontSize:11}}>{before==='0'?'Aviso às 9h do dia do vencimento.':'Aviso às 9h, '+before+(before==='1'?' dia':' dias')+' antes e de novo no dia.'}</Text>
       {tx?.virtual?<Text style={{color:c.muted,fontSize:12}}>Esta ocorrência pertence a uma série mensal. Editá-la cria uma exceção, preservando a série.</Text>:null}
       {error?<Text style={{color:BAD,fontSize:13}}>{error}</Text>:null}
-      <Button title="Salvar vencimento" loading={busy} onPress={()=>void save()} />
+      <Button title={flow==='income'?'Salvar recebimento':'Salvar vencimento'} loading={busy} onPress={()=>void save()} />
       {existing?<Pressable accessibilityRole="button" accessibilityLabel="Excluir vencimento" onPress={erase} style={{alignItems:'center',paddingVertical:12}}>
         <Text style={{color:BAD,fontWeight:'700'}}>Excluir vencimento</Text></Pressable>:null}
     </ScrollView>
@@ -419,17 +425,20 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
     dues: manualDues(d.txs, accountId, today, 10)}), [d, accountId, month, today]);
   const [hide, setHide] = useState(false), [reserveSheet, setReserveSheet] = useState<'setup' | 'in' | 'out' | 'plan' | null>(null);
   const show = (v: number) => hide ? 'R$ •••••' : money(v);
-  const reserve = isPrimary ? reserveOf(d.goals) : null;
+  // 0.3.151: cada conta tem o proprio guardado (a principal mantem a reserva antiga, sem conta).
+  const reserve = reserveFor(d.goals, accountId, isPrimary);
+  const tips = useMemo(() => financeInsights(d.txs, month), [d, month]);
   const split = useMemo(() => reserve ? moneySplit(reserve, d.moves || [], d.accounts, d.txs, d.cards, month, today, manualDues(d.txs,accountId,today,45)) : null, [reserve, d, accountId, month, today]);
   // Reserva em linha discreta no cartão original; o detalhamento dos valores fica sob demanda.
   const [reserveMenu, setReserveMenu] = useState(false);
   return (
     <>
-      {reserveSheet ? <ReserveSheet api={api} kind={reserveSheet} reserve={reserve} split={split} onClose={() => setReserveSheet(null)} onDone={async () => { setReserveSheet(null); await reload(); }} /> : null}
-      {isPrimary ? <Pressable accessibilityRole="button" accessibilityLabel="Gerenciar dinheiro guardado" onPress={() => split ? setReserveMenu(true) : setReserveSheet('setup')}
+      {reserveSheet ? <ReserveSheet accountId={accountId} api={api} kind={reserveSheet} reserve={reserve} split={split} onClose={() => setReserveSheet(null)} onDone={async () => { setReserveSheet(null); await reload(); }} /> : null}
+      {accountId ? <Pressable accessibilityRole="button" accessibilityLabel="Gerenciar dinheiro guardado" onPress={() => split ? setReserveMenu(true) : setReserveSheet('setup')}
         style={{backgroundColor:'#e99334',borderTopLeftRadius:24,borderTopRightRadius:24,paddingTop:14,paddingHorizontal:20,paddingBottom:25,marginBottom:-19,flexDirection:'row',alignItems:'center',gap:10}}>
         <Icon name="shield" size={16} color="#3c270e" />
         <Text style={{color:'#3c270e',fontWeight:'700',fontSize:13,flex:1}}>Guardado</Text>
+        {split && split.planned > 0 && split.missing > 0 ? <Text style={{color:'#3c270e',fontSize:11}}>faltam {show(split.missing)} no mês</Text> : null}
         <Text style={{color:'#3c270e',fontWeight:'800',fontSize:18}}>{split ? show(split.saved) : 'Configurar ›'}</Text>
       </Pressable> : null}
       <View style={{backgroundColor: c.accent, borderRadius: 24, padding: 18, gap: 14, elevation: 2}}>
@@ -445,6 +454,11 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
         </View>
 
       </View>
+      {/* 0.3.151: feedback curto da Sofia sobre o mes desta conta (o completo fica em Relatorios) */}
+      {tips.length ? <Pressable accessibilityRole="button" accessibilityLabel="Ver a análise completa em Relatórios" onPress={() => onTab('reports')} style={{backgroundColor: c.surface, borderRadius: 18, padding: 14, gap: 6, borderWidth: 1, borderColor: c.line}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}><SofiaLogo size={22} /><Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 14}}>A Sofia sobre o seu mês</Text><Text style={{color: c.accent, fontSize: 12, fontWeight: '700'}}>Ver mais ›</Text></View>
+        {tips.slice(0, 2).map((t, i) => <Text key={i} style={{color: t.tone === 'attention' ? WARN : t.tone === 'good' ? GOOD : c.muted, fontSize: 13, lineHeight: 19}}>{t.tone === 'good' ? '✓ ' : t.tone === 'attention' ? '! ' : '• '}<Text style={{color: c.text}}>{t.text}</Text></Text>)}
+      </Pressable> : null}
       <Sheet visible={reserveMenu} onClose={() => setReserveMenu(false)} label="Fechar detalhes da reserva">
         <View style={{gap: 14, paddingBottom: 12}}>
           <Text style={{fontSize: 18, fontWeight: '800', color: c.text}}>Sua reserva</Text>

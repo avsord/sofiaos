@@ -1629,6 +1629,11 @@ const CATALOG={
     ],
     "fields": [
       {
+        "key": "remind_days",
+        "label": "Avisar dias antes",
+        "type": "number"
+      },
+      {
         "key": "kind",
         "label": "Tipo",
         "type": "select",
@@ -1792,6 +1797,12 @@ const CATALOG={
         "key": "monthly_plan",
         "label": "Aporte mensal planejado",
         "type": "number"
+      },
+      {
+        "key": "account_id",
+        "label": "Conta",
+        "type": "text",
+        "max": 80
       }
     ],
     "description": "Meta de economia com acompanhamento do quanto falta. Com papel 'reserve', é o Dinheiro guardado (valor separado para preservar)."

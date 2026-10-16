@@ -10,7 +10,7 @@ export type Card = {id: string; name: string; limit: number; closing: number; du
 export type Tx = {
   id: string; kind: TxKind; desc: string; amount: number; date: string; category: string; accountId: string; toAccountId: string; cardId: string;
   invoice: string; paid: boolean; seriesId: string; installment: number; installments: number; recurrence: Recurrence; recurrenceEnd: string;
-  virtual?: boolean; manualDue?: boolean; entity?: Entity;
+  virtual?: boolean; manualDue?: boolean; remindDays?: number; entity?: Entity;
 };
 export type Budget = {id: string; category: string; limit: number; entity: Entity};
 export type Goal = {id: string; name: string; target: number; saved: number; deadline: string; color: string; done: boolean; entity: Entity};
@@ -74,7 +74,7 @@ export function toTx(e: Entity): Tx {
   return {id: e.id, kind: (d.kind || 'expense') as TxKind, desc: e.title, amount: num(d.amount), date: String(d.date || ''), category: String(d.category || ''),
     accountId: String(d.account_id || ''), toAccountId: String(d.to_account_id || ''), cardId: String(d.card_id || ''), invoice: String(d.invoice_month || ''),
     paid: !!d.paid, seriesId: String(d.series_id || ''), installment: num(d.installment), installments: num(d.installments), recurrence: (d.recurrence || 'none') as Recurrence,
-    recurrenceEnd: String(d.recurrence_end || ''), manualDue: String(d.import_id || '').startsWith('sofia-pendencia:'), entity: e};
+    recurrenceEnd: String(d.recurrence_end || ''), manualDue: String(d.import_id || '').startsWith('sofia-pendencia:'), remindDays: Math.max(0, Math.min(15, Number(d.remind_days) || 0)), entity: e};
 }
 export function toBudget(e: Entity): Budget { return {id: e.id, category: String(e.data?.category || e.title), limit: num(e.data?.limit), entity: e}; }
 export function toGoal(e: Entity): Goal {
@@ -256,9 +256,9 @@ export function manualDues(txs: Tx[], accountId = '', today = todayISO(), days =
   for (let m = monthOf(today); m <= monthOf(until); m = addMonths(m, 1)) months.push(m);
   const seen = new Set<string>();
   return [...txs, ...months.flatMap(m => expandRecurring(txs, m))]
-    .filter(t => t.manualDue && !t.paid && t.kind === 'expense' && !t.cardId && (!accountId || t.accountId === accountId) && t.date <= until)
+    .filter(t => t.manualDue && !t.paid && (t.kind === 'expense' || t.kind === 'income') && !t.cardId && (!accountId || t.accountId === accountId) && t.date <= until)
     .filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; })
-    .map(t => ({id: t.id, title: t.desc, amount: t.amount, date: t.date, kind: 'pagar' as const, late: t.date < today, tx: t}))
+    .map(t => ({id: t.id, title: t.desc, amount: t.amount, date: t.date, kind: (t.kind === 'income' ? 'receber' : 'pagar') as Due['kind'], late: t.date < today, tx: t}))
     .sort((a,b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
 }
 export type FinanceInsight = {tone: 'good' | 'attention' | 'neutral'; text: string};
@@ -375,4 +375,10 @@ export function moneySplit(reserve: Goal, moves: ReserveMove[], accounts: Accoun
   const planned = Number(reserve.entity?.data?.monthly_plan) || 0;
   const realized = round2(mine.filter(m => m.direction === 'in' && monthOf(m.date) === month).reduce((s, m) => s + m.amount, 0));
   return {total, saved, daily, committed, free: round2(daily - committed), planned, realized, missing: round2(Math.max(0, planned - realized)), shortfall: round2(Math.max(0, committed - daily))};
+}
+
+/** 0.3.151: reserva (Dinheiro guardado) de cada conta. A principal tambem usa a reserva antiga, sem conta. */
+export function reserveFor(goals: Goal[], accountId: string, isPrimary: boolean): Goal | null {
+  const reserves = goals.filter(g => g.entity?.data?.role === 'reserve');
+  return reserves.find(g => String(g.entity?.data?.account_id || '') === accountId) || (isPrimary ? reserves.find(g => !g.entity?.data?.account_id) || null : null);
 }
