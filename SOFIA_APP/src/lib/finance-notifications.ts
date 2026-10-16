@@ -34,6 +34,6 @@ export async function syncFinanceDueNotifications(txs: Tx[], owner: string, now 
       trigger:{type:Notifications.SchedulableTriggerInputTypes.DATE,date,channelId:CHANNEL}
     });
   }
-  try { await enqueueNotifications(()=>reconcileNotificationRequests(Notifications,PREFIX + key + ':',desired,()=>epoch===generation));return ''; }
+  try { await enqueueNotifications(()=>reconcileNotificationRequests(Notifications,PREFIX,desired,()=>epoch===generation));return ''; }
   catch(e){return notificationFailure(e);}
 }
