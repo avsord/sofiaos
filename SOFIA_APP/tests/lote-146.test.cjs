@@ -31,9 +31,10 @@ test('Price Tracker: sem busca automatica de lojas; Inicio mostra a oferta princ
   assert.ok(p.includes('label="Mover para outro produto"'));
   assert.ok(lib.includes('export function primaryNow(p: ProductSeries)'));
 });
-test('financas: blocos guardado x dia a dia e total como resumo secundario',()=>{
+test('financas: guardado e para usar dentro do cartao de saldo, retirada confirmada',()=>{
   const f=read('src/screens/Finance.tsx');
-  assert.ok(f.includes('🔒 Dinheiro guardado'));assert.ok(f.includes('🧾 Dinheiro para o dia a dia'));
-  assert.ok(f.includes("'Total organizado (resumo)'"));assert.ok(f.includes('Não é o valor disponível para gastar.'));
+  // 0.3.147: guardado dentro do cartao original (mesmo estilo de Receitas/Despesas), sem blocos grandes
+  assert.ok(f.includes('🔒 Guardado'));assert.ok(f.includes('>Para usar<'));assert.ok(!f.includes('function MoneyBlocks('));
+  assert.ok(f.includes("<Text style={{flex: 1, color: c.onAccent + 'cc', fontSize: 13}}>Saldo geral</Text>"));
   assert.ok(f.includes("Alert.alert('Retirar da reserva?'"),'retirada confirmada');
 });
