@@ -302,7 +302,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, onAccount, onManage}: {d: 
             <Pressable accessibilityRole="button" accessibilityLabel="Abrir detalhes e ações da reserva" onPress={() => setReserveMenu(true)}
               style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
               <View style={{width: 36, height: 36, borderRadius: 12, backgroundColor: c.onAccent + '22', alignItems: 'center', justifyContent: 'center'}}>
-                <Icon name="lock" size={18} color={c.onAccent} />
+                <Icon name="shield" size={18} color={c.onAccent} />
               </View>
               <View style={{flex: 1, gap: 2}}>
                 <Text style={{color: c.onAccent, fontWeight: '800', fontSize: 13}}>Reserva separada</Text>
