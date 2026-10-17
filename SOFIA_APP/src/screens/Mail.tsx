@@ -15,6 +15,7 @@ import {Spinner, LoadingLines} from '../components/Loading';
 import {parseBill, parseMoney, todayISO, toAccount} from '../lib/finance';
 import {money} from '../lib/monitoring';
 import {openInGmail} from '../lib/open-gmail';
+import {appAlert} from '../lib/app-alert';
 
 type Tab = 'hits' | 'rules' | 'accounts';
 const PROVIDERS: Array<{value: string; label: string; help: string; link?: string}> = [
@@ -77,7 +78,7 @@ function SelectionSheet({api, accounts, selection, onSelect, onClose, onChanged}
       {row('Todas as contas', {type: 'all'}, accounts.length + ' conta(s)')}
       {groups.map(g => { const list = accounts.filter(a => String(a.data?.group || '').trim() === g); return <View key={g} style={{gap: 2, marginTop: 6}}>
         {renaming === g ? <View style={{flexDirection: 'row', gap: 8, alignItems: 'center'}}><View style={{flex: 1}}><Field label={'Novo nome para ' + g} value={name} onChange={setName} placeholder={g} /></View><IconButton name="check" label="Salvar nome do grupo" disabled={busy || !name.trim()} onPress={() => { void setGroupOf(list, name.trim().slice(0, 60)).then(() => { if (selection.type === 'group' && selection.name === g) onSelect({type: 'group', name: name.trim().slice(0, 60)}); setRenaming(''); }); }} /></View>
-        : <View style={{flexDirection: 'row', alignItems: 'center'}}><View style={{flex: 1}}>{row(g, {type: 'group', name: g}, list.length + ' conta(s)')}</View><IconButton name="edit" label={'Renomear grupo ' + g} onPress={() => { setRenaming(g); setName(g); }} /><IconButton name="trash" label={'Excluir grupo ' + g} disabled={busy} onPress={() => Alert.alert('Excluir grupo “' + g + '”?', 'As contas continuam conectadas e nenhum e-mail é apagado; elas só ficam sem grupo.', [{text: 'Cancelar'}, {text: 'Excluir grupo', style: 'destructive', onPress: () => { void setGroupOf(list, '').then(() => { if (selection.type === 'group' && selection.name === g) onSelect({type: 'all'}); }); }}])} /></View>}
+        : <View style={{flexDirection: 'row', alignItems: 'center'}}><View style={{flex: 1}}>{row(g, {type: 'group', name: g}, list.length + ' conta(s)')}</View><IconButton name="edit" label={'Renomear grupo ' + g} onPress={() => { setRenaming(g); setName(g); }} /><IconButton name="trash" label={'Excluir grupo ' + g} disabled={busy} onPress={() => appAlert('Excluir grupo “' + g + '”?', 'As contas continuam conectadas e nenhum e-mail é apagado; elas só ficam sem grupo.', [{text: 'Cancelar'}, {text: 'Excluir grupo', style: 'destructive', onPress: () => { void setGroupOf(list, '').then(() => { if (selection.type === 'group' && selection.name === g) onSelect({type: 'all'}); }); }}])} /></View>}
         {list.map(a => row(String(a.data?.address || 'Conta'), {type: 'account', id: a.id}, '', 18))}
       </View>; })}
       {loose.length ? <View style={{gap: 2, marginTop: 6}}><Text style={{color: c.muted, fontSize: 12, paddingHorizontal: 12, paddingTop: 6}}>Sem grupo</Text>{loose.map(a => row(String(a.data?.address || 'Conta'), {type: 'account', id: a.id}, '', 18))}</View> : null}
@@ -267,7 +268,7 @@ function AccountSheet({api, account, onClose, onDone, groups = []}: {api: SofiaA
           {account ? (
             <View style={{gap: 4}}>
               <Pressable onPress={async () => { try { await api.saveEntity({...account, state: account.state === 'paused' ? 'active' : 'paused'}); onDone(); } catch (e) { setError(errorText(e)); } }} style={{paddingVertical: 10}}><Text style={{color: c.text}}>{account.state === 'paused' ? 'Voltar a vigiar esta conta' : 'Pausar esta conta'}</Text></Pressable>
-              <Pressable onPress={() => Alert.alert('Desconectar?', 'A senha de app é apagada do servidor. Os e-mails já encontrados ficam.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Desconectar', style: 'destructive', onPress: async () => { try { await api.mailForget(account.id); await api.deleteEntity(account.id); onDone(); } catch (e) { setError(errorText(e)); } }}])} style={{paddingVertical: 10}}><Text style={{color: c.danger}}>Desconectar e remover</Text></Pressable>
+              <Pressable onPress={() => appAlert('Desconectar?', 'A senha de app é apagada do servidor. Os e-mails já encontrados ficam.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Desconectar', style: 'destructive', onPress: async () => { try { await api.mailForget(account.id); await api.deleteEntity(account.id); onDone(); } catch (e) { setError(errorText(e)); } }}])} style={{paddingVertical: 10}}><Text style={{color: c.danger}}>Desconectar e remover</Text></Pressable>
             </View>
           ) : null}
         </ScrollView>

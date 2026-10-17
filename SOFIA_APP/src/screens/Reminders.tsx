@@ -9,6 +9,7 @@ import {DateTimeField} from '../components/DateTimeField';
 import {Sheet} from '../components/Sheet';
 import {Button,Empty,ErrorBanner,IconButton,ScreenTitle,forms} from '../components/UI';
 import {Icon} from '../components/Icon';
+import {appAlert} from '../lib/app-alert';
 
 // 0.3.141: app Lembretes. Usa o registro "reminder" que a Agenda ja conhece: o aviso no
 // celular sai pelo mesmo agendador da Agenda (api.saveEntity avisa agendaChanged).
@@ -51,7 +52,7 @@ export function Reminders({api,active,onBack}:{api:SofiaApi;active:boolean;onBac
   }catch(e){setError(errorText(e));}finally{setBusy(false);}
  }
  async function setState(item:Entity,state:string){if(busy)return;setBusy(true);setError('');try{records.merge(await api.saveEntity({...item,state,revision:item.revision}));}catch(e){setError(errorText(e));}finally{setBusy(false);}}
- function remove(item:Entity){Alert.alert('Excluir lembrete?',`“${item.title}” será removido.`,[{text:'Cancelar'},{text:'Excluir',style:'destructive',onPress:()=>{setBusy(true);api.deleteEntity(item.id).then(()=>{void records.load(false,true);setEditing(null);}).catch(e=>setError(errorText(e))).finally(()=>setBusy(false));}}]);}
+ function remove(item:Entity){appAlert('Excluir lembrete?',`“${item.title}” será removido.`,[{text:'Cancelar'},{text:'Excluir',style:'destructive',onPress:()=>{setBusy(true);api.deleteEntity(item.id).then(()=>{void records.load(false,true);setEditing(null);}).catch(e=>setError(errorText(e))).finally(()=>setBusy(false));}}]);}
  const row=(item:Entity,late=false,done=false)=><Pressable key={item.id} accessibilityRole="button" accessibilityLabel={'Editar lembrete '+item.title} onPress={()=>open(item)} style={({pressed})=>({minHeight:72,borderRadius:22,paddingHorizontal:14,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:12,backgroundColor:done?c.surface:c.card,borderWidth:1,borderColor:late?c.danger:c.line,opacity:pressed?0.85:1})}>
   <Pressable accessibilityRole="checkbox" accessibilityState={{checked:done}} accessibilityLabel={(done?'Reativar ':'Concluir ')+item.title} onPress={e=>{e.stopPropagation();void setState(item,done?'active':'done');}} style={{width:30,height:30,borderRadius:15,borderWidth:2,borderColor:done?c.accent:late?c.danger:c.muted,backgroundColor:done?c.accent:'transparent',alignItems:'center',justifyContent:'center'}}>{done?<Icon name="check" size={16} color="#fff"/>:null}</Pressable>
   <View style={{flex:1,minWidth:0,gap:3}}><Text numberOfLines={1} style={{fontSize:15,fontWeight:'700',color:done?c.muted:c.text,textDecorationLine:done?'line-through':'none'}}>{item.title}</Text><Text style={{fontSize:11,color:late?c.danger:c.muted}}>{remindLabel(item.data?.remind_at)}</Text>{item.data?.message?<Text numberOfLines={1} style={{fontSize:11,color:c.muted}}>{String(item.data.message)}</Text>:null}</View>

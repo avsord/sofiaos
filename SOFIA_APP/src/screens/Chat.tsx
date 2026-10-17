@@ -28,9 +28,10 @@ import { SofiaLogo, Empty, ErrorBanner, IconButton } from '../components/UI';
 import { Composer, deleteVoice } from '../components/Composer';
 import { VoicePlayer } from '../components/VoicePlayer';
 import {MountTimer} from '../components/MountTimer';
+import {appAlert} from '../lib/app-alert';
 function Bubble({message,previous,api,onRetry,selecting,selected,onSelect}:{message:Message;previous?:Message;api:SofiaApi;onRetry:(m:Message)=>void;selecting:boolean;selected:boolean;onSelect:(m:Message)=>void}) {
  const parsed=parseAttachments(message.content,SITE);
- async function openFile(id:string,name:string){try{const source=api.attachmentSource(id),safe=name.replace(/[^\p{L}\p{N}._-]/gu,'_');const file=await File.downloadFileAsync(source.uri,new File(Paths.cache,id+'-'+safe),{headers:source.headers,idempotent:true});await Sharing.shareAsync(file.uri);}catch(e){Alert.alert('Anexo',errorText(e));}}
+ async function openFile(id:string,name:string){try{const source=api.attachmentSource(id),safe=name.replace(/[^\p{L}\p{N}._-]/gu,'_');const file=await File.downloadFileAsync(source.uri,new File(Paths.cache,id+'-'+safe),{headers:source.headers,idempotent:true});await Sharing.shareAsync(file.uri);}catch(e){appAlert('Anexo',errorText(e));}}
  const c=useTheme(),mine=message.role==='user',isNewDay=!previous||dayKey(previous.created_at)!==dayKey(message.created_at);
  // 0.3.140: mensagem nova entra deslizando e surgindo (so as recentes; o historico carrega parado)
  const fresh=React.useRef(Date.now()-new Date(message.created_at).getTime()<4000).current;
@@ -169,7 +170,7 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
  function deleteSelected(){
   if(!conversation||!selectedIds.size||deleting||sending)return;
   const chosen=messages.filter(m=>selectedIds.has(m.id)),id=conversation.id;
-  Alert.alert('Excluir '+chosen.length+' mensagem'+(chosen.length===1?'?':'s?'),'As mensagens selecionadas serão excluídas do histórico do app e do site.',[
+  appAlert('Excluir '+chosen.length+' mensagem'+(chosen.length===1?'?':'s?'),'As mensagens selecionadas serão excluídas do histórico do app e do site.',[
    {text:'Cancelar',style:'cancel'},
    {text:'Excluir',style:'destructive',onPress:()=>{void(async()=>{
     ++syncEpoch.current;setDeleting(true);setError('');
@@ -182,7 +183,7 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
    })();}}
   ]);
  }
- function deleteConversations(){const ids=[...selectedConversations];if(!ids.length)return;Alert.alert('Excluir conversas?','Somente as conversas selecionadas serão apagadas no app e no site.',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{void(async()=>{try{setDeleting(true);await api.deleteConversations(ids);setItems(prev=>prev.filter(i=>!ids.includes(i.id)));setSelectedConversations(new Set());if(conversation&&ids.includes(conversation.id))await newChat();}catch(e){setHistory(false);setError(errorText(e));}finally{setDeleting(false);}})();}}]);}
+ function deleteConversations(){const ids=[...selectedConversations];if(!ids.length)return;appAlert('Excluir conversas?','Somente as conversas selecionadas serão apagadas no app e no site.',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{void(async()=>{try{setDeleting(true);await api.deleteConversations(ids);setItems(prev=>prev.filter(i=>!ids.includes(i.id)));setSelectedConversations(new Set());if(conversation&&ids.includes(conversation.id))await newChat();}catch(e){setHistory(false);setError(errorText(e));}finally{setDeleting(false);}})();}}]);}
  function copySelected(){const content=messages.filter(m=>selectedIds.has(m.id)).map(m=>m.content).filter(Boolean).join('\n\n');if(content)void Clipboard.setStringAsync(content);}
  return <KeyboardViewport>
  {selectedIds.size>0?<View style={{paddingHorizontal:10,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:8,borderBottomWidth:1,borderColor:c.line,backgroundColor:c.surface}}><IconButton name="back" label="Sair da seleção" disabled={deleting} onPress={()=>setSelectedIds(new Set())}/><Text style={{flex:1,color:c.text,fontSize:18,fontWeight:'600'}}>{selectedIds.size} selecionada{selectedIds.size===1?'':'s'}</Text>{selectedIds.size===1?<IconButton name="undo" label="Responder esta mensagem" disabled={deleting} onPress={()=>{const m=messages.find(x=>selectedIds.has(x.id));if(m){setQuote(m);setSelectedIds(new Set());}}}/>:null}<IconButton name="copy" label="Copiar mensagens selecionadas" disabled={deleting} onPress={copySelected}/>{deleting?<ActivityIndicator color={c.accent}/>:<IconButton name="trash" label="Excluir mensagens selecionadas" onPress={deleteSelected}/>}</View>:<View style={{paddingHorizontal:16,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:11,borderBottomWidth:1,borderColor:c.line,backgroundColor:c.surface}}><SofiaLogo size={44}/><View style={{flex:1}}><Text style={{color:c.text,fontSize:19,fontWeight:'700'}}>Sofia</Text><Text numberOfLines={1} style={{color:c.muted,fontSize:11,marginTop:3}}>Sua assistente · mesma memória</Text></View><IconButton name="history" label="Histórico de conversas" onPress={()=>void openHistory()} disabled={dirty||sending||recordingLock}/><IconButton name="plus" label="Nova conversa" onPress={()=>void newChat()} disabled={dirty||sending||recordingLock}/></View>}

@@ -7,6 +7,7 @@ import {useTheme} from '../lib/theme';
 import {errorText} from '../lib/chat-model';
 import {Button,ErrorBanner,forms} from './UI';
 import type {StoreConnection,StoreConnectionsState} from '../lib/store-connections-types';
+import {appAlert} from '../lib/app-alert';
 
 const LOGOS:Record<string,{letter:string;bg:string;fg:string}>={mercadolivre:{letter:'M',bg:'#ffe600',fg:'#2d3277'},aliexpress:{letter:'A',bg:'#ff4747',fg:'#fff'}};
 const ABOUT:Record<string,string>={
@@ -21,7 +22,7 @@ export function StoreConnections({api}:{api:SofiaApi}){
  useVisibleLoad(()=>{void load();const s=AppState.addEventListener('change',v=>{if(v==='active')void load();});return()=>s.remove();},[api]);
  async function act(provider:string,task:()=>Promise<unknown>){if(busy)return;setBusy(provider);try{await task();await load();}catch(e){setError(errorText(e));}finally{setBusy('');}}
  function connect(store:StoreConnection){
-  Alert.alert('Conectar '+store.name,ABOUT[store.provider]||'Conectar a sua conta uma vez.',[{text:'Agora nao',style:'cancel'},{text:'Conectar',onPress:()=>void act(store.provider,async()=>{
+  appAlert('Conectar '+store.name,ABOUT[store.provider]||'Conectar a sua conta uma vez.',[{text:'Agora nao',style:'cancel'},{text:'Conectar',onPress:()=>void act(store.provider,async()=>{
    const {url}=await api.storeConnect(store.provider);
    // Janela da loja dentro do app: entra na conta, autoriza e volta sozinho para a Sofia.
    const session=await WebBrowser.openAuthSessionAsync(url,'sofiaapp://stores');
@@ -29,7 +30,7 @@ export function StoreConnections({api}:{api:SofiaApi}){
   })}]);
  }
  function disconnect(store:StoreConnection){
-  Alert.alert('Desconectar '+store.name,'As leituras voltam a depender da pagina da loja, que pode pedir verificacao.',[{text:'Cancelar',style:'cancel'},{text:'Desconectar',style:'destructive',onPress:()=>void act(store.provider,()=>api.storeDisconnect(store.provider))}]);
+  appAlert('Desconectar '+store.name,'As leituras voltam a depender da pagina da loja, que pode pedir verificacao.',[{text:'Cancelar',style:'cancel'},{text:'Desconectar',style:'destructive',onPress:()=>void act(store.provider,()=>api.storeDisconnect(store.provider))}]);
  }
  return <View style={[forms.card,{backgroundColor:c.surface,borderWidth:1,borderColor:c.line,gap:12}]}>
   <Text style={{fontSize:18,fontWeight:'600',color:c.text}}>Lojas do Price Tracker</Text>

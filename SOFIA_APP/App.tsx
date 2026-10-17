@@ -37,6 +37,7 @@ import {Login} from './src/screens/Login';
 
 import {APP_VERSION,checkForUpdate} from './src/lib/update';
 import {finishLaunchHandoff} from './src/lib/launch-handoff';
+import {appAlert,AppAlertHost} from './src/lib/app-alert';
 
 const tabs:{id:Tab;label:string;icon:IconName}[]=[{id:'home',label:'Início',icon:'home'},{id:'chat',label:'Conversa',icon:'chat'},{id:'pages',label:'Páginas',icon:'book'},{id:'agenda',label:'Agenda',icon:'calendar'},{id:'apps',label:'Apps',icon:'grid'},{id:'profile',label:'Perfil',icon:'user'}];
 function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
@@ -126,11 +127,11 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
   checkingUpdate.current=true;lastUpdateCheck.current=Date.now();
   try{
    const update=await checkForUpdate();
-   if(!update){if(manual)Alert.alert('Sofia OS '+APP_VERSION,'Você já está na versão mais recente.');return;}
+   if(!update){if(manual)appAlert('Sofia OS '+APP_VERSION,'Você já está na versão mais recente.');return;}
    if(!manual&&(AppState.currentState!=='active'||navigation.current.locked||lastUpdatePrompt.current===update.version))return;
    lastUpdatePrompt.current=update.version;
-   Alert.alert('Atualização disponível',`Instalada: ${APP_VERSION}\nDisponível: ${update.version}\nO Android pedirá sua confirmação para instalar.`,[{text:'Depois',style:'cancel'},{text:'Atualizar',onPress:()=>{void Linking.openURL(update.url).catch(()=>Alert.alert('Atualizações','Não foi possível abrir o instalador. Tente novamente em Ajustes.'));}}]);
-  }catch(e){if(manual)Alert.alert('Atualizações',errorText(e));}
+   appAlert('Atualização disponível',`Instalada: ${APP_VERSION}\nDisponível: ${update.version}\nO Android pedirá sua confirmação para instalar.`,[{text:'Depois',style:'cancel'},{text:'Atualizar',onPress:()=>{void Linking.openURL(update.url).catch(()=>appAlert('Atualizações','Não foi possível abrir o instalador. Tente novamente em Ajustes.'));}}]);
+  }catch(e){if(manual)appAlert('Atualizações',errorText(e));}
   finally{checkingUpdate.current=false;}
  },[]);
  useEffect(()=>{const a=Keyboard.addListener('keyboardDidShow',()=>setKeyboard(true)),b=Keyboard.addListener('keyboardDidHide',()=>setKeyboard(false));return()=>{a.remove();b.remove();};},[]);
@@ -152,7 +153,7 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  const navigate=useCallback((next:Tab)=>{
   const current=navigation.current;
   if(next===current.tab){if(next==='apps'&&!current.locked){setWorkspaceReset(v=>v+1);setWorkspaceDepth(false);}return;}
-  if(current.locked){pager.current?.goTo(current.tab);Alert.alert('Sua conversa','Pare a gravação ou aguarde a resposta antes de trocar de aba.');return;}
+  if(current.locked){pager.current?.goTo(current.tab);appAlert('Sua conversa','Pare a gravação ou aguarde a resposta antes de trocar de aba.');return;}
   tabHistory.current=[...tabHistory.current,current.tab].slice(-30);
   tabTap.current={tab:next,at:Date.now(),early:!!nativeRevealAt.current&&Date.now()-nativeRevealAt.current<=3000};
   switchTab(next);
@@ -175,7 +176,7 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
 
  const goBack=useCallback(()=>{
   const current=navigation.current;
-  if(current.locked){Alert.alert('Sua conversa','Pare a gravação ou aguarde a resposta.');return true;}
+  if(current.locked){appAlert('Sua conversa','Pare a gravação ou aguarde a resposta.');return true;}
   while(tabHistory.current.length){const previous=tabHistory.current.pop()!;if(previous!==current.tab){switchTab(previous);return true;}}
   if(current.tab!=='home'&&auth){switchTab('home');return true;}return false;
  },[auth,switchTab]);
@@ -184,12 +185,12 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  useEffect(()=>{const s=BackHandler.addEventListener('hardwareBackPress',()=>(tab==='apps'&&workspaceDepth)||(tab==='pages'&&pagesDepth)?false:!!auth);return()=>s.remove();},[tab,workspaceDepth,pagesDepth,auth]);
  const login=useCallback(async(a:Auth)=>{await saveAuth(a);tabHistory.current=[];setAuth(a);setBootstrap(fastBootstrap(a));switchTab('home');setError('');},[switchTab]);
  const changePrefs=useCallback(async(p:Prefs)=>{await savePrefs(p);setPrefs(p);},[]);
- const logout=useCallback(async()=>{void silenceVoices();await api.discardCache();let revokeFailed=false;try{await api.logout();}catch{revokeFailed=true;}try{await forgetAuth();}catch{Alert.alert('Armazenamento','Não foi possível apagar a cópia local da sessão. Limpe os dados do aplicativo antes de compartilhar o aparelho.');}tabHistory.current=[];setAuth(null);setBootstrap(null);setLocked(false);if(revokeFailed)Alert.alert('Você saiu deste aparelho','Não foi possível confirmar a revogação no servidor. Use “Encerrar todas as sessões” no site para invalidar o acesso.');},[api]);
+ const logout=useCallback(async()=>{void silenceVoices();await api.discardCache();let revokeFailed=false;try{await api.logout();}catch{revokeFailed=true;}try{await forgetAuth();}catch{appAlert('Armazenamento','Não foi possível apagar a cópia local da sessão. Limpe os dados do aplicativo antes de compartilhar o aparelho.');}tabHistory.current=[];setAuth(null);setBootstrap(null);setLocked(false);if(revokeFailed)appAlert('Você saiu deste aparelho','Não foi possível confirmar a revogação no servidor. Use “Encerrar todas as sessões” no site para invalidar o acesso.');},[api]);
  const profile=useCallback((p:UserProfile)=>setBootstrap(prev=>prev?{...prev,profile:p}:prev),[]);
  const manualUpdate=useCallback(()=>checkUpdate(true),[checkUpdate]);
  const clearChat=useCallback(()=>setChatEpoch(v=>v+1),[]);
  const notificationBack=useCallback(()=>{void goBack();},[goBack]);
- return <ThemeContext.Provider value={c}><NotificationProvider api={api} onOpen={openNotice} enabled={!!auth&&!!bootstrap&&servicesReady&&fluency!=='pending'} scope={auth?.profile.email||''}><SafeAreaView style={{flex:1,backgroundColor:c.bg}} edges={['top','left','right','bottom']}><StatusBar barStyle={c===dark?'light-content':'dark-content'} backgroundColor={c.bg}/><View onStartShouldSetResponderCapture={()=>{noteFluencyInput();return false;}} onTouchStart={noteFluencyInput} onTouchMove={noteFluencyInput} style={{flex:1,width:'100%',maxWidth:760,alignSelf:'center',backgroundColor:c.bg}}>
+ return <ThemeContext.Provider value={c}><NotificationProvider api={api} onOpen={openNotice} enabled={!!auth&&!!bootstrap&&servicesReady&&fluency!=='pending'} scope={auth?.profile.email||''}><SafeAreaView style={{flex:1,backgroundColor:c.bg}} edges={['top','left','right','bottom']}><StatusBar barStyle={c===dark?'light-content':'dark-content'} backgroundColor={c.bg}/><AppAlertHost/><View onStartShouldSetResponderCapture={()=>{noteFluencyInput();return false;}} onTouchStart={noteFluencyInput} onTouchMove={noteFluencyInput} style={{flex:1,width:'100%',maxWidth:760,alignSelf:'center',backgroundColor:c.bg}}>
  {!ready?<StartupHome/>:!auth?<Login onLogin={login}/>:!bootstrap?<View style={{flex:1,justifyContent:'center',padding:24,gap:14}}>{booting?<Spinner size={26}/>:null}<Text style={{fontSize:23,fontWeight:'600',color:c.text}}>Abrindo sua Sofia…</Text>{error?<ErrorBanner text={error}/>:null}<Button title="Tentar novamente" onPress={()=>void boot()} loading={booting}/><Button title="Voltar para o login" secondary onPress={()=>void logout()}/></View>:!initialDataReady?<View style={{flex:1}}><StartupHome profile={bootstrap.profile}/>{preparationError?<View style={{padding:24,gap:12}}><ErrorBanner text={preparationError}/><Button title="Tentar novamente" onPress={()=>setPrepareAttempt(n=>n+1)}/></View>:null}</View>:<><View style={{flex:1}}>
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?0:1}]} pointerEvents={tab==='notifications'?'none':'auto'} accessibilityElementsHidden={tab==='notifications'} importantForAccessibility={tab==='notifications'?'no-hide-descendants':'auto'}>
   <TabPager motion={menuMotion} ref={pager} activeTab={tab} readyTabs={mountedTabs} fluencyMode={fluency==='new'?'new':'old'} onPreviewTabs={setPreviewTabs} enabled={!gestureLocked&&!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)&&!(tab==='apps'&&workspaceDepth)} onSelect={navigate}>

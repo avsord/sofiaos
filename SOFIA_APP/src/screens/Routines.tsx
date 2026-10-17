@@ -10,6 +10,7 @@ import {DateTimeField} from '../components/DateTimeField';
 import {Sheet} from '../components/Sheet';
 import {Button,Empty,ErrorBanner,IconButton,ScreenTitle,forms} from '../components/UI';
 import {Icon} from '../components/Icon';
+import {appAlert} from '../lib/app-alert';
 
 const WEEKDAYS=[{value:'0',label:'Domingo'},{value:'1',label:'Segunda'},{value:'2',label:'Terça'},{value:'3',label:'Quarta'},{value:'4',label:'Quinta'},{value:'5',label:'Sexta'},{value:'6',label:'Sábado'}];
 const today=()=>new Date().toISOString().slice(0,10);
@@ -48,7 +49,7 @@ export function Routines({api,active,onBack}:{api:SofiaApi;active:boolean;onBack
   }catch(e){setError(errorText(e));}finally{setBusy(false);}
  }
  async function toggle(item:Entity){if(busy)return;setBusy(true);setError('');try{records.merge(await api.saveEntity({...item,state:item.state==='active'?'paused':'active',revision:item.revision}));}catch(e){setError(errorText(e));}finally{setBusy(false);}}
- function archive(item:Entity){Alert.alert('Arquivar rotina?',`“${item.title}” deixa de gerar novas ocorrências, mas continua salva no histórico do sistema.`,[{text:'Cancelar'},{text:'Arquivar',style:'destructive',onPress:()=>{setBusy(true);api.saveEntity({...item,state:'archived',revision:item.revision}).then(saved=>{records.merge(saved);setEditing(null);void records.load();}).catch(e=>setError(errorText(e))).finally(()=>setBusy(false));}}]);}
+ function archive(item:Entity){appAlert('Arquivar rotina?',`“${item.title}” deixa de gerar novas ocorrências, mas continua salva no histórico do sistema.`,[{text:'Cancelar'},{text:'Arquivar',style:'destructive',onPress:()=>{setBusy(true);api.saveEntity({...item,state:'archived',revision:item.revision}).then(saved=>{records.merge(saved);setEditing(null);void records.load();}).catch(e=>setError(errorText(e))).finally(()=>setBusy(false));}}]);}
  return <View style={{flex:1}}>
   <ScreenTitle title="Rotinas" eyebrow="HÁBITOS · CUIDADOS" right={<View style={{flexDirection:'row'}}><IconButton name="back" label="Voltar aos apps" onPress={onBack}/><IconButton name="plus" label="Nova rotina" onPress={()=>open()}/></View>}/>
   {error||records.error?<ErrorBanner text={error||records.error} onRetry={()=>void records.load()}/>:null}

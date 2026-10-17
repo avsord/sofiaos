@@ -27,6 +27,7 @@ import {durationLabel,errorText} from '../lib/chat-model';
 import {VoiceDraft} from '../lib/types';
 import {IconButton} from './UI';
 import {VoicePlayer} from './VoicePlayer';
+import {appAlert} from '../lib/app-alert';
 export function deleteVoice(uri:string){try{const file=new File(uri);if(file.exists)file.delete();}catch{}}
 export function Composer({disabled,enterToSend,autoSendVoice,onText,onVoice,onAttachments,onActivity,onDraft}:{disabled:boolean;enterToSend:boolean;autoSendVoice:boolean;onText:(text:string)=>void;onAttachments:(files:AttachmentDraft[],text:string)=>void;onVoice:(draft:VoiceDraft)=>void;onActivity:(active:boolean)=>void;onDraft:(active:boolean)=>void}){
  const c=useTheme();
@@ -71,7 +72,7 @@ export function Composer({disabled,enterToSend,autoSendVoice,onText,onVoice,onAt
    await setAudioModeAsync({allowsRecording:true,playsInSilentMode:true,shouldPlayInBackground:false});const recorder=ensureRecorder();await recorder.prepareToRecordAsync();
    if(!mounted.current||AppState.currentState!=='active'){await setAudioModeAsync({allowsRecording:false});return;}
    recorder.record();recordingRef.current=true;setRecording(true);
-  }catch(e){if(mounted.current)Alert.alert('Microfone',errorText(e));}finally{busyRef.current=false;if(mounted.current)setBusy(false);}
+  }catch(e){if(mounted.current)appAlert('Microfone',errorText(e));}finally{busyRef.current=false;if(mounted.current)setBusy(false);}
  }
  async function stop(discard=false,sendImmediately=autoSendVoice){
   if(!recordingRef.current||busyRef.current)return;const recorder=recorderRef.current;if(!recorder){recordingRef.current=false;setRecording(false);return;}busyRef.current=true;setBusy(true);const duration=recorder.getStatus().durationMillis;resetCancel(false);
@@ -79,7 +80,7 @@ export function Composer({disabled,enterToSend,autoSendVoice,onText,onVoice,onAt
    const uri=recorder.uri;if(!uri)throw new Error('O áudio não foi salvo. Grave novamente.');
    if(discard||!mounted.current||duration<350){deleteVoice(uri);return;}
    const next={uri,duration:Math.max(1,Math.round(duration))};if(sendImmediately){draftRef.current=null;setDraft(null);void silenceVoices();onVoice(next);}else{draftRef.current=next;setDraft(next);}
-  }catch(e){recordingRef.current=false;if(mounted.current){setRecording(false);Alert.alert('Gravação',errorText(e));}}
+  }catch(e){recordingRef.current=false;if(mounted.current){setRecording(false);appAlert('Gravação',errorText(e));}}
   finally{busyRef.current=false;if(mounted.current)setBusy(false);}
  }
  stopRef.current=stop;
@@ -94,7 +95,7 @@ export function Composer({disabled,enterToSend,autoSendVoice,onText,onVoice,onAt
     const result=kind==='camera'?await ImagePicker.launchCameraAsync({mediaTypes:['images'],quality:.85}):await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],allowsMultipleSelection:true,selectionLimit:3,quality:.85});if(result.canceled)return;
     chosen=result.assets.map(a=>({uri:a.uri,name:a.fileName||'Imagem-'+Date.now()+'.jpg',mime:attachmentMime(a.fileName||'imagem.jpg',a.mimeType),size:a.fileSize||new File(a.uri).size}));}
    if(files.length+chosen.length>3)throw Error('Envie até 3 arquivos por mensagem.');if(chosen.some(f=>!f.size||f.size>10*1024*1024))throw Error('Cada arquivo deve ter até 10 MB.');setFiles(old=>[...old,...chosen]);
-  }catch(e){Alert.alert('Anexo',errorText(e));}finally{setBusy(false);}
+  }catch(e){appAlert('Anexo',errorText(e));}finally{setBusy(false);}
  }
  return <View testID="chat-composer" style={{padding:12,paddingTop:10,borderTopWidth:1,borderColor:c.line,backgroundColor:c.surface,gap:6}}>
   {files.length?<ScrollView horizontal keyboardShouldPersistTaps="always" style={{maxHeight:96}}>{files.map((f,i)=><View key={f.uri+String(i)} style={{maxWidth:180,marginRight:8,padding:8,backgroundColor:c.input,borderRadius:12}}>{f.mime.startsWith('image/')?<Image source={{uri:f.uri}} style={{width:60,height:42,borderRadius:6}}/>:null}<Text numberOfLines={1} style={{color:c.text,fontSize:12}}>{f.name}</Text><Pressable accessibilityLabel={'Remover anexo '+f.name} onPress={()=>setFiles(old=>old.filter((_,n)=>n!==i))}><Text style={{color:c.muted,paddingTop:4}}>Remover</Text></Pressable></View>)}</ScrollView>:null}

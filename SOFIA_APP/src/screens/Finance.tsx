@@ -28,8 +28,9 @@ import {
 import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove} from '../lib/finance';
 import {moneySplit, reserveOf, reserveFor, toReserveMove} from '../lib/finance';
 import {syncFinanceDueNotifications} from '../lib/finance-notifications';
+import {appAlert} from '../lib/app-alert';
 
-const GOOD = '#2fc58b', BAD = '#ff6b7a', WARN = '#ffb547';
+const GOOD = '#2fc58b', BAD = '#ff6b7a', WARN = '#ffb547', GUARD = '#3fbf7f';
 type Data = {accounts: Account[]; cards: Card[]; txs: Tx[]; budgets: Budget[]; goals: Goal[]; moves: ReserveMove[]};
 type Tab = 'home' | 'txs' | 'bills' | 'cards' | 'plan' | 'reports';
 const KINDS = ['fin_account', 'fin_card', 'fin_tx', 'fin_budget', 'fin_goal', 'fin_reserve_move'] as const;
@@ -305,7 +306,7 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
       await onDone();
     } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
-  function confirmOut() { Alert.alert('Retirar da reserva?', 'Esse valor deixa de ser dinheiro guardado e passa para o dia a dia. É uma retirada consciente, registrada no histórico.', [{text: 'Cancelar'}, {text: 'Retirar', style: 'destructive', onPress: () => void save()}]); }
+  function confirmOut() { appAlert('Retirar da reserva?', 'Esse valor deixa de ser dinheiro guardado e passa para o dia a dia. É uma retirada consciente, registrada no histórico.', [{text: 'Cancelar'}, {text: 'Retirar', style: 'destructive', onPress: () => void save()}]); }
   const input = (label: string, value: string, onChange: (v: string) => void, placeholder = '') => {
     const monetary = /^(Valor|Já guardado|Aporte)/.test(label);
     return <View style={{gap: 6}}>
@@ -396,7 +397,7 @@ function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;
   }
   function erase() {
     if(!tx?.entity||tx.virtual)return;
-    Alert.alert('Excluir vencimento?', 'Esse cadastro será apagado. Lançamentos já pagos de meses anteriores não serão excluídos.', [
+    appAlert('Excluir vencimento?', 'Esse cadastro será apagado. Lançamentos já pagos de meses anteriores não serão excluídos.', [
       {text:'Cancelar',style:'cancel'},
       {text:'Excluir',style:'destructive',onPress:()=>{setBusy(true);void api.deleteEntity(tx.entity!.id).then(onSaved).catch(e=>setError(errorText(e))).finally(()=>setBusy(false));}}
     ]);
@@ -435,19 +436,21 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
   const show = (v: number) => hide ? 'R$ •••••' : money(v);
   // 0.3.151: cada conta tem o proprio guardado (a principal mantem a reserva antiga, sem conta).
   const reserve = reserveFor(d.goals, accountId, isPrimary);
-  const tips = useMemo(() => financeInsights(d.txs, month), [d, month]);
   const split = useMemo(() => reserve ? moneySplit(reserve, d.moves || [], d.accounts, d.txs, d.cards, month, today, manualDues(d.txs,accountId,today,45)) : null, [reserve, d, accountId, month, today]);
   // Reserva em linha discreta no cartão original; o detalhamento dos valores fica sob demanda.
   const [reserveMenu, setReserveMenu] = useState(false);
   return (
     <>
       {reserveSheet ? <ReserveSheet accountId={accountId} api={api} kind={reserveSheet} reserve={reserve} split={split} onClose={() => setReserveSheet(null)} onDone={async () => { setReserveSheet(null); await reload(); }} /> : null}
+      {/* 0.3.153: cartao verde inteiro ATRAS do roxo (empilhados); o roxo cobre tudo menos a faixa de cima */}
+      <View style={{backgroundColor: accountId ? GUARD : 'transparent', borderRadius: 24}}>
       {accountId ? <Pressable accessibilityRole="button" accessibilityLabel="Gerenciar dinheiro guardado" onPress={() => split ? setReserveMenu(true) : setReserveSheet('setup')}
-        style={{backgroundColor:'#e99334',borderTopLeftRadius:24,borderTopRightRadius:24,paddingTop:14,paddingHorizontal:20,paddingBottom:25,marginBottom:-19,flexDirection:'row',alignItems:'center',gap:10}}>
-        <Icon name="shield" size={16} color="#3c270e" />
-        <Text style={{color:'#3c270e',fontWeight:'700',fontSize:13,flex:1}}>Guardado</Text>
-        {split && split.planned > 0 && split.missing > 0 ? <Text style={{color:'#3c270e',fontSize:11}}>faltam {show(split.missing)} no mês</Text> : null}
-        <Text style={{color:'#3c270e',fontWeight:'800',fontSize:18}}>{split ? show(split.saved) : 'Configurar ›'}</Text>
+        style={{paddingTop: 14, paddingHorizontal: 20, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10}}>
+        <Text style={{color: '#0d2f1f', fontWeight: '800', fontSize: 18}}>{split ? show(split.saved) : 'Configurar ›'}</Text>
+        {split && split.planned > 0 && split.missing > 0 ? <Text style={{color: '#0d2f1f', fontSize: 11}}>faltam {show(split.missing)} no mês</Text> : null}
+        <View style={{flex: 1}} />
+        <Text style={{color: '#0d2f1f', fontWeight: '700', fontSize: 13}}>Guardado</Text>
+        <Icon name="shield" size={16} color="#0d2f1f" />
       </Pressable> : null}
       <View style={{backgroundColor: c.accent, borderRadius: 24, padding: 18, gap: 14, elevation: 2}}>
         <View style={{flexDirection: 'row', alignItems: 'center'}}>
@@ -461,6 +464,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
           <View style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 14, padding: 10}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↓ Despesas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.expense)}</Text></View>
         </View>
 
+      </View>
       </View>
       <Sheet visible={reserveMenu} onClose={() => setReserveMenu(false)} label="Fechar detalhes da reserva">
         <View style={{gap: 14, paddingBottom: 12}}>
@@ -497,11 +501,6 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
       <View style={{gap: 10, paddingTop: 2}}>
         <TxTab d={d} month={month} accountFilter="" setAccountFilter={() => undefined} onTx={onTx} api={api} reload={reload} />
       </View>
-      {/* 0.3.151: feedback curto da Sofia sobre o mes desta conta (o completo fica em Relatorios) */}
-      {tips.length ? <Pressable accessibilityRole="button" accessibilityLabel="Ver a análise completa em Relatórios" onPress={() => onTab('reports')} style={{backgroundColor: c.surface, borderRadius: 18, padding: 14, gap: 6, borderWidth: 1, borderColor: c.line}}>
-        <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}><SofiaLogo size={22} /><Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 14}}>A Sofia sobre o seu mês</Text><Text style={{color: c.accent, fontSize: 12, fontWeight: '700'}}>Ver mais ›</Text></View>
-        {tips.slice(0, 2).map((t, i) => <Text key={i} style={{color: t.tone === 'attention' ? WARN : t.tone === 'good' ? GOOD : c.muted, fontSize: 13, lineHeight: 19}}>{t.tone === 'good' ? '✓ ' : t.tone === 'attention' ? '! ' : '• '}<Text style={{color: c.text}}>{t.text}</Text></Text>)}
-      </Pressable> : null}
 
     </>
   );
@@ -517,7 +516,7 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
         await saveEntity(api, 'fin_tx', 'Fatura ' + due.invoice.card.name + ' ' + due.invoice.month.slice(5, 7) + '/' + due.invoice.month.slice(0, 4), {kind: 'card_payment', amount: due.amount, date: todayISO(), card_id: due.invoice.card.id, invoice_month: due.invoice.month, account_id: acc, paid: true, category: 'Fatura do cartão'});
       } else if (due.tx) await confirmTx(api, due.tx);
       await reload();
-    } catch (e) { Alert.alert('Finanças', errorText(e)); } finally { setBusy(false); }
+    } catch (e) { appAlert('Finanças', errorText(e)); } finally { setBusy(false); }
   }
   return (
     <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
@@ -561,7 +560,10 @@ function BudgetRow({p}: {p: ReturnType<typeof budgetProgress>[number]}) {
 // ============================ LANÇAMENTOS ============================
 function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {d: Data; month: string; accountFilter: string; setAccountFilter: (v: string) => void; onTx: (t: Partial<Tx>) => void; api: SofiaApi; reload: () => Promise<void>}) {
   const c = useTheme(), [kind, setKind] = useState<'all' | TxKind>('all'), [q, setQ] = useState(''), [status, setStatus] = useState<'all' | 'pending'>('all');
-  const list = monthTxs(d.txs, month).filter(t => (!t.manualDue || t.paid) && (kind === 'all' || t.kind === kind) && (!accountFilter || t.accountId === accountFilter || t.toAccountId === accountFilter || t.cardId === accountFilter)
+  // 0.3.153: o que voce registrou na Sofia e o extrato importado do banco ficam separados, com troca.
+  const [source, setSource] = useState<'app' | 'import'>('app');
+  const imported = (t: Tx) => { const id = String(t.entity?.data?.import_id || ''); return !!id && !id.startsWith('sofia-pendencia:'); };
+  const list = monthTxs(d.txs, month).filter(t => (!t.manualDue || t.paid) && (source === 'import' ? imported(t) : !imported(t)) && (kind === 'all' || t.kind === kind) && (!accountFilter || t.accountId === accountFilter || t.toAccountId === accountFilter || t.cardId === accountFilter)
     && (status === 'all' || (!t.paid && !t.cardId)) && (!q.trim() || (t.desc + ' ' + t.category).toLowerCase().includes(q.trim().toLowerCase())));
   const days = useMemo(() => { const m = new Map<string, Tx[]>(); for (const t of list) { if (!m.has(t.date)) m.set(t.date, []); m.get(t.date)!.push(t); } return [...m.entries()]; }, [list]);
   const sum = list.reduce((s, t) => s + (t.kind === 'income' ? t.amount : t.kind === 'expense' ? -t.amount : 0), 0);
@@ -575,6 +577,7 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
         <IconButton name="filter" label={tools ? 'Esconder busca e filtros' : 'Buscar e filtrar'} onPress={() => setTools(v => !v)} />
         <IconButton name="plus" label="Importar extrato (OFX ou CSV)" onPress={() => setImporting(true)} />
       </View>
+      <Chips value={source} onChange={setSource} options={[{value: 'app' as const, label: 'Lançamentos'}, {value: 'import' as const, label: 'Extrato importado'}]} />
       {importing ? <ImportSheet api={api} d={d} onClose={() => setImporting(false)} onDone={async () => { setImporting(false); await reload(); }} /> : null}
       {tools || q || kind !== 'all' || status !== 'all' ? <View style={{gap: 10}}>
       <TextInput accessibilityLabel="Buscar lançamento" value={q} onChangeText={setQ} placeholder="Buscar por descrição ou categoria" placeholderTextColor={c.muted}
@@ -586,7 +589,7 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
       </View>
       </View> : null}
       {list.length ? <Text style={{color: c.muted, fontSize: 12}}>{list.length} movimentações no mês · resultado {money(sum)}</Text> : null}
-      {!days.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>{q || kind !== 'all' || status !== 'all' ? 'Nenhum lançamento com esses filtros.' : 'Nenhum lançamento neste mês. Toque em ＋ para registrar.'}</Text> : days.map(([date, items]) => (
+      {!days.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>{q || kind !== 'all' || status !== 'all' ? 'Nenhum lançamento com esses filtros.' : (source === 'import' ? 'Nenhum extrato importado neste mês. Toque em ＋ ao lado de Histórico para importar (OFX ou CSV).' : 'Nenhum lançamento neste mês. Toque em ＋ para registrar.')}</Text> : days.map(([date, items]) => (
         <View key={date} style={{gap: 6}}>
           <Text style={{color: c.muted, fontSize: 12, fontWeight: '600'}}>{weekday(date)}</Text>
           <Card_ style={{padding: 8, gap: 0}}>{items.map((t, i) => <TxRow key={t.id} t={t} d={d} first={i === 0} onPress={() => onTx(t)} api={api} reload={reload} />)}</Card_>
@@ -609,7 +612,7 @@ function TxRow({t, d, first, onPress, api, reload}: {t: Tx; d: Data; first: bool
       </View>
       <View style={{alignItems: 'flex-end', gap: 2}}>
         <Text style={{color, fontWeight: '700'}}>{t.kind === 'income' ? '+' : t.kind === 'transfer' ? '' : '−'}{money(t.amount)}</Text>
-        {pending ? <Pressable onPress={() => void confirmTx(api, t).then(reload).catch(e => Alert.alert('Finanças', errorText(e)))}><Text style={{fontSize: 11, color: t.date < todayISO() ? BAD : WARN, fontWeight: '700'}}>{t.virtual ? 'previsto · confirmar' : t.kind === 'income' ? 'a receber · ✓' : 'a pagar · ✓'}</Text></Pressable> : null}
+        {pending ? <Pressable onPress={() => void confirmTx(api, t).then(reload).catch(e => appAlert('Finanças', errorText(e)))}><Text style={{fontSize: 11, color: t.date < todayISO() ? BAD : WARN, fontWeight: '700'}}>{t.virtual ? 'previsto · confirmar' : t.kind === 'income' ? 'a receber · ✓' : 'a pagar · ✓'}</Text></Pressable> : null}
       </View>
     </Pressable>
   );
@@ -654,7 +657,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved}: {api: SofiaA
     const series = tx.seriesId;
     const others = series ? d.txs.filter(x => x.seriesId === series && x.id !== tx.id) : [];
     const del = async (all: boolean) => { try { await api.deleteEntity(tx.entity!.id); if (all) for (const o of others) if (o.entity && !o.paid) await api.deleteEntity(o.entity.id); onSaved(); } catch (e) { setError(errorText(e)); } };
-    Alert.alert('Apagar lançamento?', others.length ? 'Este lançamento faz parte de uma série.' : 'Essa ação não pode ser desfeita.', others.length
+    appAlert('Apagar lançamento?', others.length ? 'Este lançamento faz parte de uma série.' : 'Essa ação não pode ser desfeita.', others.length
       ? [{text: 'Cancelar', style: 'cancel'}, {text: 'Só este', onPress: () => void del(false)}, {text: 'Este e os pendentes', style: 'destructive', onPress: () => void del(true)}]
       : [{text: 'Cancelar', style: 'cancel'}, {text: 'Apagar', style: 'destructive', onPress: () => void del(false)}]);
   }
@@ -762,7 +765,7 @@ function CardsTab({d, api, reload, onTx, onManage}: {d: Data; api: SofiaApi; rel
   async function pay(accountId: string) {
     setPick(false); setBusy(true);
     try { await saveEntity(api, 'fin_tx', 'Fatura ' + card.name + ' ' + i.month.slice(5, 7) + '/' + i.month.slice(0, 4), {kind: 'card_payment', amount: Math.round((i.total - i.paid) * 100) / 100, date: todayISO(), card_id: card.id, invoice_month: i.month, account_id: accountId, paid: true, category: 'Fatura do cartão'}); await reload(); }
-    catch (e) { Alert.alert('Finanças', errorText(e)); } finally { setBusy(false); }
+    catch (e) { appAlert('Finanças', errorText(e)); } finally { setBusy(false); }
   }
   return (
     <>
@@ -1024,7 +1027,7 @@ function AccountCardSheet({api, d, edit, onClose, onSaved}: {api: SofiaApi; d: D
         if(result.items.length<100){exhaustive=true;break;}
       }
       const mustArchive=used||!exhaustive;
-      Alert.alert(mustArchive?'Remover cartão e preservar histórico?':'Excluir cartão?',
+      appAlert(mustArchive?'Remover cartão e preservar histórico?':'Excluir cartão?',
         mustArchive?'O cartão sai da lista. Compras, pagamentos e faturas anteriores continuam salvos.':'Nenhum lançamento está vinculado a este cartão. Excluir definitivamente?',[
         {text:'Cancelar',style:'cancel'},
         {text:mustArchive?'Remover cartão':'Excluir definitivamente',style:'destructive',onPress:()=>{setBusy(true);void (mustArchive

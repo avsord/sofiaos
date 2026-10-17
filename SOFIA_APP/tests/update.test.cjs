@@ -70,5 +70,5 @@ test('automatic discovery is retried on foreground and while open without blocki
  assert.ok(app.includes("if(state==='active')void checkUpdate(false)"));
  assert.ok(app.includes('clearInterval(interval);sub.remove()'));
  assert.ok(app.includes('lastUpdatePrompt.current===update.version'));
- assert.ok(app.includes("if(manual)Alert.alert('Atualizações',errorText(e))"));
+ assert.ok(app.includes("if(manual)appAlert('Atualizações',errorText(e))"));
 });

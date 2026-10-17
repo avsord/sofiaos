@@ -22,7 +22,7 @@ test('menu selection commits its screen before the native jump',()=>{
 test('rapid taps use the latest selection, not a stale render closure',()=>{
   const match=source.match(/const navigate=useCallback\(\(next:Tab\)=>\{([\s\S]*?)\},\[switchTab\]\)/);assert.ok(match);
   const calls=[],navigation={current:{tab:'chat',locked:false}},tabHistory={current:[]},tabTap={current:null},nativeRevealAt={current:Date.now()-1000};
-  const fn=vm.runInNewContext('(next)=>{'+match[1]+'}',{navigation,tabHistory,tabTap,nativeRevealAt,pager:{current:{goTo:()=>{}}},Alert:{alert:()=>calls.push('blocked')},switchTab:next=>{navigation.current.tab=next;calls.push(next);}});
+  const fn=vm.runInNewContext('(next)=>{'+match[1]+'}',{navigation,tabHistory,tabTap,nativeRevealAt,pager:{current:{goTo:()=>{}}},appAlert:()=>calls.push('blocked'),Alert:{alert:()=>calls.push('blocked')},switchTab:next=>{navigation.current.tab=next;calls.push(next);}});
   fn('pages');fn('agenda');fn('home');assert.deepEqual(calls,['pages','agenda','home']);assert.deepEqual(Array.from(tabHistory.current),['chat','pages','agenda']);
   fn('home');assert.equal(calls.length,3);navigation.current.locked=true;fn('profile');assert.equal(calls.at(-1),'blocked');assert.equal(navigation.current.tab,'home');
 });
@@ -115,8 +115,8 @@ test('notifications are outside the swipe sequence without losing the underlying
 test('Android identity, discovery prefix and version stay compatible',()=>{
   const config=JSON.parse(fs.readFileSync(path.join(root,'app.json'))).expo,pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json')));
   const update=fs.readFileSync(path.join(root,'src/lib/update.ts'),'utf8');
-  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,157);
-  assert.equal(config.version,'0.3.152');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
+  assert.equal(config.android.package,'com.avsord.sofiaapp');assert.equal(config.android.versionCode,158);
+  assert.equal(config.version,'0.3.153');assert.equal(pkg.version,config.version);assert.ok(update.includes("APP_VERSION = '"+pkg.version+"'"));assert.ok(update.includes("RELEASE_PREFIX = 'sofia-android-v'"));
 });
 test('Pages opens a preloaded entity synchronously without a network wait',()=>{
  const pages=fs.readFileSync(path.join(root,'src/screens/Pages.tsx'),'utf8');

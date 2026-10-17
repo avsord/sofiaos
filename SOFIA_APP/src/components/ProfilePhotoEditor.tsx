@@ -7,6 +7,7 @@ import {useTheme} from '../lib/theme';
 import {errorText,initials} from '../lib/chat-model';
 import {readProfilePhoto,removeProfilePhoto,saveProfilePhoto} from '../lib/profile-photo';
 import {photoChanged,photoPreview,primeProfilePhoto,subscribeProfilePhoto} from '../lib/profile-photo-events';
+import {appAlert} from '../lib/app-alert';
 
 export function ProfilePhotoEditor({scope,name}:{scope:string;name:string}){
  const c=useTheme(),[uri,setUri]=useState(()=>photoPreview(scope)),[busy,setBusy]=useState(false);
@@ -18,12 +19,12 @@ export function ProfilePhotoEditor({scope,name}:{scope:string;name:string}){
    const result=camera?await ImagePicker.launchCameraAsync({mediaTypes:['images'],allowsEditing:true,aspect:[1,1],quality:.8}):await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],allowsEditing:true,aspect:[1,1],quality:.8});
    if(result.canceled||!result.assets[0])return;
    const saved=await saveProfilePhoto(scope,result.assets[0].uri,result.assets[0].mimeType);setUri(saved);photoChanged(scope,saved);
-  }catch(e){Alert.alert('Foto do perfil',errorText(e));}finally{setBusy(false);}
+  }catch(e){appAlert('Foto do perfil',errorText(e));}finally{setBusy(false);}
  }
- function menu(){Alert.alert('Foto do perfil','Escolha como deseja alterar a foto.',[
+ function menu(){appAlert('Foto do perfil','Escolha como deseja alterar a foto.',[
   {text:'Escolher da galeria',onPress:()=>void pick(false)},
   {text:'Tirar foto',onPress:()=>void pick(true)},
-  ...(uri?[{text:'Remover foto',style:'destructive' as const,onPress:()=>{setBusy(true);void removeProfilePhoto(scope).then(()=>{setUri('');photoChanged(scope,'');}).catch(e=>Alert.alert('Foto do perfil',errorText(e))).finally(()=>setBusy(false));}}]:[]),
+  ...(uri?[{text:'Remover foto',style:'destructive' as const,onPress:()=>{setBusy(true);void removeProfilePhoto(scope).then(()=>{setUri('');photoChanged(scope,'');}).catch(e=>appAlert('Foto do perfil',errorText(e))).finally(()=>setBusy(false));}}]:[]),
   {text:'Cancelar',style:'cancel'}
  ]);}
  return <View style={{width:94,height:94,overflow:'visible'}}>

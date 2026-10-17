@@ -33,6 +33,7 @@ import {freshTemplate,insertTemplateBlocks} from '../lib/page-templates';
 import {subscribeSystemChanged} from '../lib/system-events';
 import {Spinner,LoadingLines} from '../components/Loading';
 import type {PageTemplate} from '../lib/page-templates';
+import {appAlert} from '../lib/app-alert';
 const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'null')??fallback;}catch{return fallback;}};
 const PAGE_LIST_KEY='/workspace/entities?limit=100&kind=user_page&q=&offset=0';
 const cachedPageRows=(api:SofiaApi)=>api.cached<{items:Entity[]}>(PAGE_LIST_KEY)?.items.filter(item=>item.state!=='archived');
@@ -161,13 +162,13 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  }catch(e){setError(errorText(e));}}
  function applyTemplate(template:PageTemplate){if(!selectedId)return;const preset=freshTemplate(template);store.edit(selectedId,d=>({...d,blocks:insertTemplateBlocks(d.blocks,preset.blocks)}),'template');setFocus(null);setCreateParent(undefined);void store.flush(selectedId);}
  function updateBlock(block:PageBlock,patch:Partial<PageBlock>,group=''){edit(d=>({...d,blocks:d.blocks.map(b=>b.id===block.id?{...b,...patch}:b)}),group);}
- function confirmRemoveBlock(b:PageBlock){Alert.alert('Excluir bloco?','Somente este bloco e seu conteúdo serão removidos desta página. O template continua disponível.',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>removeBlock(b.id)}]);}
+ function confirmRemoveBlock(b:PageBlock){appAlert('Excluir bloco?','Somente este bloco e seu conteúdo serão removidos desta página. O template continua disponível.',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>removeBlock(b.id)}]);}
  function removeBlock(id:string){edit(d=>{const blocks=d.blocks.filter(b=>b.id!==id);return {...d,blocks:blocks.length?blocks:[newBlock()]};});setFocus(null);}
  function addBlock(){const block=newBlock();edit(d=>{const blocks=[...d.blocks],i=blocks.findIndex(b=>b.id===focus);blocks.splice(i>=0?i+1:blocks.length,0,block);return {...d,blocks};});setFocus(block.id);}
  function formatBlock(type:string){if(!entry)return;const id=focus&&focus!=='title'?focus:entry.draft.blocks.at(-1)?.id;if(!id)return;edit(d=>({...d,blocks:d.blocks.map(b=>b.id===id?{...b,type,...(b.text==='/'?{text:'',html:''}:{})}:b)}));}
- function resolveConflict(){if(!selectedId)return;const id=selectedId;Alert.alert('A página mudou no site','Seu rascunho local foi preservado. Qual versão deve continuar?',[
+ function resolveConflict(){if(!selectedId)return;const id=selectedId;appAlert('A página mudou no site','Seu rascunho local foi preservado. Qual versão deve continuar?',[
   {text:'Cancelar',style:'cancel'},{text:'Usar versão do site',onPress:()=>void store.resolve(id,false)},{text:'Manter minhas alterações',onPress:()=>void store.resolve(id,true)}]);}
- function confirmDeletePage(page:Entity){const id=page.id;Alert.alert('Excluir página?','Excluir “'+page.title+'” e suas subpáginas também do site?',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{void(async()=>{
+ function confirmDeletePage(page:Entity){const id=page.id;appAlert('Excluir página?','Excluir “'+page.title+'” e suas subpáginas também do site?',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{void(async()=>{
   const ids=new Set<string>();const collect=(key:string)=>{if(ids.has(key))return;ids.add(key);for(const p of children.get(key)||[])collect(p.id);};collect(id);
   await Promise.all([...ids].map(key=>store.flush(key)));await api.deleteEntity(id);mutationEpoch.current++;for(const key of ids)store.forget(key);
   if(mounted.current){history.current=history.current.filter(key=>!ids.has(key));setPages(old=>old.filter(p=>!ids.has(p.id)));if(ids.has(selectedId||''))setSelectedId(null);setFocus(null);}

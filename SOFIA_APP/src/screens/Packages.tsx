@@ -8,6 +8,7 @@ import {errorText} from '../lib/chat-model';
 import {Sheet} from '../components/Sheet';
 import {Button,Empty,ErrorBanner,IconButton,ScreenTitle,forms} from '../components/UI';
 import {Icon} from '../components/Icon';
+import {appAlert} from '../lib/app-alert';
 
 // 0.3.142: app Encomendas (inspirado no Muambator). Cadastre o código, dê um nome e a Sofia
 // acompanha: o servidor consulta a transportadora e avisa quando o status muda.
@@ -44,7 +45,7 @@ export function Packages({api,active,onBack}:{api:SofiaApi;active:boolean;onBack
   try{const r=await api.refreshPackage(item.id);records.merge(r.item);if(viewing?.id===item.id)setViewing(r.item);if(!silent&&r.error)setError(/fecharam a consulta/.test(r.error)?r.error:'Não foi possível consultar agora: '+r.error);}
   catch(e){if(!silent)setError(errorText(e));}finally{setBusy(false);}
  }
- function archive(item:Entity){Alert.alert('Remover encomenda?',`“${item.title}” sai da lista (fica no histórico).`,[{text:'Cancelar'},{text:'Remover',style:'destructive',onPress:()=>{setBusy(true);api.saveEntity({...item,state:'archived',revision:item.revision}).then(saved=>{records.merge(saved);setViewing(null);}).catch(e=>setError(errorText(e))).finally(()=>setBusy(false));}}]);}
+ function archive(item:Entity){appAlert('Remover encomenda?',`“${item.title}” sai da lista (fica no histórico).`,[{text:'Cancelar'},{text:'Remover',style:'destructive',onPress:()=>{setBusy(true);api.saveEntity({...item,state:'archived',revision:item.revision}).then(saved=>{records.merge(saved);setViewing(null);}).catch(e=>setError(errorText(e))).finally(()=>setBusy(false));}}]);}
  const row=(item:Entity)=>{const delivered=item.state==='delivered',err=String(item.data?.error||''),status=String(item.data?.status||'')||(err?'Consulta indisponível':'Aguardando a primeira consulta');
   return <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={'Abrir encomenda '+item.title} onPress={()=>setViewing(item)} style={({pressed})=>({minHeight:74,borderRadius:22,paddingHorizontal:14,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:12,backgroundColor:delivered?c.surface:c.card,borderWidth:1,borderColor:c.line,opacity:pressed?0.85:1})}>
    <View style={{width:40,height:40,borderRadius:20,alignItems:'center',justifyContent:'center',backgroundColor:delivered?c.accentSoft:c.surface}}><Text style={{fontSize:20}}>{delivered?'✅':'📦'}</Text></View>

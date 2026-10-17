@@ -31,15 +31,15 @@ test('Price Tracker: sem busca automatica de lojas; Inicio mostra a oferta princ
   assert.ok(p.includes('label="Mover para outro produto"'));
   assert.ok(lib.includes('export function primaryNow(p: ProductSeries)'));
 });
-test('financas: card de reserva laranja atrás do saldo roxo com detalhamento sem valor redundante',()=>{
+test('financas: card de reserva (verde desde a 0.3.153) atrás do saldo roxo com detalhamento sem valor redundante',()=>{
   const f=read('src/screens/Finance.tsx');
-  assert.ok(f.includes("backgroundColor:'#e99334'"),'o guardado tem faixa laranja própria');
+  assert.ok(f.includes("backgroundColor: accountId ? GUARD : 'transparent'"),'o guardado tem cartao verde proprio atras do roxo');
   assert.ok(f.includes('Gerenciar dinheiro guardado') && f.includes('>{split ? show(split.saved) :'), 'valor e gesto de abrir');
   assert.ok(!f.includes('>Para usar<'),'reserva nao compete com saldo');
   assert.ok(!f.includes('function MoneyBlocks('),'nao restaurar blocos duplicados');
   assert.ok(f.includes("fontSize: 13}}>Saldo geral</Text>"));
   for(const label of ['Saldo geral nas contas','Fora da reserva','Despesas previstas do mês','Livre após despesas previstas','Guardar dinheiro','Retirar da reserva','Ajustar aporte mensal'])assert.ok(f.includes(label),label);
-  assert.ok(f.includes("Alert.alert('Retirar da reserva?'"),'retirada confirmada');
+  assert.ok(f.includes("appAlert('Retirar da reserva?'"),'retirada confirmada');
   assert.ok(f.includes('onChangeText={v => setAmount(old => formatMoneyInput(v, old))}'),'lançamento recebe máscara enquanto digita');
   assert.ok(f.includes('onBlur={() => setAmount(v => finishMoneyInput(v))}'),'termina mostrando centavos');
   assert.ok(f.includes("label.includes('(R$)')"),'formatação nos campos de valores sem mexer no dia de fatura');

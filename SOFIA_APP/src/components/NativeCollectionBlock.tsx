@@ -10,6 +10,7 @@ import {Button,IconButton} from './UI';
 import {Sheet} from './Sheet';
 import {NotebookBlock} from './NotebookBlock';
 import {DateTimeField} from './DateTimeField';
+import {appAlert} from '../lib/app-alert';
 
 type Prop={key:string;label:string;type:string;placeholder?:string;options?:string[];option_colors?:Record<string,string>};
 type Row={id:string;values:Record<string,any>;page_content?:string};
@@ -42,7 +43,7 @@ export function NativeCollectionBlock({block,onChange,onDelete,onInteractionChan
  // Existing page_content is the description; no migration or property deletion is needed.
  const updateDescription=(id:string,value:string)=>{const next=clone(d),row=next.rows.find(r=>r.id===id);if(!row)return;const prop=next.properties.find(p=>p.key==='description');if(prop)row.values[prop.key]=value;else row.page_content=value;commit(next,'collection-row:'+id+':description');};
  const descriptionInput=(row:Row)=><View style={{gap:4,marginTop:8}}><Text style={{color:c.muted,fontSize:11}}>Descrição</Text><TextInput accessibilityLabel={'Descrição de '+String(row.values[nameProp.key]||'nova tarefa')} multiline value={String(d.properties.some(p=>p.key==='description')?row.values.description||'':row.page_content||'')} onChangeText={v=>updateDescription(row.id,v)} placeholder="Adicionar descrição…" placeholderTextColor={c.muted} style={{minHeight:42,padding:0,color:c.text,fontSize:13,lineHeight:19,textAlignVertical:'top'}}/></View>;
- const removeRow=(id:string)=>Alert.alert('Excluir item?','Somente este item será removido deste bloco.',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{const next=clone(d);next.rows=next.rows.filter(r=>r.id!==id);commit(next);}}]);
+ const removeRow=(id:string)=>appAlert('Excluir item?','Somente este item será removido deste bloco.',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{const next=clone(d);next.rows=next.rows.filter(r=>r.id!==id);commit(next);}}]);
  const editStatus=(prop:Prop,value:string|null)=>setStatusEdit({propKey:prop.key,value,title:value||'',color:value?(prop.option_colors?.[value]||'gray'):'gray'});
  const saveStatus=()=>{if(!statusEdit)return;const next=clone(d),prop=next.properties.find(p=>p.key===statusEdit.propKey);if(!prop)return;prop.options=prop.options||[];prop.option_colors=prop.option_colors||{};
    if(statusEdit.value===null){const name=uniqueName(statusEdit.title,prop.options);prop.options.push(name);prop.option_colors[name]=statusEdit.color;}
@@ -54,7 +55,7 @@ export function NativeCollectionBlock({block,onChange,onDelete,onInteractionChan
 
  const fieldChange=(key:string,patch:Partial<Prop>)=>{const next=clone(d);Object.assign(next.properties.find(p=>p.key===key)!,patch);commit(next,'field:'+key);};
  const fieldMove=(index:number,delta:number)=>{if(index+delta<0||index+delta>=d.properties.length)return;const next=clone(d);[next.properties[index],next.properties[index+delta]]=[next.properties[index+delta],next.properties[index]];commit(next);};
- const fieldRemove=(p:Prop)=>{const remove=()=>{const next=clone(d);next.properties=next.properties.filter(x=>x.key!==p.key);for(const row of next.rows)delete row.values[p.key];commit(next);};if(d.properties.length<2)return;const populated=d.rows.some(r=>r.values[p.key]!==''&&r.values[p.key]!=null);if(populated)Alert.alert('Excluir campo '+p.label+'?','Os valores deste campo também serão apagados.',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:remove}]);else remove();};
+ const fieldRemove=(p:Prop)=>{const remove=()=>{const next=clone(d);next.properties=next.properties.filter(x=>x.key!==p.key);for(const row of next.rows)delete row.values[p.key];commit(next);};if(d.properties.length<2)return;const populated=d.rows.some(r=>r.values[p.key]!==''&&r.values[p.key]!=null);if(populated)appAlert('Excluir campo '+p.label+'?','Os valores deste campo também serão apagados.',[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:remove}]);else remove();};
  const board=()=>{
   const group=d.properties.find(p=>p.key===active?.group_by)||d.properties.find(p=>p.type==='select');if(!group)return <Text style={{color:c.muted}}>Adicione uma coluna de status.</Text>;
   const selected=d.rows.find(row=>row.id===rowEdit);

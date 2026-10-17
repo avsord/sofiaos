@@ -16,6 +16,7 @@ import {errorText} from '../lib/chat-model';
 import {subscribeSystemChanged} from '../lib/system-events';
 import {Button,ErrorBanner,IconButton} from './UI';
 import {Icon} from './Icon';
+import {appAlert} from '../lib/app-alert';
 export const noticeArea=(n:Notice)=>{const category=String(n.category||'').toLowerCase();if(/capsule|cápsula/.test(category))return 'Cápsulas';if(/routine|rotina/.test(category))return 'Rotinas';if(/course|curso|lesson|aula/.test(category))return 'Cursos';if(/study|estud/.test(category))return 'Estudos';if(/package|encomenda|rastreio/.test(category))return 'Encomendas';if(/price|monitor|preço|compra|purchase/.test(category))return 'Monitoramento de produtos';if(/^email|mail/.test(category))return 'E-mails';if(/fin|fatura|bill|boleto/.test(category))return 'Finanças';if(/task|tarefa/.test(category))return 'Tarefas';if(/agenda|remind|commitment|routine|calendar|lembrete/.test(category))return 'Agenda';return 'Outros';};
 type State={localOnly:boolean;items:Notice[];unread:number;loading:boolean;error:string;refresh:()=>Promise<void>;read:(n:Notice)=>Promise<void>;readAll:()=>Promise<void>;clear:(n:Notice)=>Promise<void>;clearAll:()=>Promise<void>;open:(n:Notice)=>void;api:SofiaApi};
 const Context=createContext<State|null>(null);
@@ -205,7 +206,7 @@ export function NotificationBell({onViewAll}:{onViewAll:()=>void}){
     <ScrollView nestedScrollEnabled decelerationRate="fast" style={{flex:1}} contentContainerStyle={{paddingBottom:10}}><NotificationList/></ScrollView>
     {n.items.length?<View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:4}}>
      {n.unread>0?<Pressable accessibilityRole="button" accessibilityLabel="Marcar todas as notificações como lidas" onPress={()=>void n.readAll()} style={{minHeight:44,justifyContent:'center',flexShrink:1,minWidth:0}}><Text numberOfLines={1} adjustsFontSizeToFit style={{color:c.muted,fontSize:12,fontWeight:'400',paddingHorizontal:6}}>Marcar tudo como lido</Text></Pressable>:null}
-     <Pressable accessibilityRole="button" accessibilityLabel="Limpar todas as notificações" onPress={()=>Alert.alert('Limpar notificações?','Somente os avisos serão removidos. Seus eventos e registros permanecem.',[{text:'Cancelar',style:'cancel'},{text:'Limpar',onPress:()=>void n.clearAll()}])} style={{minHeight:44,justifyContent:'center',flexShrink:0}}><Text numberOfLines={1} style={{color:c.muted,fontSize:12,padding:6}}>Limpar todas</Text></Pressable>
+     <Pressable accessibilityRole="button" accessibilityLabel="Limpar todas as notificações" onPress={()=>appAlert('Limpar notificações?','Somente os avisos serão removidos. Seus eventos e registros permanecem.',[{text:'Cancelar',style:'cancel'},{text:'Limpar',onPress:()=>void n.clearAll()}])} style={{minHeight:44,justifyContent:'center',flexShrink:0}}><Text numberOfLines={1} style={{color:c.muted,fontSize:12,padding:6}}>Limpar todas</Text></Pressable>
     </View>:null}
     <Button title="Ver todas as notificações" onPress={()=>close(onViewAll)}/>
    </Animated.View>

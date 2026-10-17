@@ -27,6 +27,7 @@ import {
   alertsOf, alertSummary, analyzeProduct, allReadings, searchTerms, extractProductUrl, replaceSource, readerUrl, readerAgent, searchTargetsFor, addSource, removeSource, makePrimary, withMemory, storesOf,
 } from '../lib/monitoring';
 import type {ProductSeries, Window, Candidate, StoreSeries} from '../lib/monitoring';
+import {appAlert} from '../lib/app-alert';
 
 const GOOD = '#2fc58b', BAD = '#ff6b7a';
 const ORIGIN: Record<string, string> = {
@@ -377,7 +378,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
   const vc = VERDICT_COLOR[a.verdict.kind];
 
   function remove() {
-    Alert.alert('Parar de acompanhar?', `“${monitor.title}” e todo o histórico de preços serão apagados.`, [
+    appAlert('Parar de acompanhar?', `“${monitor.title}” e todo o histórico de preços serão apagados.`, [
       {text: 'Cancelar', style: 'cancel'},
       {text: 'Apagar', style: 'destructive', onPress: () => { cancelCollection(api, monitor.id); api.deleteEntity(monitor.id).then(onDeleted).catch(e => setError(errorText(e))); }},
     ]);
@@ -385,7 +386,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
   // Comprou: vira despesa no Finanças (valor e loja do melhor preço) e o acompanhamento pausa.
   async function bought() {
     if (!product.now) return;
-    Alert.alert('Comprou?', `Lançar ${money(product.now.price, product.currency)} na ${product.now.store.name} como despesa em Finanças e pausar este acompanhamento?`, [
+    appAlert('Comprou?', `Lançar ${money(product.now.price, product.currency)} na ${product.now.store.name} como despesa em Finanças e pausar este acompanhamento?`, [
       {text: 'Cancelar', style: 'cancel'},
       {text: 'Lançar', onPress: async () => {
         try {

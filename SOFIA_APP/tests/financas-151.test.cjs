@@ -20,5 +20,5 @@ test('aviso alguns dias antes e no dia; faixa laranja com "faltam no mes"; card 
   assert.ok(n.includes("for (const offset of before ? [before, 0] : [0])"));
   assert.ok(s.includes("{value:'3',label:'3 dias antes'}"));assert.ok(s.includes("{value:'income',label:'A receber'}"));
   assert.ok(s.includes('faltam {show(split.missing)} no mês'));assert.ok(s.includes('const reserve = reserveFor(d.goals, accountId, isPrimary);'));
-  assert.ok(s.includes('A Sofia sobre o seu mês'));
+  assert.ok(!s.includes('A Sofia sobre o seu mês'),'0.3.153: card da Sofia saiu do Resumo');
 });
