@@ -16,7 +16,7 @@ import {Sheet} from '../components/Sheet';
 import {InternalBackGesture} from '../components/InternalBackGesture';
 import {DateTimeField} from '../components/DateTimeField';
 import {Icon} from '../components/Icon';
-import {Button, IconButton, SofiaLogo} from '../components/UI';
+import {Button, IconButton} from '../components/UI';
 import {PriceChart} from '../components/PriceChart';
 import {Spinner, LoadingLines} from '../components/Loading';
 import {money} from '../lib/monitoring';
