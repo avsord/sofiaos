@@ -1811,9 +1811,10 @@ const CATALOG={
       },
       {
         "key": "plan_time",
-        "label": "Hora do aporte",
+        "label": "Hora do aporte (antigo, sem uso)",
         "type": "text",
-        "max": 5
+        "max": 5,
+        "developerOnly": true
       },
       {
         "key": "remind_before_days",
@@ -1822,7 +1823,7 @@ const CATALOG={
       },
       {
         "key": "remind_time",
-        "label": "Hora do lembrete",
+        "label": "Hora do aviso",
         "type": "text",
         "max": 5
       },

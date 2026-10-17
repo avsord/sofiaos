@@ -6,7 +6,7 @@ test('Resumo: historico vem logo depois dos cartoes; cartoes de credito e vencim
   const home=s.slice(s.indexOf('function HomeTab('),s.indexOf('function DueRow('));
   assert.ok(!home.includes('<Title text="Próximos vencimentos"'));assert.ok(!home.includes('<Title text="Cartões"'));
   assert.ok(home.includes('<TxTab d={d}'));
-  assert.ok(s.includes('>Histórico</Text>'));assert.ok(s.includes("{tools || q || kind !== 'all' || status !== 'all' ?"),'filtros recolhidos');
+  assert.ok(s.includes('>Histórico</Text>'));assert.ok(s.includes("(tools || activeCat || kind !== 'all' || status !== 'all') ?"),'filtros recolhidos');
 });
 test('topo compacto e um botao + com as opcoes de lancamento',()=>{
   assert.ok(!s.includes('SEU DINHEIRO, SEM SUSTO'));

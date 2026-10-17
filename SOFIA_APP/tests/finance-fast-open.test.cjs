@@ -14,5 +14,5 @@ test('abre com o guardado (mês atual) e atualiza por trás; guarda só no armaz
 });
 test('contas pesadas do Resumo e dos Relatórios só recalculam quando dados ou mês mudam',()=>{
  assert.ok(fin.includes('const {s, total: accountsTotal, forecast: accountsForecast, dues} = useMemo('),'o resumo calcula saldo e vencimentos sob demanda');
- assert.ok(fin.includes('const {t6, s, prev, bal} = useMemo('));
+ assert.ok(fin.includes('const {t6, s, prev, bal, saved} = useMemo('),'relatorios continuam em useMemo, agora tambem com a serie do guardado');
 });

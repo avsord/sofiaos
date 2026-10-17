@@ -22,3 +22,10 @@ test('0.3.154: compromisso aceita prioridade pelo update_record (Importante), co
  assert.ok(src.includes("(field==='priority_level'||field==='priority')&&def.fields.some(f=>f.key==='priority_level')"));
  assert.ok(require('node:fs').readFileSync(require('node:path').join(__dirname,'..','src/services/intent-engine.js'),'utf8').includes('COMPROMISSOS DA AGENDA também têm prioridade'));
 });
+
+test('0.3.160: reserva ja salva pela 0.3.159 (com plan_time) continua salvando depois que a hora do aporte saiu da tela',t=>{
+ const {core}=fixture(t);const w=core.workspace;
+ const r=w.save({kind:'fin_goal',title:'Dinheiro guardado',area:'Pessoal',data:{role:'reserve',saved:15000,monthly_plan:4000,plan_day:5,plan_time:'10:00',remind_time:'09:00'}});
+ const again=w.save({...r,data:{...r.data,monthly_plan:5000}},r.id);
+ assert.equal(again.data.monthly_plan,5000);assert.equal(again.data.plan_time,'10:00');
+});

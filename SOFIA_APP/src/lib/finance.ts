@@ -213,12 +213,28 @@ export function budgetProgress(budgets: Budget[], txs: Tx[], month: string): Bud
 export function trend(txs: Tx[], month: string, count = 6): Array<{month: string; income: number; expense: number}> {
   return Array.from({length: count}, (_, i) => addMonths(month, i - count + 1)).map(m => { const s = monthSummary(txs, m); return {month: m, income: s.income + s.incomePending, expense: s.expense + s.expensePending}; });
 }
-export function balanceSeries(accounts: Account[], txs: Tx[], month: string): Array<{t: number; v: number}> {
+/** 0.3.160: com reserva, o saldo geral de cada dia desconta o que ja tinha sido guardado ate ali
+ * (e devolve o que foi retirado), igual ao Saldo geral do Resumo. */
+export function reserveNetUntil(moves: ReserveMove[], goalId: string, date: string): number {
+  return round2(moves.filter(m => m.goalId === goalId && m.entity?.state !== 'archived' && m.date <= date)
+    .reduce((s, m) => s + (m.direction === 'in' ? m.amount : -m.amount), 0));
+}
+export function balanceSeries(accounts: Account[], txs: Tx[], month: string, reserve?: {goalId: string; moves: ReserveMove[]}): Array<{t: number; v: number}> {
   const out: Array<{t: number; v: number}> = [], days = daysIn(month), today = todayISO();
   for (let d = 1; d <= days; d++) {
     const date = dayIn(month, d);
     if (date > today) break;
-    out.push({t: Date.parse(date + 'T12:00:00Z'), v: totalBalance(accounts, txs, date)});
+    out.push({t: Date.parse(date + 'T12:00:00Z'), v: round2(totalBalance(accounts, txs, date) - (reserve ? reserveNetUntil(reserve.moves, reserve.goalId, date) : 0))});
+  }
+  return out;
+}
+/** Evolucao do guardado dia a dia no mes: valor inicial + aportes - retiradas ate cada dia. */
+export function reserveSeries(reserve: Goal, moves: ReserveMove[], month: string, today = todayISO()): Array<{t: number; v: number}> {
+  const out: Array<{t: number; v: number}> = [], days = daysIn(month);
+  for (let d = 1; d <= days; d++) {
+    const date = dayIn(month, d);
+    if (date > today) break;
+    out.push({t: Date.parse(date + 'T12:00:00Z'), v: round2((Number(reserve.saved) || 0) + reserveNetUntil(moves, reserve.id, date))});
   }
   return out;
 }
@@ -364,7 +380,7 @@ export function toReserveMove(e: Entity): ReserveMove {
 export function reserveOf(goals: Goal[]): Goal | null { return goals.find(g => g.entity?.data?.role === 'reserve') || null; }
 export type MoneySplit = {net: number; total: number; saved: number; daily: number; committed: number; free: number;
   planned: number; realized: number; takenBack: number; monthTarget: number; missing: number; shortfall: number;
-  planDay: number; planTime: string; remindBefore: number; remindTime: string; remindRepeatDays: number; nextPlanDate: string; closed: boolean};
+  planDay: number; remindBefore: number; remindTime: string; remindRepeatDays: number; nextPlanDate: string; closed: boolean};
 export function moneySplit(reserve: Goal, moves: ReserveMove[], accounts: Account[], txs: Tx[], cards: Card[], month: string, today = todayISO(), manualBills?: Due[]): MoneySplit {
   const mine = moves.filter(m => m.goalId === reserve.id && m.entity?.state !== 'archived');
   const net = mine.reduce((s, m) => s + (m.direction === 'in' ? m.amount : -m.amount), 0);
@@ -384,11 +400,10 @@ export function moneySplit(reserve: Goal, moves: ReserveMove[], accounts: Accoun
   const takenBack = round2(ofMonth.filter(m => m.direction === 'out' && m.entity?.data?.planned !== true).reduce((s, m) => s + m.amount, 0));
   const monthTarget = round2(planned > 0 ? planned + takenBack : takenBack);
   const planDay = Math.min(28, Math.max(1, Number(d.plan_day) || 1));
-  const planTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(d.plan_time || '')) ? String(d.plan_time) : '10:00';
   const nextPlanDate = planned > 0 ? (dayIn(month, planDay) >= today ? dayIn(month, planDay) : dayIn(addMonths(month, 1), planDay)) : '';
   const missing = round2(Math.max(0, monthTarget - realized));
   return {net, total, saved, daily, committed, free: round2(daily - committed), planned, realized, takenBack, monthTarget,
-    missing, shortfall: round2(Math.max(0, committed - daily)), planDay, planTime,
+    missing, shortfall: round2(Math.max(0, committed - daily)), planDay,
     remindBefore: Math.max(0, Math.min(15, Number(d.remind_before_days) || 0)),
     remindTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(d.remind_time || '')) ? String(d.remind_time) : '09:00',
     remindRepeatDays: Math.max(0, Number(d.remind_repeat_days) || 0),
@@ -411,4 +426,22 @@ export function reserveBadge(split: MoneySplit, today = todayISO(), money = (v: 
     return 'faltam ' + money(split.missing);
   }
   return '';
+}
+
+/** 0.3.159: historico da reserva agrupado por mes (mais recente primeiro), com o que entrou e saiu. */
+export type ReserveMonth = {month: string; in: number; out: number; net: number; items: ReserveMove[]};
+export function reserveHistory(moves: ReserveMove[], goalId: string): ReserveMonth[] {
+  const mine = moves.filter(m => m.goalId === goalId && m.entity?.state !== 'archived');
+  const by = new Map<string, ReserveMove[]>();
+  for (const m of mine) { const k = monthOf(m.date || todayISO()); by.set(k, [...(by.get(k) || []), m]); }
+  return [...by.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([month, list]) => {
+    const items = [...list].sort((a, b) => b.date.localeCompare(a.date) || String(b.entity?.updated_at || '').localeCompare(String(a.entity?.updated_at || '')));
+    const inn = round2(items.filter(m => m.direction === 'in').reduce((t, m) => t + m.amount, 0));
+    const out = round2(items.filter(m => m.direction === 'out').reduce((t, m) => t + m.amount, 0));
+    return {month, in: inn, out, net: round2(inn - out), items};
+  });
+}
+/** Rotulo de cada movimento no historico. */
+export function reserveMoveLabel(m: ReserveMove): string {
+  return m.direction === 'in' ? 'Aporte' : m.planned ? 'Retirada planejada' : 'Retirada a recompor';
 }

@@ -23,10 +23,10 @@ import {money} from '../lib/monitoring';
 import {
   EXPENSE_CATEGORIES, INCOME_CATEGORIES, ACCOUNT_TYPES, FIN_COLORS, categoryOf, toAccount, toCard, toTx, toBudget, toGoal, monthOf, addMonths, monthLabel, todayISO,
   invoiceMonth, cardInvoices, cardUsed, installmentPlan, accountBalance, totalBalance, forecastBalance, monthTxs, monthSummary, byCategory, budgetProgress,
-  trend, balanceSeries, upcoming, manualDues, transactionsForAccount, financeInsights, goalProgress, parseMoney, formatMoneyInput, finishMoneyInput, addDays,
+  trend, balanceSeries, upcoming, manualDues, transactionsForAccount, goalProgress, parseMoney, formatMoneyInput, finishMoneyInput, addDays,
 } from '../lib/finance';
 import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove} from '../lib/finance';
-import {moneySplit, reserveBadge, reserveOf, reserveFor, toReserveMove} from '../lib/finance';
+import {moneySplit, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove} from '../lib/finance';
 import {syncFinanceDueNotifications} from '../lib/finance-notifications';
 import {appAlert} from '../lib/app-alert';
 
@@ -205,7 +205,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
             {tab === 'home' ? <HomeTab d={scoped || d} month={month} api={api} reload={reload} onTx={setEditing} onTab={navigateFinance} accountId={accountId} isPrimary={isPrimary} onBill={t => setBillEditor(t || 'new')} />
               : tab === 'bills' ? <PendingTab d={scoped || d} api={api} month={month} accountId={accountId} warning={notificationWarning} onBill={setBillEditor} reload={reload} />
               : tab === 'cards' ? <CardsTab d={scoped || d} api={api} reload={reload} onTx={setEditing} onManage={() => setManage(true)} />
-              : <ReportsTab d={scoped || d} month={month} />}
+              : <ReportsTab d={scoped || d} month={month} reserve={reserveFor((scoped || d).goals, accountId, isPrimary)} />}
           </ScrollView>
         )}
 
@@ -283,17 +283,43 @@ function Field({label, value, onChange, placeholder, numeric = false, big = fals
 }
 
 // ============================ 0.3.146: GUARDADO x DIA A DIA ============================
+// ============================ 0.3.159: HISTORICO DA RESERVA ============================
+function ReserveHistorySheet({reserve, moves, show, onClose}: {reserve: Goal; moves: ReserveMove[]; show: (v: number) => string; onClose: () => void}) {
+  const c = useTheme(), months = useMemo(() => reserveHistory(moves, reserve.id), [moves, reserve.id]);
+  return <Sheet visible onClose={onClose} label="Fechar histórico da reserva">
+    <ScrollView style={{maxHeight: 620}} contentContainerStyle={{gap: 16, paddingBottom: 18}}>
+      <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Histórico da reserva</Text>
+      {months.length ? months.map(m => <View key={m.month} style={{gap: 8}}>
+        <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8}}>
+          <Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 15}}>{monthLabel(m.month)}</Text>
+          <Text style={{color: m.net >= 0 ? GOOD : BAD, fontWeight: '800', fontSize: 14}}>{m.net >= 0 ? '+' : '−'}{show(Math.abs(m.net))}</Text>
+        </View>
+        <Text style={{color: c.muted, fontSize: 12}}>Entrou {show(m.in)} · Saiu {show(m.out)}</Text>
+        <View style={{backgroundColor: c.input, borderRadius: 16, paddingHorizontal: 14}}>
+          {m.items.map((it, i) => <View key={it.id} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderColor: c.line}}>
+            <View style={{flex: 1, gap: 2}}>
+              <Text style={{color: c.text, fontSize: 14, fontWeight: '600'}}>{reserveMoveLabel(it)}</Text>
+              <Text style={{color: c.muted, fontSize: 11}}>{it.date.slice(8, 10) + '/' + it.date.slice(5, 7)}{it.note ? ' · ' + it.note : ''}</Text>
+            </View>
+            <Text style={{color: it.direction === 'in' ? GOOD : BAD, fontWeight: '800', fontSize: 15}}>{it.direction === 'in' ? '+' : '−'}{show(it.amount)}</Text>
+          </View>)}
+        </View>
+      </View>) : <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Ainda não há movimentos. Cada aporte e cada retirada aparece aqui, por mês, com o que entrou e o que saiu.</Text>}
+      {Number(reserve.saved) > 0 ? <Text style={{color: c.muted, fontSize: 12}}>Valor inicial informado: {show(Number(reserve.saved))}</Text> : null}
+    </ScrollView>
+  </Sheet>;
+}
+
 function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = ''}: {accountId?: string; api: SofiaApi; kind: 'setup' | 'in' | 'out' | 'plan'; reserve: Goal | null; split: ReturnType<typeof moneySplit> | null; onClose: () => void; onDone: () => Promise<void>}) {
   const c = useTheme();
   const [name, setName] = useState(reserve?.name || 'Dinheiro guardado'), [amount, setAmount] = useState(''), [note, setNote] = useState(''),
     [plan, setPlan] = useState(reserve?.entity?.data?.monthly_plan ? finishMoneyInput(String(reserve.entity.data.monthly_plan).replace('.', ',')) : ''),
     [day, setDay] = useState(String(reserve?.entity?.data?.plan_day || 5)),
-    [planTime, setPlanTime] = useState(String(reserve?.entity?.data?.plan_time || '10:00')),
     [remindBefore, setRemindBefore] = useState(String(reserve?.entity?.data?.remind_before_days ?? 0)),
     [remindTime, setRemindTime] = useState(String(reserve?.entity?.data?.remind_time || '09:00')),
     [repeatDays, setRepeatDays] = useState(String(reserve?.entity?.data?.remind_repeat_days ?? 0)),
     [plannedOut, setPlannedOut] = useState(false);
-  const planFields = {monthly_plan: parseMoney(plan) ?? 0, plan_day: Math.min(28, Math.max(1, Number(day) || 5)), plan_time: planTime,
+  const planFields = {monthly_plan: parseMoney(plan) ?? 0, plan_day: Math.min(28, Math.max(1, Number(day) || 5)),
     remind_before_days: Math.max(0, Number(remindBefore) || 0), remind_time: remindTime, remind_repeat_days: Math.max(0, Number(repeatDays) || 0)};
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const title = kind === 'setup' ? 'Separar o dinheiro guardado' : kind === 'in' ? 'Guardar dinheiro' : kind === 'plan' ? 'Valor dos aportes' : 'Retirar da reserva';
@@ -329,12 +355,11 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
   const planEditor = <View style={{gap: 10}}>
     <View style={{flexDirection: 'row', gap: 10}}>
       <View style={{flex: 1}}>{input('Todo dia (1 a 28)', day, setDay, '5')}</View>
-      <View style={{flex: 1}}>{input('Às', planTime, setPlanTime, '10:00')}</View>
+      <View style={{flex: 1}}>{input('Avisar às', remindTime, setRemindTime, '09:00')}</View>
     </View>
-    <Text style={{color: c.muted, fontSize: 12}}>Lembrete</Text>
+    <Text style={{color: c.muted, fontSize: 12}}>Avisar também</Text>
     <Chips value={remindBefore} onChange={setRemindBefore} options={[{value: '0', label: 'No dia'}, {value: '1', label: '1 dia antes'}, {value: '2', label: '2 dias antes'}, {value: '5', label: '5 dias antes'}]} />
     <Chips value={repeatDays} onChange={setRepeatDays} options={[{value: '0', label: 'Não repetir'}, {value: '3', label: 'A cada 3 dias até aportar'}, {value: '7', label: 'A cada 7 dias até aportar'}]} />
-    {input('Hora do lembrete', remindTime, setRemindTime, '09:00')}
   </View>;
   return <Sheet visible onClose={onClose} label={'Fechar ' + title}>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 14, paddingBottom: 18}}>
@@ -470,7 +495,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
   // Contas pesadas só quando os dados ou o mês mudam (não a cada toque, como esconder valores).
   const {s, total: accountsTotal, forecast: accountsForecast, dues} = useMemo(() => ({s: monthSummary(d.txs, month), total: totalBalance(d.accounts, d.txs), forecast: forecastBalance(d.accounts, d.txs, month, d.cards),
     dues: manualDues(d.txs, accountId, today, 10)}), [d, accountId, month, today]);
-  const [hide, setHide] = useState(false), [reserveSheet, setReserveSheet] = useState<'setup' | 'in' | 'out' | 'plan' | null>(null);
+  const [hide, setHide] = useState(false), [reserveSheet, setReserveSheet] = useState<'setup' | 'in' | 'out' | 'plan' | null>(null), [reserveHistoryOpen, setReserveHistoryOpen] = useState(false);
   const show = (v: number) => hide ? 'R$ •••••' : money(v);
   // 0.3.151: cada conta tem o proprio guardado (a principal mantem a reserva antiga, sem conta).
   const reserve = reserveFor(d.goals, accountId, isPrimary);
@@ -482,6 +507,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
   const [reserveMenu, setReserveMenu] = useState(false);
   return (
     <>
+      {reserveHistoryOpen && reserve ? <ReserveHistorySheet reserve={reserve} moves={d.moves || []} show={show} onClose={() => setReserveHistoryOpen(false)} /> : null}
       {reserveSheet ? <ReserveSheet accountId={accountId} api={api} kind={reserveSheet} reserve={reserve} split={split} onClose={() => setReserveSheet(null)} onDone={async () => { setReserveSheet(null); await reload(); }} /> : null}
       {/* 0.3.153: cartao verde inteiro ATRAS do roxo (empilhados); o roxo cobre tudo menos a faixa de cima */}
       <View style={{backgroundColor: accountId ? GUARD : 'transparent', borderRadius: 24}}>
@@ -513,32 +539,25 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
           {split ? <>
             <Text style={{fontSize: 29, fontWeight: '800', color: c.text}}>{show(split.saved)}</Text>
             <Text style={{fontSize: 12, lineHeight: 18, color: c.muted}}>Esse valor é separado das suas contas: não entra no saldo geral. O saldo geral é o que você tem para usar. Guardar dinheiro tira do saldo geral; retirar devolve. É uma organização da Sofia, não bloqueia nada no banco.</Text>
-            <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 10}}>
-              {split.monthTarget > 0 ? <View style={{backgroundColor: GUARD + '1f', borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: GUARD + '55'}}>
+            {split.monthTarget > 0 || split.realized > 0 ? <View style={{backgroundColor: GUARD + '1f', borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: GUARD + '55'}}>
               <Text style={{color: c.text, fontWeight: '800', fontSize: 14}}>Aportes de {monthLabel(month)}</Text>
-              {split.planned > 0 ? <Text style={{color: c.muted, fontSize: 12}}>{show(split.planned)} todo dia {split.planDay}, às {split.planTime}</Text> : null}
+              {split.planned > 0 ? <Text style={{color: c.muted, fontSize: 12}}>{show(split.planned)} todo dia {split.planDay}, avisar às {split.remindTime}</Text> : null}
               <Text style={{color: c.muted, fontSize: 12}}>Guardado no mês: {show(split.realized)}</Text>
               {split.takenBack > 0 ? <Text style={{color: c.muted, fontSize: 12}}>Retirado no mês, a recompor: −{show(split.takenBack)}</Text> : null}
-              <Text style={{color: split.closed ? GOOD : c.text, fontWeight: '700', fontSize: 13}}>{split.closed ? 'Aporte do mês fechado ✓' : 'Faltam ' + show(split.missing) + ' para fechar o mês'}</Text>
-              <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>O que faltar não passa para o mês seguinte: a conta recomeça no valor do aporte.</Text>
-              <View style={{flexDirection: 'row', gap: 8, marginTop: 4}}>
-                <Pressable accessibilityRole="button" onPress={() => { setReserveMenu(false); setReserveSheet('in'); }} style={{paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, backgroundColor: c.accent}}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 13}}>Guardar agora</Text></Pressable>
-                <Pressable accessibilityRole="button" onPress={() => { setReserveMenu(false); setReserveSheet('plan'); }} style={{paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, borderWidth: 1, borderColor: c.line}}><Text style={{color: c.accent, fontWeight: '700', fontSize: 13}}>Editar aportes</Text></Pressable>
-              </View>
+              {split.monthTarget > 0 ? <Text style={{color: split.closed ? GOOD : c.text, fontWeight: '700', fontSize: 13}}>{split.closed ? 'Aporte do mês fechado ✓' : 'Faltam ' + show(split.missing) + ' para fechar o mês'}</Text> : null}
+              {split.monthTarget > 0 ? <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>O que faltar não passa para o mês seguinte: a conta recomeça no valor do aporte.</Text> : null}
             </View> : null}
+            <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 10}}>
             <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Saldo geral (para usar)</Text><Text style={{color: split.daily < 0 ? BAD : c.text, fontWeight: '700'}}>{show(split.daily)}</Text></View>
               <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Guardado + saldo geral</Text><Text style={{color: c.text, fontWeight: '700'}}>{show(split.total)}</Text></View>
               <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Despesas previstas do mês</Text><Text style={{color: c.text, fontWeight: '700'}}>{show(split.committed)}</Text></View>
               <View style={{height: 1, backgroundColor: c.line}} />
               <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '700', fontSize: 12}}>Livre após despesas previstas</Text><Text style={{color: split.free < 0 ? BAD : GOOD, fontWeight: '800'}}>{show(split.free)}</Text></View>
-              <View style={{height: 1, backgroundColor: c.line}} />
-              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Guardado neste mês</Text><Text style={{color: c.text, fontWeight: '700'}}>{show(split.realized)}</Text></View>
-              {split.planned > 0 ? <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Aportes de</Text><Text style={{color: c.text, fontWeight: '700'}}>{show(split.planned)} por mês</Text></View> : null}
             </View>
             {split.daily < 0 ? <Text style={{color: BAD, fontSize: 12}}>O saldo geral ficou negativo: o que foi guardado é maior que o dinheiro que estava disponível. Confira os valores.</Text> : null}
           </> : null}
-          {[['Guardar dinheiro', 'in'], ['Retirar da reserva', 'out'], ['Mudar o valor dos aportes', 'plan']].map(([label, k]) => (
-            <Pressable key={k} accessibilityRole="button" onPress={() => { setReserveMenu(false); setReserveSheet(k as 'in' | 'out' | 'plan'); }}
+          {[['Guardar dinheiro', 'in'], ['Retirar da reserva', 'out'], ['Editar aportes', 'plan'], ['Histórico da reserva', 'history']].map(([label, k]) => (
+            <Pressable key={k} accessibilityRole="button" onPress={() => { setReserveMenu(false); if (k === 'history') setReserveHistoryOpen(true); else setReserveSheet(k as 'in' | 'out' | 'plan'); }}
               style={{paddingVertical: 13, borderBottomWidth: 1, borderColor: c.line}}>
               <Text style={{color: k === 'out' ? BAD : c.text, fontSize: 15, fontWeight: '600'}}>{label}  ›</Text>
             </Pressable>
@@ -615,12 +634,17 @@ function BudgetRow({p}: {p: ReturnType<typeof budgetProgress>[number]}) {
 
 // ============================ LANÇAMENTOS ============================
 function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {d: Data; month: string; accountFilter: string; setAccountFilter: (v: string) => void; onTx: (t: Partial<Tx>) => void; api: SofiaApi; reload: () => Promise<void>}) {
-  const c = useTheme(), [kind, setKind] = useState<'all' | TxKind>('all'), [q, setQ] = useState(''), [status, setStatus] = useState<'all' | 'pending'>('all');
+  const c = useTheme(), [kind, setKind] = useState<'all' | TxKind>('all'), [cat, setCat] = useState(''), [status, setStatus] = useState<'all' | 'pending'>('all');
   // 0.3.153: o que voce registrou na Sofia e o extrato importado do banco ficam separados, com troca.
   const [source, setSource] = useState<'app' | 'import'>('app');
   const imported = (t: Tx) => { const id = String(t.entity?.data?.import_id || ''); return !!id && !id.startsWith('sofia-pendencia:'); };
+  // 0.3.160: em vez de digitar uma busca, filtros prontos com as categorias que JA foram usadas nos
+  // lancamentos (nada inventado), da mais usada para a menos usada. Sem nenhuma categoria, sem filtro.
+  const catPresets = useMemo(() => { const n = new Map<string, number>(); for (const t of d.txs) { if ((t.manualDue && !t.paid) || (source === 'import' ? !imported(t) : imported(t)) || (kind !== 'all' && t.kind !== kind)) continue; const name = String(t.category || '').trim(); if (name) n.set(name, (n.get(name) || 0) + 1); } return [...n.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR')).map(([name]) => name); }, [d.txs, source, kind]);
+  const activeCat = catPresets.includes(cat) ? cat : '';
+  const hasAnyTx = d.txs.some(t => (!t.manualDue || t.paid) && (source === 'import' ? imported(t) : !imported(t)));
   const list = monthTxs(d.txs, month).filter(t => (!t.manualDue || t.paid) && (source === 'import' ? imported(t) : !imported(t)) && (kind === 'all' || t.kind === kind) && (!accountFilter || t.accountId === accountFilter || t.toAccountId === accountFilter || t.cardId === accountFilter)
-    && (status === 'all' || (!t.paid && !t.cardId)) && (!q.trim() || (t.desc + ' ' + t.category).toLowerCase().includes(q.trim().toLowerCase())));
+    && (status === 'all' || (!t.paid && !t.cardId)) && (!activeCat || t.category === activeCat));
   const days = useMemo(() => { const m = new Map<string, Tx[]>(); for (const t of list) { if (!m.has(t.date)) m.set(t.date, []); m.get(t.date)!.push(t); } return [...m.entries()]; }, [list]);
   const sum = list.reduce((s, t) => s + (t.kind === 'income' ? t.amount : t.kind === 'expense' ? -t.amount : 0), 0);
   const filterName = d.accounts.find(a => a.id === accountFilter)?.name || d.cards.find(x => x.id === accountFilter)?.name;
@@ -630,14 +654,13 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
       {/* 0.3.152: historico direto sob os cartoes; busca, filtros e importacao ficam recolhidos */}
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 2}}>
         <Text style={{flex: 1, fontSize: 18, fontWeight: '800', color: c.text}}>Histórico</Text>
-        <IconButton name="filter" label={tools ? 'Esconder busca e filtros' : 'Buscar e filtrar'} onPress={() => setTools(v => !v)} />
+        {hasAnyTx ? <IconButton name="filter" label={tools ? 'Esconder filtros' : 'Filtrar'} onPress={() => setTools(v => !v)} /> : null}
         <IconButton name="plus" label="Importar extrato (OFX ou CSV)" onPress={() => setImporting(true)} />
       </View>
       <Chips value={source} onChange={setSource} options={[{value: 'app' as const, label: 'Lançamentos'}, {value: 'import' as const, label: 'Extrato importado'}]} />
       {importing ? <ImportSheet api={api} d={d} onClose={() => setImporting(false)} onDone={async () => { setImporting(false); await reload(); }} /> : null}
-      {tools || q || kind !== 'all' || status !== 'all' ? <View style={{gap: 10}}>
-      <TextInput accessibilityLabel="Buscar lançamento" value={q} onChangeText={setQ} placeholder="Buscar por descrição ou categoria" placeholderTextColor={c.muted}
-        style={{borderWidth: 1, borderColor: c.line, borderRadius: 14, padding: 12, color: c.text, backgroundColor: c.surface}} />
+      {hasAnyTx && (tools || activeCat || kind !== 'all' || status !== 'all') ? <View style={{gap: 10}}>
+      {catPresets.length ? <Chips scroll value={activeCat} onChange={setCat} options={[{value: '', label: 'Todas as categorias'}, ...catPresets.map(name => ({value: name, label: name}))]} /> : null}
       <Chips scroll value={kind} onChange={setKind} options={[{value: 'all' as const, label: 'Todos'}, {value: 'expense' as const, label: 'Despesas'}, {value: 'income' as const, label: 'Receitas'}, {value: 'transfer' as const, label: 'Transferências'}, {value: 'card_payment' as const, label: 'Faturas'}]} />
       <View style={{flexDirection: 'row', gap: 8, flexWrap: 'wrap', alignItems: 'center'}}>
         <Chips value={status} onChange={setStatus} options={[{value: 'all' as const, label: 'Tudo'}, {value: 'pending' as const, label: 'Só pendentes'}]} />
@@ -645,7 +668,7 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
       </View>
       </View> : null}
       {list.length ? <Text style={{color: c.muted, fontSize: 12}}>{list.length} movimentações no mês · resultado {money(sum)}</Text> : null}
-      {!days.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>{q || kind !== 'all' || status !== 'all' ? 'Nenhum lançamento com esses filtros.' : (source === 'import' ? 'Nenhum extrato importado neste mês. Toque em ＋ ao lado de Histórico para importar (OFX ou CSV).' : 'Nenhum lançamento neste mês. Toque em ＋ para registrar.')}</Text> : days.map(([date, items]) => (
+      {!days.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>{activeCat || kind !== 'all' || status !== 'all' ? 'Nenhum lançamento com esses filtros.' : (source === 'import' ? 'Nenhum extrato importado neste mês. Toque em ＋ ao lado de Histórico para importar (OFX ou CSV).' : 'Nenhum lançamento neste mês. Toque em ＋ para registrar.')}</Text> : days.map(([date, items]) => (
         <View key={date} style={{gap: 8}}>
           <Text style={{color: c.muted, fontSize: 12, fontWeight: '700', paddingLeft: 4}}>{weekday(date)}</Text>
           <Card_ style={{padding: 10, gap: 0}}>{items.map((t, i) => <TxRow key={t.id} t={t} d={d} first={i === 0} onPress={() => onTx(t)} api={api} reload={reload} />)}</Card_>
@@ -962,23 +985,14 @@ function Donut({slices, size = 170}: {slices: Array<{value: number; color: strin
   });
   return <Svg width={size} height={size}>{arcs}</Svg>;
 }
-function ReportsTab({d, month}: {d: Data; month: string}) {
+function ReportsTab({d, month, reserve}: {d: Data; month: string; reserve: Goal | null}) {
   const c = useTheme(), [kind, setKind] = useState<'expense' | 'income'>('expense');
-  const tips = useMemo(()=>financeInsights(d.txs,month),[d,month]);
   const cats = useMemo(() => byCategory(d.txs, month, kind), [d, month, kind]), total = cats.reduce((s, x) => s + x.total, 0);
-  const {t6, s, prev, bal} = useMemo(() => ({t6: trend(d.txs, month, 6), s: monthSummary(d.txs, month), prev: monthSummary(d.txs, addMonths(month, -1)), bal: balanceSeries(d.accounts, d.txs, month)}), [d, month]);
+  const {t6, s, prev, bal, saved} = useMemo(() => ({t6: trend(d.txs, month, 6), s: monthSummary(d.txs, month), prev: monthSummary(d.txs, addMonths(month, -1)), bal: balanceSeries(d.accounts, d.txs, month, reserve ? {goalId: reserve.id, moves: d.moves || []} : undefined), saved: reserve ? reserveSeries(reserve, d.moves || [], month) : []}), [d, month, reserve]);
   const max = Math.max(1, ...t6.flatMap(x => [x.income, x.expense]));
   const [w, setW] = useState(0);
   return (
     <>
-      <Card_>
-        <Title text="Análise da Sofia" />
-        <Text style={{fontSize:12,color:c.muted,lineHeight:18}}>Sugestões baseadas somente nas entradas e saídas confirmadas da conta selecionada. Registros incompletos podem mudar a análise.</Text>
-        {tips.map((tip,i)=><View key={i} style={{flexDirection:'row',gap:9,alignItems:'flex-start'}}>
-          <View style={{width:7,height:7,borderRadius:4,marginTop:7,backgroundColor:tip.tone==='good'?GOOD:tip.tone==='attention'?WARN:c.muted}} />
-          <Text style={{flex:1,color:c.text,fontSize:13,lineHeight:19}}>{tip.text}</Text>
-        </View>)}
-      </Card_>
       <Card_>
         <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, fontSize: 16, fontWeight: '700', color: c.text}}>Por categoria</Text><Chips value={kind} onChange={setKind} options={[{value: 'expense' as const, label: 'Despesas'}, {value: 'income' as const, label: 'Receitas'}]} /></View>
         <View style={{alignItems: 'center', justifyContent: 'center'}}>
@@ -1015,6 +1029,14 @@ function ReportsTab({d, month}: {d: Data; month: string}) {
         <Card_>
           <Title text="Evolução do saldo no mês" />
           <PriceChart lines={[{id: 'saldo', color: c.accent, points: bal}]} height={160} window="all" mode="price" />
+        </Card_>
+      ) : null}
+      {/* 0.3.160: evolucao do guardado, ao lado da do saldo */}
+      {saved.length > 1 ? (
+        <Card_>
+          <Title text="Evolução do guardado no mês" />
+          <PriceChart lines={[{id: 'guardado', color: GUARD, points: saved}]} height={160} window="all" mode="price" />
+          <Text style={{color: c.muted, fontSize: 12}}>De {money(saved[0].v)} no início a {money(saved[saved.length - 1].v)} hoje.</Text>
         </Card_>
       ) : null}
     </>

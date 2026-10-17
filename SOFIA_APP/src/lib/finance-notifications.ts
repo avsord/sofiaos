@@ -63,7 +63,7 @@ export function reservePlanAlarms(split: MoneySplit, title: string, now = new Da
   const before = Math.max(0, Math.min(15, split.planDay - 1, split.remindBefore));
   if (before > 0) out.push({id: 'before', date: at(split.planDay - before, split.remindTime || '09:00'),
     title: 'Aporte em ' + before + (before === 1 ? ' dia' : ' dias'), body: 'Guardar ' + value + ' no dia ' + split.planDay + '.', signature: sig('before')});
-  out.push({id: 'day', date: at(split.planDay, split.planTime || '10:00'),
+  out.push({id: 'day', date: at(split.planDay, split.remindTime || '09:00'),
     title: 'Dia de guardar ' + value, body: 'Abra Finanças e toque em “Guardar agora” para registrar o aporte.', signature: sig('day')});
   const repeat = Math.max(0, Number(split.remindRepeatDays) || 0);
   if (repeat > 0) for (let day = split.planDay + repeat, n = 0; day <= 28 && n < 5; day += repeat, n++)
