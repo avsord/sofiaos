@@ -89,11 +89,11 @@ function Chips<T extends string | number>({value, options, onChange, scroll = fa
 }
 function Card_({children, style}: {children: React.ReactNode; style?: any}) {
   const c = useTheme();
-  return <View style={[{backgroundColor: c.surface, borderRadius: 22, borderWidth: 1, borderColor: c.line, padding: 16, gap: 12}, style]}>{children}</View>;
+  return <View style={[{backgroundColor: c.surface, borderRadius: 22, borderWidth: 1, borderColor: c.line, padding: 18, gap: 14}, style]}>{children}</View>;
 }
 function Title({text, action, onAction}: {text: string; action?: string; onAction?: () => void}) {
   const c = useTheme();
-  return <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, fontSize: 16, fontWeight: '700', color: c.text}}>{text}</Text>{action ? <Pressable onPress={onAction}><Text style={{color: c.accent, fontWeight: '600', fontSize: 13}}>{action}</Text></Pressable> : null}</View>;
+  return <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Text style={{flex: 1, fontSize: 17, fontWeight: '700', color: c.text}}>{text}</Text>{action ? <Pressable onPress={onAction}><Text style={{color: c.accent, fontWeight: '600', fontSize: 13}}>{action}</Text></Pressable> : null}</View>;
 }
 function Bar({pct, color}: {pct: number; color: string}) {
   const c = useTheme();
@@ -173,7 +173,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
   return (
     <InternalBackGesture enabled={active && !editing && !manage && !billEditor && !accountPicker} onBack={backFinance}>
       <View style={{flex: 1, backgroundColor: c.bg}}>
-        <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 14, paddingBottom: 4}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 12, paddingBottom: 2}}>
           <IconButton name="back" label="Voltar à tela anterior" onPress={backFinance} />
           <View style={{flex: 1, paddingHorizontal: 4}}>
             <Text style={{fontSize: 24, fontWeight: '800', color: c.text}}>Finanças</Text>
@@ -181,7 +181,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
           <IconButton name="settings" label="Contas e cartões" onPress={() => setManage(true)} />
         </View>
         {/* 0.3.152: conta e mes na mesma linha, compactos (antes eram dois blocos grandes) */}
-        <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 2, paddingBottom: 6, gap: 8}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 4, paddingBottom: 10, gap: 8}}>
           {d?.accounts.length ? <Pressable accessibilityRole="button" accessibilityLabel={'Conta: ' + (account?.name || 'selecionar') + '. Trocar'} onPress={() => setAccountPicker(true)}
             style={{flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: c.surface, borderColor: c.line, borderWidth: 1, borderRadius: 99, paddingHorizontal: 12, paddingVertical: 8}}>
             <View style={{width: 9, height: 9, borderRadius: 5, backgroundColor: account?.color || c.accent}} />
@@ -193,14 +193,14 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
           <Pressable accessibilityLabel="Voltar ao mês atual" onPress={() => setMonth(monthOf(todayISO()))}><Text style={{fontSize: 14, fontWeight: '700', color: c.text, minWidth: 104, textAlign: 'center'}}>{monthLabel(month)}</Text></Pressable>
           <Pressable accessibilityLabel="Próximo mês" onPress={() => setMonth(m => addMonths(m, 1))} style={{width: 32, height: 32, alignItems: 'center', justifyContent: 'center', transform: [{rotate: '180deg'}]}}><Icon name="back" size={18} color={c.text} /></Pressable>
         </View>
-        <View style={{paddingHorizontal: 16, paddingBottom: 8}}>
+        <View style={{paddingHorizontal: 20, paddingBottom: 14}}>
           <Chips scroll value={tab} onChange={navigateFinance} options={[{value: 'home' as Tab, label: 'Resumo'}, {value: 'bills' as Tab, label: 'Pendentes'}, {value: 'cards' as Tab, label: 'Cartões'}, {value: 'reports' as Tab, label: 'Relatórios'}]} />
         </View>
 
         {!d ? <View style={{flex: 1, padding: 16, gap: 14}}>{error ? <View style={{padding: 20, gap: 12}}><Text style={{color: c.danger}}>{error}</Text><Button title="Tentar de novo" secondary onPress={() => void reload()} /></View> : <View style={{gap: 6}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Spinner size={16} stroke={1.8} /><Text style={{color: c.muted, fontSize: 13}}>Carregando suas finanças</Text></View><LoadingLines rows={5} /></View>}</View> : !d.accounts.length ? (
           <Onboarding api={api} onDone={reload} />
         ) : (
-          <ScrollView contentContainerStyle={{padding: 16, paddingBottom: insets.bottom + 110, gap: 14}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>
+          <ScrollView contentContainerStyle={{paddingHorizontal: 20, paddingTop: 2, paddingBottom: insets.bottom + 110, gap: 16}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>
             {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
             {tab === 'home' ? <HomeTab d={scoped || d} month={month} api={api} reload={reload} onTx={setEditing} onTab={navigateFinance} accountId={accountId} isPrimary={isPrimary} onBill={t => setBillEditor(t || 'new')} />
               : tab === 'bills' ? <PendingTab d={scoped || d} api={api} month={month} accountId={accountId} warning={notificationWarning} onBill={setBillEditor} reload={reload} />
@@ -342,13 +342,13 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload}: {d:Data;api:S
   return <>
     <Card_>
       <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
-        <View style={{flex:1,gap:5}}><Text style={{fontSize:17,fontWeight:'800',color:c.text}}>A pagar e a receber</Text>
+        <View style={{flex:1,gap:6}}><Text style={{fontSize:17,fontWeight:'800',color:c.text}}>A pagar e a receber</Text>
         <Text style={{fontSize:12,color:c.muted,lineHeight:18}}>Cadastre cada vencimento manualmente. Compras e extratos não criam pendências.</Text></View>
         <Pressable accessibilityRole="button" accessibilityLabel="Cadastrar conta a pagar" onPress={()=>onBill('new')} style={{backgroundColor:c.accent,paddingHorizontal:13,paddingVertical:11,borderRadius:12}}>
           <Text style={{color:c.onAccent,fontSize:13,fontWeight:'800'}}>＋ Nova</Text>
         </Pressable>
       </View>
-      <View style={{borderTopWidth:1,borderColor:c.line,paddingTop:12,flexDirection:'row',justifyContent:'space-between'}}>
+      <View style={{borderTopWidth:1,borderColor:c.line,paddingTop:14,flexDirection:'row',justifyContent:'space-between'}}>
         <Text style={{color:c.muted,fontSize:12}}>{list.length} pendentes cadastradas</Text>
         <Text style={{color:c.text,fontWeight:'800'}}>{money(total)}</Text>
       </View>
@@ -441,23 +441,23 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
       {/* 0.3.153: cartao verde inteiro ATRAS do roxo (empilhados); o roxo cobre tudo menos a faixa de cima */}
       <View style={{backgroundColor: accountId ? GUARD : 'transparent', borderRadius: 24}}>
       {accountId ? <Pressable accessibilityRole="button" accessibilityLabel="Gerenciar dinheiro guardado" onPress={() => split ? setReserveMenu(true) : setReserveSheet('setup')}
-        style={{paddingTop: 14, paddingHorizontal: 20, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10}}>
+        style={{paddingTop: 15, paddingHorizontal: 20, paddingBottom: 13, flexDirection: 'row', alignItems: 'center', gap: 10}}>
         <Text style={{color: '#0d2f1f', fontWeight: '800', fontSize: 18}}>{split ? show(split.saved) : 'Configurar ›'}</Text>
         {split && split.realized > 0 ? <Text style={{color: '#0d2f1f', fontSize: 11}}>+{show(split.realized)} neste mês</Text> : null}
         <View style={{flex: 1}} />
         <Text style={{color: '#0d2f1f', fontWeight: '700', fontSize: 13}}>Guardado</Text>
         <Icon name="shield" size={16} color="#0d2f1f" />
       </Pressable> : null}
-      <View style={{backgroundColor: c.accent, borderRadius: 24, padding: 18, gap: 14, elevation: 2}}>
+      <View style={{backgroundColor: c.accent, borderRadius: 24, padding: 20, gap: 16, elevation: 2}}>
         <View style={{flexDirection: 'row', alignItems: 'center'}}>
           <Text style={{flex: 1, color: c.onAccent + 'cc', fontSize: 13}}>Saldo geral</Text>
           <Pressable accessibilityLabel={hide ? 'Mostrar valores' : 'Esconder valores'} onPress={() => setHide(h => !h)}><Icon name="eye" size={18} color={c.onAccent + 'cc'} /></Pressable>
         </View>
         <Text style={{color: c.onAccent, fontSize: 32, fontWeight: '800'}}>{show(total)}</Text>
         <Text style={{color: c.onAccent + 'cc', fontSize: 12}}>Previsto no fim de {monthLabel(month).split(' ')[0].toLowerCase()}: <Text style={{color: c.onAccent, fontWeight: '700'}}>{show(forecast)}</Text></Text>
-        <View style={{flexDirection: 'row', gap: 10}}>
-          <View style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 14, padding: 10}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↑ Receitas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.income)}</Text></View>
-          <View style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 14, padding: 10}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↓ Despesas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.expense)}</Text></View>
+        <View style={{flexDirection: 'row', gap: 12}}>
+          <View style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 16, padding: 12, gap: 2}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↑ Receitas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.income)}</Text></View>
+          <View style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 16, padding: 12, gap: 2}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↓ Despesas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.expense)}</Text></View>
         </View>
 
       </View>
@@ -488,13 +488,13 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
 
       {/* 0.3.152: vencimentos proximos viram uma linha so (o detalhe fica em Pendentes); cartoes ficam na aba Cartoes */}
       {dues.length ? <Pressable accessibilityRole="button" accessibilityLabel="Ver pendentes" onPress={() => onTab('bills')}
-        style={{flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.surface, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: dues.some(x => x.late) ? BAD : c.line}}>
+        style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.surface, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: dues.some(x => x.late) ? BAD : c.line}}>
         <Text style={{fontSize: 16}}>⏰</Text>
         <Text style={{flex: 1, color: c.text, fontSize: 13}}>{dues.some(x => x.late) ? 'Há conta atrasada' : dues.length === 1 ? '1 vencimento nos próximos 10 dias' : dues.length + ' vencimentos nos próximos 10 dias'}</Text>
         <Text style={{color: c.text, fontWeight: '700', fontSize: 13}}>{show(dues.reduce((sum, x) => sum + x.amount, 0))}</Text><Text style={{color: c.muted}}>›</Text>
       </Pressable> : null}
 
-      <View style={{gap: 10, paddingTop: 2}}>
+      <View style={{gap: 12, paddingTop: 6}}>
         <TxTab d={d} month={month} accountFilter="" setAccountFilter={() => undefined} onTx={onTx} api={api} reload={reload} />
       </View>
 
@@ -515,14 +515,14 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
     } catch (e) { appAlert('Finanças', errorText(e)); } finally { setBusy(false); }
   }
   return (
-    <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-      <View style={{width: 4, height: 34, borderRadius: 2, backgroundColor: color}} />
-      <Pressable style={{flex: 1}} onPress={() => due.tx && onTx(due.tx)}>
+    <View style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4}}>
+      <View style={{width: 4, height: 36, borderRadius: 2, backgroundColor: color}} />
+      <Pressable style={{flex: 1, gap: 2}} onPress={() => due.tx && onTx(due.tx)}>
         <Text numberOfLines={1} style={{color: c.text, fontWeight: '600'}}>{due.title}</Text>
         <Text style={{fontSize: 11, color: due.late ? BAD : c.muted}}>{due.late ? 'Atrasado · ' : ''}{due.kind === 'receber' ? 'receber' : 'vence'} {dateBR(due.date)}{due.tx?.virtual ? ' · repetição' : ''}</Text>
       </Pressable>
       <Text style={{color: due.kind === 'receber' ? GOOD : c.text, fontWeight: '700'}}>{money(due.amount)}</Text>
-      <Pressable disabled={busy} onPress={() => due.invoice && d.accounts.length > 1 ? setPick(true) : void settle()} style={{paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99, backgroundColor: color + '22'}}>
+      <Pressable disabled={busy} onPress={() => due.invoice && d.accounts.length > 1 ? setPick(true) : void settle()} style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: color + '22'}}>
         {busy ? <ActivityIndicator size="small" color={color} /> : <Text style={{color, fontWeight: '700', fontSize: 12}}>{due.kind === 'receber' ? 'Recebi' : 'Paguei'}</Text>}
       </Pressable>
       <Sheet visible={pick} onClose={() => setPick(false)} label="Fechar escolha de conta">
@@ -568,7 +568,7 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
   return (
     <>
       {/* 0.3.152: historico direto sob os cartoes; busca, filtros e importacao ficam recolhidos */}
-      <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 2}}>
         <Text style={{flex: 1, fontSize: 18, fontWeight: '800', color: c.text}}>Histórico</Text>
         <IconButton name="filter" label={tools ? 'Esconder busca e filtros' : 'Buscar e filtrar'} onPress={() => setTools(v => !v)} />
         <IconButton name="plus" label="Importar extrato (OFX ou CSV)" onPress={() => setImporting(true)} />
@@ -586,9 +586,9 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
       </View> : null}
       {list.length ? <Text style={{color: c.muted, fontSize: 12}}>{list.length} movimentações no mês · resultado {money(sum)}</Text> : null}
       {!days.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>{q || kind !== 'all' || status !== 'all' ? 'Nenhum lançamento com esses filtros.' : (source === 'import' ? 'Nenhum extrato importado neste mês. Toque em ＋ ao lado de Histórico para importar (OFX ou CSV).' : 'Nenhum lançamento neste mês. Toque em ＋ para registrar.')}</Text> : days.map(([date, items]) => (
-        <View key={date} style={{gap: 6}}>
-          <Text style={{color: c.muted, fontSize: 12, fontWeight: '600'}}>{weekday(date)}</Text>
-          <Card_ style={{padding: 8, gap: 0}}>{items.map((t, i) => <TxRow key={t.id} t={t} d={d} first={i === 0} onPress={() => onTx(t)} api={api} reload={reload} />)}</Card_>
+        <View key={date} style={{gap: 8}}>
+          <Text style={{color: c.muted, fontSize: 12, fontWeight: '700', paddingLeft: 4}}>{weekday(date)}</Text>
+          <Card_ style={{padding: 10, gap: 0}}>{items.map((t, i) => <TxRow key={t.id} t={t} d={d} first={i === 0} onPress={() => onTx(t)} api={api} reload={reload} />)}</Card_>
         </View>
       ))}
     </>
@@ -600,7 +600,7 @@ function TxRow({t, d, first, onPress, api, reload}: {t: Tx; d: Data; first: bool
   const pending = !t.paid && !t.cardId;
   const color = t.kind === 'income' ? GOOD : t.kind === 'transfer' ? c.muted : c.text;
   return (
-    <Pressable onPress={onPress} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 6, borderTopWidth: first ? 0 : 1, borderColor: c.line, opacity: t.virtual ? 0.75 : 1}}>
+    <Pressable onPress={onPress} style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 6, borderTopWidth: first ? 0 : 1, borderColor: c.line, opacity: t.virtual ? 0.75 : 1}}>
       <Dot color={cat.color} icon={cat.icon} />
       <View style={{flex: 1}}>
         <Text numberOfLines={1} style={{color: c.text, fontWeight: '600'}}>{t.desc}</Text>
