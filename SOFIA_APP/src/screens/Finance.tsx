@@ -323,7 +323,7 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
       <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>{title}</Text>
       {error ? <Text style={{color: BAD}}>{error}</Text> : null}
       {kind === 'setup' ? <>
-        <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Informe o dinheiro que já está guardado nas suas contas. Ele não é somado de novo: a Sofia só passa a separá-lo do dinheiro para o dia a dia.</Text>
+        <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Informe quanto você tem guardado, esteja onde estiver. Esse valor fica separado: não entra no saldo geral, que continua sendo o que você tem para usar.</Text>
         {input('Nome', name, setName, 'Dinheiro guardado')}
         {input('Já guardado hoje', amount, setAmount, 'Ex.: 15.000')}
         {input('Aporte mensal planejado (opcional)', plan, setPlan, 'Ex.: 4.000')}
@@ -331,8 +331,9 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
         <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>É a intenção do mês. O guardado só aumenta quando você registrar o aporte em “Guardar dinheiro”.</Text>
         {input('Aporte mensal planejado', plan, setPlan, 'Ex.: 4.000')}
       </> : <>
-        {kind === 'in' && split ? <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Sai do dia a dia ({money(split.daily)}) e passa a ser guardado. Não é despesa nem receita: o total não muda.{split.missing > 0 ? ' Faltam ' + money(split.missing) + ' para o aporte do mês.' : ''}</Text> : null}
-        {kind === 'out' && split ? <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Hoje guardado: {money(split.saved)}. A retirada passa o valor para o dia a dia.</Text> : null}
+        {kind === 'in' && split ? <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Sai do saldo geral ({money(split.daily)}) e passa a ser guardado. Não é despesa nem receita.{split.missing > 0 ? ' Faltam ' + money(split.missing) + ' para o aporte do mês.' : ''}</Text> : null}
+        {kind === 'in' && split && (parseMoney(amount) ?? 0) > split.daily ? <Text style={{color: BAD, fontSize: 12}}>Esse valor é maior que o saldo geral e o deixaria negativo.</Text> : null}
+        {kind === 'out' && split ? <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Hoje guardado: {money(split.saved)}. A retirada devolve o valor ao saldo geral.</Text> : null}
         {input('Valor', amount, setAmount, kind === 'in' && split && split.missing > 0 ? String(split.missing).replace('.', ',') : 'Ex.: 500')}
         {input('Observação (opcional)', note, setNote)}
       </>}
@@ -430,14 +431,16 @@ function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;
 function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBill}: {d: Data; month: string; api: SofiaApi; reload: () => Promise<void>; onTx: (t: Partial<Tx>) => void; onTab: (t: Tab) => void; accountId: string; isPrimary: boolean; onBill: (t?: Tx) => void}) {
   const c = useTheme(), today = todayISO();
   // Contas pesadas só quando os dados ou o mês mudam (não a cada toque, como esconder valores).
-  const {s, total, forecast, dues} = useMemo(() => ({s: monthSummary(d.txs, month), total: totalBalance(d.accounts, d.txs), forecast: forecastBalance(d.accounts, d.txs, month, d.cards),
+  const {s, total: accountsTotal, forecast: accountsForecast, dues} = useMemo(() => ({s: monthSummary(d.txs, month), total: totalBalance(d.accounts, d.txs), forecast: forecastBalance(d.accounts, d.txs, month, d.cards),
     dues: manualDues(d.txs, accountId, today, 10)}), [d, accountId, month, today]);
   const [hide, setHide] = useState(false), [reserveSheet, setReserveSheet] = useState<'setup' | 'in' | 'out' | 'plan' | null>(null);
   const show = (v: number) => hide ? 'R$ •••••' : money(v);
   // 0.3.151: cada conta tem o proprio guardado (a principal mantem a reserva antiga, sem conta).
   const reserve = reserveFor(d.goals, accountId, isPrimary);
   const split = useMemo(() => reserve ? moneySplit(reserve, d.moves || [], d.accounts, d.txs, d.cards, month, today, manualDues(d.txs,accountId,today,45)) : null, [reserve, d, accountId, month, today]);
-  // Reserva em linha discreta no cartão original; o detalhamento dos valores fica sob demanda.
+  // 0.3.154: o guardado e independente das contas. O Saldo geral e o que voce tem para usar: so os
+  // movimentos de guardar/retirar passam dinheiro entre os dois (o valor inicial nao e descontado).
+  const net = split ? split.net : 0, total = Math.round((accountsTotal - net) * 100) / 100, forecast = Math.round((accountsForecast - net) * 100) / 100;
   const [reserveMenu, setReserveMenu] = useState(false);
   return (
     <>
@@ -471,15 +474,15 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
           <Text style={{fontSize: 18, fontWeight: '800', color: c.text}}>Sua reserva</Text>
           {split ? <>
             <Text style={{fontSize: 29, fontWeight: '800', color: c.text}}>{show(split.saved)}</Text>
-            <Text style={{fontSize: 12, lineHeight: 18, color: c.muted}}>Esse dinheiro está incluído no saldo geral. A separação organiza o que você pretende preservar, mas não bloqueia nem transfere valores no banco.</Text>
+            <Text style={{fontSize: 12, lineHeight: 18, color: c.muted}}>Esse valor é separado das suas contas: não entra no saldo geral. O saldo geral é o que você tem para usar. Guardar dinheiro tira do saldo geral; retirar devolve. É uma organização da Sofia, não bloqueia nada no banco.</Text>
             <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 10}}>
-              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Saldo geral nas contas</Text><Text style={{color: c.text, fontWeight: '700'}}>{show(split.total)}</Text></View>
-              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Fora da reserva</Text><Text style={{color: split.daily < 0 ? BAD : c.text, fontWeight: '700'}}>{show(split.daily)}</Text></View>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Saldo geral (para usar)</Text><Text style={{color: split.daily < 0 ? BAD : c.text, fontWeight: '700'}}>{show(split.daily)}</Text></View>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Guardado + saldo geral</Text><Text style={{color: c.text, fontWeight: '700'}}>{show(split.total)}</Text></View>
               <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Despesas previstas do mês</Text><Text style={{color: c.text, fontWeight: '700'}}>{show(split.committed)}</Text></View>
               <View style={{height: 1, backgroundColor: c.line}} />
               <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '700', fontSize: 12}}>Livre após despesas previstas</Text><Text style={{color: split.free < 0 ? BAD : GOOD, fontWeight: '800'}}>{show(split.free)}</Text></View>
             </View>
-            {split.daily < 0 ? <Text style={{color: BAD, fontSize: 12}}>Sua reserva está maior que o saldo geral das contas. Confira os valores antes de gastar.</Text> : null}
+            {split.daily < 0 ? <Text style={{color: BAD, fontSize: 12}}>O saldo geral ficou negativo: o que foi guardado é maior que o dinheiro que estava disponível. Confira os valores.</Text> : null}
           </> : null}
           {[['Guardar dinheiro', 'in'], ['Retirar da reserva', 'out'], ['Ajustar aporte mensal', 'plan']].map(([label, k]) => (
             <Pressable key={k} accessibilityRole="button" onPress={() => { setReserveMenu(false); setReserveSheet(k as 'in' | 'out' | 'plan'); }}

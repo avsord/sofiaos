@@ -1,3 +1,5 @@
+import {capsuleStore} from '../lib/capsule-store';
+import {capsuleDoseOfNotice,capsuleKey} from '../lib/capsule-model';
 import {queueOptional} from '../lib/fluency';
 import {useBellInbox} from '../lib/use-bell-inbox';
 import {mergeBellNotices} from '../lib/bell-inbox';
@@ -52,7 +54,7 @@ const SWIPE_OUT=90;
 /** Arrastar para a esquerda e soltar apaga o aviso (igual à gaveta do Android). Toque continua abrindo.
  * 0.3.146: arrastar para a DIREITA marca como lida (o aviso volta ao lugar; nao apaga). Ja lida: nada muda. */
 const SWIPE_READ=80;
-function Swipeable({children,onDismiss,onRead,label}:{children:React.ReactNode|((dismiss:()=>void)=>React.ReactNode);onDismiss:()=>void;onRead?:()=>void;label:string}){
+function Swipeable({children,onDismiss,onRead,readLabel='✓ Lida',readAction='Marcar como lida',label}:{children:React.ReactNode|((dismiss:()=>void)=>React.ReactNode);onDismiss:()=>void;onRead?:()=>void;readLabel?:string;readAction?:string;label:string}){
  const c=useTheme(),x=useRef(new Animated.Value(0)).current,collapse=useRef(new Animated.Value(1)).current,[gone,setGone]=useState(false),[closing,setClosing]=useState(false),width=useRef(360),height=useRef(0);
  // Sai pela esquerda e DEPOIS a altura fecha suave: os avisos de baixo sobem
  // acompanhando, como no iPhone, em vez de pularem de uma vez (corte seco).
@@ -72,14 +74,18 @@ function Swipeable({children,onDismiss,onRead,label}:{children:React.ReactNode|(
  if(gone)return null;
  return <Animated.View onLayout={e=>{width.current=e.nativeEvent.layout.width;if(!closing)height.current=e.nativeEvent.layout.height;}}
   style={closing?{height:collapse.interpolate({inputRange:[0,1],outputRange:[0,height.current||64]}),opacity:collapse,marginBottom:collapse.interpolate({inputRange:[0,1],outputRange:[0,4]}),overflow:'hidden'}:{marginBottom:4}}
-  accessibilityActions={onRead?[{name:'delete',label:'Apagar '+label},{name:'read',label:'Marcar como lida'}]:[{name:'delete',label:'Apagar '+label}]} onAccessibilityAction={e=>{if(e.nativeEvent.actionName==='delete')dismiss();if(e.nativeEvent.actionName==='read')onRead?.();}}>
+  accessibilityActions={onRead?[{name:'delete',label:'Apagar '+label},{name:'read',label:readAction}]:[{name:'delete',label:'Apagar '+label}]} onAccessibilityAction={e=>{if(e.nativeEvent.actionName==='delete')dismiss();if(e.nativeEvent.actionName==='read')onRead?.();}}>
   <Animated.View style={{position:'absolute',top:0,bottom:0,left:0,right:0,borderRadius:16,backgroundColor:'#ff6b7a',alignItems:'flex-end',justifyContent:'center',paddingRight:18,opacity:x.interpolate({inputRange:[-1,0],outputRange:[1,0],extrapolate:'clamp'})}}><Text style={{color:'#fff',fontWeight:'700',fontSize:12}}>Apagar</Text></Animated.View>
-  {onRead?<Animated.View style={{position:'absolute',top:0,bottom:0,left:0,right:0,borderRadius:16,backgroundColor:'#2fc58b',alignItems:'flex-start',justifyContent:'center',paddingLeft:18,opacity:x.interpolate({inputRange:[0,1],outputRange:[0,1],extrapolate:'clamp'})}}><Text style={{color:'#fff',fontWeight:'700',fontSize:12}}>✓ Lida</Text></Animated.View>:null}
+  {onRead?<Animated.View style={{position:'absolute',top:0,bottom:0,left:0,right:0,borderRadius:16,backgroundColor:'#2fc58b',alignItems:'flex-start',justifyContent:'center',paddingLeft:18,opacity:x.interpolate({inputRange:[0,1],outputRange:[0,1],extrapolate:'clamp'})}}><Text style={{color:'#fff',fontWeight:'700',fontSize:12}}>{readLabel}</Text></Animated.View>:null}
   <Animated.View {...pan.panHandlers} style={{transform:[{translateX:x}],backgroundColor:c.bg,borderRadius:16}}>{typeof children==='function'?children(dismiss):children}</Animated.View>
  </Animated.View>;
 }
 export const NoticeRow=React.memo(function NoticeRow({item}:{item:Notice}){const c=useTheme(),notices=useNotifications(),area=noticeArea(item),st=AREA_STYLE[area]||AREA_STYLE.Outros,unread=item.state==='unread';
- return <Swipeable label={item.title} onDismiss={()=>void notices.clear(item)} onRead={unread?()=>void notices.read(item):undefined}>{dismiss=><Pressable accessibilityRole="button" accessibilityLabel={'Abrir: '+item.title} onPress={()=>notices.open(item)} style={{flexDirection:'row',gap:12,paddingVertical:12,paddingHorizontal:10,borderRadius:16,backgroundColor:unread?st.color+'12':c.bg}}>
+// 0.3.154: 1o arrastar para a direita = lida. Em aviso de capsula JA lido, arrastar de novo = "tomei":
+ // registra a dose como tomada e tira o aviso.
+ const dose=item.category==='capsule'?capsuleDoseOfNotice(item.id):null;
+ async function takeDose(){if(!dose)return;await capsuleStore(notices.api).take(dose.planId,dose.day,dose.time,true);const key=capsuleKey(dose.planId,dose.day,dose.time);if(capsuleStore(notices.api).snapshot.history.some(h=>capsuleKey(h.data.capsule_id,h.data.day,h.data.time)===key))await notices.clear(item);}
+ return <Swipeable label={item.title} onDismiss={()=>void notices.clear(item)} onRead={unread?()=>void notices.read(item):dose?()=>void takeDose():undefined} readLabel={unread?'✓ Lida':'💊 Tomei'} readAction={unread?'Marcar como lida':'Marcar dose como tomada'}>{dismiss=><Pressable accessibilityRole="button" accessibilityLabel={'Abrir: '+item.title} onPress={()=>notices.open(item)} style={{flexDirection:'row',gap:12,paddingVertical:12,paddingHorizontal:10,borderRadius:16,backgroundColor:unread?st.color+'12':c.bg}}>
   <View style={{width:38,height:38,borderRadius:19,backgroundColor:st.color+'26',alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:18}}>{st.icon}</Text></View>
   <View style={{flex:1,gap:3}}>
    <View style={{flexDirection:'row',alignItems:'center',gap:6}}>{unread?<View style={{width:8,height:8,borderRadius:4,backgroundColor:st.color}}/>:null}<Text numberOfLines={2} style={{flex:1,color:c.text,fontSize:14,fontWeight:unread?'700':'500'}}>{item.title}</Text></View>

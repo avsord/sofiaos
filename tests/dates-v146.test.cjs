@@ -12,3 +12,13 @@ test('lembrete "hoje as 10h" sem fuso vira 10h de Sao Paulo (13h UTC); com fuso 
  assert.equal(c.data.remind_at,'2026-01-10T12:30:00.000Z');
  assert.throws(()=>w.save({kind:'reminder',title:'D',area:'Pessoal',data:{remind_at:'amanha',message:'',location:''}}),/data e hora/);
 });
+
+test('0.3.154: compromisso aceita prioridade pelo update_record (Importante), como a tarefa',t=>{
+ const {core}=fixture(t);const w=core.workspace;
+ const c=w.save({kind:'commitment',title:'Levar encomendas do Mercado Livre',area:'Pessoal',data:{start_at:'2026-10-20T13:00:00.000Z'}});
+ const saved=w.save({...c,data:{...c.data,priority_level:'important'}},c.id);
+ assert.equal(saved.data.priority_level,'important');
+ const src=require('node:fs').readFileSync(require('node:path').join(__dirname,'..','src/core/sofia-core.js'),'utf8');
+ assert.ok(src.includes("(field==='priority_level'||field==='priority')&&def.fields.some(f=>f.key==='priority_level')"));
+ assert.ok(require('node:fs').readFileSync(require('node:path').join(__dirname,'..','src/services/intent-engine.js'),'utf8').includes('COMPROMISSOS DA AGENDA também têm prioridade'));
+});

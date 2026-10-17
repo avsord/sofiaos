@@ -129,10 +129,15 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
  async function newChat(){if(dirty||sending)return;followChat();++syncEpoch.current;currentId.current='';setConversation(null);setMessages([]);setHasMore(false);setHistory(false);setSelectedIds(new Set());setClarification(null);setLoading(false);setError('');}
  async function openHistory(){if(dirty||sending)return;const stored=api.cached<{items:Conversation[];has_more:boolean}>('/conversations?offset=0');if(stored){setItems(stored.items);setHistoryMore(stored.has_more);}setHistory(true);setSelectedConversations(new Set());setQuery('');try{const h=await api.conversations();const saved=api.cached<{items:Conversation[]}>('/conversations?offset=0');const rows=h.items.length?h.items:(saved?.items||[]);const all=conversation&&messages.length?[conversation,...rows]:rows;setItems([...new Map(all.map(c=>[c.id,c])).values()]);setHistoryMore(h.has_more);}catch(e){const saved=api.cached<{items:Conversation[];has_more:boolean}>('/conversations?offset=0');if(saved){setItems(saved.items);setHistoryMore(saved.has_more);}setError(errorText(e));}}
  async function moreHistory(){try{const h=await api.conversations(items.length);setItems(prev=>[...prev,...h.items]);setHistoryMore(h.has_more);}catch(e){setError(errorText(e));}}
+ // 0.3.154: da para mandar varias mensagens enquanto a Sofia responde. Enquanto uma esta em curso,
+ // as seguintes entram na tela na hora (como "enviando") e saem uma a uma, na ordem, quando a anterior termina.
+ const sendRef=useRef<(m:Message,r?:boolean)=>Promise<void>>(async()=>{}),sendQueue=useRef<{message:Message;retry:boolean}[]>([]);
  async function send(message:Message,retry=false){
-  if(sendLock.current||deleting)return;++syncEpoch.current;sendLock.current=true;setSending(true);setError('');followChat();
+  if(deleting)return;
+  if(sendLock.current){if(sendQueue.current.length>=8){setError('Aguarde a Sofia responder antes de enviar mais mensagens.');return;}sendQueue.current.push({message,retry});setMessages(prev=>mergeMessages(prev,[{...message,status:'sending',error:undefined}]));followChat();return;}
+  ++syncEpoch.current;sendLock.current=true;setSending(true);setError('');followChat();
   setMessages(prev=>mergeMessages(prev,[{...message,status:'sending',error:undefined}]));
-  let targetId=conversation?.id||'';
+  let targetId=conversation?.id||currentId.current||'';
   const data={selected_task_id:taskContext?.id,conversation_id:targetId,client_message_id:message.client_id,retry,...(clarification?.id?{clarification_id:clarification.id}:{})};
   try{let result:ChatResult;
    if(!targetId){const next=(await api.newConversation()).conversation;targetId=next.id;data.conversation_id=targetId;currentId.current=targetId;setConversation(next);}
@@ -161,8 +166,9 @@ export function Chat({api,bootstrap,enterToSend,autoSendVoice,onLock,active,onRe
    resettle();
    if(message.localVoice){deleteVoice(message.localVoice.uri);voices.current.delete(message.localVoice.uri);}
   }catch(e){if(!mounted.current)return;const explanation=errorText(e);setError(explanation);setMessages(prev=>mergeMessages(prev,[{...message,status:'failed',error:explanation}]));try{const page=await api.history(targetId);if(mounted.current&&currentId.current===targetId)setMessages(prev=>reconcileChatWindow(prev,page));}catch{}}
-  finally{sendLock.current=false;if(mounted.current)setSending(false);}
+  finally{sendLock.current=false;if(mounted.current)setSending(false);const next=sendQueue.current.shift();if(next&&mounted.current)void sendRef.current(next.message,next.retry);}
  }
+ sendRef.current=send;
  function text(content:string){const id=Crypto.randomUUID();const quoted=quote?'> '+(quote.role==='user'?'Você':'Sofia')+': '+quoteSnippet(quote)+'\n\n':'';setQuote(null);void send({id,client_id:id,conversation_id:conversation?.id,role:'user',content:quoted+content,created_at:new Date().toISOString(),status:'sending'});}
  function attachments(files:AttachmentDraft[],content:string){const id=Crypto.randomUUID();void send({id,client_id:id,conversation_id:conversation?.id,role:'user',content,created_at:new Date().toISOString(),status:'sending',localAttachments:files});}
  function audio(draft:VoiceDraft){voices.current.add(draft.uri);const id=Crypto.randomUUID();void send({id,client_id:id,conversation_id:conversation?.id,role:'user',content:'',created_at:new Date().toISOString(),status:'sending',localVoice:draft});}

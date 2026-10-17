@@ -349,32 +349,33 @@ export function parseBill(text: string, today = todayISO()): {amount: number | n
   return {amount: money.length ? Math.max(...money) : null, due};
 }
 
-// ---------- 0.3.146: Dinheiro guardado x Dinheiro para o dia a dia ----------
-// A reserva e um DESTINO do dinheiro (um Objetivo com papel 'reserve'), nao um lugar: o dinheiro
-// continua nas contas. Por isso o total nao muda ao guardar/retirar - so a divisao entre os blocos.
-// Guardado = valor inicial informado + guardados - retiradas (movimentos fin_reserve_move).
-// Dia a dia = saldo das contas - guardado. Comprometido = contas a pagar/faturas ate o fim do mes.
-// Livre = dia a dia - comprometido. Aporte planejado nao soma nada ate ser registrado.
+// ---------- Dinheiro guardado x saldo geral (0.3.154: guardado e INDEPENDENTE das contas) ----------
+// O valor guardado (Objetivo com papel 'reserve') e um dinheiro a parte: os R$ 15.000 informados
+// NAO estao nas contas e nao sao descontados do saldo geral. Saldo geral = o que voce tem para usar.
+// So os movimentos (guardar/retirar) passam dinheiro entre os dois: guardar tira do saldo geral e
+// soma no guardado; retirar faz o caminho inverso. O total (guardado + saldo geral) nao muda por isso.
+// Guardado = valor inicial + guardados - retiradas. Comprometido = contas a pagar ate o fim do mes.
+// Livre = saldo geral - comprometido. Aporte planejado nao soma nada ate ser registrado.
 export type ReserveMove = {id: string; goalId: string; direction: 'in' | 'out'; amount: number; date: string; note: string; entity: Entity};
 export function toReserveMove(e: Entity): ReserveMove {
   const d = e.data || {};
   return {id: e.id, goalId: String(d.goal_id || ''), direction: d.direction === 'out' ? 'out' : 'in', amount: Number(d.amount) || 0, date: String(d.date || ''), note: String(d.note || ''), entity: e};
 }
 export function reserveOf(goals: Goal[]): Goal | null { return goals.find(g => g.entity?.data?.role === 'reserve') || null; }
-export type MoneySplit = {total: number; saved: number; daily: number; committed: number; free: number; planned: number; realized: number; missing: number; shortfall: number};
+export type MoneySplit = {net: number; total: number; saved: number; daily: number; committed: number; free: number; planned: number; realized: number; missing: number; shortfall: number};
 export function moneySplit(reserve: Goal, moves: ReserveMove[], accounts: Account[], txs: Tx[], cards: Card[], month: string, today = todayISO(), manualBills?: Due[]): MoneySplit {
   const mine = moves.filter(m => m.goalId === reserve.id && m.entity?.state !== 'archived');
   const net = mine.reduce((s, m) => s + (m.direction === 'in' ? m.amount : -m.amount), 0);
   const saved = round2((Number(reserve.saved) || 0) + net);
-  const total = round2(totalBalance(accounts, txs));
-  const daily = round2(total - saved);
+  const daily = round2(totalBalance(accounts, txs) - net);   // saldo geral: o que voce tem para usar
+  const total = round2(daily + saved);                        // guardado + saldo geral (resumo)
   const monthEnd = dayIn(month, daysIn(month));
   const days = Math.max(0, Math.round((Date.parse(monthEnd + 'T12:00:00Z') - Date.parse(today + 'T12:00:00Z')) / 864e5));
   const commitments = manualBills === undefined ? upcoming(txs, cards, today, days) : manualBills;
   const committed = round2(commitments.filter(d => d.kind !== 'receber' && d.date <= monthEnd).reduce((s, d) => s + d.amount, 0));
   const planned = Number(reserve.entity?.data?.monthly_plan) || 0;
   const realized = round2(mine.filter(m => m.direction === 'in' && monthOf(m.date) === month).reduce((s, m) => s + m.amount, 0));
-  return {total, saved, daily, committed, free: round2(daily - committed), planned, realized, missing: round2(Math.max(0, planned - realized)), shortfall: round2(Math.max(0, committed - daily))};
+  return {net, total, saved, daily, committed, free: round2(daily - committed), planned, realized, missing: round2(Math.max(0, planned - realized)), shortfall: round2(Math.max(0, committed - daily))};
 }
 
 /** 0.3.151: reserva (Dinheiro guardado) de cada conta. A principal tambem usa a reserva antiga, sem conta. */

@@ -4,7 +4,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const root=path.join(__dirname,'..'),read=f=>fs.readFileSync(path.join(root,f),'utf8');
 test('notificacoes: arrastar para a direita marca lida; feriado nao gera aviso no celular; sem texto tecnico',()=>{
   const n=read('src/components/NotificationCenter.tsx');
-  assert.ok(n.includes("onRead={unread?()=>void notices.read(item):undefined}"));
+  assert.ok(n.includes("onRead={unread?()=>void notices.read(item):dose?()=>void takeDose():undefined}"));
   assert.ok(n.includes('if(onRead&&g.dx>SWIPE_READ)onRead();'));
   assert.ok(!n.includes('A limpeza global aguarda a atualização do servidor'));
   assert.ok(read('src/lib/agenda-notifications.ts').includes('holiday@group'));
@@ -38,7 +38,7 @@ test('financas: card de reserva (verde desde a 0.3.153) atrás do saldo roxo com
   assert.ok(!f.includes('>Para usar<'),'reserva nao compete com saldo');
   assert.ok(!f.includes('function MoneyBlocks('),'nao restaurar blocos duplicados');
   assert.ok(f.includes("fontSize: 13}}>Saldo geral</Text>"));
-  for(const label of ['Saldo geral nas contas','Fora da reserva','Despesas previstas do mês','Livre após despesas previstas','Guardar dinheiro','Retirar da reserva','Ajustar aporte mensal'])assert.ok(f.includes(label),label);
+  for(const label of ['Saldo geral (para usar)','Guardado + saldo geral','Despesas previstas do mês','Livre após despesas previstas','Guardar dinheiro','Retirar da reserva','Ajustar aporte mensal'])assert.ok(f.includes(label),label);
   assert.ok(f.includes("appAlert('Retirar da reserva?'"),'retirada confirmada');
   assert.ok(f.includes('onChangeText={v => setAmount(old => formatMoneyInput(v, old))}'),'lançamento recebe máscara enquanto digita');
   assert.ok(f.includes('onBlur={() => setAmount(v => finishMoneyInput(v))}'),'termina mostrando centavos');
