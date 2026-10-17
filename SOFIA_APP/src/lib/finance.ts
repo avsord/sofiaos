@@ -333,8 +333,18 @@ export function formatMoneyInput(text: string, previous: string | number = ''): 
   const pastedDecimal = !(typeof previous === 'string' ? previous : '') && dot >= 0 && (clean.match(/\./g) || []).length === 1
     && clean.slice(dot + 1).length <= 2;
   const decimalAt = comma >= 0 ? comma : dot >= 0 && (clean.endsWith('.') || pastedDecimal) ? dot : -1;
+  // 0.3.163: com os centavos ja preenchidos ("15.000,00"), digitar no fim nao fazia nada - o
+  // digito caia fora dos dois decimais. Agora ele entra pela direita, como nos apps de banco:
+  // "15.000,00" + "5" vira "150.000,05". Apagar continua igual.
+  const typedFraction = decimalAt >= 0 ? clean.slice(decimalAt + 1).replace(/\D/g, '') : '';
+  if (typedFraction.length > 2) {
+    const digits = clean.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+    const cents = digits.padStart(3, '0');
+    const head = cents.slice(0, -2).replace(/^0+(?=\d)/, '') || '0';
+    return sign + head.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + cents.slice(-2);
+  }
   const whole = (decimalAt >= 0 ? clean.slice(0, decimalAt) : clean).replace(/\D/g, '').replace(/^0+(?=\d)/, '');
-  const fraction = decimalAt >= 0 ? clean.slice(decimalAt + 1).replace(/\D/g, '').slice(0, 2) : '';
+  const fraction = typedFraction.slice(0, 2);
   const grouped = (whole || '0').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   return sign + grouped + (decimalAt >= 0 ? ',' + fraction : '');
 }

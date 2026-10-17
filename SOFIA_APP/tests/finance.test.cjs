@@ -126,3 +126,15 @@ test('máscara em português preserva milhares após apagar',()=>{
  assert.equal(f.formatMoneyInput('1.234.','1.234'),'1.234,');
  assert.equal(f.formatMoneyInput('1.234,5','1.234,'),'1.234,5');
 });
+
+test('0.3.163: com os centavos preenchidos, digitar no fim entra pela direita (antes nao digitava nada)',()=>{
+  const fmt=(t,p)=>f.formatMoneyInput(t,p);
+  assert.equal(fmt('15.000,005','15.000,00'),'150.000,05');
+  assert.equal(fmt('150.000,055','150.000,05'),'1.500.000,55');
+  assert.equal(fmt('0,001','0,00'),'0,01');
+  // apagar e digitar sem centavos continuam como antes
+  assert.equal(fmt('15.000,0','15.000,00'),'15.000,0');
+  assert.equal(fmt('3000',''),'3.000');
+  assert.equal(fmt('1,23',''),'1,23');
+  assert.equal(f.parseMoney(fmt('15.000,005','15.000,00')),150000.05);
+});
