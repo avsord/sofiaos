@@ -126,7 +126,7 @@ test('104 source-resolution surface preserves one animation clock without startu
  assert.ok(resources.includes('A33.6,33.6'));
  assert.ok(resources.includes('android:scaleX="0.020658489"'));
  assert.ok(resources.includes('android:strokeColor="#12FFFFFF"'));
- assert.ok(resources.includes('android:scaleX="0.70" android:scaleY="0.70"'));
+ assert.ok(resources.includes('android:scaleX="0.86" android:scaleY="0.86"'));
  assert.ok(resources.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_empty</item>'));
  assert.ok(resources.includes('<animated-vector')); 
  assert.ok(!resources.includes('repeatCount'));

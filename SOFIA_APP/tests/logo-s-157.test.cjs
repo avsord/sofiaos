@@ -17,6 +17,12 @@ test('abertura, login e chat com o S (sem a esfera)',()=>{
   const chat=read('src/screens/Chat.tsx');assert.ok(chat.includes('<Brand size={25}/>')&&chat.includes('<Brand/>'));
   assert.ok(!chat.includes('SofiaLogo'));
 });
+test('0.3.158: o build procura os arquivos do S, nao os da esfera (era isso que quebrava a compilacao)',()=>{
+  const wf=read('../.github/workflows/sofia-native-047-update.yml');
+  assert.ok(wf.includes("grep -q '@drawable/sofia_logo_foreground' android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml"));
+  assert.ok(wf.includes('test -f android/app/src/main/res/drawable/sofia_launch_mark.xml'));
+  assert.ok(!wf.includes('sofia_launch_orb'));
+});
 test('site publico e paginas do servidor voltam ao S roxo',()=>{
   const site=read('../public/site.html'),handler=read('../src/core/http-handler.js');
   assert.ok(site.includes('<span class="mark">S</span>'));assert.ok(!site.includes('sofia-logo.png'));

@@ -82,7 +82,7 @@ test('067 cached Home and Agenda remain primary; catalog, widgets and monitors s
 test('086 finite system S does not extend the native Home handoff or restart an animator',()=>{
  const logo=fs.readFileSync(path.join(root,'plugins/with-sofia-logo.cjs'),'utf8');
  assert.ok(logo.includes('<animated-vector')); 
- assert.ok(logo.includes('android:scaleX="0.70" android:scaleY="0.70"')); 
+ assert.ok(logo.includes('android:scaleX="0.86" android:scaleY="0.86"')); 
  assert.ok(logo.includes('android:windowSplashScreenAnimationDuration')); 
  assert.ok(logo.includes('android:windowSplashScreenAnimatedIcon">@drawable/sofia_launch_mark_empty</item>'));
  const launch=fs.readFileSync(path.join(root,'plugins/native/SofiaLaunchOverlay.kt'),'utf8');
@@ -137,7 +137,7 @@ test('086 startup S uses the reference vector and one finite scale and defers op
  assert.ok(code.includes('android:scaleX="0.020658489"'));
  assert.ok(code.includes('<animated-vector')); 
  assert.ok(!code.includes('repeatCount'));
- assert.ok(code.includes('android:scaleX="0.70" android:scaleY="0.70"')); 
+ assert.ok(code.includes('android:scaleX="0.86" android:scaleY="0.86"')); 
  const bg=fs.readFileSync(path.join(root,'src/components/BackgroundServices.tsx'),'utf8');
  assert.ok(bg.includes('if(!enabled||!preloadWhenIdle'));
  assert.ok(bg.includes('scheduleIdleTask('));
@@ -172,7 +172,7 @@ test('078 Home is allowed to reveal without waiting for server or prefetch',()=>
  assert.ok(overlay.includes('splash.remove()'));
  assert.ok(overlay.includes('record(activity, "FADE_DONE")'));
  assert.ok(logo.includes('android:windowSplashScreenAnimationDuration')); 
- assert.ok(logo.includes('android:scaleX="0.70" android:scaleY="0.70"')); 
+ assert.ok(logo.includes('android:scaleX="0.86" android:scaleY="0.86"')); 
 });
 test('074 hidden tabs mount one frame at a time after original splash exits',()=>{
  const mounts=fs.readFileSync(path.join(root,'src/lib/startup-mounts-legacy.ts'),'utf8');
