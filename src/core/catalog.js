@@ -1549,6 +1549,11 @@ const CATALOG={
     ],
     "fields": [
       {
+        "key": "cycle_day",
+        "label": "Dia em que recebe (início do ciclo)",
+        "type": "number"
+      },
+      {
         "key": "account_type",
         "label": "Tipo",
         "type": "select",
@@ -1878,7 +1883,7 @@ const CATALOG={
       {
         "key": "planned",
         "label": "Retirada planejada (não precisa recompor)",
-        "type": "boolean"
+        "type": "checkbox"
       }
     ],
     "description": "Guardar ou retirar dinheiro da reserva: muda o destino do dinheiro, não é receita nem despesa e não altera o saldo das contas."

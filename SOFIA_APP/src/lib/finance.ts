@@ -5,7 +5,7 @@ import type {Entity} from './types';
 
 export type TxKind = 'expense' | 'income' | 'transfer' | 'card_payment';
 export type Recurrence = 'none' | 'monthly' | 'weekly' | 'yearly';
-export type Account = {id: string; name: string; type: string; initial: number; color: string; include: boolean; archived: boolean; entity: Entity};
+export type Account = {id: string; name: string; type: string; initial: number; color: string; include: boolean; archived: boolean; cycleDay: number; entity: Entity};
 export type Card = {id: string; name: string; limit: number; closing: number; due: number; color: string; accountId: string; archived: boolean; entity: Entity};
 export type Tx = {
   id: string; kind: TxKind; desc: string; amount: number; date: string; category: string; accountId: string; toAccountId: string; cardId: string;
@@ -63,7 +63,7 @@ export function addDays(date: string, n: number): string { const d = new Date(da
 // ---------- Leitura das entidades ----------
 export function toAccount(e: Entity): Account {
   return {id: e.id, name: e.title, type: String(e.data?.account_type || 'corrente'), initial: num(e.data?.initial_balance), color: String(e.data?.color || FIN_COLORS[0]),
-    include: e.data?.include_total !== false, archived: e.state === 'archived', entity: e};
+    include: e.data?.include_total !== false, archived: e.state === 'archived', cycleDay: Math.min(31, Math.max(0, num(e.data?.cycle_day))), entity: e};
 }
 export function toCard(e: Entity): Card {
   return {id: e.id, name: e.title, limit: num(e.data?.limit), closing: num(e.data?.closing_day) || 1, due: num(e.data?.due_day) || 10, color: String(e.data?.color || FIN_COLORS[2]),
@@ -444,4 +444,62 @@ export function reserveHistory(moves: ReserveMove[], goalId: string): ReserveMon
 /** Rotulo de cada movimento no historico. */
 export function reserveMoveLabel(m: ReserveMove): string {
   return m.direction === 'in' ? 'Aporte' : m.planned ? 'Retirada planejada' : 'Retirada a recompor';
+}
+
+// ---------- 0.3.161: ciclo do dinheiro, contas fixas e folga ----------
+/** O ciclo comeca no dia em que a pessoa recebe (ex.: 25) e vai ate a vespera do proximo.
+ * Sem dia definido, e o proprio mes do calendario. */
+export function cycleRange(day: number, today = todayISO()): {start: string; end: string; label: string} {
+  const d = Math.min(31, Math.max(1, Math.round(day) || 0));
+  if (!d) { const m = monthOf(today); return {start: dayIn(m, 1), end: dayIn(m, daysIn(m)), label: monthLabel(m)}; }  // sem dia: mes do calendario
+  const clamp = (month: string) => dayIn(month, Math.min(d, daysIn(month)));
+  const thisMonth = monthOf(today), start = today >= clamp(thisMonth) ? clamp(thisMonth) : clamp(addMonths(thisMonth, -1));
+  const next = clamp(addMonths(monthOf(start), 1));
+  const end = addDays(next, -1);
+  return {start, end, label: 'até ' + end.slice(8, 10) + '/' + end.slice(5, 7)};
+}
+/** Contas fixas = pendencias marcadas como "todo mes". Previsto e o valor cadastrado; realizado, o confirmado. */
+export type FixedBill = {id: string; title: string; amount: number; paidAmount: number | null; day: number; date: string; paid: boolean; cardId: string; tx: Tx};
+export function fixedBills(txs: Tx[], accountId: string, range: {start: string; end: string}): FixedBill[] {
+  const months = [...new Set([monthOf(range.start), monthOf(range.end)])];
+  const all = [...txs, ...months.flatMap(m => expandRecurring(txs, m))];
+  const seen = new Set<string>();
+  return all.filter(t => t.recurrence === 'monthly' && t.kind === 'expense' && (!accountId || t.accountId === accountId) && t.date >= range.start && t.date <= range.end)
+    .filter(t => { const k = t.desc + '|' + t.date; if (seen.has(k)) return false; seen.add(k); return true; })
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(t => ({id: t.id, title: t.desc, amount: t.amount, paidAmount: t.paid ? t.amount : null, day: Number(t.date.slice(8, 10)), date: t.date, paid: t.paid, cardId: t.cardId || '', tx: t}));
+}
+export type FixedSummary = {bills: FixedBill[]; total: number; paid: number; open: number; income: number; share: number | null};
+export function fixedSummary(txs: Tx[], accountId: string, range: {start: string; end: string}): FixedSummary {
+  const bills = fixedBills(txs, accountId, range);
+  const total = round2(bills.reduce((s, b) => s + b.amount, 0));
+  const paid = round2(bills.filter(b => b.paid).reduce((s, b) => s + b.amount, 0));
+  const income = round2(txs.filter(t => t.kind === 'income' && (!accountId || t.accountId === accountId) && t.date >= range.start && t.date <= range.end).reduce((s, t) => s + t.amount, 0));
+  return {bills, total, paid, open: round2(total - paid), income, share: income > 0 ? total / income : null};
+}
+/** Folga do ciclo: o que entrou menos as fixas (pagas ou nao), menos o aporte do ciclo, menos os gastos variaveis. */
+export type CycleRoom = {start: string; end: string; label: string; income: number; fixed: number; plan: number; ceiling: number; spent: number; left: number; pct: number; over: number};
+export function cycleRoom(txs: Tx[], accountId: string, range: {start: string; end: string; label: string}, plan: number, opening = 0): CycleRoom {
+  const mine = txs.filter(t => (!accountId || t.accountId === accountId) && t.date >= range.start && t.date <= range.end);
+  const income = round2(mine.filter(t => t.kind === 'income').reduce((s, t) => s + t.amount, 0));
+  const fixed = round2(fixedBills(txs, accountId, range).reduce((s, b) => s + b.amount, 0));
+  const fixedKeys = new Set(fixedBills(txs, accountId, range).map(b => b.title + '|' + b.date));
+  const spent = round2(mine.filter(t => t.kind === 'expense' && !fixedKeys.has(t.desc + '|' + t.date)).reduce((s, t) => s + t.amount, 0));
+  const ceiling = round2(Math.max(0, opening + income - fixed - Math.max(0, plan)));
+  const left = round2(ceiling - spent);
+  return {...range, income, fixed, plan: Math.max(0, plan), ceiling, spent, left: Math.max(left, left), pct: ceiling > 0 ? Math.max(0, Math.min(1, left / ceiling)) : 0, over: round2(Math.max(0, -left))};
+}
+
+/** 0.3.161: meta do guardado - quanto falta, o que o aporte atual alcanca no prazo e quanto por mes fecharia. */
+export type ReservePlanOutlook = {target: number; deadline: string; missing: number; months: number; atCurrent: number; neededMonthly: number; reachDate: string; onTrack: boolean; ahead: number};
+export function reserveOutlook(reserve: Goal, saved: number, monthly: number, today = todayISO()): ReservePlanOutlook | null {
+  const target = Number(reserve.target) || 0, deadline = String(reserve.entity?.data?.deadline || '');
+  if (target <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(deadline)) return null;
+  const missing = round2(Math.max(0, target - saved));
+  const months = Math.max(0, (Number(deadline.slice(0, 4)) - Number(today.slice(0, 4))) * 12 + (Number(deadline.slice(5, 7)) - Number(today.slice(5, 7))));
+  const atCurrent = round2(saved + monthly * months);
+  const neededMonthly = months > 0 ? round2(missing / months) : missing;
+  const reachMonths = monthly > 0 ? Math.ceil(missing / monthly) : 0;
+  const reachDate = missing === 0 ? today.slice(0, 7) : monthly > 0 ? addMonths(monthOf(today), reachMonths) : '';
+  return {target, deadline, missing, months, atCurrent, neededMonthly, reachDate, onTrack: atCurrent >= target, ahead: round2(saved - Math.max(0, target - neededMonthly * months))};
 }

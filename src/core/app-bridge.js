@@ -109,7 +109,11 @@ const APPS={
   example:'"Gastei 45,90 no mercado hoje no cartão Nubank" → create_entity entity_kind=fin_tx title="Mercado" changes=[{field:"data.kind",value:"expense"},{field:"data.amount",value:"45,90"},{field:"data.category",value:"Mercado"},{field:"data.card_id",value:"Nubank"}]',
   defaults:{kind:'expense',paid:true,recurrence:'none'}},
  fin_budget:{app:'Finanças',names:['orçamento','orcamento','limite de gasto','meta de gasto'],ui:'finance',describe:'Orçamento mensal por categoria. title=categoria; data.category; data.limit=valor limite por mês.',defaults:{}},
- fin_goal:{app:'Finanças',names:['objetivo','meta','juntar','guardar dinheiro'],ui:'finance',describe:'Objetivo de poupança. title=nome; data.target=valor a juntar; data.saved=já guardado; data.deadline=data.',defaults:{saved:0}},
+ fin_goal:{app:'Finanças',names:['objetivo','meta','juntar','guardar dinheiro','reserva','dinheiro guardado'],ui:'finance',describe:'Objetivo de poupança. title=nome; data.target=valor a juntar; data.saved=já guardado; data.deadline=data. Com data.role=reserve é o Dinheiro guardado da pessoa (data.monthly_plan=aporte por mês; data.plan_day=dia do aporte).',defaults:{saved:0}},
+ fin_reserve_move:{app:'Finanças',names:['aporte','aportar','guardar','guardei','retirar da reserva','tirei da reserva'],ui:'finance',
+  describe:'Guardar ou retirar dinheiro da reserva. data.goal_id=id da reserva (o fin_goal com role=reserve); data.direction=in (guardar) ou out (retirar); data.amount=valor; data.date (padrão hoje); data.planned=true somente quando a pessoa disser que a retirada é planejada e não precisa recompor.',
+  example:'"Guarda 2.000" → create_entity entity_kind=fin_reserve_move title="Aporte" changes=[{field:"data.goal_id",value:"<id da reserva>"},{field:"data.direction",value:"in"},{field:"data.amount",value:"2.000"}]',
+  defaults:{direction:'in',planned:false}},
  mail_rule:{app:'E-mails',names:['e-mail','email','e-mails','emails','remetente','assunto'],ui:'mail',
   describe:'Regra de vigia de e-mail: avisar quando chegar e-mail de X / com assunto Y. title=nome da regra; data.field=any|from|subject|body; data.contains=termos separados por vírgula; data.account_id=NOME/endereço da conta conectada (opcional); data.notify (padrão sim); data.important.',
   example:'"Me avisa quando chegar e-mail da Ana Souza" → create_entity entity_kind=mail_rule title="Ana Souza" changes=[{field:"data.field",value:"from"},{field:"data.contains",value:"ana souza"}]',
@@ -251,6 +255,35 @@ function query(workspace,store,target,action={}){
   else if(accHit){const base=Number(accHit.data.initial_balance||0);const flow=txs.filter(t=>t.data.paid!==false).reduce((x,t)=>{if(t.data.kind==='income'&&t.data.account_id===accHit.id)return x+Number(t.data.amount||0);if(((t.data.kind==='expense'&&!t.data.card_id)||t.data.kind==='card_payment')&&t.data.account_id===accHit.id)return x-Number(t.data.amount||0);if(t.data.kind==='transfer'){if(t.data.account_id===accHit.id)return x-Number(t.data.amount||0);if(t.data.to_account_id===accHit.id)return x+Number(t.data.amount||0);}return x;},0);lines.push('• Saldo de '+accHit.title+': '+money(base+flow));}
   if(top.length)lines.push('• Maiores gastos: '+top.join(', '));
   if(pending.length)lines.push('• A pagar: '+pending.map(t=>t.title+' '+money(t.data.amount)+' ('+String(t.data.date).split('-').reverse().slice(0,2).join('/')+')').join(', '));
+  // 0.3.161: guardado, meta, aporte, contas fixas e folga - os MESMOS numeros da tela, para a Sofia
+  // responder "quanto falta para a meta" sem inventar nem divergir do app.
+  try{
+   const goals=workspace.list({kind:'fin_goal',limit:50}).filter(e=>e.state!=='archived');
+   const reserve=goals.find(e=>e.data&&e.data.role==='reserve');
+   if(reserve){
+    const moves=workspace.list({kind:'fin_reserve_move',limit:500}).filter(e=>e.state!=='archived'&&e.data&&e.data.goal_id===reserve.id);
+    const net=moves.reduce((x,m)=>x+(m.data.direction==='out'?-Number(m.data.amount||0):Number(m.data.amount||0)),0);
+    const saved=Number(reserve.data.saved||0)+net, plan=Number(reserve.data.monthly_plan||0);
+    const mm=moves.filter(m=>String(m.data.date||'').startsWith(month));
+    const done=mm.filter(m=>m.data.direction==='in').reduce((x,m)=>x+Number(m.data.amount||0),0);
+    const back=mm.filter(m=>m.data.direction==='out'&&m.data.planned!==true).reduce((x,m)=>x+Number(m.data.amount||0),0);
+    const alvo=plan>0?plan+back:back, falta=Math.max(0,alvo-done);
+    lines.push('\u2022 Dinheiro guardado: '+money(saved)+(plan>0?' \u00b7 aporte de '+money(plan)+' todo dia '+(Number(reserve.data.plan_day)||1):''));
+    if(alvo>0)lines.push('\u2022 Aporte deste m\u00eas: '+money(done)+' de '+money(alvo)+(falta>0?' \u00b7 faltam '+money(falta):' \u00b7 fechado'));
+    const target=Number(reserve.data.target||0), deadline=String(reserve.data.deadline||'');
+    if(target>0&&/^\d{4}-\d{2}/.test(deadline)){
+     const meses=Math.max(0,(Number(deadline.slice(0,4))-Number(today().slice(0,4)))*12+(Number(deadline.slice(5,7))-Number(today().slice(5,7))));
+     const resta=Math.max(0,target-saved), porMes=meses>0?resta/meses:resta, noRitmo=saved+plan*meses;
+     lines.push('\u2022 Meta: '+money(target)+' at\u00e9 '+deadline.slice(0,7).split('-').reverse().join('/')+' \u00b7 faltam '+money(resta)+' em '+meses+' meses'
+      +(plan>0?' \u00b7 no ritmo atual chega a '+money(noRitmo)+(noRitmo>=target?' (fecha no prazo)':' (faltariam '+money(target-noRitmo)+')'):'')
+      +' \u00b7 para fechar no prazo: '+money(porMes)+' por m\u00eas'+(plan>0&&noRitmo<target?'; de uma vez agora: '+money(Math.max(0,target-noRitmo)):''));
+    }
+    const fixas=txs.filter(t=>t.data.recurrence==='monthly'&&t.data.kind==='expense'&&String(t.data.date||'').startsWith(month));
+    const totalFixas=fixas.reduce((x,t)=>x+Number(t.data.amount||0),0);
+    if(totalFixas>0)lines.push('\u2022 Contas fixas do m\u00eas: '+money(totalFixas)+(income>0?' ('+Math.round(totalFixas/income*100)+'% do que entrou)':''));
+    if(income>0)lines.push('\u2022 Sobra depois das fixas, do aporte e do que j\u00e1 gastou: '+money(income-expense-Math.max(0,plan)));
+   }
+  }catch{/* sem reserva configurada */}
   if(!inMonth.length&&!accounts.length)lines.push('Nenhum lançamento ainda. Diga, por exemplo: “gastei 45,90 no mercado hoje”.');
   return {reply:lines.join('\n'),ui_target:'finance',items:inMonth.slice(0,30)};
  }

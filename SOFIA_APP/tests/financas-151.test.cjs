@@ -22,7 +22,7 @@ test('aviso alguns dias antes e no dia; faixa do guardado mostra o aportado no m
   // 0.3.155: sem meta mensal - a faixa mostra o que foi guardado no mes
   // 0.3.159: o valor do aporte volta, como informacao ('aportes de R$ X'), nunca como cobranca
   // 0.3.159: resumo curto na faixa (reserveBadge); o texto longo foi para Sua reserva
-  assert.ok(s.includes('{split && badge ? <Text'));assert.ok(s.includes('reserveBadge(split, today, money)'));
+  assert.ok(s.includes('split && badge ? <Text'));assert.ok(s.includes('reserveBadge(split, today, money)'));
   assert.ok(s.includes('const reserve = reserveFor(d.goals, accountId, isPrimary);'));
   assert.ok(!s.includes('A Sofia sobre o seu mês'),'0.3.153: card da Sofia saiu do Resumo');
 });
