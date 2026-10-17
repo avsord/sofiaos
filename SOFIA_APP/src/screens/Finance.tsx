@@ -365,11 +365,58 @@ function Field({label, value, onChange, placeholder, numeric = false, big = fals
 
 // ============================ 0.3.146: GUARDADO x DIA A DIA ============================
 // ============================ 0.3.159: HISTORICO DA RESERVA ============================
-function ReserveHistorySheet({reserve, moves, show, onClose}: {reserve: Goal; moves: ReserveMove[]; show: (v: number) => string; onClose: () => void}) {
+function ReserveHistorySheet({api, reserve, moves, show, onClose, reload}: {api: SofiaApi; reserve: Goal; moves: ReserveMove[]; show: (v: number) => string; onClose: () => void; reload: () => Promise<void>}) {
   const c = useTheme(), months = useMemo(() => reserveHistory(moves, reserve.id), [moves, reserve.id]);
+  // 0.3.162: corrigir ou apagar um movimento errado. O guardado e a conta do mes se ajustam sozinhos,
+  // porque sao calculados a partir destes registros.
+  const [edit, setEdit] = useState<ReserveMove | null>(null), [amount, setAmount] = useState(''), [date, setDate] = useState(''), [note, setNote] = useState(''), [planned, setPlanned] = useState(false);
+  const [busy, setBusy] = useState(false), [error, setError] = useState('');
+  function open(m: ReserveMove) { setEdit(m); setAmount(finishMoneyInput(String(m.amount).replace('.', ','))); setDate(m.date); setNote(m.note); setPlanned(m.planned); setError(''); }
+  async function save() {
+    if (!edit) return;
+    const v = parseMoney(amount);
+    if (!v || v <= 0) { setError('Informe o valor.'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { setError('Data no formato AAAA-MM-DD.'); return; }
+    setBusy(true); setError('');
+    try { await api.saveEntity({...edit.entity, data: {...edit.entity.data, amount: v, date, note: note.trim(), planned: edit.direction === 'out' ? planned : false}}); setEdit(null); await reload(); }
+    catch (e) { setError(errorText(e)); } finally { setBusy(false); }
+  }
+  function remove() {
+    if (!edit) return;
+    const label = reserveMoveLabel(edit).toLowerCase();
+    appAlert('Apagar este ' + (edit.direction === 'in' ? 'aporte' : 'movimento') + '?', 'O ' + label + ' de ' + show(edit.amount) + ' sai do histórico e o dinheiro guardado volta ao valor de antes.',
+      [{text: 'Cancelar', style: 'cancel'}, {text: 'Apagar', style: 'destructive', onPress: () => { setBusy(true); void api.deleteEntity(edit.entity.id).then(async () => { setEdit(null); await reload(); }).catch(e => setError(errorText(e))).finally(() => setBusy(false)); }}]);
+  }
+  const input = (label: string, value: string, onChange: (v: string) => void, money = false) => <View style={{gap: 6}}>
+    <Text style={{color: c.muted, fontSize: 12}}>{label}</Text>
+    <TextInput accessibilityLabel={label} value={value} onChangeText={v => onChange(money ? formatMoneyInput(v, value) : v)} onBlur={() => { if (money) onChange(finishMoneyInput(value)); }}
+      keyboardType={money ? 'decimal-pad' : 'default'} placeholderTextColor={c.muted}
+      style={{fontSize: 16, color: c.text, borderWidth: 1, borderColor: c.line, borderRadius: 12, padding: 12, backgroundColor: c.surface}} />
+  </View>;
+  if (edit) return <Sheet visible onClose={() => setEdit(null)} label="Fechar edição do movimento">
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 14, paddingBottom: 18}}>
+      <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>{reserveMoveLabel(edit)}</Text>
+      <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Ao salvar, o dinheiro guardado e o aporte do mês são recalculados com o novo valor.</Text>
+      {error ? <Text style={{color: BAD}}>{error}</Text> : null}
+      {input('Valor', amount, setAmount, true)}
+      {input('Data (AAAA-MM-DD)', date, setDate)}
+      {input('Observação (opcional)', note, setNote)}
+      {edit.direction === 'out' ? <View style={{gap: 8}}>
+        <Text style={{color: c.muted, fontSize: 12}}>Essa retirada</Text>
+        {([[false, 'Recompor este mês'], [true, 'Retirada planejada']] as const).map(([v, label]) =>
+          <Pressable key={label} accessibilityRole="button" accessibilityState={{selected: planned === v}} onPress={() => setPlanned(v)}
+            style={{padding: 12, borderRadius: 14, borderWidth: 1, borderColor: planned === v ? c.accent : c.line, backgroundColor: planned === v ? c.accentSoft : 'transparent'}}>
+            <Text style={{color: planned === v ? c.accent : c.text, fontWeight: '700', fontSize: 14}}>{label}</Text>
+          </Pressable>)}
+      </View> : null}
+      <Button title="Salvar" loading={busy} onPress={() => void save()} />
+      <Pressable accessibilityRole="button" onPress={remove} disabled={busy}><Text style={{color: BAD, fontWeight: '700', textAlign: 'center'}}>Apagar movimento</Text></Pressable>
+    </ScrollView>
+  </Sheet>;
   return <Sheet visible onClose={onClose} label="Fechar histórico da reserva">
     <ScrollView style={{maxHeight: 620}} contentContainerStyle={{gap: 16, paddingBottom: 18}}>
       <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Histórico da reserva</Text>
+      <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Toque em um movimento para corrigir o valor, a data ou apagá-lo.</Text>
       {months.length ? months.map(m => <View key={m.month} style={{gap: 8}}>
         <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8}}>
           <Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 15}}>{monthLabel(m.month)}</Text>
@@ -377,13 +424,14 @@ function ReserveHistorySheet({reserve, moves, show, onClose}: {reserve: Goal; mo
         </View>
         <Text style={{color: c.muted, fontSize: 12}}>Entrou {show(m.in)} · Saiu {show(m.out)}</Text>
         <View style={{backgroundColor: c.input, borderRadius: 16, paddingHorizontal: 14}}>
-          {m.items.map((it, i) => <View key={it.id} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderColor: c.line}}>
+          {m.items.map((it, i) => <Pressable key={it.id} accessibilityRole="button" accessibilityLabel={'Editar ' + reserveMoveLabel(it) + ' de ' + show(it.amount)} onPress={() => open(it)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderColor: c.line}}>
             <View style={{flex: 1, gap: 2}}>
               <Text style={{color: c.text, fontSize: 14, fontWeight: '600'}}>{reserveMoveLabel(it)}</Text>
               <Text style={{color: c.muted, fontSize: 11}}>{it.date.slice(8, 10) + '/' + it.date.slice(5, 7)}{it.note ? ' · ' + it.note : ''}</Text>
             </View>
             <Text style={{color: it.direction === 'in' ? GOOD : BAD, fontWeight: '800', fontSize: 15}}>{it.direction === 'in' ? '+' : '−'}{show(it.amount)}</Text>
-          </View>)}
+            <Text style={{color: c.muted, fontSize: 13}}>›</Text>
+          </Pressable>)}
         </View>
       </View>) : <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Ainda não há movimentos. Cada aporte e cada retirada aparece aqui, por mês, com o que entrou e o que saiu.</Text>}
       {Number(reserve.saved) > 0 ? <Text style={{color: c.muted, fontSize: 12}}>Valor inicial informado: {show(Number(reserve.saved))}</Text> : null}
@@ -628,7 +676,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
   const [reserveMenu, setReserveMenu] = useState(false);
   return (
     <>
-      {reserveHistoryOpen && reserve ? <ReserveHistorySheet reserve={reserve} moves={d.moves || []} show={show} onClose={() => setReserveHistoryOpen(false)} /> : null}
+      {reserveHistoryOpen && reserve ? <ReserveHistorySheet api={api} reserve={reserve} moves={d.moves || []} show={show} reload={reload} onClose={() => setReserveHistoryOpen(false)} /> : null}
       {reserveSheet ? <ReserveSheet accountId={accountId} api={api} kind={reserveSheet} reserve={reserve} split={split} onClose={() => setReserveSheet(null)} onDone={async () => { setReserveSheet(null); await reload(); }} /> : null}
       {/* 0.3.153: cartao verde inteiro ATRAS do roxo (empilhados); o roxo cobre tudo menos a faixa de cima */}
       <View style={{backgroundColor: accountId ? GUARD : 'transparent', borderRadius: 24}}>

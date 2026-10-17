@@ -49,3 +49,26 @@ test('telas: cartao Saldo, secao de contas fixas, meta e passo a passo com 7 eta
   assert.ok(s.includes('Refazer a configuração'),'reabre ja preenchido em Contas e cartoes');
   assert.ok(s.includes('Dia em que você recebe (opcional)'),'campo no cadastro da conta');
 });
+
+test('0.3.162: corrigir ou apagar um movimento reajusta o guardado e o aporte do mes',()=>{
+  const acc2=f.toAccount({id:'a1',kind:'fin_account',title:'C',state:'active',data:{account_type:'corrente',initial_balance:0,include_total:true}});
+  const reserve=f.toGoal({id:'g1',kind:'fin_goal',title:'R',state:'active',data:{role:'reserve',saved:15000,monthly_plan:4000}});
+  const mv=(id,dir,amount,date,planned=false)=>f.toReserveMove({id,kind:'fin_reserve_move',title:id,state:'active',data:{goal_id:'g1',direction:dir,amount,date,planned}});
+  const split=m=>f.moneySplit(reserve,m,[acc2],[],[], '2026-10','2026-10-20',[]);
+  const errado=split([mv('m1','in',20000,'2026-10-05')]);
+  assert.equal(errado.saved,35000);assert.equal(errado.realized,20000);
+  const corrigido=split([mv('m1','in',2000,'2026-10-05')]);
+  assert.equal(corrigido.saved,17000);assert.equal(corrigido.realized,2000);assert.equal(corrigido.missing,2000);
+  const apagado=split([]);
+  assert.equal(apagado.saved,15000);assert.equal(apagado.realized,0);assert.equal(apagado.missing,4000);
+  // trocar "a recompor" por "planejada" tira a retirada da conta do mes, sem mexer no guardado
+  const recompor=split([mv('m2','out',1000,'2026-10-10')]),planejada=split([mv('m2','out',1000,'2026-10-10',true)]);
+  assert.equal(recompor.saved,planejada.saved);assert.equal(recompor.monthTarget,5000);assert.equal(planejada.monthTarget,4000);
+});
+test('0.3.162: historico abre a edicao do movimento, com apagar',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("accessibilityLabel={'Editar ' + reserveMoveLabel(it) + ' de ' + show(it.amount)}"));
+  assert.ok(s.includes('Apagar movimento'));assert.ok(s.includes('o dinheiro guardado volta ao valor de antes'));
+  assert.ok(s.includes("input('Data (AAAA-MM-DD)', date, setDate)"));
+  assert.ok(s.includes("Toque em um movimento para corrigir o valor, a data ou apagá-lo."));
+});
