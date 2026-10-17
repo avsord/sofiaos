@@ -356,13 +356,15 @@ export function parseBill(text: string, today = todayISO()): {amount: number | n
 // soma no guardado; retirar faz o caminho inverso. O total (guardado + saldo geral) nao muda por isso.
 // Guardado = valor inicial + guardados - retiradas. Comprometido = contas a pagar ate o fim do mes.
 // Livre = saldo geral - comprometido. Aporte planejado nao soma nada ate ser registrado.
-export type ReserveMove = {id: string; goalId: string; direction: 'in' | 'out'; amount: number; date: string; note: string; entity: Entity};
+export type ReserveMove = {id: string; goalId: string; direction: 'in' | 'out'; amount: number; date: string; note: string; planned: boolean; entity: Entity};
 export function toReserveMove(e: Entity): ReserveMove {
   const d = e.data || {};
-  return {id: e.id, goalId: String(d.goal_id || ''), direction: d.direction === 'out' ? 'out' : 'in', amount: Number(d.amount) || 0, date: String(d.date || ''), note: String(d.note || ''), entity: e};
+  return {id: e.id, goalId: String(d.goal_id || ''), direction: d.direction === 'out' ? 'out' : 'in', amount: Number(d.amount) || 0, date: String(d.date || ''), note: String(d.note || ''), planned: d.planned === true, entity: e};
 }
 export function reserveOf(goals: Goal[]): Goal | null { return goals.find(g => g.entity?.data?.role === 'reserve') || null; }
-export type MoneySplit = {net: number; total: number; saved: number; daily: number; committed: number; free: number; planned: number; realized: number; missing: number; shortfall: number};
+export type MoneySplit = {net: number; total: number; saved: number; daily: number; committed: number; free: number;
+  planned: number; realized: number; takenBack: number; monthTarget: number; missing: number; shortfall: number;
+  planDay: number; planTime: string; remindBefore: number; remindTime: string; remindRepeatDays: number; nextPlanDate: string; closed: boolean};
 export function moneySplit(reserve: Goal, moves: ReserveMove[], accounts: Account[], txs: Tx[], cards: Card[], month: string, today = todayISO(), manualBills?: Due[]): MoneySplit {
   const mine = moves.filter(m => m.goalId === reserve.id && m.entity?.state !== 'archived');
   const net = mine.reduce((s, m) => s + (m.direction === 'in' ? m.amount : -m.amount), 0);
@@ -373,13 +375,40 @@ export function moneySplit(reserve: Goal, moves: ReserveMove[], accounts: Accoun
   const days = Math.max(0, Math.round((Date.parse(monthEnd + 'T12:00:00Z') - Date.parse(today + 'T12:00:00Z')) / 864e5));
   const commitments = manualBills === undefined ? upcoming(txs, cards, today, days) : manualBills;
   const committed = round2(commitments.filter(d => d.kind !== 'receber' && d.date <= monthEnd).reduce((s, d) => s + d.amount, 0));
-  const planned = Number(reserve.entity?.data?.monthly_plan) || 0;
-  const realized = round2(mine.filter(m => m.direction === 'in' && monthOf(m.date) === month).reduce((s, m) => s + m.amount, 0));
-  return {net, total, saved, daily, committed, free: round2(daily - committed), planned, realized, missing: round2(Math.max(0, planned - realized)), shortfall: round2(Math.max(0, committed - daily))};
+  // 0.3.159: aporte do mes. Retirada marcada para recompor soma ao que falta NESTE mes; retirada
+  // planejada nao. O mes nunca acumula para o seguinte: em novembro a conta recomeca no valor cheio.
+  const d = reserve.entity?.data || {};
+  const planned = Number(d.monthly_plan) || 0;
+  const ofMonth = mine.filter(m => monthOf(m.date) === month);
+  const realized = round2(ofMonth.filter(m => m.direction === 'in').reduce((s, m) => s + m.amount, 0));
+  const takenBack = round2(ofMonth.filter(m => m.direction === 'out' && m.entity?.data?.planned !== true).reduce((s, m) => s + m.amount, 0));
+  const monthTarget = round2(planned > 0 ? planned + takenBack : takenBack);
+  const planDay = Math.min(28, Math.max(1, Number(d.plan_day) || 1));
+  const planTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(d.plan_time || '')) ? String(d.plan_time) : '10:00';
+  const nextPlanDate = planned > 0 ? (dayIn(month, planDay) >= today ? dayIn(month, planDay) : dayIn(addMonths(month, 1), planDay)) : '';
+  const missing = round2(Math.max(0, monthTarget - realized));
+  return {net, total, saved, daily, committed, free: round2(daily - committed), planned, realized, takenBack, monthTarget,
+    missing, shortfall: round2(Math.max(0, committed - daily)), planDay, planTime,
+    remindBefore: Math.max(0, Math.min(15, Number(d.remind_before_days) || 0)),
+    remindTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(d.remind_time || '')) ? String(d.remind_time) : '09:00',
+    remindRepeatDays: Math.max(0, Number(d.remind_repeat_days) || 0),
+    nextPlanDate, closed: monthTarget > 0 && missing === 0};
 }
 
 /** 0.3.151: reserva (Dinheiro guardado) de cada conta. A principal tambem usa a reserva antiga, sem conta. */
 export function reserveFor(goals: Goal[], accountId: string, isPrimary: boolean): Goal | null {
   const reserves = goals.filter(g => g.entity?.data?.role === 'reserve');
   return reserves.find(g => String(g.entity?.data?.account_id || '') === accountId) || (isPrimary ? reserves.find(g => !g.entity?.data?.account_id) || null : null);
+}
+
+/** 0.3.159: resumo curto para a faixa do guardado (o texto longo fica em "Sua reserva"). */
+export function reserveBadge(split: MoneySplit, today = todayISO(), money = (v: number) => 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})): string {
+  if (split.realized > 0 && split.missing > 0) return '+' + money(split.realized) + ' de ' + money(split.monthTarget);
+  if (split.closed) return '✓ em dia';
+  if (split.missing > 0) {
+    const day = dayIn(monthOf(today), split.planDay);
+    if (today < day) return money(split.missing) + ' · dia ' + split.planDay;
+    return 'faltam ' + money(split.missing);
+  }
+  return '';
 }

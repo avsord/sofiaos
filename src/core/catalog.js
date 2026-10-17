@@ -1803,6 +1803,33 @@ const CATALOG={
         "label": "Conta",
         "type": "text",
         "max": 80
+      },
+      {
+        "key": "plan_day",
+        "label": "Dia do aporte",
+        "type": "number"
+      },
+      {
+        "key": "plan_time",
+        "label": "Hora do aporte",
+        "type": "text",
+        "max": 5
+      },
+      {
+        "key": "remind_before_days",
+        "label": "Lembrar dias antes",
+        "type": "number"
+      },
+      {
+        "key": "remind_time",
+        "label": "Hora do lembrete",
+        "type": "text",
+        "max": 5
+      },
+      {
+        "key": "remind_repeat_days",
+        "label": "Repetir a cada (dias) até aportar",
+        "type": "number"
       }
     ],
     "description": "Meta de economia com acompanhamento do quanto falta. Com papel 'reserve', é o Dinheiro guardado (valor separado para preservar)."
@@ -1846,6 +1873,11 @@ const CATALOG={
         "label": "Observação",
         "type": "text",
         "max": 200
+      },
+      {
+        "key": "planned",
+        "label": "Retirada planejada (não precisa recompor)",
+        "type": "boolean"
       }
     ],
     "description": "Guardar ou retirar dinheiro da reserva: muda o destino do dinheiro, não é receita nem despesa e não altera o saldo das contas."
