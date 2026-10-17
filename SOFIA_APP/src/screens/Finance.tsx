@@ -283,21 +283,18 @@ function Field({label, value, onChange, placeholder, numeric = false, big = fals
 }
 
 // ============================ 0.3.146: GUARDADO x DIA A DIA ============================
-function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = ''}: {accountId?: string; api: SofiaApi; kind: 'setup' | 'in' | 'out' | 'plan'; reserve: Goal | null; split: ReturnType<typeof moneySplit> | null; onClose: () => void; onDone: () => Promise<void>}) {
+function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = ''}: {accountId?: string; api: SofiaApi; kind: 'setup' | 'in' | 'out'; reserve: Goal | null; split: ReturnType<typeof moneySplit> | null; onClose: () => void; onDone: () => Promise<void>}) {
   const c = useTheme();
-  const [name, setName] = useState(reserve?.name || 'Dinheiro guardado'), [amount, setAmount] = useState(''), [plan, setPlan] = useState(reserve?.entity?.data?.monthly_plan ? finishMoneyInput(String(reserve.entity.data.monthly_plan).replace('.', ',')) : ''), [note, setNote] = useState('');
+  const [name, setName] = useState(reserve?.name || 'Dinheiro guardado'), [amount, setAmount] = useState(''), [note, setNote] = useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
-  const title = kind === 'setup' ? 'Separar o dinheiro guardado' : kind === 'in' ? 'Guardar dinheiro' : kind === 'out' ? 'Retirar da reserva' : 'Ajustar aporte mensal';
+  const title = kind === 'setup' ? 'Separar o dinheiro guardado' : kind === 'in' ? 'Guardar dinheiro' : 'Retirar da reserva';
   async function save() {
     setBusy(true); setError('');
     try {
       if (kind === 'setup') {
-        const saved = parseMoney(amount) ?? 0, monthly = parseMoney(plan) ?? 0;
-        if (saved < 0 || monthly < 0) throw Error('Use valores positivos.');
-        await api.saveEntity({kind: 'fin_goal', title: name.trim() || 'Dinheiro guardado', content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {role: 'reserve', saved, monthly_plan: monthly, target: '', deadline: '', color: GOOD, account_id: accountId || ''}});
-      } else if (kind === 'plan' && reserve) {
-        const monthly = parseMoney(plan) ?? 0;
-        await api.saveEntity({...reserve.entity, data: {...reserve.entity.data, monthly_plan: monthly}});
+        const saved = parseMoney(amount) ?? 0;
+        if (saved < 0) throw Error('Use valores positivos.');
+        await api.saveEntity({kind: 'fin_goal', title: name.trim() || 'Dinheiro guardado', content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {role: 'reserve', saved, monthly_plan: '', target: '', deadline: '', color: GOOD, account_id: accountId || ''}});
       } else if (reserve) {
         const v = parseMoney(amount);
         if (!v || v <= 0) throw Error('Informe o valor.');
@@ -323,18 +320,14 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
       <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>{title}</Text>
       {error ? <Text style={{color: BAD}}>{error}</Text> : null}
       {kind === 'setup' ? <>
-        <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Informe quanto você tem guardado, esteja onde estiver. Esse valor fica separado: não entra no saldo geral, que continua sendo o que você tem para usar.</Text>
+        <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Informe quanto você tem guardado, esteja onde estiver. Esse valor fica separado: não entra no saldo geral, que continua sendo o que você tem para usar. Depois é só registrar cada aporte em “Guardar dinheiro”.</Text>
         {input('Nome', name, setName, 'Dinheiro guardado')}
         {input('Já guardado hoje', amount, setAmount, 'Ex.: 15.000')}
-        {input('Aporte mensal planejado (opcional)', plan, setPlan, 'Ex.: 4.000')}
-      </> : kind === 'plan' ? <>
-        <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>É a intenção do mês. O guardado só aumenta quando você registrar o aporte em “Guardar dinheiro”.</Text>
-        {input('Aporte mensal planejado', plan, setPlan, 'Ex.: 4.000')}
       </> : <>
-        {kind === 'in' && split ? <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Sai do saldo geral ({money(split.daily)}) e passa a ser guardado. Não é despesa nem receita.{split.missing > 0 ? ' Faltam ' + money(split.missing) + ' para o aporte do mês.' : ''}</Text> : null}
+        {kind === 'in' && split ? <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Sai do saldo geral ({money(split.daily)}) e passa a ser guardado. Não é despesa nem receita.{split.realized > 0 ? ' Você já guardou ' + money(split.realized) + ' neste mês.' : ''}</Text> : null}
         {kind === 'in' && split && (parseMoney(amount) ?? 0) > split.daily ? <Text style={{color: BAD, fontSize: 12}}>Esse valor é maior que o saldo geral e o deixaria negativo.</Text> : null}
         {kind === 'out' && split ? <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Hoje guardado: {money(split.saved)}. A retirada devolve o valor ao saldo geral.</Text> : null}
-        {input('Valor', amount, setAmount, kind === 'in' && split && split.missing > 0 ? String(split.missing).replace('.', ',') : 'Ex.: 500')}
+        {input('Valor', amount, setAmount, 'Ex.: 500')}
         {input('Observação (opcional)', note, setNote)}
       </>}
       <Button title={kind === 'out' ? 'Retirar' : 'Salvar'} loading={busy} onPress={() => kind === 'out' ? confirmOut() : void save()} />
@@ -433,7 +426,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
   // Contas pesadas só quando os dados ou o mês mudam (não a cada toque, como esconder valores).
   const {s, total: accountsTotal, forecast: accountsForecast, dues} = useMemo(() => ({s: monthSummary(d.txs, month), total: totalBalance(d.accounts, d.txs), forecast: forecastBalance(d.accounts, d.txs, month, d.cards),
     dues: manualDues(d.txs, accountId, today, 10)}), [d, accountId, month, today]);
-  const [hide, setHide] = useState(false), [reserveSheet, setReserveSheet] = useState<'setup' | 'in' | 'out' | 'plan' | null>(null);
+  const [hide, setHide] = useState(false), [reserveSheet, setReserveSheet] = useState<'setup' | 'in' | 'out' | null>(null);
   const show = (v: number) => hide ? 'R$ •••••' : money(v);
   // 0.3.151: cada conta tem o proprio guardado (a principal mantem a reserva antiga, sem conta).
   const reserve = reserveFor(d.goals, accountId, isPrimary);
@@ -450,7 +443,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
       {accountId ? <Pressable accessibilityRole="button" accessibilityLabel="Gerenciar dinheiro guardado" onPress={() => split ? setReserveMenu(true) : setReserveSheet('setup')}
         style={{paddingTop: 14, paddingHorizontal: 20, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10}}>
         <Text style={{color: '#0d2f1f', fontWeight: '800', fontSize: 18}}>{split ? show(split.saved) : 'Configurar ›'}</Text>
-        {split && split.planned > 0 && split.missing > 0 ? <Text style={{color: '#0d2f1f', fontSize: 11}}>faltam {show(split.missing)} no mês</Text> : null}
+        {split && split.realized > 0 ? <Text style={{color: '#0d2f1f', fontSize: 11}}>+{show(split.realized)} neste mês</Text> : null}
         <View style={{flex: 1}} />
         <Text style={{color: '#0d2f1f', fontWeight: '700', fontSize: 13}}>Guardado</Text>
         <Icon name="shield" size={16} color="#0d2f1f" />
@@ -484,8 +477,8 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
             </View>
             {split.daily < 0 ? <Text style={{color: BAD, fontSize: 12}}>O saldo geral ficou negativo: o que foi guardado é maior que o dinheiro que estava disponível. Confira os valores.</Text> : null}
           </> : null}
-          {[['Guardar dinheiro', 'in'], ['Retirar da reserva', 'out'], ['Ajustar aporte mensal', 'plan']].map(([label, k]) => (
-            <Pressable key={k} accessibilityRole="button" onPress={() => { setReserveMenu(false); setReserveSheet(k as 'in' | 'out' | 'plan'); }}
+          {[['Guardar dinheiro', 'in'], ['Retirar da reserva', 'out']].map(([label, k]) => (
+            <Pressable key={k} accessibilityRole="button" onPress={() => { setReserveMenu(false); setReserveSheet(k as 'in' | 'out'); }}
               style={{paddingVertical: 13, borderBottomWidth: 1, borderColor: c.line}}>
               <Text style={{color: k === 'out' ? BAD : c.text, fontSize: 15, fontWeight: '600'}}>{label}  ›</Text>
             </Pressable>

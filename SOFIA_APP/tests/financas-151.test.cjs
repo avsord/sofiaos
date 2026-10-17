@@ -15,10 +15,11 @@ test('cada conta tem o proprio guardado; a principal mantem a reserva antiga',()
   const goals=[g('antiga',''),g('esposa','a2')];
   assert.equal(f.reserveFor(goals,'a1',true).id,'antiga');assert.equal(f.reserveFor(goals,'a2',false).id,'esposa');assert.equal(f.reserveFor(goals,'a3',false),null);
 });
-test('aviso alguns dias antes e no dia; faixa laranja com "faltam no mes"; card da Sofia no Resumo',()=>{
+test('aviso alguns dias antes e no dia; faixa do guardado mostra o aportado no mes; sem card da Sofia no Resumo',()=>{
   const n=read('src/lib/finance-notifications.ts'),s=read('src/screens/Finance.tsx');
   assert.ok(n.includes("for (const offset of before ? [before, 0] : [0])"));
   assert.ok(s.includes("{value:'3',label:'3 dias antes'}"));assert.ok(s.includes("{value:'income',label:'A receber'}"));
-  assert.ok(s.includes('faltam {show(split.missing)} no mês'));assert.ok(s.includes('const reserve = reserveFor(d.goals, accountId, isPrimary);'));
+  // 0.3.155: sem meta mensal - a faixa mostra o que foi guardado no mes
+  assert.ok(s.includes('+{show(split.realized)} neste mês'));assert.ok(!s.includes('no mês</Text> : null}'));assert.ok(s.includes('const reserve = reserveFor(d.goals, accountId, isPrimary);'));
   assert.ok(!s.includes('A Sofia sobre o seu mês'),'0.3.153: card da Sofia saiu do Resumo');
 });
