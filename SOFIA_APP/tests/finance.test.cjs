@@ -73,15 +73,15 @@ test('valor digitado em reais vira número sem surpresa',()=>{
  eq(['89,90','R$ 1.234,56','1234.56','1.500','12.5','','abc'].map(f.parseMoney),[89.9,1234.56,1234.56,1500,12.5,null,null]);
 });
 
-test('campos monetários formatam milhares ao digitar e vírgula com centavos ao terminar sem alterar o valor',()=>{
-  eq(['1','1911','191146','191146,5','191146,56','1.234,56','1234.5','1.234.567','0,05',''].map(f.formatMoneyInput),
-    ['1','1.911','191.146','191.146,5','191.146,56','1.234,56','1.234,5','1.234.567','0,05','']);
+test('0.3.164: campos monetários usam máscara de banco ao digitar e mantêm o valor ao terminar',()=>{
+  eq(['1','1911','191146','1911465','19114656','123456','12345','1234567','5',''].map(v=>f.formatMoneyInput(v)),
+    ['0,01','19,11','1.911,46','19.114,65','191.146,56','1.234,56','123,45','12.345,67','0,05','']);
   eq(['191.146','191.146,5','1.234,56','0,05',''].map(f.finishMoneyInput),
     ['191.146,00','191.146,50','1.234,56','0,05','']);
-  assert.equal(f.parseMoney(f.finishMoneyInput(f.formatMoneyInput('191146'))),191146);
-  assert.equal(f.parseMoney(f.finishMoneyInput(f.formatMoneyInput('1234,56'))),1234.56);
-  assert.equal(f.parseMoney(f.finishMoneyInput(f.formatMoneyInput('0,05'))),0.05);
-  assert.equal(f.formatMoneyInput('12.345,'),'12.345,');
+  assert.equal(f.parseMoney(f.finishMoneyInput(f.formatMoneyInput('19114600'))),191146);
+  assert.equal(f.parseMoney(f.finishMoneyInput(f.formatMoneyInput('123456'))),1234.56);
+  assert.equal(f.parseMoney(f.finishMoneyInput(f.formatMoneyInput('5'))),0.05);
+  assert.equal(f.formatMoneyInput('1234500'),'12.345,00');
 });
 
 test('e-mail de cobrança: lê valor e vencimento, sem inventar quando não há',()=>{
@@ -121,20 +121,19 @@ test('orientação financeira usa lançamentos reais, não pendências que ainda
  assert.ok(!tips.some(x=>x.text.includes('superaram as receitas')),'pendencia futura nao cria aconselhamento falso');
 });
 test('máscara em português preserva milhares após apagar',()=>{
- assert.equal(f.formatMoneyInput('1.23','1.234'),'123');
- assert.equal(f.formatMoneyInput('1.00','1.000'),'100');
- assert.equal(f.formatMoneyInput('1.234.','1.234'),'1.234,');
- assert.equal(f.formatMoneyInput('1.234,5','1.234,'),'1.234,5');
+  assert.equal(f.formatMoneyInput('123','1.234'),'1,23','apagar devolve o digito anterior');
+  assert.equal(f.formatMoneyInput('100','1.000'),'1,00');
+  assert.equal(f.formatMoneyInput('1234','1.234'),'12,34');
+  assert.equal(f.formatMoneyInput('12345','1.234,'),'123,45');
 });
 
-test('0.3.163: com os centavos preenchidos, digitar no fim entra pela direita (antes nao digitava nada)',()=>{
+test('0.3.164: mascara de banco - os digitos entram pela direita e os separadores aparecem sozinhos',()=>{
   const fmt=(t,p)=>f.formatMoneyInput(t,p);
+  assert.equal(fmt('3',''),'0,03');assert.equal(fmt('30','0,03'),'0,30');assert.equal(fmt('300','0,30'),'3,00');
+  assert.equal(fmt('3000','3,00'),'30,00');assert.equal(fmt('1500000','150.000,0'),'15.000,00');
+  // digitar no fim de um valor ja com centavos (o bug da 0.3.163)
   assert.equal(fmt('15.000,005','15.000,00'),'150.000,05');
-  assert.equal(fmt('150.000,055','150.000,05'),'1.500.000,55');
-  assert.equal(fmt('0,001','0,00'),'0,01');
-  // apagar e digitar sem centavos continuam como antes
-  assert.equal(fmt('15.000,0','15.000,00'),'15.000,0');
-  assert.equal(fmt('3000',''),'3.000');
-  assert.equal(fmt('1,23',''),'1,23');
-  assert.equal(f.parseMoney(fmt('15.000,005','15.000,00')),150000.05);
+  // apagar devolve o digito anterior
+  assert.equal(fmt('15.000,0','15.000,00'),'1.500,00');
+  assert.equal(fmt('',''),'');assert.equal(f.parseMoney(fmt('123456','')),1234.56);
 });
