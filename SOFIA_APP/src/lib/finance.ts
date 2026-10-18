@@ -277,6 +277,18 @@ export function manualDues(txs: Tx[], accountId = '', today = todayISO(), days =
     .map(t => ({id: t.id, title: t.desc, amount: t.amount, date: t.date, kind: (t.kind === 'income' ? 'receber' : 'pagar') as Due['kind'], late: t.date < today, tx: t}))
     .sort((a,b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
 }
+/** 0.3.176: pendencias do MES escolhido no topo. No mes atual tambem entram as atrasadas de meses
+ * anteriores (ainda nao pagas); em outros meses, so as daquele mes. */
+export function monthDues(txs: Tx[], accountId: string, month: string, today = todayISO()): Due[] {
+  const current = monthOf(today), start = dayIn(month, 1), end = dayIn(month, daysIn(month));
+  const seen = new Set<string>();
+  return [...txs, ...expandRecurring(txs, month)]
+    .filter(t => t.manualDue && !t.paid && (t.kind === 'expense' || t.kind === 'income') && !t.cardId && (!accountId || t.accountId === accountId))
+    .filter(t => (t.date >= start && t.date <= end) || (month === current && t.date < start))
+    .filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; })
+    .map(t => ({id: t.id, title: t.desc, amount: t.amount, date: t.date, kind: (t.kind === 'income' ? 'receber' : 'pagar') as Due['kind'], late: t.date < today, tx: t}))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
+}
 export type FinanceInsight = {tone: 'good' | 'attention' | 'neutral'; text: string};
 export function financeInsights(txs: Tx[], month: string): FinanceInsight[] {
   // Conselhos só com dados realmente registrados; sem inventar gastos, projeções ou culpa.

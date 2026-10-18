@@ -26,7 +26,7 @@ import {
   trend, balanceSeries, upcoming, manualDues, transactionsForAccount, goalProgress, parseMoney, formatMoneyInput, finishMoneyInput, addDays,
   dayIn} from '../lib/finance';
 import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove} from '../lib/finance';
-import {cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove} from '../lib/finance';
+import {cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, monthDues, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove} from '../lib/finance';
 import {syncFinanceDueNotifications} from '../lib/finance-notifications';
 import {appAlert} from '../lib/app-alert';
 import {useFormDraft} from '../lib/form-draft';
@@ -642,12 +642,13 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
 
 // ============================ PENDENTES MANUAIS ============================
 function PendingTab({d,api,month,accountId,warning,onBill,reload}: {d:Data;api:SofiaApi;month:string;accountId:string;warning:string;onBill:(t:Tx|'new')=>void;reload:()=>Promise<void>}) {
-  const c=useTheme(),today=todayISO(),list=useMemo(()=>manualDues(d.txs,accountId,today,120),[d,accountId,today]);
+  // 0.3.176: a aba segue o mes escolhido no topo (no mes atual, junto com as atrasadas)
+  const c=useTheme(),today=todayISO(),list=useMemo(()=>monthDues(d.txs,accountId,month,today),[d,accountId,month,today]);
   const total=list.reduce((sum,row)=>sum+row.amount,0);
   // 0.3.161: as pendencias marcadas como "todo mes" sao as contas fixas; aqui elas aparecem juntas,
   // com o total do ciclo, o quanto ja foi pago e quanto representam do que entrou.
   const cycleDay=d.accounts.find(a=>a.id===accountId)?.cycleDay||0;
-  const range=useMemo(()=>cycleRange(cycleDay,today),[cycleDay,today]);
+  const range=useMemo(()=>cycleRange(cycleDay,month===monthOf(today)?today:dayIn(month,Math.min(28,Math.max(1,cycleDay||1)))),[cycleDay,today,month]);
   const fixed=useMemo(()=>fixedSummary(d.txs,accountId,range),[d,accountId,range]);
   const prevShare=useMemo(()=>{const out:number[]=[];let r=range;for(let i=0;i<3;i++){r=cycleRange(cycleDay,addDays(r.start,-1));const f=fixedSummary(d.txs,accountId,r);if(f.share!==null)out.push(f.share);}return out.length?out.reduce((a,b)=>a+b,0)/out.length:null;},[d,accountId,range,cycleDay]);
   return <>
@@ -660,7 +661,7 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload}: {d:Data;api:S
         </Pressable>
       </View>
       <View style={{borderTopWidth:1,borderColor:c.line,paddingTop:14,flexDirection:'row',justifyContent:'space-between'}}>
-        <Text style={{color:c.muted,fontSize:12}}>{list.length} pendentes cadastradas</Text>
+        <Text style={{color:c.muted,fontSize:12}}>{list.length} {list.length===1?'pendente':'pendentes'} em {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
         <Text style={{color:c.text,fontWeight:'800'}}>{money(total)}</Text>
       </View>
       {warning ? <Text style={{fontSize:12,color:WARN}}>{warning}</Text> : null}
@@ -683,9 +684,9 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload}: {d:Data;api:S
       </View>
     </Card_> : null}
     <Card_>
-      <Title text="A vencer e atrasadas" />
+      <Title text={month===monthOf(today)?'A vencer e atrasadas':'Pendentes de '+monthLabel(month).split(' ')[0].toLowerCase()} />
       {list.length ? list.map(due=><DueRow key={due.id} due={due} d={d} api={api} reload={reload} onTx={t=>onBill(t as Tx)} />)
-        : <Text style={{color:c.muted,fontSize:13,lineHeight:20}}>Nenhum vencimento manual nos próximos 120 dias. Adicione boletos, contas ou dívidas com a data em que deseja ser lembrado.</Text>}
+        : <Text style={{color:c.muted,fontSize:13,lineHeight:20}}>{month===monthOf(today)?'Nada a pagar ou receber neste mês.':'Nada pendente em '+monthLabel(month).split(' ')[0].toLowerCase()+'.'} Para ver outro mês, troque o mês no topo.</Text>}
       <Text style={{fontSize:11,color:c.muted}}>Os avisos locais saem às 9h do vencimento (e, se você escolher, alguns dias antes), com a permissão de notificações do Android. Confirmar o pagamento ou o recebimento tira o item dos pendentes e o inclui no extrato.</Text>
     </Card_>
   </>;

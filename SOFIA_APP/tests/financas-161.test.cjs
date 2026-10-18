@@ -107,3 +107,15 @@ test('0.3.166: conta que ja esta no meio ("3 de 10") conta certo e termina na de
   assert.ok(s.includes('Esta é a parcela nº'),'campo ao criar e ao editar');
   assert.ok(s.includes('Conta com prazo (ex.: 10x)?'),'tambem no passo a passo');
 });
+
+test('0.3.176: pendencias seguem o mes do topo; no mes atual entram as atrasadas',()=>{
+  const p=(id,date,extra={})=>f.toTx({id,kind:'fin_tx',title:id,state:'active',data:{kind:'expense',amount:100,date,account_id:'a1',paid:false,category:'Contas',recurrence:'none',import_id:'sofia-pendencia:'+id,...extra}});
+  const txs=[p('atrasada','2026-09-20'),p('outubro','2026-10-25'),p('novembro','2026-11-05'),p('academia','2026-10-10',{recurrence:'monthly'})];
+  const titles=m=>f.monthDues(txs,'a1',m,'2026-10-17').map(d=>d.title).join(',');
+  assert.equal(titles('2026-10'),'atrasada,academia,outubro');
+  assert.equal(titles('2026-11'),'novembro,academia','outro mes: so o dele, com as fixas daquele mes');
+  assert.equal(titles('2026-12'),'academia');
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes('monthDues(d.txs,accountId,month,today)'));
+  assert.ok(s.includes("'Pendentes de '+monthLabel(month)"));
+});
