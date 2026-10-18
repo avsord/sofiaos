@@ -29,6 +29,7 @@ import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove}
 import {cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove} from '../lib/finance';
 import {syncFinanceDueNotifications} from '../lib/finance-notifications';
 import {appAlert} from '../lib/app-alert';
+import {useFormDraft} from '../lib/form-draft';
 
 const GOOD = '#2fc58b', BAD = '#ff6b7a', WARN = '#ffb547', GUARD = '#1f9d63';
 type Data = {accounts: Account[]; cards: Card[]; txs: Tx[]; budgets: Budget[]; goals: Goal[]; moves: ReserveMove[]};
@@ -261,6 +262,25 @@ function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: ()
   const [planDay, setPlanDay] = useState(String(reserve?.entity?.data?.plan_day || ''));
   const [goalValue, setGoalValue] = useState(reserve?.target ? finishMoneyInput(String(reserve.target).replace('.', ',')) : '');
   const [goalMonth, setGoalMonth] = useState(String(reserve?.entity?.data?.deadline || '').slice(0, 7));
+  // 0.3.168: a configuracao tambem sobrevive a sair do app no meio do preenchimento.
+  const wizardForm = {step: String(step), name, balance, cycleDay, bills: JSON.stringify(bills), saved, plan, planDay, goalValue, goalMonth};
+  const {draft: wizardDraft, ready: wizardReady, clear: clearWizardDraft} = useFormDraft('financas:setup:' + (acc?.id || 'novo'), wizardForm);
+  const wizardRestored = useRef(false);
+  useEffect(() => {
+    if (!wizardReady || wizardRestored.current || !wizardDraft) return;
+    wizardRestored.current = true;
+    const d = wizardDraft as Record<string, string>;
+    if (d.name !== undefined) setName(d.name);
+    if (d.balance !== undefined) setBalance(d.balance);
+    if (d.cycleDay !== undefined) setCycleDay(d.cycleDay);
+    if (d.saved !== undefined) setSaved(d.saved);
+    if (d.plan !== undefined) setPlan(d.plan);
+    if (d.planDay !== undefined) setPlanDay(d.planDay);
+    if (d.goalValue !== undefined) setGoalValue(d.goalValue);
+    if (d.goalMonth !== undefined) setGoalMonth(d.goalMonth);
+    if (d.bills) { try { const list = JSON.parse(d.bills); if (Array.isArray(list)) setBills(list); } catch { /* rascunho invalido */ } }
+    if (d.step) setStep(Math.max(0, Math.min(6, Number(d.step) || 0)));
+  }, [wizardReady, wizardDraft]);
   const money0 = (v: string) => parseMoney(v) ?? 0;
   const fixedTotal = bills.reduce((t, b) => t + money0(b.amount), 0);
   const ceiling = Math.max(0, money0(balance) - fixedTotal - money0(plan));
@@ -285,6 +305,7 @@ function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: ()
           target: money0(goalValue) || '', deadline: /^\d{4}-\d{2}$/.test(goalMonth) ? goalMonth + '-' + String(new Date(Number(goalMonth.slice(0, 4)), Number(goalMonth.slice(5, 7)), 0).getDate()).padStart(2, '0') : ''};
         await api.saveEntity(reserve ? {...reserve.entity, data: {...reserve.entity.data, ...data}} : {kind: 'fin_goal', title: 'Dinheiro guardado', content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data});
       }
+      await clearWizardDraft();
       await onDone(); onClose?.();
     } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
@@ -463,6 +484,26 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
   const planFields = {monthly_plan: parseMoney(plan) ?? 0, plan_day: Math.min(28, Math.max(1, Number(day) || 5)),
     remind_before_days: Math.max(0, Number(remindBefore) || 0), remind_time: remindTime, remind_repeat_days: Math.max(0, Number(repeatDays) || 0)};
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
+  // 0.3.168: o que foi digitado aqui tambem sobrevive a sair do app no meio.
+  const reserveForm = {amount, note, plan, day, remindBefore, remindTime, repeatDays, goalValue, goalMonth, name, plannedOut};
+  const {draft: reserveDraft, ready: reserveReady, clear: clearReserveDraft} = useFormDraft('reserve:' + kind + ':' + (reserve?.id || 'novo'), reserveForm);
+  const reserveRestored = useRef(false);
+  useEffect(() => {
+    if (!reserveReady || reserveRestored.current || !reserveDraft) return;
+    reserveRestored.current = true;
+    const d = reserveDraft as Record<string, string | boolean>;
+    if (d.amount !== undefined) setAmount(String(d.amount));
+    if (d.note !== undefined) setNote(String(d.note));
+    if (d.plan !== undefined) setPlan(String(d.plan));
+    if (d.day !== undefined) setDay(String(d.day));
+    if (d.remindBefore !== undefined) setRemindBefore(String(d.remindBefore));
+    if (d.remindTime !== undefined) setRemindTime(String(d.remindTime));
+    if (d.repeatDays !== undefined) setRepeatDays(String(d.repeatDays));
+    if (d.goalValue !== undefined) setGoalValue(String(d.goalValue));
+    if (d.goalMonth !== undefined) setGoalMonth(String(d.goalMonth));
+    if (d.name !== undefined) setName(String(d.name));
+    if (typeof d.plannedOut === 'boolean') setPlannedOut(d.plannedOut);
+  }, [reserveReady, reserveDraft]);
   const title = kind === 'setup' ? 'Separar o dinheiro guardado' : kind === 'in' ? 'Guardar dinheiro' : kind === 'plan' ? 'Valor dos aportes' : 'Retirar da reserva';
   async function save() {
     setBusy(true); setError('');
@@ -478,6 +519,7 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
         if (!v || v <= 0) throw Error('Informe o valor.');
         await api.saveEntity({kind: 'fin_reserve_move', title: kind === 'in' ? 'Guardado na reserva' : 'Retirada da reserva', content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {goal_id: reserve.id, direction: kind, amount: v, date: todayISO(), note: note.trim(), planned: kind === 'out' ? plannedOut : false}});
       }
+      await clearReserveDraft();
       await onDone();
     } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
@@ -607,6 +649,24 @@ function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;
   // 0.3.165: conta fixa com prazo (ex.: 10 parcelas) - para de se repetir sozinha no fim
   const [parcels,setParcels]=useState(String(tx?.entity?.data?.installments||''));
   const [parcelNow,setParcelNow]=useState(String(tx?.entity?.data?.installment||''));
+  // 0.3.168: se o app for para o fundo (ou for encerrado) no meio do preenchimento, nada se perde.
+  const draftKey='bill:'+(tx?.id||'novo');
+  const form={name,amount,date,category,repeat,flow,before,parcels,parcelNow};
+  const {draft,ready,clear:clearDraft}=useFormDraft(draftKey,form);
+  const restored=useRef(false);
+  useEffect(()=>{
+    if(!ready||restored.current||!draft)return;
+    restored.current=true;
+    if(draft.name!==undefined)setName(String(draft.name));
+    if(draft.amount!==undefined)setAmount(String(draft.amount));
+    if(draft.category)setCategory(String(draft.category));
+    if(draft.date)setDate(String(draft.date));
+    if(draft.repeat)setRepeat(String(draft.repeat) as typeof repeat);
+    if(draft.flow)setFlow(draft.flow==='income'?'income':'expense');
+    if(draft.before!==undefined)setBefore(String(draft.before));
+    if(draft.parcels!==undefined)setParcels(String(draft.parcels));
+    if(draft.parcelNow!==undefined)setParcelNow(String(draft.parcelNow));
+  },[ready,draft]);
   const [error,setError]=useState(''),[busy,setBusy]=useState(false);
   async function save() {
     const value=parseMoney(amount);
@@ -627,6 +687,7 @@ function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;
         import_id:existing?String(tx?.entity?.data?.import_id||''): 'sofia-pendencia:'+uid(),
       };
       await saveEntity(api,'fin_tx',name.trim(),data,existing?tx?.entity:undefined);
+      await clearDraft();
       onSaved();
     }catch(e){setError(errorText(e));}finally{setBusy(false);}
   }
