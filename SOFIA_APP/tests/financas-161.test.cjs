@@ -131,3 +131,14 @@ test('0.3.177: ao pagar, a conta fica verde e continua na lista do mes',()=>{
   assert.ok(s.includes("import_id: t.manualDue ? 'sofia-pendencia:' + (t.seriesId || t.id) + ':' + t.date : ''"),'repeticao paga continua pendencia daquele mes');
   assert.ok(s.includes("paidCount?' · '+paidCount"),'cabecalho separa pendentes e pagas');
 });
+
+test('0.3.178: apagar no historico um pagamento de pendencia desfaz o pagamento (volta como a pagar)',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes('if (tx.manualDue && tx.paid) {'));
+  assert.ok(s.includes("await api.saveEntity({...tx.entity!, data: {...tx.entity!.data, paid: false}})"),'nao apaga o registro, so desfaz o pagamento');
+  assert.ok(s.includes("'Desfazer o ' + kind + '?'"));
+  assert.ok(s.includes('accessibilityLabel={tx.manualDue && tx.paid ? "Desfazer pagamento" : "Apagar lançamento"}'));
+  // e a pendencia desfeita aparece de novo no mes como a pagar
+  const p=f.toTx({id:'luz',kind:'fin_tx',title:'Luz',state:'active',data:{kind:'expense',amount:180,date:'2026-10-12',account_id:'a1',paid:false,category:'Contas',recurrence:'none',import_id:'sofia-pendencia:luz'}});
+  const d=f.monthDues([p],'a1','2026-10','2026-10-17')[0];assert.equal(d.paid,false);assert.equal(d.late,true);
+});

@@ -1090,6 +1090,16 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved}: {api: SofiaA
   }
   function remove() {
     if (!tx.entity) return;
+    // 0.3.178: lancamento que veio de uma conta a pagar/receber paga. Apagar no historico desfaz o
+    // pagamento: a conta volta para Pendentes como "a pagar", e o registro nao some de vez.
+    if (tx.manualDue && tx.paid) {
+      const kind = tx.kind === 'income' ? 'recebimento' : 'pagamento';
+      appAlert('Desfazer o ' + kind + '?', '“' + tx.desc + '” sai do histórico e volta para Pendentes como ' + (tx.kind === 'income' ? 'a receber' : 'a pagar') + '.',
+        [{text: 'Cancelar', style: 'cancel'}, {text: 'Desfazer', style: 'destructive', onPress: () => void (async () => {
+          try { await api.saveEntity({...tx.entity!, data: {...tx.entity!.data, paid: false}}); onSaved(); } catch (e) { setError(errorText(e)); }
+        })()}]);
+      return;
+    }
     const series = tx.seriesId;
     const others = series ? d.txs.filter(x => x.seriesId === series && x.id !== tx.id) : [];
     const del = async (all: boolean) => { try { await api.deleteEntity(tx.entity!.id); if (all) for (const o of others) if (o.entity && !o.paid) await api.deleteEntity(o.entity.id); onSaved(); } catch (e) { setError(errorText(e)); } };
@@ -1108,7 +1118,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved}: {api: SofiaA
           <View style={{flexDirection: 'row', alignItems: 'center'}}>
             <Pressable accessibilityLabel="Fechar" onPress={onClose} style={{padding: 8}}><Text style={{color: headText, fontSize: 18}}>✕</Text></Pressable>
             <Text style={{flex: 1, color: headText, fontWeight: '700', fontSize: 17}}>{editing ? 'Editar' : tx.virtual ? 'Confirmar repetição' : 'Novo lançamento'}</Text>
-            {editing ? <Pressable accessibilityLabel="Apagar lançamento" onPress={remove} style={{padding: 8}}><Icon name="trash" size={20} color={headText} /></Pressable> : null}
+            {editing ? <Pressable accessibilityLabel={tx.manualDue && tx.paid ? "Desfazer pagamento" : "Apagar lançamento"} onPress={remove} style={{padding: 8}}><Icon name="trash" size={20} color={headText} /></Pressable> : null}
           </View>
           {!editing ? (
             <View style={{flexDirection: 'row', backgroundColor: headText + '26', borderRadius: 99, padding: 3}}>
