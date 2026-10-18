@@ -86,5 +86,22 @@ class BackupService {
    * sem isso, um por dia nunca apagado enche o disco sozinho, só com o tempo. */
   prune(keep=7) {const extra=this.list().slice(keep);for(const b of extra){try{fs.unlinkSync(path.join(this.directory,b.name));}catch{/* um arquivo preso não impede os outros */}}return extra.length;}
   portable(passphrase) {return seal(this.snapshot(),{passphrase});}
+  /** 0.3.182: registros que existiam nos backups recentes e foram apagados depois. Abre os backups
+   * mais novos primeiro e devolve a versao mais recente de cada registro que nao existe mais. */
+  recoverable(kinds, exists, limit = 7) {
+    const out = new Map();
+    for (const b of this.list().slice(0, limit)) {
+      let snap; try { snap = openBackup(fs.readFileSync(path.join(this.directory, b.name)), {key: this.keyStore.get()}); } catch { continue; }
+      const rows = (snap && snap.tables && snap.tables.entities) || [];
+      for (const r of rows) {
+        if (!kinds.includes(r.kind) || out.has(r.id) || exists(r.id)) continue;
+        let data = {}, tags = [];
+        try { data = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || {}); } catch { data = {}; }
+        try { tags = typeof r.tags === 'string' ? JSON.parse(r.tags) : (r.tags || []); } catch { tags = []; }
+        out.set(r.id, {id: r.id, kind: r.kind, title: r.title, content: r.content || '', area: r.area, privacy: r.privacy, state: r.state, tags, data, updated_at: r.updated_at, backup: b.name});
+      }
+    }
+    return [...out.values()].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+  }
 }
 module.exports={KeyStore,BackupService,seal,openBackup,pruneBackupsSync};

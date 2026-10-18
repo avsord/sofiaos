@@ -808,9 +808,10 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
   const room = useMemo(() => cycleRoom(d.txs, accountId, cycleRange(cycleDay, today), split?.planned || 0,
     d.accounts.filter(a => (!accountId || a.id === accountId) && a.include).reduce((s, a) => s + a.initial, 0)), [d, accountId, cycleDay, today, split?.planned]);
   const net = split ? split.net : 0, total = Math.round((accountsTotal - net) * 100) / 100, forecast = Math.round((accountsForecast - net) * 100) / 100;
-  const [reserveMenu, setReserveMenu] = useState(false);
+  const [reserveMenu, setReserveMenu] = useState(false), [breakdown, setBreakdown] = useState<'saldo' | 'income' | 'expense' | null>(null);
   return (
     <>
+      {breakdown ? <MonthBreakdown kind={breakdown} d={d} month={month} show={show} net={net} onTx={(t: Tx) => { setBreakdown(null); onTx(t); }} onClose={() => setBreakdown(null)} /> : null}
       {reserveHistoryOpen && reserve ? <ReserveHistorySheet api={api} reserve={reserve} moves={d.moves || []} show={show} reload={reload} onClose={() => setReserveHistoryOpen(false)} /> : null}
       {reserveSheet ? <ReserveSheet accountId={accountId} api={api} kind={reserveSheet} reserve={reserve} split={split} onClose={() => setReserveSheet(null)} onDone={async () => { setReserveSheet(null); await reload(); }} /> : null}
       {/* 0.3.153: cartao verde inteiro ATRAS do roxo (empilhados); o roxo cobre tudo menos a faixa de cima */}
@@ -825,14 +826,14 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
       </Pressable> : null}
       <View style={{backgroundColor: c.accent, borderRadius: 24, padding: 20, gap: 16, elevation: 2}}>
         <View style={{flexDirection: 'row', alignItems: 'center'}}>
-          <Text style={{flex: 1, color: c.onAccent + 'cc', fontSize: 13}}>Saldo geral</Text>
+          <Text style={{flex: 1, color: c.onAccent + 'cc', fontSize: 13}}>Saldo</Text>
           <Pressable accessibilityLabel={hide ? 'Mostrar valores' : 'Esconder valores'} onPress={() => setHide(h => !h)}><Icon name="eye" size={18} color={c.onAccent + 'cc'} /></Pressable>
         </View>
-        <Text style={{color: c.onAccent, fontSize: 32, fontWeight: '800'}}>{show(total)}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Ver como o saldo é calculado" onPress={() => setBreakdown('saldo')}><Text style={{color: c.onAccent, fontSize: 32, fontWeight: '800'}}>{show(total)}</Text></Pressable>
         <Text style={{color: c.onAccent + 'cc', fontSize: 12}}>Previsto no fim de {monthLabel(month).split(' ')[0].toLowerCase()}: <Text style={{color: c.onAccent, fontWeight: '700'}}>{show(forecast)}</Text></Text>
         <View style={{flexDirection: 'row', gap: 12}}>
-          <View style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 16, padding: 12, gap: 2}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↑ Receitas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.income)}</Text></View>
-          <View style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 16, padding: 12, gap: 2}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↓ Despesas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.expense)}</Text></View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Ver receitas do mês" onPress={() => setBreakdown('income')} style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 16, padding: 12, gap: 2}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↑ Receitas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.income)}</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Ver despesas do mês" onPress={() => setBreakdown('expense')} style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 16, padding: 12, gap: 2}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↓ Despesas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.expense)}</Text></Pressable>
         </View>
 
       </View>
@@ -864,7 +865,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
               {split.monthTarget > 0 ? <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>O que faltar não passa para o mês seguinte: a conta recomeça no valor do aporte.</Text> : null}
             </View> : null}
             <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 10}}>
-            <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Saldo geral (para usar)</Text><Text style={{color: split.daily < 0 ? BAD : c.text, fontWeight: '700'}}>{show(split.daily)}</Text></View>
+            <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Saldo (para usar)</Text><Text style={{color: split.daily < 0 ? BAD : c.text, fontWeight: '700'}}>{show(split.daily)}</Text></View>
               <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Guardado + saldo geral</Text><Text style={{color: c.text, fontWeight: '700'}}>{show(split.total)}</Text></View>
               <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Despesas previstas do mês</Text><Text style={{color: c.text, fontWeight: '700'}}>{show(split.committed)}</Text></View>
               <View style={{height: 1, backgroundColor: c.line}} />
@@ -885,7 +886,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
       {room && room.ceiling > 0 ? <Pressable accessibilityRole="button" accessibilityLabel="Ver contas fixas" onPress={() => onTab('bills')}
         style={{backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 10, borderWidth: 1, borderColor: room.over > 0 ? BAD : c.line}}>
         <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8}}>
-          <Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 15}}>Saldo</Text>
+          <Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 15}}>Saldo do ciclo</Text>
           <Text style={{color: c.muted, fontSize: 11}}>{room.label}</Text>
         </View>
         <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 6}}>
@@ -1411,10 +1412,97 @@ function ReportsTab({d, month, reserve}: {d: Data; month: string; reserve: Goal 
   );
 }
 
+// ============================ 0.3.182: DETALHES DO SALDO, RECEITAS E DESPESAS ============================
+/** Tocar no Saldo mostra de onde ele vem; tocar em Receitas ou Despesas lista as do mes. */
+function MonthBreakdown({kind, d, month, show, net, onTx, onClose}: {kind: 'saldo' | 'income' | 'expense'; d: Data; month: string; show: (v: number) => string; net: number; onTx: (t: Tx) => void; onClose: () => void}) {
+  const c = useTheme();
+  const list = useMemo(() => monthTxs(d.txs, month).filter(t => t.paid && t.kind === kind).sort((a, b) => b.date.localeCompare(a.date)), [d, month, kind]);
+  const total = list.reduce((s, t) => s + t.amount, 0);
+  const parts = useMemo(() => {
+    if (kind !== 'saldo') return null;
+    const accounts = d.accounts.filter(a => a.include && !a.archived);
+    const ids = new Set(accounts.map(a => a.id));
+    const paid = d.txs.filter(t => t.paid && !t.virtual && ids.has(t.accountId) && !t.cardId);
+    const initial = accounts.reduce((s, a) => s + a.initial, 0);
+    const income = paid.filter(t => t.kind === 'income').reduce((s, t) => s + t.amount, 0);
+    const expense = paid.filter(t => t.kind === 'expense').reduce((s, t) => s + t.amount, 0);
+    const cards = d.txs.filter(t => t.paid && t.kind === 'card_payment' && ids.has(t.accountId)).reduce((s, t) => s + t.amount, 0);
+    const total = totalBalance(d.accounts, d.txs) - net;
+    // o que sobra para fechar a conta sao as transferencias entre contas (com conta fora do total)
+    const transfers = Math.round((total + net - (initial + income - expense - cards)) * 100) / 100;
+    return {initial, income, expense, cards, transfers, total};
+  }, [kind, d, net]);
+  const row = (label: string, value: string, strong = false, color?: string) => <View style={{flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4}}>
+    <Text style={{color: strong ? c.text : c.muted, fontSize: strong ? 14 : 13, fontWeight: strong ? '800' : '400'}}>{label}</Text>
+    <Text style={{color: color || c.text, fontSize: strong ? 15 : 13, fontWeight: strong ? '800' : '700'}}>{value}</Text></View>;
+  return <Sheet visible onClose={onClose} label="Fechar detalhes">
+    <ScrollView contentContainerStyle={{gap: 12, paddingBottom: 18}}>
+      {parts ? <>
+        <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Como o saldo é calculado</Text>
+        <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 2}}>
+          {row('Saldo inicial das contas', show(parts.initial))}
+          {row('+ Receitas recebidas', show(parts.income), false, GOOD)}
+          {row('− Despesas pagas', show(parts.expense), false, BAD)}
+          {parts.cards ? row('− Faturas de cartão pagas', show(parts.cards), false, BAD) : null}
+          {parts.transfers ? row((parts.transfers > 0 ? '+' : '−') + ' Transferências entre contas', show(Math.abs(parts.transfers)), false, parts.transfers > 0 ? GOOD : BAD) : null}
+          {net ? row(net > 0 ? '− Guardado (aportes − retiradas)' : '+ Retirado da reserva', show(Math.abs(net)), false, net > 0 ? BAD : GOOD) : null}
+          <View style={{height: 1, backgroundColor: c.line, marginVertical: 6}} />
+          {row('= Saldo', show(parts.total), true)}
+        </View>
+        <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Soma de tudo o que já foi pago ou recebido nas contas (não só deste mês). Se algum valor parecer errado, toque em Receitas ou Despesas para ver os lançamentos, ou confira o saldo inicial da conta em Contas e cartões.</Text>
+      </> : <>
+        <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>{kind === 'income' ? 'Receitas' : 'Despesas'} de {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
+        <Text style={{color: kind === 'income' ? GOOD : BAD, fontWeight: '800', fontSize: 22}}>{show(total)}</Text>
+        {list.length ? list.map((t, i) => <Pressable key={t.id} accessibilityRole="button" onPress={() => onTx(t)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderColor: c.line}}>
+          <Text style={{fontSize: 18}}>{categoryOf(t.category).icon}</Text>
+          <View style={{flex: 1, gap: 2}}>
+            <Text numberOfLines={1} style={{color: c.text, fontWeight: '600'}}>{t.desc}</Text>
+            <Text style={{color: c.muted, fontSize: 11}}>{t.date.split('-').reverse().slice(0, 2).join('/')} · {t.category}</Text>
+          </View>
+          <Text style={{color: kind === 'income' ? GOOD : BAD, fontWeight: '700'}}>{kind === 'income' ? '+' : '−'}{show(t.amount)}</Text>
+        </Pressable>) : <Text style={{color: c.muted}}>Nenhuma {kind === 'income' ? 'receita' : 'despesa'} paga neste mês.</Text>}
+      </>}
+    </ScrollView>
+  </Sheet>;
+}
+
+// ============================ 0.3.182: RECUPERAR APAGADOS ============================
+function RecoverSheet({api, onClose, onRestored}: {api: SofiaApi; onClose: () => void; onRestored: () => void}) {
+  const c = useTheme();
+  const [items, setItems] = useState<{id: string; kind: string; title: string; data: Record<string, any>; updated_at: string; backup: string}[] | null>(null);
+  const [error, setError] = useState(''), [busy, setBusy] = useState(''), [done, setDone] = useState<string[]>([]);
+  useEffect(() => { api.financeRecoverable().then(r => setItems(r.items)).catch(e => setError(errorText(e))); }, [api]);
+  const kindLabel = (k: string, d: Record<string, any>) => k === 'fin_tx' ? (String(d.import_id || '').startsWith('sofia-pendencia:') ? (d.recurrence === 'monthly' ? 'Conta fixa' : 'Conta a pagar') : d.kind === 'income' ? 'Receita' : 'Despesa')
+    : k === 'fin_reserve_move' ? (d.direction === 'out' ? 'Retirada da reserva' : 'Aporte') : k === 'fin_goal' ? 'Reserva / objetivo' : k === 'fin_card' ? 'Cartão' : 'Conta';
+  async function restore(id: string) {
+    setBusy(id); setError('');
+    try { await api.financeRecover(id); setDone(list => [...list, id]); onRestored(); } catch (e) { setError(errorText(e)); } finally { setBusy(''); }
+  }
+  return <Sheet visible onClose={onClose} label="Fechar recuperar itens apagados">
+    <ScrollView contentContainerStyle={{gap: 12, paddingBottom: 18}}>
+      <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Recuperar itens apagados</Text>
+      <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Itens que estavam na cópia diária do servidor e foram apagados depois. Restaurar traz de volta com os mesmos dados.</Text>
+      {error ? <Text style={{color: BAD}}>{error}</Text> : null}
+      {!items && !error ? <ActivityIndicator color={c.accent} /> : null}
+      {items && !items.length ? <Text style={{color: c.muted, fontSize: 13}}>Nada para recuperar nas cópias dos últimos dias.</Text> : null}
+      {(items || []).map(it => <View key={it.id} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderColor: c.line}}>
+        <View style={{flex: 1, gap: 2}}>
+          <Text style={{color: c.text, fontWeight: '600'}}>{it.title}</Text>
+          <Text style={{color: c.muted, fontSize: 11}}>{kindLabel(it.kind, it.data)}{it.data?.amount ? ' · ' + money(Number(it.data.amount)) : ''}{it.data?.date ? ' · ' + String(it.data.date).split('-').reverse().join('/') : ''}</Text>
+        </View>
+        {done.includes(it.id) ? <Text style={{color: GOOD, fontWeight: '800', fontSize: 12}}>✓ Restaurado</Text>
+          : <Pressable accessibilityRole="button" disabled={!!busy} onPress={() => void restore(it.id)} style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: c.accentSoft}}>
+            {busy === it.id ? <ActivityIndicator size="small" color={c.accent} /> : <Text style={{color: c.accent, fontWeight: '700', fontSize: 12}}>Restaurar</Text>}
+          </Pressable>}
+      </View>)}
+    </ScrollView>
+  </Sheet>;
+}
+
 // ============================ CONTAS E CARTÕES ============================
 function ManageSheet({api, d, onClose, reload, onFinished}: {api: SofiaApi; d: Data; onClose: () => void; reload: () => Promise<void>; onFinished?: () => void}) {
   const c = useTheme(), [edit, setEdit] = useState<{type: 'account'; item: Account | null} | {type: 'card'; item: Card | null} | null>(null);
-  const [setup, setSetup] = useState(false);
+  const [setup, setSetup] = useState(false), [recover, setRecover] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   return (
     <MotionModal visible animationType="slide" onRequestClose={onClose}>
@@ -1424,6 +1512,14 @@ function ManageSheet({api, d, onClose, reload, onFinished}: {api: SofiaApi; d: D
         </View>
         {setup ? <Onboarding api={api} onDone={reload} onClose={() => setSetup(false)} onFinished={() => { setSetup(false); onFinished ? onFinished() : onClose(); }} existing={{account: d.accounts.find(a => !a.archived) || null, reserve: reserveOf(d.goals), fixed: d.txs.filter(t => t.manualDue && t.recurrence === 'monthly' && !t.virtual && t.kind === 'expense' && t.entity?.state !== 'archived')}} /> :
         <ScrollView contentContainerStyle={{padding: 18, gap: 14}}>
+          <Pressable accessibilityRole="button" onPress={() => setRecover(true)} style={{backgroundColor: c.surface, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: c.line, flexDirection: 'row', alignItems: 'center', gap: 10}}>
+            <View style={{flex: 1, gap: 2}}>
+              <Text style={{color: c.text, fontWeight: '700', fontSize: 14}}>Recuperar itens apagados</Text>
+              <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Contas, lançamentos e movimentos apagados nos últimos dias, a partir das cópias diárias do servidor.</Text>
+            </View>
+            <Text style={{color: c.muted}}>›</Text>
+          </Pressable>
+          {recover ? <RecoverSheet api={api} onClose={() => setRecover(false)} onRestored={() => void reload()} /> : null}
           <Pressable accessibilityRole="button" onPress={() => setSetup(true)} style={{backgroundColor: c.surface, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: c.line, flexDirection: 'row', alignItems: 'center', gap: 10}}>
             <View style={{flex: 1, gap: 2}}>
               <Text style={{color: c.text, fontWeight: '700', fontSize: 14}}>Refazer a configuração</Text>

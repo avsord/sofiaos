@@ -151,3 +151,14 @@ test('0.3.181: amarelo em aberto, verde pago, vermelho atrasada e roxo fatura',(
   assert.ok(row.includes("const color = due.late ? BAD : due.kind === 'fatura' ? c.accent : WARN;"),'atrasada vermelha, fatura roxa, resto amarelo');
   assert.ok(row.includes("backgroundColor: color + '1a'"));assert.ok(row.includes("backgroundColor: GOOD + '1a'"),'pago: verde');
 });
+
+test('0.3.182: Saldo, detalhes do saldo, listas de receitas e despesas, cartao no lugar da lampada',()=>{
+  const s=read('src/screens/Finance.tsx'),lib=read('src/lib/finance.ts');
+  assert.ok(s.includes('accessibilityLabel="Ver como o saldo é calculado" onPress={() => setBreakdown(\'saldo\')}'));
+  assert.ok(s.includes('accessibilityLabel="Ver receitas do mês"')&&s.includes('accessibilityLabel="Ver despesas do mês"'));
+  assert.ok(s.includes("'Como o saldo é calculado'")||s.includes('Como o saldo é calculado'));
+  assert.ok(s.includes('Transferências entre contas'),'a conta do saldo sempre fecha');
+  assert.ok(s.includes('>Saldo do ciclo</Text>'),'sem dois cartoes com o mesmo nome');
+  assert.ok(lib.includes("{name: 'Contas', icon: '💳'")&&!lib.includes('💡'));
+  assert.ok(s.includes('Recuperar itens apagados'));
+});

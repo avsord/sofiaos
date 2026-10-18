@@ -18,7 +18,7 @@ export type Goal = {id: string; name: string; target: number; saved: number; dea
 export type Category = {name: string; icon: string; color: string};
 export const EXPENSE_CATEGORIES: Category[] = [
   {name: 'Alimentação', icon: '🍽️', color: '#ff8a5b'}, {name: 'Mercado', icon: '🛒', color: '#2fc58b'}, {name: 'Transporte', icon: '🚗', color: '#4fa3ff'},
-  {name: 'Moradia', icon: '🏠', color: '#a98bff'}, {name: 'Contas', icon: '💡', color: '#ffb547'}, {name: 'Saúde', icon: '💊', color: '#ff6b7a'},
+  {name: 'Moradia', icon: '🏠', color: '#a98bff'}, {name: 'Contas', icon: '💳', color: '#ffb547'}, {name: 'Saúde', icon: '💊', color: '#ff6b7a'},
   {name: 'Educação', icon: '📚', color: '#3fd0d4'}, {name: 'Lazer', icon: '🎬', color: '#ef7bd0'}, {name: 'Compras', icon: '🛍️', color: '#c6d84a'},
   {name: 'Assinaturas', icon: '📺', color: '#8f7cf7'}, {name: 'Viagem', icon: '✈️', color: '#38b6ff'}, {name: 'Pets', icon: '🐾', color: '#d99a5b'},
   {name: 'Presentes', icon: '🎁', color: '#ff7eb6'}, {name: 'Impostos', icon: '🧾', color: '#9a9aa8'}, {name: 'Trabalho', icon: '💼', color: '#6c8ebf'},

@@ -37,8 +37,8 @@ test('financas: card de reserva (verde desde a 0.3.153) atrás do saldo roxo com
   assert.ok(f.includes('Gerenciar dinheiro guardado') && f.includes('>{split ? show(split.saved) :'), 'valor e gesto de abrir');
   assert.ok(!f.includes('>Para usar<'),'reserva nao compete com saldo');
   assert.ok(!f.includes('function MoneyBlocks('),'nao restaurar blocos duplicados');
-  assert.ok(f.includes("fontSize: 13}}>Saldo geral</Text>"));
-  for(const label of ['Saldo geral (para usar)','Guardado + saldo geral','Despesas previstas do mês','Livre após despesas previstas','Guardar dinheiro','Retirar da reserva'])assert.ok(f.includes(label),label);
+  assert.ok(f.includes("fontSize: 13}}>Saldo</Text>"),'0.3.182: so "Saldo"');
+  for(const label of ['Saldo (para usar)','Guardado + saldo geral','Despesas previstas do mês','Livre após despesas previstas','Guardar dinheiro','Retirar da reserva'])assert.ok(f.includes(label),label);
   assert.ok(f.includes("appAlert('Retirar da reserva?'"),'retirada confirmada');
   assert.ok(f.includes('onChangeText={v => setAmount(old => formatMoneyInput(v, old))}'),'lançamento recebe máscara enquanto digita');
   assert.ok(f.includes('onBlur={() => setAmount(v => finishMoneyInput(v))}'),'termina mostrando centavos');

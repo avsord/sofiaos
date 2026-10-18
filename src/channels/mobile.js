@@ -355,6 +355,25 @@ function makeMobileApi(runtime, deps) {
     if (match && m === 'POST') { workspace.markRead(validId(match[1])); return send({ ok: true }); }
     // Apagar aviso no servidor (um, ou 'all'): antes o app dizia que isso 'aguardava atualização do servidor'.
     // 0.3.146: lista paginada (sem os apagados) com o total real de nao lidas, e "marcar tudo" global.
+    // 0.3.182: recuperar registros de Financas apagados por engano, a partir dos backups diarios do servidor.
+    if (p === '/api/mobile/md/finance/recoverable' && m === 'GET') {
+      const exists = id => { try { workspace.get(id); return true; } catch { return false; } };
+      // Ja restaurado (ou recriado igual)? Nao aparece de novo.
+      const sig = e => [e.kind, String(e.title || '').trim().toLowerCase(), Number(e.data && e.data.amount) || 0, String(e.data && e.data.date || '')].join('|');
+      const now = new Set(); for (const k of ['fin_tx', 'fin_goal', 'fin_reserve_move', 'fin_account', 'fin_card']) { try { for (const e of workspace.list({kind: k, limit: 5000})) now.add(sig(e)); } catch { /* sem registros */ } }
+      const items = (runtime.backups && runtime.backups.recoverable ? runtime.backups.recoverable(['fin_tx', 'fin_goal', 'fin_reserve_move', 'fin_account', 'fin_card'], exists) : []).filter(x => !now.has(sig(x)));
+      return send({items: items.slice(0, 200).map(x => ({id: x.id, kind: x.kind, title: x.title, data: x.data, state: x.state, updated_at: x.updated_at, backup: x.backup}))});
+    }
+    if (p === '/api/mobile/md/finance/recover' && m === 'POST') {
+      const b = await bodyJson(req, 1024);
+      const exists = id => { try { workspace.get(id); return true; } catch { return false; } };
+      const found = (runtime.backups && runtime.backups.recoverable ? runtime.backups.recoverable(['fin_tx', 'fin_goal', 'fin_reserve_move', 'fin_account', 'fin_card'], exists) : []).find(x => x.id === String(b.id || ''));
+      if (!found) fail('NOT_FOUND', 'Esse item não está mais nos backups ou já foi restaurado.', 404);
+      const fields = new Set(((require('../core/catalog.js').CATALOG[found.kind] || {}).fields || []).map(f => f.key));
+      const data = Object.fromEntries(Object.entries(found.data || {}).filter(([k]) => fields.has(k)));
+      const states = (require('../core/catalog.js').CATALOG[found.kind] || {}).states || ['active'];
+      return send(workspace.save({kind: found.kind, title: found.title, content: found.content, area: found.area || 'Pessoal', privacy: found.privacy || 'private', state: states.includes(found.state) ? found.state : states[0], tags: found.tags || [], data}));
+    }
     if (p === '/api/mobile/md/notifications' && m === 'GET') return send(workspace.noticePage(new URL(req.url, 'http://x').searchParams.get('offset')));
     if (p === '/api/mobile/md/notifications/read-all' && m === 'POST') { await bodyJson(req, 256).catch(() => ({})); return send(workspace.markAllRead()); }
     match = p.match(/^\/api\/mobile\/md\/notifications\/([\w-]+)$/);

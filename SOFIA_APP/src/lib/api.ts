@@ -240,6 +240,9 @@ export class SofiaApi {
   notifications() { return this.request<{items: Notice[]; push_enabled: boolean}>('/notifications'); }
   /** 0.3.146: marcar TODAS como lidas no servidor (nao so as carregadas). */
   markAllRead() { return this.md.readAll(); }
+  /** 0.3.182: registros de Financas apagados que ainda estao nos backups diarios do servidor. */
+  financeRecoverable() { return this.request<{items: {id: string; kind: string; title: string; data: Record<string, any>; state: string; updated_at: string; backup: string}[]}>('/md/finance/recoverable'); }
+  financeRecover(id: string) { return this.request<Entity>('/md/finance/recover', {id}, 'POST'); }
   markRead(id: string) { return this.request<{ok: boolean}>('/notifications/' + encodeURIComponent(id) + '/read', {}); }
   profile(name: string) { return this.request<{profile: Profile}>('/profile', {name}, 'PATCH'); }
   catalog() { return this.request<Catalog>('/workspace/catalog'); }
