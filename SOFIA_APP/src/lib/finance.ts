@@ -452,7 +452,8 @@ export function cycleRange(day: number, today = todayISO()): {start: string; end
   return {start, end, label: 'até ' + end.slice(8, 10) + '/' + end.slice(5, 7)};
 }
 /** Contas fixas = pendencias marcadas como "todo mes". Previsto e o valor cadastrado; realizado, o confirmado. */
-export type FixedBill = {id: string; title: string; amount: number; paidAmount: number | null; day: number; date: string; paid: boolean; cardId: string; tx: Tx};
+export type FixedBill = {id: string; title: string; amount: number; paidAmount: number | null; day: number; date: string; paid: boolean; cardId: string;
+  installments: number; index: number; left: number; last: boolean; tx: Tx};
 export function fixedBills(txs: Tx[], accountId: string, range: {start: string; end: string}): FixedBill[] {
   const months = [...new Set([monthOf(range.start), monthOf(range.end)])];
   const all = [...txs, ...months.flatMap(m => expandRecurring(txs, m))];
@@ -460,7 +461,15 @@ export function fixedBills(txs: Tx[], accountId: string, range: {start: string; 
   return all.filter(t => t.recurrence === 'monthly' && t.kind === 'expense' && (!accountId || t.accountId === accountId) && t.date >= range.start && t.date <= range.end)
     .filter(t => { const k = t.desc + '|' + t.date; if (seen.has(k)) return false; seen.add(k); return true; })
     .sort((a, b) => a.date.localeCompare(b.date))
-    .map(t => ({id: t.id, title: t.desc, amount: t.amount, paidAmount: t.paid ? t.amount : null, day: Number(t.date.slice(8, 10)), date: t.date, paid: t.paid, cardId: t.cardId || '', tx: t}));
+    .map(t => {
+      // 0.3.165: conta fixa com prazo ("10x"). A parcela sai da distancia ate a primeira; o que falta
+      // conta a partir do proximo pagamento: paga a 6a de 10, restam 4.
+      const total = Math.max(0, Math.round(Number(t.entity?.data?.installments) || 0));
+      const first = String(t.entity?.data?.date || t.date);
+      const index = total ? Math.min(total, monthsBetween(monthOf(first), monthOf(t.date)) + 1) : 0;
+      return {id: t.id, title: t.desc, amount: t.amount, paidAmount: t.paid ? t.amount : null, day: Number(t.date.slice(8, 10)), date: t.date, paid: t.paid, cardId: t.cardId || '',
+        installments: total, index, left: total ? Math.max(0, total - index + (t.paid ? 0 : 1)) : 0, last: !!total && index >= total, tx: t};
+    });
 }
 export type FixedSummary = {bills: FixedBill[]; total: number; paid: number; open: number; income: number; share: number | null};
 export function fixedSummary(txs: Tx[], accountId: string, range: {start: string; end: string}): FixedSummary {
@@ -495,4 +504,14 @@ export function reserveOutlook(reserve: Goal, saved: number, monthly: number, to
   const reachMonths = monthly > 0 ? Math.ceil(missing / monthly) : 0;
   const reachDate = missing === 0 ? today.slice(0, 7) : monthly > 0 ? addMonths(monthOf(today), reachMonths) : '';
   return {target, deadline, missing, months, atCurrent, neededMonthly, reachDate, onTrack: atCurrent >= target, ahead: round2(saved - Math.max(0, target - neededMonthly * months))};
+}
+
+/** Meses entre dois meses no formato AAAA-MM. */
+export function monthsBetween(from: string, to: string): number {
+  return (Number(to.slice(0, 4)) - Number(from.slice(0, 4))) * 12 + (Number(to.slice(5, 7)) - Number(from.slice(5, 7)));
+}
+/** 0.3.165: ultimo mes de uma conta fixa com prazo (para parar de se repetir sozinha). */
+export function lastInstallmentMonth(firstDate: string, installments: number): string {
+  const n = Math.max(1, Math.round(installments)) - 1;
+  return addMonths(monthOf(firstDate), n);
 }

@@ -24,6 +24,21 @@ export async function syncFinanceDueNotifications(txs: Tx[], owner: string, now 
   await Notifications.setNotificationChannelAsync(CHANNEL,{name:'Contas a pagar',importance:Notifications.AndroidImportance.HIGH,sound:'default'});
   const desired: Notifications.NotificationRequestInput[] = [];
   // 0.3.159: lembretes do aporte do mes - antes, no dia e, se escolhido, repetindo ate fechar.
+  // 0.3.165: no dia seguinte a ultima parcela, a Sofia avisa que a conta acabou.
+  for (const due of items) {
+    const total = Math.round(Number(due.tx?.entity?.data?.installments) || 0);
+    if (!total || due.kind === 'receber') continue;
+    const first = String(due.tx?.entity?.data?.date || due.date);
+    const idx = 1 + (Number(due.date.slice(0, 4)) - Number(first.slice(0, 4))) * 12 + (Number(due.date.slice(5, 7)) - Number(first.slice(5, 7)));
+    if (idx < total) continue;
+    const [y, m, d] = due.date.split('-').map(Number);
+    const date = new Date(y, m - 1, d + 1, 9, 0, 0);
+    if (date.getTime() <= now.getTime()) continue;
+    desired.push({identifier: PREFIX + key + ':done:' + due.id,
+      content: {title: due.title + ' acabou 🎉', body: 'Era a última das ' + total + ' parcelas. Ela não vai mais aparecer nas contas fixas.', sound: 'default',
+        data: {sofiaFinanceDue: true, scope: key, entityId: due.tx?.entity?.id || '', signature: JSON.stringify([NOTIFICATION_SIGNATURE_VERSION, 'done', due.title, total])}},
+      trigger: {type: Notifications.SchedulableTriggerInputTypes.DATE, date, channelId: CHANNEL}});
+  }
   for (const alarm of reserveItems) {
     if (alarm.date.getTime() <= now.getTime()) continue;
     desired.push({identifier: PREFIX + key + ':plan:' + alarm.id,
@@ -39,10 +54,14 @@ export async function syncFinanceDueNotifications(txs: Tx[], owner: string, now 
       const date = new Date(year,month-1,day-offset,9,0,0);
       if (date.getTime() <= now.getTime()) continue;
       const when = offset ? (offset === 1 ? 'amanhã' : 'em '+offset+' dias') : 'hoje';
+      const first = String(due.tx?.entity?.data?.date || due.date);
+      const total = Math.round(Number(due.tx?.entity?.data?.installments) || 0);
+      const index = total ? Math.min(total, 1 + (Number(due.date.slice(0,4)) - Number(first.slice(0,4))) * 12 + (Number(due.date.slice(5,7)) - Number(first.slice(5,7)))) : 0;
+      const parcela = total ? ' (parcela ' + index + ' de ' + total + ')' : '';
       const signature=JSON.stringify([NOTIFICATION_SIGNATURE_VERSION,due.title,due.amount,due.date,offset,receive]);
       desired.push({
         identifier:PREFIX + key + ':' + due.id + (offset ? ':-' + offset : ''),
-        content:{title:(receive ? 'Recebimento previsto ' : 'Conta vence ') + when + ': ' + due.title,body:'Valor: '+valor+'. Abra Finanças → Pendentes para confirmar '+(receive ? 'o recebimento.' : 'o pagamento.'),sound:'default',
+        content:{title:(receive ? 'Recebimento previsto ' : 'Conta vence ') + when + ': ' + due.title + parcela,body:(total && index >= total ? 'Última parcela de ' + due.title + '. ' : '') + 'Valor: '+valor+'. Abra Finanças → Pendentes para confirmar '+(receive ? 'o recebimento.' : 'o pagamento.'),sound:'default',
           data:{sofiaFinanceDue:true,scope:key,entityId:due.tx?.entity?.id||'',signature}},
         trigger:{type:Notifications.SchedulableTriggerInputTypes.DATE,date,channelId:CHANNEL}
       });

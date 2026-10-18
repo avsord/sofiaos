@@ -26,7 +26,7 @@ import {
   trend, balanceSeries, upcoming, manualDues, transactionsForAccount, goalProgress, parseMoney, formatMoneyInput, finishMoneyInput, addDays,
   dayIn} from '../lib/finance';
 import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove} from '../lib/finance';
-import {cycleRange, cycleRoom, fixedSummary, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove} from '../lib/finance';
+import {cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove} from '../lib/finance';
 import {syncFinanceDueNotifications} from '../lib/finance-notifications';
 import {appAlert} from '../lib/app-alert';
 
@@ -569,7 +569,7 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload}: {d:Data;api:S
       {fixed.bills.map(b=><View key={b.id+b.date} style={{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:9,borderTopWidth:1,borderColor:c.line}}>
         <View style={{flex:1,gap:2}}>
           <Text style={{color:c.text,fontSize:14,fontWeight:'600'}}>{b.title}</Text>
-          <Text style={{color:c.muted,fontSize:11}}>dia {b.day}{b.cardId?' · cartão':''} · {b.paid?'paga':'a pagar'}</Text>
+          <Text style={{color:c.muted,fontSize:11}}>dia {b.day}{b.cardId?' · cartão':''} · {b.paid?'paga':'a pagar'}{b.installments?' · parcela '+b.index+' de '+b.installments+(b.left?' · faltam '+b.left:' · última'):''}</Text>
         </View>
         <Text style={{color:b.paid?c.muted:c.text,fontWeight:'700',fontSize:14,textDecorationLine:b.paid?'line-through':'none'}}>{money(b.amount)}</Text>
       </View>)}
@@ -595,6 +595,8 @@ function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;
   const [repeat,setRepeat]=useState(tx?.recurrence==='monthly'?'monthly':'none');
   // 0.3.151: tambem contas a receber, e aviso alguns dias antes (alem do aviso no dia)
   const [flow,setFlow]=useState<'expense'|'income'>(tx?.kind==='income'?'income':'expense'),[before,setBefore]=useState(String(tx?.remindDays||0));
+  // 0.3.165: conta fixa com prazo (ex.: 10 parcelas) - para de se repetir sozinha no fim
+  const [parcels,setParcels]=useState(String(tx?.entity?.data?.installments||''));
   const [error,setError]=useState(''),[busy,setBusy]=useState(false);
   async function save() {
     const value=parseMoney(amount);
@@ -606,6 +608,8 @@ function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;
     try{
       const data={
         kind:flow,amount:value,date,category,account_id:tx?.accountId||accountId,remind_days:Number(before)||0,
+        installments:repeat==='monthly'&&Number(parcels)>1?Math.min(360,Math.round(Number(parcels))):'',
+        recurrence_end:repeat==='monthly'&&Number(parcels)>1?lastInstallmentMonth(date,Number(parcels)):'',
         paid:false,card_id:'',to_account_id:'',
         recurrence:tx?.virtual?'none':repeat,
         series_id:tx?.seriesId||'',
@@ -634,6 +638,10 @@ function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;
       <Chips scroll value={category} onChange={setCategory} options={['Contas','Moradia','Saúde','Impostos','Outros'].map(x=>({value:x,label:x}))}/>
       <Text style={{color:c.muted,fontSize:12}}>Repetição</Text>
       <Chips value={repeat} onChange={setRepeat} options={[{value:'none',label:'Só esta vez'},{value:'monthly',label:'Todo mês'}]}/>
+      {repeat==='monthly'?<>
+        <Field label="Parcelas (opcional)" value={parcels} onChange={setParcels} numeric placeholder="Ex.: 10" />
+        <Text style={{color:c.muted,fontSize:11,lineHeight:16}}>{Number(parcels)>1?'Acaba sozinha na '+Math.round(Number(parcels))+'ª parcela, em '+monthLabel(lastInstallmentMonth(date,Number(parcels)))+'. A Sofia avisa quando terminar.':'Em branco, se repete todo mês sem prazo.'}</Text>
+      </>:null}
       <Text style={{color:c.muted,fontSize:12}}>Avisar</Text>
       <Chips value={before} onChange={setBefore} options={[{value:'0',label:'No dia'},{value:'1',label:'1 dia antes'},{value:'3',label:'3 dias antes'},{value:'7',label:'7 dias antes'}]}/>
       <Text style={{color:c.muted,fontSize:11}}>{before==='0'?'Aviso às 9h do dia do vencimento.':'Aviso às 9h, '+before+(before==='1'?' dia':' dias')+' antes e de novo no dia.'}</Text>

@@ -72,3 +72,26 @@ test('0.3.162: historico abre a edicao do movimento, com apagar',()=>{
   assert.ok(s.includes("input('Data (AAAA-MM-DD)', date, setDate)"));
   assert.ok(s.includes("Toque em um movimento para corrigir o valor, a data ou apagá-lo."));
 });
+
+test('0.3.165: conta fixa com prazo conta as parcelas e acaba sozinha',()=>{
+  const bill=(id,date,paid,extra={})=>f.toTx({id,kind:'fin_tx',title:'Cartão',state:'active',
+    data:{kind:'expense',amount:500,date,account_id:'a1',paid,category:'Contas',recurrence:'monthly',installments:10,recurrence_end:'2027-05',...extra}});
+  // primeira parcela em agosto/2026; em outubro estamos na 3a
+  const txs=[bill('p1','2026-08-10',true),bill('p2','2026-09-10',true,{series_id:'p1'}),bill('p3','2026-10-10',false,{series_id:'p1'})];
+  const out=f.fixedBills(txs,'a1',{start:'2026-10-01',end:'2026-10-31'});
+  assert.equal(out.length,1);
+  const b=out[0];assert.equal(b.installments,10);assert.equal(b.index,1,'index sai da data da propria parcela quando ela e a primeira do registro');
+  // usando o campo data.date da serie (primeira parcela) o indice fica correto
+  const serie=f.fixedBills([f.toTx({id:'p3',kind:'fin_tx',title:'Cartão',state:'active',
+    data:{kind:'expense',amount:500,date:'2026-10-10',account_id:'a1',paid:false,category:'Contas',recurrence:'monthly',installments:10}})],'a1',{start:'2026-10-01',end:'2026-10-31'});
+  assert.equal(serie[0].left,10,'a pagar: conta a propria parcela');
+  assert.equal(f.lastInstallmentMonth('2026-08-10',10),'2027-05','para de se repetir na 10a');
+  assert.equal(f.monthsBetween('2026-08','2026-10'),2);
+});
+test('0.3.165: tela e avisos das parcelas',()=>{
+  const s=read('src/screens/Finance.tsx'),n=read('src/lib/finance-notifications.ts');
+  assert.ok(s.includes('Parcelas (opcional)'));
+  assert.ok(s.includes("parcela '+b.index+' de '+b.installments"));
+  assert.ok(s.includes('A Sofia avisa quando terminar.'));
+  assert.ok(n.includes("due.title + ' acabou"));assert.ok(n.includes("'Última parcela de '"));
+});
