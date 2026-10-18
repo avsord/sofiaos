@@ -30,3 +30,19 @@ test('0.3.169: no passo a passo, tocar numa conta fixa abre para editar (sem rem
   // a conta meio preenchida tambem entra no rascunho
   assert.ok(s.includes('billTitle, billAmount, billDay, billParcels, billAt};'));
 });
+
+test('0.3.171: meta com dia, mes e ano pelo seletor de data',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes('<DateTimeField label="Até" value={goalMonth} onChange={setGoalMonth} dateOnly emptyLabel="Escolher data" />'));
+  assert.ok(!s.includes("'Até (AAAA-MM)'")&&!s.includes('label="Até (AAAA-MM)"'),'saiu o campo de texto');
+  assert.ok(s.includes('test(goalMonth) ? goalMonth : '),'data completa');
+});
+test('0.3.171: refazer a configuracao mostra o que existe e so substitui ao confirmar no fim',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("fixed: d.txs.filter(t => t.manualDue && t.recurrence === 'monthly' && !t.virtual"),'contas fixas atuais entram na lista');
+  assert.ok(s.includes("appAlert('Substituir a configuração atual?'"),'confirmacao antes de alterar');
+  assert.ok(s.includes("existing ? 'Substituir configuração' : 'Começar a usar'"));
+  assert.ok(s.includes('Nada foi alterado ainda.'));
+  assert.ok(s.includes("await api.saveEntity({...old.entity, state: 'archived'})"),'removidas sao arquivadas, nao apagadas');
+  assert.ok(s.includes('if (previous && previous.entity) {'),'as que ficaram sao atualizadas, sem duplicar');
+});

@@ -250,19 +250,22 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
 // ============================ PRIMEIRO USO ============================
 /** 0.3.161: passo a passo da primeira configuracao. Tudo opcional menos a conta; "Pular" em
  * qualquer passo vai direto para o app. Reaberto depois em Contas e cartoes, ja preenchido. */
-function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: () => Promise<void>; existing?: {account: Account | null; reserve: Goal | null} | null; onClose?: () => void}) {
+function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: () => Promise<void>; existing?: {account: Account | null; reserve: Goal | null; fixed?: Tx[]} | null; onClose?: () => void}) {
   const c = useTheme(), acc = existing?.account || null, reserve = existing?.reserve || null;
   const [step, setStep] = useState(0), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [name, setName] = useState(acc?.name || 'Conta principal'), [balance, setBalance] = useState(acc ? finishMoneyInput(String(acc.initial).replace('.', ',')) : '');
   const [cycleDay, setCycleDay] = useState(acc?.cycleDay ? String(acc.cycleDay) : '');
-  const [bills, setBills] = useState<{title: string; amount: string; day: string; parcels: string; at: string}[]>([]);
+  // 0.3.171: ao refazer, as contas fixas que ja existem entram na lista; nada e alterado ate confirmar no fim.
+  type WizardBill = {id?: string; title: string; amount: string; day: string; parcels: string; at: string};
+  const [bills, setBills] = useState<WizardBill[]>(() => (existing?.fixed || []).filter(t => t.entity).map(t => ({id: t.entity!.id, title: t.desc, amount: finishMoneyInput(String(t.amount).replace('.', ',')),
+    day: String(Number(t.date.slice(8, 10)) || ''), parcels: t.entity!.data?.installments ? String(t.entity!.data.installments) : '', at: t.entity!.data?.installment ? String(t.entity!.data.installment) : ''})));
   const [billTitle, setBillTitle] = useState(''), [billAmount, setBillAmount] = useState(''), [billDay, setBillDay] = useState(''), [billParcels, setBillParcels] = useState(''), [billAt, setBillAt] = useState('');
   const [billEditing, setBillEditing] = useState<number | null>(null);
   const [saved, setSaved] = useState(reserve ? finishMoneyInput(String(reserve.saved).replace('.', ',')) : '');
   const [plan, setPlan] = useState(reserve?.entity?.data?.monthly_plan ? finishMoneyInput(String(reserve.entity.data.monthly_plan).replace('.', ',')) : '');
   const [planDay, setPlanDay] = useState(String(reserve?.entity?.data?.plan_day || ''));
   const [goalValue, setGoalValue] = useState(reserve?.target ? finishMoneyInput(String(reserve.target).replace('.', ',')) : '');
-  const [goalMonth, setGoalMonth] = useState(String(reserve?.entity?.data?.deadline || '').slice(0, 7));
+  const [goalMonth, setGoalMonth] = useState(String(reserve?.entity?.data?.deadline || '').slice(0, 10));
   // 0.3.168: a configuracao tambem sobrevive a sair do app no meio do preenchimento.
   const wizardForm = {step: String(step), name, balance, cycleDay, bills: JSON.stringify(bills), saved, plan, planDay, goalValue, goalMonth,
     billTitle, billAmount, billDay, billParcels, billAt};
@@ -292,13 +295,29 @@ function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: ()
   const fixedTotal = bills.reduce((t, b) => t + money0(b.amount), 0);
   const ceiling = Math.max(0, money0(balance) - fixedTotal - money0(plan));
 
+  function confirmFinish() {
+    if (!existing) { void finish(); return; }
+    appAlert('Substituir a configuração atual?', 'Conta, dia do recebimento, contas fixas, guardado, aporte e meta passam a ser os desta configuração. Contas fixas que você removeu daqui são arquivadas. Lançamentos e histórico não são apagados.',
+      [{text: 'Voltar', style: 'cancel'}, {text: 'Substituir', onPress: () => void finish()}]);
+  }
   async function finish() {
     setBusy(true); setError('');
     try {
       const account = await saveEntity(api, 'fin_account', name.trim() || 'Conta principal',
         {account_type: acc?.type || 'corrente', initial_balance: String(money0(balance)), color: acc?.color || FIN_COLORS[0], include_total: true, cycle_day: Math.min(31, Math.max(0, Number(cycleDay) || 0))}, acc?.entity);
+      const kept = new Set(bills.map(b => b.id).filter(Boolean));
+      for (const old of existing?.fixed || []) if (old.entity && !kept.has(old.entity.id)) await api.saveEntity({...old.entity, state: 'archived'});
       for (const b of bills) {
         const day = Math.min(28, Math.max(1, Number(b.day) || 1)), month = monthOf(todayISO());
+        const previous = b.id ? (existing?.fixed || []).find(t => t.entity?.id === b.id) : undefined;
+        if (previous && previous.entity) {
+          const parcels = Number(b.parcels) > 1 ? Math.min(360, Math.round(Number(b.parcels))) : '';
+          const at = parcels ? Math.min(Number(parcels), Math.max(1, Math.round(Number(b.at)) || 1)) : '';
+          const pdate = dayIn(monthOf(previous.date), day);
+          await api.saveEntity({...previous.entity, title: b.title.trim(), data: {...previous.entity.data, amount: money0(b.amount), date: pdate,
+            installments: parcels, installment: at, recurrence_end: parcels ? addMonths(monthOf(pdate), Number(parcels) - Number(at || 1)) : ''}});
+          continue;
+        }
         await api.saveEntity({kind: 'fin_tx', title: b.title.trim(), content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [],
           data: {kind: 'expense', amount: money0(b.amount), date: dayIn(month, day), account_id: account.id, paid: false, category: 'Contas', recurrence: 'monthly',
             installments: Number(b.parcels) > 1 ? Math.min(360, Math.round(Number(b.parcels))) : '',
@@ -309,7 +328,7 @@ function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: ()
       if (money0(saved) > 0 || money0(plan) > 0 || money0(goalValue) > 0) {
         const data: Record<string, unknown> = {role: 'reserve', saved: money0(saved), monthly_plan: money0(plan), color: GOOD, account_id: account.id,
           plan_day: Math.min(28, Math.max(1, Number(planDay) || Number(cycleDay) || 5)), remind_time: '09:00', remind_before_days: 0, remind_repeat_days: 0,
-          target: money0(goalValue) || '', deadline: /^\d{4}-\d{2}$/.test(goalMonth) ? goalMonth + '-' + String(new Date(Number(goalMonth.slice(0, 4)), Number(goalMonth.slice(5, 7)), 0).getDate()).padStart(2, '0') : ''};
+          target: money0(goalValue) || '', deadline: /^\d{4}-\d{2}-\d{2}$/.test(goalMonth) ? goalMonth : ''};
         await api.saveEntity(reserve ? {...reserve.entity, data: {...reserve.entity.data, ...data}} : {kind: 'fin_goal', title: 'Dinheiro guardado', content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data});
       }
       await clearWizardDraft();
@@ -360,7 +379,7 @@ function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: ()
     </>},
     {title: 'Meta', hint: 'Quanto quer juntar e até quando. A Sofia mostra se o aporte dá conta do prazo.', body: <>
       <Field label="Quero juntar (R$)" value={goalValue} onChange={setGoalValue} placeholder="Ex.: 39.000,00" numeric />
-      <Field label="Até (AAAA-MM)" value={goalMonth} onChange={setGoalMonth} placeholder="2027-03" />
+      <DateTimeField label="Até" value={goalMonth} onChange={setGoalMonth} dateOnly emptyLabel="Escolher data" />
     </>},
     {title: 'Tudo pronto', hint: 'Você pode mudar qualquer coisa depois.', body: <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 8}}>
       <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Conta</Text><Text style={{color: c.text, fontWeight: '700'}}>{name || 'Conta principal'} · {money(money0(balance))}</Text></View>
@@ -368,7 +387,7 @@ function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: ()
       {bills.length ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Contas fixas</Text><Text style={{color: c.text, fontWeight: '700'}}>{bills.length} · {money(fixedTotal)}</Text></View> : null}
       {money0(saved) > 0 ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Guardado</Text><Text style={{color: c.text, fontWeight: '700'}}>{money(money0(saved))}</Text></View> : null}
       {money0(plan) > 0 ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Aporte</Text><Text style={{color: c.text, fontWeight: '700'}}>{money(money0(plan))} por mês</Text></View> : null}
-      {money0(goalValue) > 0 ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Meta</Text><Text style={{color: c.text, fontWeight: '700'}}>{money(money0(goalValue))}{goalMonth ? ' até ' + goalMonth : ''}</Text></View> : null}
+      {money0(goalValue) > 0 ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Meta</Text><Text style={{color: c.text, fontWeight: '700'}}>{money(money0(goalValue))}{goalMonth ? ' até ' + goalMonth.split('-').reverse().join('/') : ''}</Text></View> : null}
       <View style={{height: 1, backgroundColor: c.line}} />
       <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.text, fontWeight: '700', fontSize: 12}}>Saldo deste ciclo</Text><Text style={{color: GOOD, fontWeight: '800'}}>{money(ceiling)}</Text></View>
       <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>É o que sobra depois das contas fixas e do aporte. Essa é a conta que a tela inicial acompanha.</Text>
@@ -387,8 +406,9 @@ function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: ()
       </View>
       {current.body}
       {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
-      <Button title={last ? (existing ? 'Salvar' : 'Começar a usar') : 'Continuar'} loading={busy} disabled={step === 0 && !name.trim()}
-        onPress={() => last ? void finish() : setStep(s => s + 1)} />
+      {last && existing ? <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Nada foi alterado ainda. Só ao tocar em “Substituir configuração” estes dados passam a valer; se sair agora, tudo continua como estava.</Text> : null}
+      <Button title={last ? (existing ? 'Substituir configuração' : 'Começar a usar') : 'Continuar'} loading={busy} disabled={step === 0 && !name.trim()}
+        onPress={() => last ? confirmFinish() : setStep(s => s + 1)} />
       <View style={{flexDirection: 'row', justifyContent: 'center', gap: 18}}>
         {step > 0 ? <Pressable accessibilityRole="button" onPress={() => setStep(s => s - 1)}><Text style={{color: c.accent, fontSize: 13, fontWeight: '700'}}>Voltar</Text></Pressable> : null}
         {!last ? <Pressable accessibilityRole="button" onPress={() => setStep(steps.length - 1)}><Text style={{color: c.muted, fontSize: 13}}>Pular o resto</Text></Pressable> : null}
@@ -489,13 +509,13 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
   const [name, setName] = useState(reserve?.name || 'Dinheiro guardado'), [amount, setAmount] = useState(''), [note, setNote] = useState(''),
     [plan, setPlan] = useState(reserve?.entity?.data?.monthly_plan ? finishMoneyInput(String(reserve.entity.data.monthly_plan).replace('.', ',')) : ''),
     [goalValue, setGoalValue] = useState(reserve?.target ? finishMoneyInput(String(reserve.target).replace('.', ',')) : ''),
-    [goalMonth, setGoalMonth] = useState(String(reserve?.entity?.data?.deadline || '').slice(0, 7)),
+    [goalMonth, setGoalMonth] = useState(String(reserve?.entity?.data?.deadline || '').slice(0, 10)),
     [day, setDay] = useState(String(reserve?.entity?.data?.plan_day || 5)),
     [remindBefore, setRemindBefore] = useState(String(reserve?.entity?.data?.remind_before_days ?? 0)),
     [remindTime, setRemindTime] = useState(String(reserve?.entity?.data?.remind_time || '09:00')),
     [repeatDays, setRepeatDays] = useState(String(reserve?.entity?.data?.remind_repeat_days ?? 0)),
     [plannedOut, setPlannedOut] = useState(false);
-  const goalFields = {target: parseMoney(goalValue) ?? '', deadline: /^\d{4}-\d{2}$/.test(goalMonth) ? goalMonth + '-' + String(new Date(Number(goalMonth.slice(0, 4)), Number(goalMonth.slice(5, 7)), 0).getDate()).padStart(2, '0') : ''};
+  const goalFields = {target: parseMoney(goalValue) ?? '', deadline: /^\d{4}-\d{2}-\d{2}$/.test(goalMonth) ? goalMonth : ''};
   const planFields = {monthly_plan: parseMoney(plan) ?? 0, plan_day: Math.min(28, Math.max(1, Number(day) || 5)),
     remind_before_days: Math.max(0, Number(remindBefore) || 0), remind_time: remindTime, remind_repeat_days: Math.max(0, Number(repeatDays) || 0)};
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
@@ -554,7 +574,7 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
     <Text style={{color: c.muted, fontSize: 12}}>Meta (opcional)</Text>
     <View style={{flexDirection: 'row', gap: 10}}>
       <View style={{flex: 1}}>{input('Quero juntar', goalValue, setGoalValue, 'Ex.: 39.000')}</View>
-      <View style={{flex: 1}}>{input('Até (AAAA-MM)', goalMonth, setGoalMonth, '2027-03')}</View>
+      <View style={{flex: 1}}><DateTimeField label="Até" value={goalMonth} onChange={setGoalMonth} dateOnly emptyLabel="Escolher data" /></View>
     </View>
   </View>;
   const planEditor = <View style={{gap: 10}}>
@@ -807,7 +827,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
             <Text style={{fontSize: 29, fontWeight: '800', color: c.text}}>{show(split.saved)}</Text>
             <Text style={{fontSize: 12, lineHeight: 18, color: c.muted}}>Esse valor é separado das suas contas: não entra no saldo geral. O saldo geral é o que você tem para usar. Guardar dinheiro tira do saldo geral; retirar devolve. É uma organização da Sofia, não bloqueia nada no banco.</Text>
             {outlook ? <View style={{backgroundColor: GUARD + '1f', borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: GUARD + '55'}}>
-              <Text style={{color: c.text, fontWeight: '800', fontSize: 14}}>Meta: {show(outlook.target)} até {monthLabel(outlook.deadline.slice(0, 7))}</Text>
+              <Text style={{color: c.text, fontWeight: '800', fontSize: 14}}>Meta: {show(outlook.target)} até {outlook.deadline.split('-').reverse().join('/')}</Text>
               <View style={{height: 8, borderRadius: 4, backgroundColor: c.line, overflow: 'hidden'}}>
                 <View style={{width: `${Math.round(Math.min(1, split.saved / outlook.target) * 100)}%` as `${number}%`, height: 8, backgroundColor: GUARD}} />
               </View>
@@ -1351,7 +1371,7 @@ function ManageSheet({api, d, onClose, reload}: {api: SofiaApi; d: Data; onClose
         <View style={{paddingTop: 40, paddingBottom: 8, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: c.line}}>
           <IconButton name="back" label="Voltar" onPress={onClose} /><Text style={{flex: 1, fontSize: 17, fontWeight: '700', color: c.text}}>Contas e cartões</Text>
         </View>
-        {setup ? <Onboarding api={api} onDone={reload} onClose={() => setSetup(false)} existing={{account: d.accounts.find(a => !a.archived) || null, reserve: reserveOf(d.goals)}} /> :
+        {setup ? <Onboarding api={api} onDone={reload} onClose={() => setSetup(false)} existing={{account: d.accounts.find(a => !a.archived) || null, reserve: reserveOf(d.goals), fixed: d.txs.filter(t => t.manualDue && t.recurrence === 'monthly' && !t.virtual && t.kind === 'expense' && t.entity?.state !== 'archived')}} /> :
         <ScrollView contentContainerStyle={{padding: 18, gap: 14}}>
           <Pressable accessibilityRole="button" onPress={() => setSetup(true)} style={{backgroundColor: c.surface, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: c.line, flexDirection: 'row', alignItems: 'center', gap: 10}}>
             <View style={{flex: 1, gap: 2}}>
