@@ -142,3 +142,10 @@ test('0.3.178: apagar no historico um pagamento de pendencia desfaz o pagamento 
   const p=f.toTx({id:'luz',kind:'fin_tx',title:'Luz',state:'active',data:{kind:'expense',amount:180,date:'2026-10-12',account_id:'a1',paid:false,category:'Contas',recurrence:'none',import_id:'sofia-pendencia:luz'}});
   const d=f.monthDues([p],'a1','2026-10','2026-10-17')[0];assert.equal(d.paid,false);assert.equal(d.late,true);
 });
+
+test('0.3.179: em aberto fica amarelo e pago fica verde',()=>{
+  const s=read('src/screens/Finance.tsx');
+  const row=s.slice(s.indexOf('function DueRow('),s.indexOf('// 0.3.175: atualizacoes locais imediatas'));
+  assert.ok(row.includes('const color = WARN;'),'em aberto: amarelo, inclusive a receber e atrasada');
+  assert.ok(row.includes("backgroundColor: WARN + '1a'"));assert.ok(row.includes("backgroundColor: GOOD + '1a'"),'pago: verde');
+});

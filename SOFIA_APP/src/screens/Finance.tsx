@@ -917,7 +917,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
 }
 function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; reload: () => Promise<void>; onTx: (t: Partial<Tx>) => void}) {
   const c = useTheme(), [busy, setBusy] = useState(false), [pick, setPick] = useState(false);
-  const color = due.kind === 'receber' ? GOOD : due.late ? BAD : due.kind === 'fatura' ? c.accent : WARN;
+  const color = WARN;
   const local = React.useContext(FinanceLocal);
   async function settle(accountId?: string) {
     setBusy(true);
@@ -947,13 +947,13 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
     </View>
   );
   return (
-    <View style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4}}>
+    <View style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 14, backgroundColor: WARN + '1a'}}>
       <View style={{width: 4, height: 36, borderRadius: 2, backgroundColor: color}} />
       <Pressable style={{flex: 1, gap: 2}} onPress={() => due.tx && onTx(due.tx)}>
         <Text numberOfLines={1} style={{color: c.text, fontWeight: '600'}}>{due.title}</Text>
         <Text style={{fontSize: 11, color: due.late ? BAD : c.muted}}>{due.late ? 'Atrasado · ' : ''}{due.kind === 'receber' ? 'receber' : 'vence'} {dateBR(due.date)}{due.tx?.virtual ? ' · repetição' : ''}</Text>
       </Pressable>
-      <Text style={{color: due.kind === 'receber' ? GOOD : c.text, fontWeight: '700'}}>{money(due.amount)}</Text>
+      <Text style={{color: c.text, fontWeight: '700'}}>{money(due.amount)}</Text>
       <Pressable disabled={busy} onPress={() => due.invoice && d.accounts.length > 1 ? setPick(true) : void settle()} style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: color + '22'}}>
         {busy ? <ActivityIndicator size="small" color={color} /> : <Text style={{color, fontWeight: '700', fontSize: 12}}>{due.kind === 'receber' ? 'Recebi' : 'Paguei'}</Text>}
       </Pressable>
