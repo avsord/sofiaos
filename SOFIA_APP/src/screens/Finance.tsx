@@ -642,7 +642,7 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
 
 // ============================ PENDENTES MANUAIS ============================
 function PendingTab({d,api,month,accountId,warning,onBill,reload}: {d:Data;api:SofiaApi;month:string;accountId:string;warning:string;onBill:(t:Tx|'new')=>void;reload:()=>Promise<void>}) {
-  // 0.3.176: a aba segue o mes escolhido no topo (no mes atual, junto com as atrasadas)
+  // A aba segue o mes escolhido no topo; cada mes mostra so as suas contas (0.3.180)
   const c=useTheme(),today=todayISO(),list=useMemo(()=>monthDues(d.txs,accountId,month,today),[d,accountId,month,today]);
   const open=list.filter(row=>!row.paid),total=open.reduce((sum,row)=>sum+row.amount,0),paidCount=list.length-open.length;
   // 0.3.161: as pendencias marcadas como "todo mes" sao as contas fixas; aqui elas aparecem juntas,

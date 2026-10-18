@@ -277,15 +277,15 @@ export function manualDues(txs: Tx[], accountId = '', today = todayISO(), days =
     .map(t => ({id: t.id, title: t.desc, amount: t.amount, date: t.date, kind: (t.kind === 'income' ? 'receber' : 'pagar') as Due['kind'], late: t.date < today, tx: t}))
     .sort((a,b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
 }
-/** 0.3.176: pendencias do MES escolhido no topo. No mes atual tambem entram as atrasadas de meses
- * anteriores (ainda nao pagas); em outros meses, so as daquele mes. */
+/** Pendencias do MES escolhido no topo. 0.3.180: cada mes fica com as suas contas, mesmo as
+ * atrasadas - uma conta de setembro nao pagas continua em setembro (marcada como atrasada). */
 export function monthDues(txs: Tx[], accountId: string, month: string, today = todayISO()): Due[] {
-  const current = monthOf(today), start = dayIn(month, 1), end = dayIn(month, daysIn(month));
+  const start = dayIn(month, 1), end = dayIn(month, daysIn(month));
   const seen = new Set<string>();
   return [...txs, ...expandRecurring(txs, month)]
     // 0.3.177: as pagas daquele mes continuam na lista (verdes), em vez de sumirem ao pagar
     .filter(t => t.manualDue && (t.kind === 'expense' || t.kind === 'income') && !t.cardId && (!accountId || t.accountId === accountId))
-    .filter(t => (t.date >= start && t.date <= end) || (!t.paid && month === current && t.date < start))
+    .filter(t => t.date >= start && t.date <= end)
     .filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; })
     .map(t => ({id: t.id, title: t.desc, amount: t.amount, date: t.date, kind: (t.kind === 'income' ? 'receber' : 'pagar') as Due['kind'], late: !t.paid && t.date < today, paid: t.paid, tx: t}))
     .sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));

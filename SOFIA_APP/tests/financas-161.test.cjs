@@ -108,11 +108,13 @@ test('0.3.166: conta que ja esta no meio ("3 de 10") conta certo e termina na de
   assert.ok(s.includes('Conta com prazo (ex.: 10x)?'),'tambem no passo a passo');
 });
 
-test('0.3.176: pendencias seguem o mes do topo; no mes atual entram as atrasadas',()=>{
+test('0.3.180: pendencias seguem o mes do topo; cada mes fica com as suas, mesmo atrasadas',()=>{
   const p=(id,date,extra={})=>f.toTx({id,kind:'fin_tx',title:id,state:'active',data:{kind:'expense',amount:100,date,account_id:'a1',paid:false,category:'Contas',recurrence:'none',import_id:'sofia-pendencia:'+id,...extra}});
   const txs=[p('atrasada','2026-09-20'),p('outubro','2026-10-25'),p('novembro','2026-11-05'),p('academia','2026-10-10',{recurrence:'monthly'})];
   const titles=m=>f.monthDues(txs,'a1',m,'2026-10-17').map(d=>d.title).join(',');
-  assert.equal(titles('2026-10'),'atrasada,academia,outubro');
+  assert.equal(titles('2026-10'),'academia,outubro','a atrasada de setembro nao vem para outubro');
+  assert.equal(titles('2026-09'),'atrasada','fica em setembro');
+  assert.equal(f.monthDues(txs,'a1','2026-09','2026-10-17')[0].late,true,'marcada como atrasada');
   assert.equal(titles('2026-11'),'novembro,academia','outro mes: so o dele, com as fixas daquele mes');
   assert.equal(titles('2026-12'),'academia');
   const s=read('src/screens/Finance.tsx');
@@ -123,7 +125,7 @@ test('0.3.176: pendencias seguem o mes do topo; no mes atual entram as atrasadas
 test('0.3.177: ao pagar, a conta fica verde e continua na lista do mes',()=>{
   const p=(id,date,paid=false)=>f.toTx({id,kind:'fin_tx',title:id,state:'active',data:{kind:'expense',amount:100,date,account_id:'a1',paid,category:'Contas',recurrence:'none',import_id:'sofia-pendencia:'+id}});
   const list=f.monthDues([p('atrasada','2026-09-20'),p('paga-setembro','2026-09-05',true),p('outubro','2026-10-25'),p('paga-outubro','2026-10-02',true)],'a1','2026-10','2026-10-17');
-  assert.equal(list.map(d=>d.title).join(','),'atrasada,paga-outubro,outubro','paga de setembro nao vem para outubro');
+  assert.equal(list.map(d=>d.title).join(','),'paga-outubro,outubro','so as de outubro');
   const paga=list.find(d=>d.title==='paga-outubro');assert.equal(paga.paid,true);assert.equal(paga.late,false);
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes("if (due.paid) return ("),'linha propria para paga');
