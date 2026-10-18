@@ -466,7 +466,8 @@ export function fixedBills(txs: Tx[], accountId: string, range: {start: string; 
       // conta a partir do proximo pagamento: paga a 6a de 10, restam 4.
       const total = Math.max(0, Math.round(Number(t.entity?.data?.installments) || 0));
       const first = String(t.entity?.data?.date || t.date);
-      const index = total ? Math.min(total, monthsBetween(monthOf(first), monthOf(t.date)) + 1) : 0;
+      const base = Math.max(1, Math.round(Number(t.entity?.data?.installment) || 1));
+      const index = total ? Math.min(total, monthsBetween(monthOf(first), monthOf(t.date)) + base) : 0;
       return {id: t.id, title: t.desc, amount: t.amount, paidAmount: t.paid ? t.amount : null, day: Number(t.date.slice(8, 10)), date: t.date, paid: t.paid, cardId: t.cardId || '',
         installments: total, index, left: total ? Math.max(0, total - index + (t.paid ? 0 : 1)) : 0, last: !!total && index >= total, tx: t};
     });

@@ -254,8 +254,8 @@ function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: ()
   const [step, setStep] = useState(0), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [name, setName] = useState(acc?.name || 'Conta principal'), [balance, setBalance] = useState(acc ? finishMoneyInput(String(acc.initial).replace('.', ',')) : '');
   const [cycleDay, setCycleDay] = useState(acc?.cycleDay ? String(acc.cycleDay) : '');
-  const [bills, setBills] = useState<{title: string; amount: string; day: string}[]>([]);
-  const [billTitle, setBillTitle] = useState(''), [billAmount, setBillAmount] = useState(''), [billDay, setBillDay] = useState('');
+  const [bills, setBills] = useState<{title: string; amount: string; day: string; parcels: string; at: string}[]>([]);
+  const [billTitle, setBillTitle] = useState(''), [billAmount, setBillAmount] = useState(''), [billDay, setBillDay] = useState(''), [billParcels, setBillParcels] = useState(''), [billAt, setBillAt] = useState('');
   const [saved, setSaved] = useState(reserve ? finishMoneyInput(String(reserve.saved).replace('.', ',')) : '');
   const [plan, setPlan] = useState(reserve?.entity?.data?.monthly_plan ? finishMoneyInput(String(reserve.entity.data.monthly_plan).replace('.', ',')) : '');
   const [planDay, setPlanDay] = useState(String(reserve?.entity?.data?.plan_day || ''));
@@ -273,7 +273,11 @@ function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: ()
       for (const b of bills) {
         const day = Math.min(28, Math.max(1, Number(b.day) || 1)), month = monthOf(todayISO());
         await api.saveEntity({kind: 'fin_tx', title: b.title.trim(), content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [],
-          data: {kind: 'expense', amount: money0(b.amount), date: dayIn(month, day), account_id: account.id, paid: false, category: 'Contas', recurrence: 'monthly', import_id: 'sofia-pendencia:' + Date.now() + ':' + day, remind_days: 0}});
+          data: {kind: 'expense', amount: money0(b.amount), date: dayIn(month, day), account_id: account.id, paid: false, category: 'Contas', recurrence: 'monthly',
+            installments: Number(b.parcels) > 1 ? Math.min(360, Math.round(Number(b.parcels))) : '',
+            installment: Number(b.parcels) > 1 ? Math.min(Math.round(Number(b.parcels)), Math.max(1, Math.round(Number(b.at)) || 1)) : '',
+            recurrence_end: Number(b.parcels) > 1 ? addMonths(month, Math.round(Number(b.parcels)) - Math.max(1, Math.round(Number(b.at)) || 1)) : '',
+            import_id: 'sofia-pendencia:' + Date.now() + ':' + day, remind_days: 0}});
       }
       if (money0(saved) > 0 || money0(plan) > 0 || money0(goalValue) > 0) {
         const data: Record<string, unknown> = {role: 'reserve', saved: money0(saved), monthly_plan: money0(plan), color: GOOD, account_id: account.id,
@@ -294,7 +298,7 @@ function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: ()
       <Field label="Dia em que você recebe" value={cycleDay} onChange={setCycleDay} placeholder="Ex.: 25" numeric />},
     {title: 'Contas fixas', hint: 'Aluguel, academia, imposto, assinaturas. Elas se repetem todo mês e a Sofia avisa no vencimento.', body: <>
       {bills.map((b, i) => <View key={i} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderColor: c.line}}>
-        <View style={{flex: 1}}><Text style={{color: c.text, fontWeight: '600'}}>{b.title}</Text><Text style={{color: c.muted, fontSize: 11}}>dia {b.day || 1}</Text></View>
+        <View style={{flex: 1}}><Text style={{color: c.text, fontWeight: '600'}}>{b.title}</Text><Text style={{color: c.muted, fontSize: 11}}>dia {b.day || 1}{Number(b.parcels) > 1 ? ' · parcela ' + (Math.max(1, Number(b.at) || 1)) + ' de ' + Math.round(Number(b.parcels)) : ''}</Text></View>
         <Text style={{color: c.text, fontWeight: '700'}}>{money(money0(b.amount))}</Text>
         <IconButton name="trash" label={'Remover ' + b.title} onPress={() => setBills(list => list.filter((_, n) => n !== i))} />
       </View>)}
@@ -303,8 +307,13 @@ function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: ()
         <View style={{flex: 1}}><Field label="Valor (R$)" value={billAmount} onChange={setBillAmount} placeholder="0,00" numeric /></View>
         <View style={{flex: 1}}><Field label="Dia" value={billDay} onChange={setBillDay} placeholder="5" numeric /></View>
       </View>
+      <View style={{flexDirection: 'row', gap: 10}}>
+        <View style={{flex: 1}}><Field label="Parcelas (opcional)" value={billParcels} onChange={setBillParcels} placeholder="Ex.: 10" numeric /></View>
+        {Number(billParcels) > 1 ? <View style={{flex: 1}}><Field label="Esta é a parcela nº" value={billAt} onChange={setBillAt} placeholder="1" numeric /></View> : null}
+      </View>
+      <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Conta com prazo (ex.: 10x)? Informe o total e em qual parcela você está. Ela acaba sozinha no fim e a Sofia avisa.</Text>
       <Button title="Adicionar conta fixa" secondary disabled={!billTitle.trim() || !money0(billAmount)}
-        onPress={() => { setBills(list => [...list, {title: billTitle.trim(), amount: billAmount, day: billDay}]); setBillTitle(''); setBillAmount(''); setBillDay(''); }} />
+        onPress={() => { setBills(list => [...list, {title: billTitle.trim(), amount: billAmount, day: billDay, parcels: billParcels, at: billAt}]); setBillTitle(''); setBillAmount(''); setBillDay(''); setBillParcels(''); setBillAt(''); }} />
       {bills.length ? <Text style={{color: c.muted, fontSize: 12}}>Total por mês: {money(fixedTotal)}</Text> : null}
     </>},
     {title: 'Dinheiro guardado', hint: 'Quanto você já tem guardado, esteja onde estiver. Esse valor fica separado do Saldo.', body:
@@ -597,6 +606,7 @@ function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;
   const [flow,setFlow]=useState<'expense'|'income'>(tx?.kind==='income'?'income':'expense'),[before,setBefore]=useState(String(tx?.remindDays||0));
   // 0.3.165: conta fixa com prazo (ex.: 10 parcelas) - para de se repetir sozinha no fim
   const [parcels,setParcels]=useState(String(tx?.entity?.data?.installments||''));
+  const [parcelNow,setParcelNow]=useState(String(tx?.entity?.data?.installment||''));
   const [error,setError]=useState(''),[busy,setBusy]=useState(false);
   async function save() {
     const value=parseMoney(amount);
@@ -609,7 +619,8 @@ function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;
       const data={
         kind:flow,amount:value,date,category,account_id:tx?.accountId||accountId,remind_days:Number(before)||0,
         installments:repeat==='monthly'&&Number(parcels)>1?Math.min(360,Math.round(Number(parcels))):'',
-        recurrence_end:repeat==='monthly'&&Number(parcels)>1?lastInstallmentMonth(date,Number(parcels)):'',
+        installment:repeat==='monthly'&&Number(parcels)>1?Math.min(Math.round(Number(parcels)),Math.max(1,Math.round(Number(parcelNow))||1)):'',
+        recurrence_end:repeat==='monthly'&&Number(parcels)>1?addMonths(monthOf(date),Math.round(Number(parcels))-Math.max(1,Math.round(Number(parcelNow))||1)):'',
         paid:false,card_id:'',to_account_id:'',
         recurrence:tx?.virtual?'none':repeat,
         series_id:tx?.seriesId||'',
@@ -639,8 +650,11 @@ function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;
       <Text style={{color:c.muted,fontSize:12}}>Repetição</Text>
       <Chips value={repeat} onChange={setRepeat} options={[{value:'none',label:'Só esta vez'},{value:'monthly',label:'Todo mês'}]}/>
       {repeat==='monthly'?<>
-        <Field label="Parcelas (opcional)" value={parcels} onChange={setParcels} numeric placeholder="Ex.: 10" />
-        <Text style={{color:c.muted,fontSize:11,lineHeight:16}}>{Number(parcels)>1?'Acaba sozinha na '+Math.round(Number(parcels))+'ª parcela, em '+monthLabel(lastInstallmentMonth(date,Number(parcels)))+'. A Sofia avisa quando terminar.':'Em branco, se repete todo mês sem prazo.'}</Text>
+        <View style={{flexDirection:'row',gap:10}}>
+          <View style={{flex:1}}><Field label="Parcelas (opcional)" value={parcels} onChange={setParcels} numeric placeholder="Ex.: 10" /></View>
+          {Number(parcels)>1?<View style={{flex:1}}><Field label="Esta é a parcela nº" value={parcelNow} onChange={setParcelNow} numeric placeholder="1" /></View>:null}
+        </View>
+        <Text style={{color:c.muted,fontSize:11,lineHeight:16}}>{Number(parcels)>1?'Acaba sozinha na '+Math.round(Number(parcels))+'ª parcela, em '+monthLabel(addMonths(monthOf(date),Math.round(Number(parcels))-Math.max(1,Math.round(Number(parcelNow))||1)))+'. A Sofia avisa quando terminar.':'Em branco, se repete todo mês sem prazo. Já tem parcelas pagas? Informe o total e em qual você está.'}</Text>
       </>:null}
       <Text style={{color:c.muted,fontSize:12}}>Avisar</Text>
       <Chips value={before} onChange={setBefore} options={[{value:'0',label:'No dia'},{value:'1',label:'1 dia antes'},{value:'3',label:'3 dias antes'},{value:'7',label:'7 dias antes'}]}/>

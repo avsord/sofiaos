@@ -95,3 +95,15 @@ test('0.3.165: tela e avisos das parcelas',()=>{
   assert.ok(s.includes('A Sofia avisa quando terminar.'));
   assert.ok(n.includes("due.title + ' acabou"));assert.ok(n.includes("'Última parcela de '"));
 });
+
+test('0.3.166: conta que ja esta no meio ("3 de 10") conta certo e termina na decima',()=>{
+  const tx=f.toTx({id:'p1',kind:'fin_tx',title:'Cartão',state:'active',
+    data:{kind:'expense',amount:500,date:'2026-10-10',account_id:'a1',paid:false,category:'Contas',recurrence:'monthly',installments:10,installment:3}});
+  const b=f.fixedBills([tx],'a1',{start:'2026-10-01',end:'2026-10-31'})[0];
+  assert.equal(b.index,3);assert.equal(b.left,8,'a pagar: a 3a mais as 7 seguintes');
+  const pago=f.fixedBills([{...tx,paid:true}],'a1',{start:'2026-10-01',end:'2026-10-31'})[0];
+  assert.equal(pago.left,7,'depois de pagar a 3a, faltam 7');
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes('Esta é a parcela nº'),'campo ao criar e ao editar');
+  assert.ok(s.includes('Conta com prazo (ex.: 10x)?'),'tambem no passo a passo');
+});
