@@ -136,18 +136,18 @@ test('0.3.177: ao pagar, a conta fica verde e continua na lista do mes',()=>{
 
 test('0.3.178: apagar no historico um pagamento de pendencia desfaz o pagamento (volta como a pagar)',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('if (tx.manualDue && tx.paid) {'));
+  assert.ok(s.includes("if (tx.manualDue && tx.paid && (tx.recurrence === 'monthly' || !!tx.seriesId)) {"),'0.3.181: so conta fixa volta como nao paga');
   assert.ok(s.includes("await api.saveEntity({...tx.entity!, data: {...tx.entity!.data, paid: false}})"),'nao apaga o registro, so desfaz o pagamento');
   assert.ok(s.includes("'Desfazer o ' + kind + '?'"));
-  assert.ok(s.includes('accessibilityLabel={tx.manualDue && tx.paid ? "Desfazer pagamento" : "Apagar lançamento"}'));
+  assert.ok(s.includes('accessibilityLabel={tx.manualDue && tx.paid && (tx.recurrence === \'monthly\' || !!tx.seriesId) ? "Desfazer pagamento" : "Apagar lançamento"}'));
   // e a pendencia desfeita aparece de novo no mes como a pagar
   const p=f.toTx({id:'luz',kind:'fin_tx',title:'Luz',state:'active',data:{kind:'expense',amount:180,date:'2026-10-12',account_id:'a1',paid:false,category:'Contas',recurrence:'none',import_id:'sofia-pendencia:luz'}});
   const d=f.monthDues([p],'a1','2026-10','2026-10-17')[0];assert.equal(d.paid,false);assert.equal(d.late,true);
 });
 
-test('0.3.179: em aberto fica amarelo e pago fica verde',()=>{
+test('0.3.181: amarelo em aberto, verde pago, vermelho atrasada e roxo fatura',()=>{
   const s=read('src/screens/Finance.tsx');
   const row=s.slice(s.indexOf('function DueRow('),s.indexOf('// 0.3.175: atualizacoes locais imediatas'));
-  assert.ok(row.includes('const color = WARN;'),'em aberto: amarelo, inclusive a receber e atrasada');
-  assert.ok(row.includes("backgroundColor: WARN + '1a'"));assert.ok(row.includes("backgroundColor: GOOD + '1a'"),'pago: verde');
+  assert.ok(row.includes("const color = due.late ? BAD : due.kind === 'fatura' ? c.accent : WARN;"),'atrasada vermelha, fatura roxa, resto amarelo');
+  assert.ok(row.includes("backgroundColor: color + '1a'"));assert.ok(row.includes("backgroundColor: GOOD + '1a'"),'pago: verde');
 });

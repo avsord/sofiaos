@@ -917,7 +917,8 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
 }
 function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; reload: () => Promise<void>; onTx: (t: Partial<Tx>) => void}) {
   const c = useTheme(), [busy, setBusy] = useState(false), [pick, setPick] = useState(false);
-  const color = WARN;
+  // 0.3.181: atrasada continua vermelha e fatura roxa; o resto em aberto (inclusive a receber) amarelo; paga verde
+  const color = due.late ? BAD : due.kind === 'fatura' ? c.accent : WARN;
   const local = React.useContext(FinanceLocal);
   async function settle(accountId?: string) {
     setBusy(true);
@@ -947,7 +948,7 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
     </View>
   );
   return (
-    <View style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 14, backgroundColor: WARN + '1a'}}>
+    <View style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 14, backgroundColor: color + '1a'}}>
       <View style={{width: 4, height: 36, borderRadius: 2, backgroundColor: color}} />
       <Pressable style={{flex: 1, gap: 2}} onPress={() => due.tx && onTx(due.tx)}>
         <Text numberOfLines={1} style={{color: c.text, fontWeight: '600'}}>{due.title}</Text>
@@ -1090,9 +1091,9 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved}: {api: SofiaA
   }
   function remove() {
     if (!tx.entity) return;
-    // 0.3.178: lancamento que veio de uma conta a pagar/receber paga. Apagar no historico desfaz o
-    // pagamento: a conta volta para Pendentes como "a pagar", e o registro nao some de vez.
-    if (tx.manualDue && tx.paid) {
+    // 0.3.178/0.3.181: pagamento de CONTA FIXA (inclusive a 1a vez dela). Apagar no historico desfaz o
+    // pagamento: a conta volta para Pendentes como "a pagar". Conta avulsa paga e apagada sai de vez.
+    if (tx.manualDue && tx.paid && (tx.recurrence === 'monthly' || !!tx.seriesId)) {
       const kind = tx.kind === 'income' ? 'recebimento' : 'pagamento';
       appAlert('Desfazer o ' + kind + '?', '“' + tx.desc + '” sai do histórico e volta para Pendentes como ' + (tx.kind === 'income' ? 'a receber' : 'a pagar') + '.',
         [{text: 'Cancelar', style: 'cancel'}, {text: 'Desfazer', style: 'destructive', onPress: () => void (async () => {
@@ -1118,7 +1119,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved}: {api: SofiaA
           <View style={{flexDirection: 'row', alignItems: 'center'}}>
             <Pressable accessibilityLabel="Fechar" onPress={onClose} style={{padding: 8}}><Text style={{color: headText, fontSize: 18}}>✕</Text></Pressable>
             <Text style={{flex: 1, color: headText, fontWeight: '700', fontSize: 17}}>{editing ? 'Editar' : tx.virtual ? 'Confirmar repetição' : 'Novo lançamento'}</Text>
-            {editing ? <Pressable accessibilityLabel={tx.manualDue && tx.paid ? "Desfazer pagamento" : "Apagar lançamento"} onPress={remove} style={{padding: 8}}><Icon name="trash" size={20} color={headText} /></Pressable> : null}
+            {editing ? <Pressable accessibilityLabel={tx.manualDue && tx.paid && (tx.recurrence === 'monthly' || !!tx.seriesId) ? "Desfazer pagamento" : "Apagar lançamento"} onPress={remove} style={{padding: 8}}><Icon name="trash" size={20} color={headText} /></Pressable> : null}
           </View>
           {!editing ? (
             <View style={{flexDirection: 'row', backgroundColor: headText + '26', borderRadius: 99, padding: 3}}>
