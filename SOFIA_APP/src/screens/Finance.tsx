@@ -459,7 +459,7 @@ function ReserveHistorySheet({api, reserve, moves, show, onClose, reload}: {api:
     </ScrollView>
   </Sheet>;
   return <Sheet visible onClose={onClose} label="Fechar histórico da reserva">
-    <ScrollView style={{maxHeight: 620}} contentContainerStyle={{gap: 16, paddingBottom: 18}}>
+    <ScrollView contentContainerStyle={{gap: 16, paddingBottom: 18}}>
       <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Histórico da reserva</Text>
       <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Toque em um movimento para corrigir o valor, a data ou apagá-lo.</Text>
       {months.length ? months.map(m => <View key={m.month} style={{gap: 8}}>
@@ -714,7 +714,7 @@ function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;
     ]);
   }
   return <Sheet visible onClose={onClose} label="Fechar cadastro de vencimento">
-    <ScrollView keyboardShouldPersistTaps="handled" style={{maxHeight:560}} contentContainerStyle={{gap:13,paddingBottom:24}}>
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap:13,paddingBottom:24}}>
       <Text style={{fontSize:20,fontWeight:'800',color:c.text}}>{existing?'Editar vencimento':'Novo vencimento'}</Text>
       <Text style={{fontSize:13,lineHeight:19,color:c.muted}}>Este registro só afeta o saldo depois que você confirmar o pagamento. Não vem automaticamente do extrato bancário.</Text>
       <Chips value={flow} onChange={setFlow} options={[{value:'expense',label:'A pagar'},{value:'income',label:'A receber'}]}/>
@@ -1232,7 +1232,7 @@ function BudgetSheet({api, budget, used, onClose, onSaved}: {api: SofiaApi; budg
   const c = useTheme(), [cat, setCat] = useState(budget?.category || ''), [limit, setLimit] = useState(budget ? finishMoneyInput(String(budget.limit).replace('.', ',')) : ''), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   return (
     <Sheet visible onClose={onClose} label="Fechar orçamento">
-      <ScrollView style={{maxHeight: 520}} contentContainerStyle={{gap: 12}}>
+      <ScrollView contentContainerStyle={{gap: 12}}>
         <Text style={{fontSize: 18, fontWeight: '700', color: c.text}}>{budget ? 'Editar orçamento' : 'Novo orçamento'}</Text>
         <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
           {EXPENSE_CATEGORIES.filter(x => x.name === budget?.category || !used.includes(x.name)).map(x => <Pressable key={x.name} onPress={() => setCat(x.name)} style={{flexDirection: 'row', gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 99, borderWidth: 1, borderColor: cat === x.name ? x.color : c.line, backgroundColor: cat === x.name ? x.color + '22' : 'transparent'}}><Text>{x.icon}</Text><Text style={{color: c.text, fontSize: 13}}>{x.name}</Text></Pressable>)}
@@ -1250,7 +1250,7 @@ function GoalSheet({api, goal, onClose, onSaved}: {api: SofiaApi; goal: Goal | n
   const [deadline, setDeadline] = useState(goal?.deadline || ''), [color, setColor] = useState(goal?.color || FIN_COLORS[1]), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   return (
     <Sheet visible onClose={onClose} label="Fechar objetivo">
-      <ScrollView style={{maxHeight: 560}} contentContainerStyle={{gap: 12}}>
+      <ScrollView contentContainerStyle={{gap: 12}}>
         <Text style={{fontSize: 18, fontWeight: '700', color: c.text}}>{goal ? 'Editar objetivo' : 'Novo objetivo'}</Text>
         <Field label="Nome" value={name} onChange={setName} placeholder="Ex.: Reserva de emergência" />
         <Field label="Valor do objetivo (R$)" value={target} onChange={setTarget} numeric placeholder="0,00" />
@@ -1424,7 +1424,7 @@ function AccountCardSheet({api, d, edit, onClose, onSaved}: {api: SofiaApi; d: D
   }
   return (
     <Sheet visible onClose={onClose} label="Fechar edição">
-      <ScrollView style={{maxHeight: 600}} contentContainerStyle={{gap: 12}} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{gap: 12}} keyboardShouldPersistTaps="handled">
         <Text style={{fontSize: 18, fontWeight: '700', color: c.text}}>{edit.item ? 'Editar' : 'Novo'} {isCard ? 'cartão' : 'conta'}</Text>
         <Field label="Nome" value={name} onChange={setName} placeholder={isCard ? 'Ex.: Nubank Visa' : 'Ex.: Itaú'} />
         {isCard ? (
@@ -1506,7 +1506,7 @@ function ImportSheet({api, d, onClose, onDone}: {api: SofiaApi; d: Data; onClose
             {preview ? (
               <View style={{gap: 6}}>
                 <Text style={{fontSize: 12, color: c.muted, fontWeight: '700'}}>3. Confira ({chosenItems.length} de {preview.length} marcados · {money(Math.abs(sum))} {sum >= 0 ? 'de entrada' : 'de saída'})</Text>
-                <View style={{maxHeight: 320}}><ScrollView nestedScrollEnabled>
+                <View><ScrollView nestedScrollEnabled>
                   {preview.map(i => <Pressable key={i.import_id} disabled={!!i.skip} onPress={() => toggle(i.import_id)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderColor: c.line, opacity: i.skip ? 0.45 : 1}}>
                     <View style={{width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: chosen.has(i.import_id) ? c.accent : c.line, backgroundColor: chosen.has(i.import_id) ? c.accent : 'transparent', alignItems: 'center', justifyContent: 'center'}}>{chosen.has(i.import_id) ? <Text style={{color: c.onAccent, fontSize: 13, fontWeight: '800'}}>✓</Text> : null}</View>
                     <View style={{flex: 1}}><Text style={{color: c.text}} numberOfLines={1}>{i.desc}</Text><Text style={{fontSize: 11, color: c.muted}}>{i.date.split('-').reverse().join('/')}{i.category ? ' · ' + i.category : ''}{i.duplicate ? ' · já importado' : ''}{i.skip ? ' · ' + i.skip : ''}</Text></View>

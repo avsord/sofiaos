@@ -24,7 +24,7 @@ export function PageCreateMenu({visible,parentTitle,onClose,onBlank,onTemplate}:
        <Text style={{fontSize:17,fontWeight:'700',color:c.accent}}>▦ Usar template</Text>
        <Text style={{fontSize:12,color:c.muted,marginTop:5}}>Kanban, Notas ou Formulário.</Text>
       </Pressable>
-    </View>:<ScrollView style={{maxHeight:520}} contentContainerStyle={{gap:10,paddingBottom:10}}>
+    </View>:<ScrollView contentContainerStyle={{gap:10,paddingBottom:10}}>
       {PAGE_TEMPLATES.map(template=><Pressable key={template.id} accessibilityRole="button" accessibilityLabel={'Aplicar template '+template.title}
        onPress={()=>{close();onTemplate(template);}} style={{padding:15,borderRadius:14,backgroundColor:c.input,borderWidth:1,borderColor:c.line,flexDirection:'row',gap:12,alignItems:'center'}}>
        <Text style={{fontSize:32}}>{template.icon}</Text><View style={{flex:1}}><Text style={{fontSize:16,fontWeight:'700',color:c.text}}>{template.title}</Text><Text style={{fontSize:12,lineHeight:17,color:c.muted,marginTop:3}}>{template.description}</Text></View>

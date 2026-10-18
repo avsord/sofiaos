@@ -72,7 +72,7 @@ function SelectionSheet({api, accounts, selection, onSelect, onClose, onChanged}
   }
   const row = (label: string, v: MailSelection, sub = '', indent = 0) => <Pressable key={label + JSON.stringify(v)} accessibilityRole="button" accessibilityState={{selected: isSel(v)}} onPress={() => onSelect(v)} style={{paddingVertical: 12, paddingLeft: 12 + indent, paddingRight: 12, borderRadius: 12, backgroundColor: isSel(v) ? c.accentSoft : 'transparent', flexDirection: 'row', alignItems: 'center', gap: 8}}><Text style={{flex: 1, color: isSel(v) ? c.accent : c.text, fontWeight: indent ? '500' : '700'}}>{label}</Text>{sub ? <Text style={{color: c.muted, fontSize: 12}}>{sub}</Text> : null}</Pressable>;
   return <Sheet visible onClose={onClose} label="Fechar seleção de contas">
-    <ScrollView style={{maxHeight: 620}} contentContainerStyle={{gap: 4}} keyboardShouldPersistTaps="handled">
+    <ScrollView contentContainerStyle={{gap: 4}} keyboardShouldPersistTaps="handled">
       <Text style={{fontSize: 18, fontWeight: '800', color: c.text, marginBottom: 6}}>Mostrar e-mails de</Text>
       {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
       {row('Todas as contas', {type: 'all'}, accounts.length + ' conta(s)')}
@@ -245,7 +245,7 @@ function AccountSheet({api, account, onClose, onDone, groups = []}: {api: SofiaA
   return (
     <Sheet visible onClose={onClose} label="Fechar conta de e-mail">
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView style={{maxHeight: 620}} contentContainerStyle={{gap: 12}} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{gap: 12}} keyboardShouldPersistTaps="handled">
           <Text style={{fontSize: 18, fontWeight: '800', color: c.text}}>{account ? 'Conta de e-mail' : 'Conectar e-mail'}</Text>
           <Chips value={provider} onChange={setProvider} options={PROVIDERS.map(x => ({value: x.value, label: x.label}))} />
           <Field label="Seu e-mail" value={address} onChange={setAddress} placeholder="voce@gmail.com" email />
@@ -293,7 +293,7 @@ function RuleSheet({api, rule, accounts, onClose, onDone}: {api: SofiaApi; rule:
   }
   return (
     <Sheet visible onClose={onClose} label="Fechar regra">
-      <ScrollView style={{maxHeight: 620}} contentContainerStyle={{gap: 12}} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{gap: 12}} keyboardShouldPersistTaps="handled">
         <Text style={{fontSize: 18, fontWeight: '800', color: c.text}}>{existing ? 'Editar regra' : 'Nova regra'}</Text>
         <Text style={{fontSize: 12, color: c.muted}}>Procurar em</Text>
         <Chips value={field} onChange={setField} options={FIELDS} />

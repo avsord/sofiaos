@@ -10,7 +10,10 @@ test('a folha mede o teclado e se afasta dele',()=>{
   assert.ok(s.includes("if(Platform.OS==='ios')return;"),'no iOS o KeyboardAvoidingView ja resolve');
   assert.ok(s.includes('show.remove();hide.remove();'),'sem ouvintes vazados');
 });
-test('o cadastro de conta fixa rola com o teclado aberto',()=>{
-  const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('<ScrollView keyboardShouldPersistTaps="handled" style={{maxHeight:560}} contentContainerStyle={{gap:13,paddingBottom:24}}'));
+test('0.3.170: o painel encolhe para caber acima do teclado e o conteudo rola, sem altura fixa',()=>{
+  const sheet=read('src/components/Sheet.tsx'),fin=read('src/screens/Finance.tsx');
+  assert.ok(sheet.includes('maxHeight:Math.max(220,windowHeight-keyboard-insets.top-24)'),'o painel cabe no que sobra');
+  assert.ok(sheet.includes('paddingBottom:keyboard?16:Math.max(20,insets.bottom+12)'));
+  assert.ok(fin.includes('<ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap:13,paddingBottom:24}}'));
+  assert.ok(!/style=\{\{maxHeight: ?\d{3}\}\}/.test(fin),'nenhuma folha com altura fixa');
 });
