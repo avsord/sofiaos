@@ -1,14 +1,23 @@
 import React,{useState} from 'react';
-import {Pressable,ScrollView,Text,View} from 'react-native';
+import {Keyboard,Pressable,ScrollView,Text,View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {dateDisplay} from '../lib/date-time';
 import {monthCells,localDateKey} from '../lib/dashboard';
 import {Sheet} from './Sheet';
 import {Button,IconButton,forms} from './UI';
 import {MonthSwipe} from './MonthSwipe';
+// 0.3.190: com o teclado aberto, o calendario abria por cima dele e, em seguida, o teclado fechava
+// sozinho - as duas folhas pulavam juntas. Agora o teclado fecha primeiro e so entao o calendario abre.
+function openAfterKeyboard(open:()=>void){
+ const visible=typeof (Keyboard as any).isVisible==='function'?(Keyboard as any).isVisible():false;
+ if(!visible){open();return;}
+ let done=false;const finish=()=>{if(done)return;done=true;sub.remove();clearTimeout(timer);open();};
+ const sub=Keyboard.addListener('keyboardDidHide',finish),timer=setTimeout(finish,320);
+ Keyboard.dismiss();
+}
 export function DateTimeField({label,value,onChange,dateOnly=false,timeOnly=false,compact=false,allowClear=true,emptyLabel='Selecionar…'}:{label:string;value:string;onChange:(value:string)=>void;dateOnly?:boolean;timeOnly?:boolean;compact?:boolean;allowClear?:boolean;emptyLabel?:string}){
  const c=useTheme(),[open,setOpen]=useState(false),[selected,setSelected]=useState(new Date()),[month,setMonth]=useState(new Date());
- function reveal(){const d=timeOnly?new Date():value?new Date(value.length===10?value+'T12:00:00':value):new Date();if(timeOnly){const parts=/^([01]\d|2[0-3]):([0-5]\d)$/.exec(value||'09:00');if(parts)d.setHours(Number(parts[1]),Number(parts[2]),0,0);}const valid=Number.isFinite(d.getTime())?d:new Date();setSelected(valid);setMonth(new Date(valid.getFullYear(),valid.getMonth(),1));setOpen(true);}
+ function reveal(){const d=timeOnly?new Date():value?new Date(value.length===10?value+'T12:00:00':value):new Date();if(timeOnly){const parts=/^([01]\d|2[0-3]):([0-5]\d)$/.exec(value||'09:00');if(parts)d.setHours(Number(parts[1]),Number(parts[2]),0,0);}const valid=Number.isFinite(d.getTime())?d:new Date();setSelected(valid);setMonth(new Date(valid.getFullYear(),valid.getMonth(),1));openAfterKeyboard(()=>setOpen(true));}
  const change=(part:'hours'|'minutes',n:number)=>setSelected(old=>{const d=new Date(old);part==='hours'?d.setHours(n):d.setMinutes(n);d.setSeconds(0,0);return d;});
  return <><View style={compact?{flexDirection:"row",gap:20,alignItems:"center"}:undefined}><Text style={compact?{color:c.muted,fontSize:13}:[forms.label,{color:c.muted}]}>{compact?"◷  ":""}{label}</Text><Pressable accessibilityLabel={label} onPress={reveal} style={compact?{flex:1,minHeight:40,justifyContent:"center"}:[forms.input,{backgroundColor:c.input,borderColor:c.line,minHeight:52,justifyContent:"center"}]}><Text style={{color:value?c.text:c.muted,fontSize:14}}>{value&&compact?new Date(value).toLocaleString('pt-BR',{dateStyle:'long',timeStyle:'short'}):(timeOnly?value:dateDisplay(value,dateOnly))||emptyLabel}</Text></Pressable></View>
  <Sheet visible={open} onClose={()=>setOpen(false)} label="Fechar data e horário"><ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><View style={{flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,fontSize:20,fontWeight:'700',color:c.text}}>{label}</Text><IconButton name="close" label="Fechar data e horário" onPress={()=>setOpen(false)}/></View>{!timeOnly?<MonthSwipe onMonth={delta=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()+delta,1))}>

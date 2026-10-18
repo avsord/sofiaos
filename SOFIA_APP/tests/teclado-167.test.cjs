@@ -20,7 +20,14 @@ test('0.3.170: o painel encolhe para caber acima do teclado e o conteudo rola, s
 
 test('0.3.187: em aparelho que ja encolhe a janela, a folha nao e empurrada de novo (sem vao e sem corte)',()=>{
   const s=read('src/components/Sheet.tsx');
-  assert.ok(s.includes('rootRef.current?.measureInWindow((_x,y,_w,h)=>setKeyboard(Math.max(0,Math.round(y+h-kbTop.current))))'),'mede o quanto o teclado cobre de verdade');
+  assert.ok(s.includes('rootRef.current?.measureInWindow((_x,y,_w,h)=>{smooth();setKeyboard(Math.max(0,Math.round(y+h-kbTop.current)));})'),'mede o quanto o teclado cobre de verdade');
   assert.ok(s.includes("behavior={Platform.OS==='ios'?'padding':undefined}"),'sem o segundo ajuste no Android');
   assert.ok(s.includes('if(kbTop.current)measure();'),'mede de novo quando a janela muda de tamanho');
+});
+
+test('0.3.190: com o teclado aberto, o calendario espera o teclado fechar; a folha desce suave',()=>{
+  const dt=read('src/components/DateTimeField.tsx'),sh=read('src/components/Sheet.tsx');
+  assert.ok(dt.includes('openAfterKeyboard(()=>setOpen(true))'));
+  assert.ok(dt.includes("const sub=Keyboard.addListener('keyboardDidHide',finish),timer=setTimeout(finish,320);"),'abre quando o teclado fechou (ou logo depois, se o evento nao vier)');
+  assert.ok(sh.includes('LayoutAnimation.configureNext(LayoutAnimation.create(180,'),'sem pulo seco');
 });

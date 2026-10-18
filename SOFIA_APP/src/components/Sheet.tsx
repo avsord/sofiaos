@@ -1,6 +1,6 @@
 import {useMotionPresence} from '../lib/motion';
 import React,{useEffect,useRef,useState} from 'react';
-import {Animated,Keyboard,KeyboardAvoidingView,Modal,Platform,Pressable,StyleSheet,useWindowDimensions,View} from 'react-native';
+import {Animated,Keyboard,KeyboardAvoidingView,LayoutAnimation,Modal,Platform,Pressable,StyleSheet,useWindowDimensions,View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTheme} from '../lib/theme';
 export function Sheet({visible,onClose,children,label='Fechar painel'}:{visible:boolean;onClose:()=>void;children:React.ReactNode;label?:string}){
@@ -12,11 +12,12 @@ export function Sheet({visible,onClose,children,label='Fechar painel'}:{visible:
  // medimos quanto o teclado REALMENTE cobre a area da folha e afastamos so isso.
  const rootRef=useRef<View>(null),kbTop=useRef(0);
  const [keyboard,setKeyboard]=useState(0),[kbOpen,setKbOpen]=useState(false),[rootH,setRootH]=useState(0);
- const measure=()=>{if(!kbTop.current){setKeyboard(0);return;}rootRef.current?.measureInWindow((_x,y,_w,h)=>setKeyboard(Math.max(0,Math.round(y+h-kbTop.current))));};
+ const smooth=()=>{try{LayoutAnimation.configureNext(LayoutAnimation.create(180,LayoutAnimation.Types.easeInEaseOut,LayoutAnimation.Properties.opacity));}catch{/* sem animacao neste aparelho */}};
+ const measure=()=>{if(!kbTop.current){smooth();setKeyboard(0);return;}rootRef.current?.measureInWindow((_x,y,_w,h)=>{smooth();setKeyboard(Math.max(0,Math.round(y+h-kbTop.current)));});};
  useEffect(()=>{
   if(Platform.OS==='ios')return;
   const show=Keyboard.addListener('keyboardDidShow',e=>{kbTop.current=e.endCoordinates?.screenY||0;setKbOpen(true);measure();});
-  const hide=Keyboard.addListener('keyboardDidHide',()=>{kbTop.current=0;setKbOpen(false);setKeyboard(0);});
+  const hide=Keyboard.addListener('keyboardDidHide',()=>{kbTop.current=0;smooth();setKbOpen(false);setKeyboard(0);});
   return()=>{show.remove();hide.remove();};
  },[]);
  const {mounted,progress,reduced}=useMotionPresence(visible,{enterReady:shown&&height>0,enterDuration:220,exitDuration:180}),last=useRef(children);
