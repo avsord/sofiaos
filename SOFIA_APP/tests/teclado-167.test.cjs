@@ -27,7 +27,17 @@ test('0.3.187: em aparelho que ja encolhe a janela, a folha nao e empurrada de n
 
 test('0.3.190: com o teclado aberto, o calendario espera o teclado fechar; a folha desce suave',()=>{
   const dt=read('src/components/DateTimeField.tsx'),sh=read('src/components/Sheet.tsx');
-  assert.ok(dt.includes('openAfterKeyboard(()=>setOpen(true))'));
+  assert.ok(dt.includes('afterKeyboard(()=>{busy.current=false;smooth();setOpen(true);})'));
   assert.ok(dt.includes("const sub=Keyboard.addListener('keyboardDidHide',finish),timer=setTimeout(finish,320);"),'abre quando o teclado fechou (ou logo depois, se o evento nao vier)');
   assert.ok(sh.includes('LayoutAnimation.configureNext(LayoutAnimation.create(180,'),'sem pulo seco');
+});
+
+test('0.3.191: calendario dentro do formulario (sem janela por cima) e uma janela espera a outra sair',()=>{
+  const dt=read('src/components/DateTimeField.tsx'),fin=read('src/screens/Finance.tsx');
+  assert.ok(!dt.includes("from './Sheet'")&&!dt.includes('<Sheet'),'sem segunda janela');
+  assert.ok(dt.includes('{open?<View style={{marginTop:8,backgroundColor:c.input'),'abre logo abaixo do campo');
+  assert.ok(dt.includes('if(dateOnly)commit(next);'),'so data: tocar no dia ja escolhe');
+  assert.ok(fin.includes('function afterSheet(run: () => void) { setTimeout(run, 230); }'));
+  assert.ok(fin.includes("setNewMenu(false); afterSheet(() => setBillEditor('new'));"));
+  assert.ok(fin.includes("setBreakdown(null); afterSheet(() => onTx(t));"));
 });

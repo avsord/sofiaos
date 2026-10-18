@@ -1,28 +1,69 @@
-import React,{useState} from 'react';
-import {Keyboard,Pressable,ScrollView,Text,View} from 'react-native';
+import React,{useRef,useState} from 'react';
+import {Keyboard,LayoutAnimation,Pressable,ScrollView,Text,View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {dateDisplay} from '../lib/date-time';
 import {monthCells,localDateKey} from '../lib/dashboard';
-import {Sheet} from './Sheet';
 import {Button,IconButton,forms} from './UI';
+import {Icon} from './Icon';
 import {MonthSwipe} from './MonthSwipe';
-// 0.3.190: com o teclado aberto, o calendario abria por cima dele e, em seguida, o teclado fechava
-// sozinho - as duas folhas pulavam juntas. Agora o teclado fecha primeiro e so entao o calendario abre.
-function openAfterKeyboard(open:()=>void){
+
+// 0.3.191: o calendario abre DENTRO do formulario, logo abaixo do campo, em vez de uma segunda janela por
+// cima (que deixava o formulario de tras cortado, preso no tamanho que tinha com o teclado aberto).
+// Teclado aberto? Ele fecha primeiro e so entao o calendario expande. So data: tocar no dia ja escolhe.
+function smooth(){try{LayoutAnimation.configureNext(LayoutAnimation.create(200,LayoutAnimation.Types.easeInEaseOut,LayoutAnimation.Properties.opacity));}catch{/* sem animacao */}}
+function afterKeyboard(run:()=>void){
  const visible=typeof (Keyboard as any).isVisible==='function'?(Keyboard as any).isVisible():false;
- if(!visible){open();return;}
- let done=false;const finish=()=>{if(done)return;done=true;sub.remove();clearTimeout(timer);open();};
+ if(!visible){run();return;}
+ let done=false;const finish=()=>{if(done)return;done=true;sub.remove();clearTimeout(timer);run();};
  const sub=Keyboard.addListener('keyboardDidHide',finish),timer=setTimeout(finish,320);
  Keyboard.dismiss();
 }
+const pad=(n:number)=>String(n).padStart(2,'0');
+
 export function DateTimeField({label,value,onChange,dateOnly=false,timeOnly=false,compact=false,allowClear=true,emptyLabel='Selecionar…'}:{label:string;value:string;onChange:(value:string)=>void;dateOnly?:boolean;timeOnly?:boolean;compact?:boolean;allowClear?:boolean;emptyLabel?:string}){
  const c=useTheme(),[open,setOpen]=useState(false),[selected,setSelected]=useState(new Date()),[month,setMonth]=useState(new Date());
- function reveal(){const d=timeOnly?new Date():value?new Date(value.length===10?value+'T12:00:00':value):new Date();if(timeOnly){const parts=/^([01]\d|2[0-3]):([0-5]\d)$/.exec(value||'09:00');if(parts)d.setHours(Number(parts[1]),Number(parts[2]),0,0);}const valid=Number.isFinite(d.getTime())?d:new Date();setSelected(valid);setMonth(new Date(valid.getFullYear(),valid.getMonth(),1));openAfterKeyboard(()=>setOpen(true));}
+ const busy=useRef(false);
+ function parse(){const d=timeOnly?new Date():value?new Date(value.length===10?value+'T12:00:00':value):new Date();if(timeOnly){const parts=/^([01]\d|2[0-3]):([0-5]\d)$/.exec(value||'09:00');if(parts)d.setHours(Number(parts[1]),Number(parts[2]),0,0);}return Number.isFinite(d.getTime())?d:new Date();}
+ function toggle(){
+  if(busy.current)return;
+  if(open){smooth();setOpen(false);return;}
+  const v=parse();setSelected(v);setMonth(new Date(v.getFullYear(),v.getMonth(),1));
+  busy.current=true;afterKeyboard(()=>{busy.current=false;smooth();setOpen(true);});
+ }
+ function commit(next:Date){onChange(timeOnly?pad(next.getHours())+':'+pad(next.getMinutes()):dateOnly?localDateKey(next):next.toISOString());smooth();setOpen(false);}
  const change=(part:'hours'|'minutes',n:number)=>setSelected(old=>{const d=new Date(old);part==='hours'?d.setHours(n):d.setMinutes(n);d.setSeconds(0,0);return d;});
- return <><View style={compact?{flexDirection:"row",gap:20,alignItems:"center"}:undefined}><Text style={compact?{color:c.muted,fontSize:13}:[forms.label,{color:c.muted}]}>{compact?"◷  ":""}{label}</Text><Pressable accessibilityLabel={label} onPress={reveal} style={compact?{flex:1,minHeight:40,justifyContent:"center"}:[forms.input,{backgroundColor:c.input,borderColor:c.line,minHeight:52,justifyContent:"center"}]}><Text style={{color:value?c.text:c.muted,fontSize:14}}>{value&&compact?new Date(value).toLocaleString('pt-BR',{dateStyle:'long',timeStyle:'short'}):(timeOnly?value:dateDisplay(value,dateOnly))||emptyLabel}</Text></Pressable></View>
- <Sheet visible={open} onClose={()=>setOpen(false)} label="Fechar data e horário"><ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><View style={{flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,fontSize:20,fontWeight:'700',color:c.text}}>{label}</Text><IconButton name="close" label="Fechar data e horário" onPress={()=>setOpen(false)}/></View>{!timeOnly?<MonthSwipe onMonth={delta=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()+delta,1))}>
- <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><IconButton name="back" label="Mês anterior do seletor" onPress={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()-1,1))}/><Text style={{color:c.text,fontSize:16}}>{month.toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}</Text><IconButton name="chevron" label="Próximo mês do seletor" onPress={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()+1,1))}/></View>
- <View style={{flexDirection:'row'}}>{['D','S','T','Q','Q','S','S'].map((d,i)=><Text key={i} style={{width:'14.2857%',textAlign:'center',color:c.muted}}>{d}</Text>)}</View><View style={{flexDirection:'row',flexWrap:'wrap',marginVertical:8}}>{monthCells(month).map((d,i)=><View key={i} style={{width:'14.2857%',padding:2}}>{d?<Pressable accessibilityLabel={'Selecionar '+dateDisplay(localDateKey(d),true)} onPress={()=>{const next=new Date(d);next.setHours(selected.getHours(),selected.getMinutes(),0,0);setSelected(next);}} style={{height:36,borderRadius:9,alignItems:'center',justifyContent:'center',backgroundColor:localDateKey(d)===localDateKey(selected)?c.accent:'transparent'}}><Text style={{color:localDateKey(d)===localDateKey(selected)?'#fff':c.text}}>{d.getDate()}</Text></Pressable>:null}</View>)}</View></MonthSwipe>:null}
- {!dateOnly?<View style={{flexDirection:'row',gap:12,marginVertical:12}}>{(['hours','minutes'] as const).map(part=><View key={part} style={{flex:1}}><Text style={{textAlign:'center',color:c.muted,marginBottom:8}}>{part==='hours'?'Hora · 24h':'Minutos'}</Text><ScrollView showsVerticalScrollIndicator={false} style={{height:126,backgroundColor:c.input,borderRadius:12}} nestedScrollEnabled contentOffset={{x:0,y:Math.max(0,(part==='hours'?selected.getHours():selected.getMinutes())*42-42)}}>{Array.from({length:part==='hours'?24:60},(_,i)=><Pressable key={i} accessibilityLabel={(part==='hours'?'Hora ':'Minuto ')+i} onPress={()=>change(part,i)} style={{height:42,alignItems:'center',justifyContent:'center',backgroundColor:(part==='hours'?selected.getHours():selected.getMinutes())===i?c.accentSoft:'transparent'}}><Text style={{color:c.text,fontSize:20,fontWeight:'600'}}>{String(i).padStart(2,'0')}</Text></Pressable>)}</ScrollView></View>)}</View>:null}
- <Text style={{color:c.accent,textAlign:'center',marginVertical:12,fontWeight:'600'}}>{timeOnly?String(selected.getHours()).padStart(2,'0')+':'+String(selected.getMinutes()).padStart(2,'0'):dateDisplay(selected.toISOString(),dateOnly)}</Text><Button title={timeOnly?"Confirmar horário":"Confirmar data e horário"} onPress={()=>{onChange(timeOnly?String(selected.getHours()).padStart(2,'0')+':'+String(selected.getMinutes()).padStart(2,'0'):dateOnly?localDateKey(selected):selected.toISOString());setOpen(false);}}/>{allowClear?<Pressable onPress={()=>{onChange('');setOpen(false);}} style={{padding:14,alignItems:'center'}}><Text style={{color:c.muted}}>Remover data</Text></Pressable>:null}</ScrollView></Sheet></>;
+ const shown=value&&compact?new Date(value).toLocaleString('pt-BR',{dateStyle:'long',timeStyle:'short'}):(timeOnly?value:dateDisplay(value,dateOnly))||emptyLabel;
+ return <View style={{gap:compact?4:0}}>
+  <View style={compact?{flexDirection:'row',gap:20,alignItems:'center'}:undefined}>
+   <Text style={compact?{color:c.muted,fontSize:13}:[forms.label,{color:c.muted}]}>{label}</Text>
+   <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{expanded:open}} onPress={toggle}
+    style={compact?{flex:1,minHeight:40,flexDirection:'row',alignItems:'center',gap:8}:[forms.input,{backgroundColor:c.input,borderColor:open?c.accent:c.line,borderWidth:open?1.5:1,minHeight:52,flexDirection:'row',alignItems:'center',gap:10}]}>
+    <Text style={{flex:1,color:value?c.text:c.muted,fontSize:14}}>{shown}</Text>
+    <Icon name="calendar" size={18} color={open?c.accent:c.muted}/>
+   </Pressable>
+  </View>
+  {open?<View style={{marginTop:8,backgroundColor:c.input,borderRadius:16,padding:12,borderWidth:1,borderColor:c.line}}>
+   {!timeOnly?<MonthSwipe onMonth={delta=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()+delta,1))}>
+    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
+     <IconButton name="back" label="Mês anterior do seletor" onPress={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()-1,1))}/>
+     <Text style={{color:c.text,fontSize:15,fontWeight:'600'}}>{month.toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}</Text>
+     <IconButton name="chevron" label="Próximo mês do seletor" onPress={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()+1,1))}/>
+    </View>
+    <View style={{flexDirection:'row',marginTop:4}}>{['D','S','T','Q','Q','S','S'].map((d,i)=><Text key={i} style={{width:'14.2857%',textAlign:'center',color:c.muted,fontSize:12}}>{d}</Text>)}</View>
+    <View style={{flexDirection:'row',flexWrap:'wrap',marginTop:6}}>{monthCells(month).map((d,i)=><View key={i} style={{width:'14.2857%',padding:2}}>{d?<Pressable accessibilityLabel={'Selecionar '+dateDisplay(localDateKey(d),true)} onPress={()=>{const next=new Date(d);next.setHours(selected.getHours(),selected.getMinutes(),0,0);setSelected(next);if(dateOnly)commit(next);}}
+     style={{height:36,borderRadius:10,alignItems:'center',justifyContent:'center',backgroundColor:localDateKey(d)===localDateKey(selected)?c.accent:'transparent',borderWidth:localDateKey(d)===localDateKey(new Date())&&localDateKey(d)!==localDateKey(selected)?1:0,borderColor:c.accent}}>
+     <Text style={{color:localDateKey(d)===localDateKey(selected)?'#fff':c.text,fontWeight:localDateKey(d)===localDateKey(selected)?'700':'400'}}>{d.getDate()}</Text></Pressable>:null}</View>)}</View>
+   </MonthSwipe>:null}
+   {!dateOnly?<View style={{flexDirection:'row',gap:12,marginTop:timeOnly?0:10}}>{(['hours','minutes'] as const).map(part=><View key={part} style={{flex:1}}>
+    <Text style={{textAlign:'center',color:c.muted,marginBottom:6,fontSize:12}}>{part==='hours'?'Hora':'Minutos'}</Text>
+    <ScrollView showsVerticalScrollIndicator={false} style={{height:126,backgroundColor:c.surface,borderRadius:12}} nestedScrollEnabled contentOffset={{x:0,y:Math.max(0,(part==='hours'?selected.getHours():selected.getMinutes())*42-42)}}>
+     {Array.from({length:part==='hours'?24:60},(_,i)=><Pressable key={i} accessibilityLabel={(part==='hours'?'Hora ':'Minuto ')+i} onPress={()=>change(part,i)} style={{height:42,alignItems:'center',justifyContent:'center',backgroundColor:(part==='hours'?selected.getHours():selected.getMinutes())===i?c.accentSoft:'transparent'}}><Text style={{color:c.text,fontSize:20,fontWeight:'600'}}>{pad(i)}</Text></Pressable>)}
+    </ScrollView></View>)}</View>:null}
+   {!dateOnly?<View style={{marginTop:12}}><Button title={'Confirmar '+(timeOnly?pad(selected.getHours())+':'+pad(selected.getMinutes()):dateDisplay(selected.toISOString(),false))} onPress={()=>commit(selected)}/></View>:null}
+   <View style={{flexDirection:'row',justifyContent:allowClear&&value?'space-between':'flex-end',marginTop:8}}>
+    {allowClear&&value?<Pressable accessibilityRole="button" onPress={()=>{onChange('');smooth();setOpen(false);}} style={{padding:8}}><Text style={{color:c.muted,fontWeight:'600'}}>Limpar</Text></Pressable>:null}
+    <Pressable accessibilityRole="button" onPress={()=>{smooth();setOpen(false);}} style={{padding:8}}><Text style={{color:c.accent,fontWeight:'700'}}>Fechar</Text></Pressable>
+   </View>
+  </View>:null}
+ </View>;
 }

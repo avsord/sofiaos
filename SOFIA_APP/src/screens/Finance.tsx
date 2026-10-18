@@ -228,9 +228,9 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
             <View style={{gap: 4, paddingBottom: 12}}>
               <Text style={{fontSize: 18, fontWeight: '800', color: c.text, marginBottom: 6}}>Novo lançamento</Text>
               {([['expense', '↓ Despesa', BAD], ['income', '↑ Receita', GOOD], ['transfer', '⇄ Transferência entre contas', c.accent]] as const).map(([k, label, color]) =>
-                <Pressable key={k} accessibilityRole="button" onPress={() => { setNewMenu(false); newTx(k as TxKind); }} style={{paddingVertical: 15, borderBottomWidth: 1, borderColor: c.line}}><Text style={{color, fontSize: 16, fontWeight: '700'}}>{label}</Text></Pressable>)}
-              <Pressable accessibilityRole="button" onPress={() => { setNewMenu(false); navigateFinance('home'); setAporteKey(k => k + 1); }} style={{paddingVertical: 15, borderBottomWidth: 1, borderColor: c.line}}><Text style={{color: GUARD, fontSize: 16, fontWeight: '700'}}>🔒 Aporte (guardar dinheiro)</Text></Pressable>
-              <Pressable accessibilityRole="button" onPress={() => { setNewMenu(false); setBillEditor('new'); }} style={{paddingVertical: 15}}><Text style={{color: c.text, fontSize: 16, fontWeight: '700'}}>⏰ Conta a pagar ou receber</Text></Pressable>
+                <Pressable key={k} accessibilityRole="button" onPress={() => { setNewMenu(false); afterSheet(() => newTx(k as TxKind)); }} style={{paddingVertical: 15, borderBottomWidth: 1, borderColor: c.line}}><Text style={{color, fontSize: 16, fontWeight: '700'}}>{label}</Text></Pressable>)}
+              <Pressable accessibilityRole="button" onPress={() => { setNewMenu(false); navigateFinance('home'); afterSheet(() => setAporteKey(k => k + 1)); }} style={{paddingVertical: 15, borderBottomWidth: 1, borderColor: c.line}}><Text style={{color: GUARD, fontSize: 16, fontWeight: '700'}}>🔒 Aporte (guardar dinheiro)</Text></Pressable>
+              <Pressable accessibilityRole="button" onPress={() => { setNewMenu(false); afterSheet(() => setBillEditor('new')); }} style={{paddingVertical: 15}}><Text style={{color: c.text, fontSize: 16, fontWeight: '700'}}>⏰ Conta a pagar ou receber</Text></Pressable>
             </View>
           </Sheet>
         </> : null}
@@ -589,16 +589,12 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
   };
   const goalEditor = <View style={{gap: 10}}>
     <Text style={{color: c.muted, fontSize: 12}}>Meta (opcional)</Text>
-    <View style={{flexDirection: 'row', gap: 10}}>
-      <View style={{flex: 1}}>{input('Quero juntar', goalValue, setGoalValue, 'Ex.: 39.000')}</View>
-      <View style={{flex: 1}}><DateTimeField label="Até" value={goalMonth} onChange={setGoalMonth} dateOnly emptyLabel="Escolher data" /></View>
-    </View>
+    {input('Quero juntar', goalValue, setGoalValue, 'Ex.: 39.000')}
+    <DateTimeField label="Até" value={goalMonth} onChange={setGoalMonth} dateOnly emptyLabel="Escolher data" />
   </View>;
   const planEditor = <View style={{gap: 10}}>
-    <View style={{flexDirection: 'row', gap: 10}}>
-      <View style={{flex: 1}}>{input('Todo dia (1 a 28)', day, setDay, '5')}</View>
-      <View style={{flex: 1}}><DateTimeField label="Avisar às" value={remindTime} onChange={v => setRemindTime(v || remindTime)} timeOnly allowClear={false} /></View>
-    </View>
+    {input('Todo dia (1 a 28)', day, setDay, '5')}
+    <DateTimeField label="Avisar às" value={remindTime} onChange={v => setRemindTime(v || remindTime)} timeOnly allowClear={false} />
     <Text style={{color: c.muted, fontSize: 12}}>Avisar também</Text>
     <Chips value={remindBefore} onChange={setRemindBefore} options={[{value: '0', label: 'No dia'}, {value: '1', label: '1 dia antes'}, {value: '2', label: '2 dias antes'}, {value: '5', label: '5 dias antes'}]} />
     <Chips value={repeatDays} onChange={setRepeatDays} options={[{value: '0', label: 'Não repetir'}, {value: '3', label: 'A cada 3 dias até aportar'}, {value: '7', label: 'A cada 7 dias até aportar'}]} />
@@ -837,7 +833,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
   const aporteDue = !!split && split.planned > 0 && split.missing > 0 && month === monthOf(today) && Number(today.slice(8, 10)) >= Math.max(1, (split.planDay || 1) - Math.max(3, split.remindBefore || 0));
   return (
     <>
-      {breakdown ? <MonthBreakdown kind={breakdown} d={d} month={month} show={show} net={net} onTx={(t: Tx) => { setBreakdown(null); onTx(t); }} onClose={() => setBreakdown(null)} /> : null}
+      {breakdown ? <MonthBreakdown kind={breakdown} d={d} month={month} show={show} net={net} onTx={(t: Tx) => { setBreakdown(null); afterSheet(() => onTx(t)); }} onClose={() => setBreakdown(null)} /> : null}
       {reserveHistoryOpen && reserve ? <ReserveHistorySheet api={api} reserve={reserve} moves={d.moves || []} show={show} reload={reload} onClose={() => setReserveHistoryOpen(false)} /> : null}
       {reserveSheet ? <ReserveSheet accountId={accountId} api={api} kind={reserveSheet} reserve={reserve} split={split} onClose={() => setReserveSheet(null)} onDone={async () => { setReserveSheet(null); await reload(); }} /> : null}
       {/* 0.3.153: cartao verde inteiro ATRAS do roxo (empilhados); o roxo cobre tudo menos a faixa de cima */}
@@ -870,7 +866,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
           {split ? <>
             <Text style={{fontSize: 29, fontWeight: '800', color: c.text}}>{show(split.saved)}</Text>
             <Text style={{fontSize: 12, lineHeight: 18, color: c.muted}}>Esse valor é separado das suas contas: não entra no Saldo, que é o que você tem para usar. Aportar tira do Saldo e soma aqui; retirar devolve. É uma organização da Sofia, não bloqueia nada no banco.</Text>
-            {outlook ? <Pressable accessibilityRole="button" accessibilityLabel="Editar meta" onPress={() => { setReserveMenu(false); setReserveSheet('goal'); }} style={{backgroundColor: GUARD + '1f', borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: GUARD + '55'}}>
+            {outlook ? <Pressable accessibilityRole="button" accessibilityLabel="Editar meta" onPress={() => { setReserveMenu(false); afterSheet(() => setReserveSheet('goal')); }} style={{backgroundColor: GUARD + '1f', borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: GUARD + '55'}}>
               <Text style={{color: c.text, fontWeight: '800', fontSize: 14}}>Meta: {show(outlook.target)} até {outlook.deadline.split('-').reverse().join('/')}</Text>
               <View style={{height: 8, borderRadius: 4, backgroundColor: c.line, overflow: 'hidden'}}>
                 <View style={{width: `${Math.round(Math.min(1, split.saved / outlook.target) * 100)}%` as `${number}%`, height: 8, backgroundColor: GUARD}} />
@@ -881,7 +877,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
                 : <Text style={{color: c.text, fontWeight: '700', fontSize: 13}}>Para fechar no prazo: {show(outlook.neededMonthly)} por mês</Text>}
               {!outlook.onTrack && split.planned > 0 ? <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Você pode manter {show(split.planned)} e compensar com aportes maiores quando sobrar, ou ajustar o valor em “Editar aportes”.</Text> : null}
             </Pressable> : null}
-            {!outlook ? <Pressable accessibilityRole="button" onPress={() => { setReserveMenu(false); setReserveSheet('goal'); }}><Text style={{color: c.accent, fontSize: 13, fontWeight: '700'}}>+ Definir uma meta (quanto e até quando)</Text></Pressable> : null}
+            {!outlook ? <Pressable accessibilityRole="button" onPress={() => { setReserveMenu(false); afterSheet(() => setReserveSheet('goal')); }}><Text style={{color: c.accent, fontSize: 13, fontWeight: '700'}}>+ Definir uma meta (quanto e até quando)</Text></Pressable> : null}
             {split.monthTarget > 0 || split.realized > 0 ? <View style={{backgroundColor: GUARD + '1f', borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: GUARD + '55'}}>
               <Text style={{color: c.text, fontWeight: '800', fontSize: 14}}>Aportes de {monthLabel(month)}</Text>
               {split.planned > 0 ? <Text style={{color: c.muted, fontSize: 12}}>{show(split.planned)} todo dia {split.planDay}, avisar às {split.remindTime}</Text> : null}
@@ -900,7 +896,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
             {split.daily < 0 ? <Text style={{color: BAD, fontSize: 12}}>O saldo geral ficou negativo: o que foi guardado é maior que o dinheiro que estava disponível. Confira os valores.</Text> : null}
           </> : null}
           {[['Guardar dinheiro', 'in'], ['Retirar da reserva', 'out'], ['Editar aportes', 'plan'], ['Editar meta', 'goal'], ['Histórico da reserva', 'history']].map(([label, k]) => (
-            <Pressable key={k} accessibilityRole="button" onPress={() => { setReserveMenu(false); if (k === 'history') setReserveHistoryOpen(true); else setReserveSheet(k as 'in' | 'out' | 'plan' | 'goal'); }}
+            <Pressable key={k} accessibilityRole="button" onPress={() => { setReserveMenu(false); afterSheet(() => { if (k === 'history') setReserveHistoryOpen(true); else setReserveSheet(k as 'in' | 'out' | 'plan' | 'goal'); }); }}
               style={{paddingVertical: 13, borderBottomWidth: 1, borderColor: c.line}}>
               <Text style={{color: k === 'out' ? BAD : c.text, fontSize: 15, fontWeight: '600'}}>{label}  ›</Text>
             </Pressable>
@@ -1004,6 +1000,8 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
   );
 }
 /** Pagar/receber: lançamento real vira pago; repetição prevista vira um lançamento real daquele mês. */
+/** Espera a janela que esta fechando terminar de sair antes de abrir a proxima. */
+function afterSheet(run: () => void) { setTimeout(run, 230); }
 // 0.3.175: atualizacoes locais imediatas (o servidor confirma por tras, sem a pessoa esperar).
 const FinanceLocal = React.createContext<{markPaid: (t: Tx) => void} | null>(null);
 async function confirmTx(api: SofiaApi, t: Tx, txs: Tx[] = []) {
