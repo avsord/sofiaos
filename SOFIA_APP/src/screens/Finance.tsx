@@ -24,7 +24,7 @@ import {
   EXPENSE_CATEGORIES, INCOME_CATEGORIES, ACCOUNT_TYPES, FIN_COLORS, categoryOf, toAccount, toCard, toTx, toBudget, toGoal, monthOf, addMonths, monthLabel, todayISO,
   invoiceMonth, cardInvoices, cardUsed, installmentPlan, accountBalance, totalBalance, forecastBalance, monthTxs, monthSummary, byCategory, budgetProgress,
   trend, balanceSeries, upcoming, manualDues, transactionsForAccount, goalProgress, parseMoney, formatMoneyInput, finishMoneyInput, addDays,
-  dayIn} from '../lib/finance';
+  dayIn, daysIn} from '../lib/finance';
 import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove} from '../lib/finance';
 import {cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, monthDues, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove} from '../lib/finance';
 import {syncFinanceDueNotifications} from '../lib/finance-notifications';
@@ -312,8 +312,10 @@ function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi
   async function finish() {
     setBusy(true); setError('');
     try {
+      // 0.3.186: ao refazer, o saldo inicial da conta so muda se a pessoa mexeu no campo
+      const initialTouched = !acc || money0(balance) !== acc.initial;
       const account = await saveEntity(api, 'fin_account', name.trim() || 'Conta principal',
-        {account_type: acc?.type || 'corrente', initial_balance: String(money0(balance)), color: acc?.color || FIN_COLORS[0], include_total: true, cycle_day: Math.min(31, Math.max(0, Number(cycleDay) || 0))}, acc?.entity);
+        {account_type: acc?.type || 'corrente', initial_balance: String(initialTouched ? money0(balance) : acc!.initial), color: acc?.color || FIN_COLORS[0], include_total: true, cycle_day: Math.min(31, Math.max(0, Number(cycleDay) || 0))}, acc?.entity);
       const kept = new Set(bills.map(b => b.id).filter(Boolean));
       const jobs: Promise<unknown>[] = [];
       for (const old of existing?.fixed || []) if (old.entity && !kept.has(old.entity.id)) jobs.push(api.saveEntity({...old.entity, state: 'archived'}));
@@ -351,7 +353,8 @@ function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi
   const steps = [
     {title: 'Sua conta', hint: 'Onde seu dinheiro fica hoje. Dá para adicionar outras depois.', body: <>
       <Field label="Nome da conta" value={name} onChange={setName} />
-      <Field label="Saldo de hoje (R$)" value={balance} onChange={setBalance} placeholder="0,00" numeric />
+      <Field label="Saldo inicial da conta (R$)" value={balance} onChange={setBalance} placeholder="0,00" numeric />
+      <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>É o que está no banco agora, antes de qualquer lançamento na Sofia. Ele entra no Saldo. Em branco ou 0, a conta começa zerada.</Text>
     </>},
     {title: 'Quando você recebe', hint: 'O dia do mês em que entra seu dinheiro. O Saldo passa a contar de um recebimento ao outro. Em branco, conta pelo mês do calendário.', body:
       <Field label="Dia em que você recebe" value={cycleDay} onChange={setCycleDay} placeholder="Ex.: 25" numeric />},
@@ -648,9 +651,10 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload}: {d:Data;api:S
   // 0.3.161: as pendencias marcadas como "todo mes" sao as contas fixas; aqui elas aparecem juntas,
   // com o total do ciclo, o quanto ja foi pago e quanto representam do que entrou.
   const cycleDay=d.accounts.find(a=>a.id===accountId)?.cycleDay||0;
-  const range=useMemo(()=>cycleRange(cycleDay,month===monthOf(today)?today:dayIn(month,Math.min(28,Math.max(1,cycleDay||1)))),[cycleDay,today,month]);
+  // 0.3.185: mesmo periodo da lista de cima (o mes escolhido no topo), para nenhuma conta sumir de uma das duas
+  const range=useMemo(()=>({start:dayIn(month,1),end:dayIn(month,daysIn(month)),label:monthLabel(month).split(' ')[0].toLowerCase()}),[month]);
   const fixed=useMemo(()=>fixedSummary(d.txs,accountId,range),[d,accountId,range]);
-  const prevShare=useMemo(()=>{const out:number[]=[];let r=range;for(let i=0;i<3;i++){r=cycleRange(cycleDay,addDays(r.start,-1));const f=fixedSummary(d.txs,accountId,r);if(f.share!==null)out.push(f.share);}return out.length?out.reduce((a,b)=>a+b,0)/out.length:null;},[d,accountId,range,cycleDay]);
+  const prevShare=useMemo(()=>{const out:number[]=[];for(let i=1;i<=3;i++){const m=addMonths(month,-i);const f=fixedSummary(d.txs,accountId,{start:dayIn(m,1),end:dayIn(m,daysIn(m))});if(f.share!==null)out.push(f.share);}return out.length?out.reduce((a,b)=>a+b,0)/out.length:null;},[d,accountId,month]);
   return <>
     <Card_>
       <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
@@ -668,7 +672,7 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload}: {d:Data;api:S
     </Card_>
     {fixed.bills.length ? <Card_>
       <Title text="Contas fixas" />
-      <Text style={{fontSize:12,color:c.muted,lineHeight:18}}>As pendências marcadas como “Todo mês”, no ciclo {range.label}.</Text>
+      <Text style={{fontSize:12,color:c.muted,lineHeight:18}}>As pendências marcadas como “Todo mês”, em {range.label}.</Text>
       {fixed.bills.map(b=><View key={b.id+b.date} style={{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:9,borderTopWidth:1,borderColor:c.line}}>
         <View style={{flex:1,gap:2}}>
           <Text style={{color:c.text,fontSize:14,fontWeight:'600'}}>{b.title}</Text>
@@ -677,10 +681,10 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload}: {d:Data;api:S
         <Text style={{color:b.paid?c.muted:c.text,fontWeight:'700',fontSize:14,textDecorationLine:b.paid?'line-through':'none'}}>{money(b.amount)}</Text>
       </View>)}
       <View style={{borderTopWidth:1,borderColor:c.line,paddingTop:12,gap:6}}>
-        <View style={{flexDirection:'row'}}><Text style={{flex:1,color:c.text,fontWeight:'700'}}>Total do ciclo</Text><Text style={{color:c.text,fontWeight:'800'}}>{money(fixed.total)}</Text></View>
+        <View style={{flexDirection:'row'}}><Text style={{flex:1,color:c.text,fontWeight:'700'}}>Total do mês</Text><Text style={{color:c.text,fontWeight:'800'}}>{money(fixed.total)}</Text></View>
         <View style={{flexDirection:'row'}}><Text style={{flex:1,color:c.muted,fontSize:12}}>Pagas</Text><Text style={{color:c.muted,fontSize:12}}>{money(fixed.paid)} · faltam {money(fixed.open)}</Text></View>
-        {fixed.share!==null?<Text style={{color:c.muted,fontSize:12,lineHeight:18}}>Suas fixas são {Math.round(fixed.share*100)}% do que entrou neste ciclo ({money(fixed.income)}){prevShare!==null?`, contra ${Math.round(prevShare*100)}% na média dos anteriores`:''}.</Text>
-          :<Text style={{color:c.muted,fontSize:12}}>Ainda não há receitas registradas neste ciclo para calcular a proporção.</Text>}
+        {fixed.share!==null?<Text style={{color:c.muted,fontSize:12,lineHeight:18}}>Suas fixas são {Math.round(fixed.share*100)}% do que entrou em {range.label} ({money(fixed.income)}){prevShare!==null?`, contra ${Math.round(prevShare*100)}% na média dos meses anteriores`:''}.</Text>
+          :<Text style={{color:c.muted,fontSize:12}}>Ainda não há receitas registradas em {range.label} para calcular a proporção.</Text>}
       </View>
     </Card_> : null}
     <Card_>
@@ -932,7 +936,7 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
         // Fica "pago" na hora; o servidor grava em seguida. Se falhar, a tela volta ao estado real.
         local?.markPaid(due.tx);
         setBusy(false);
-        void confirmTx(api, due.tx).then(() => reload()).catch(e => { appAlert('Finanças', errorText(e)); void reload(); });
+        void confirmTx(api, due.tx, d.txs).then(() => reload()).catch(e => { appAlert('Finanças', errorText(e)); void reload(); });
         return;
       }
     } catch (e) { appAlert('Finanças', errorText(e)); } finally { setBusy(false); }
@@ -969,8 +973,13 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
 /** Pagar/receber: lançamento real vira pago; repetição prevista vira um lançamento real daquele mês. */
 // 0.3.175: atualizacoes locais imediatas (o servidor confirma por tras, sem a pessoa esperar).
 const FinanceLocal = React.createContext<{markPaid: (t: Tx) => void} | null>(null);
-async function confirmTx(api: SofiaApi, t: Tx) {
+async function confirmTx(api: SofiaApi, t: Tx, txs: Tx[] = []) {
   if (t.virtual) {
+    // 0.3.185: nunca registrar duas vezes a mesma ocorrencia (ex.: salario do mes). Se ja existe um
+    // registro dessa serie naquele mes, ele e o que fica pago.
+    const series = t.seriesId || t.id, month = t.date.slice(0, 7);
+    const same = txs.find(x => !x.virtual && x.entity && (x.seriesId === series || x.id === series) && x.date.slice(0, 7) === month);
+    if (same && same.entity) { await saveEntity(api, 'fin_tx', same.desc, {paid: true}, same.entity); return; }
     const data: Record<string, any> = {kind: t.kind, amount: t.amount, date: t.date, category: t.category, account_id: t.accountId, paid: true, series_id: t.seriesId, recurrence: 'none',
       // 0.3.177: a parcela paga continua aparecendo como pendencia (paga) daquele mes
       import_id: t.manualDue ? 'sofia-pendencia:' + (t.seriesId || t.id) + ':' + t.date : ''};
@@ -1050,7 +1059,7 @@ function TxRow({t, d, first, onPress, api, reload}: {t: Tx; d: Data; first: bool
       </View>
       <View style={{alignItems: 'flex-end', gap: 2}}>
         <Text style={{color, fontWeight: '700'}}>{t.kind === 'income' ? '+' : t.kind === 'transfer' ? '' : '−'}{money(t.amount)}</Text>
-        {pending ? <Pressable onPress={() => void confirmTx(api, t).then(reload).catch(e => appAlert('Finanças', errorText(e)))}><Text style={{fontSize: 11, color: t.date < todayISO() ? BAD : WARN, fontWeight: '700'}}>{t.virtual ? 'previsto · confirmar' : t.kind === 'income' ? 'a receber · ✓' : 'a pagar · ✓'}</Text></Pressable> : null}
+        {pending ? <Pressable onPress={() => void confirmTx(api, t, d.txs).then(reload).catch(e => appAlert('Finanças', errorText(e)))}><Text style={{fontSize: 11, color: t.date < todayISO() ? BAD : WARN, fontWeight: '700'}}>{t.virtual ? 'previsto · confirmar' : t.kind === 'income' ? 'a receber · ✓' : 'a pagar · ✓'}</Text></Pressable> : null}
       </View>
     </Pressable>
   );
@@ -1441,6 +1450,7 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose}: {kind: 'sald
         <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Como o saldo é calculado</Text>
         <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 2}}>
           {row('Saldo inicial das contas', show(parts.initial))}
+          {parts.initial ? <Text style={{color: c.muted, fontSize: 11, lineHeight: 16, marginBottom: 4}}>Não é um lançamento: é o valor informado no cadastro da conta (engrenagem → Contas e cartões → toque na conta → “Saldo inicial”). Se não deveria existir, deixe 0 ali.</Text> : null}
           {row('+ Receitas recebidas', show(parts.income), false, GOOD)}
           {row('− Despesas pagas', show(parts.expense), false, BAD)}
           {parts.cards ? row('− Faturas de cartão pagas', show(parts.cards), false, BAD) : null}

@@ -290,6 +290,20 @@ export function monthDues(txs: Tx[], accountId: string, month: string, today = t
     .map(t => ({id: t.id, title: t.desc, amount: t.amount, date: t.date, kind: (t.kind === 'income' ? 'receber' : 'pagar') as Due['kind'], late: !t.paid && t.date < today, paid: t.paid, tx: t}))
     .sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
 }
+/** 0.3.185: lancamentos pagos que parecem repetidos - mesmo tipo, mesma descricao, mesmo valor e mesmo
+ * mes (ex.: o salario confirmado duas vezes). A pessoa decide qual sai. */
+export type DuplicateGroup = {key: string; title: string; amount: number; month: string; kind: TxKind; items: Tx[]};
+export function duplicateGroups(txs: Tx[]): DuplicateGroup[] {
+  const groups = new Map<string, Tx[]>();
+  for (const t of txs) {
+    if (!t.paid || t.virtual || !t.entity || String(t.id).startsWith('local:')) continue;
+    if (t.kind !== 'income' && t.kind !== 'expense') continue;
+    const key = [t.kind, t.desc.trim().toLowerCase(), t.amount.toFixed(2), monthOf(t.date), t.accountId].join('|');
+    groups.set(key, [...(groups.get(key) || []), t]);
+  }
+  return [...groups.entries()].filter(([, items]) => items.length > 1)
+    .map(([key, items]) => ({key, title: items[0].desc, amount: items[0].amount, month: monthOf(items[0].date), kind: items[0].kind, items: items.sort((a, b) => a.date.localeCompare(b.date))}));
+}
 export type FinanceInsight = {tone: 'good' | 'attention' | 'neutral'; text: string};
 export function financeInsights(txs: Tx[], month: string): FinanceInsight[] {
   // Conselhos só com dados realmente registrados; sem inventar gastos, projeções ou culpa.

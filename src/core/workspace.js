@@ -154,7 +154,34 @@ class Workspace {
  // eles, o salvamento da pessoa segue: os campos dela valem e os automaticos ficam como estao
  // no servidor. Se outra pessoa/dispositivo mudou um campo de verdade, o conflito continua.
  systemOnlyChange(kind,input,old){const keys=SYSTEM_KEYS[kind];if(!keys||!input||!old)return false;const base=input.base_data;if(!base||typeof base!=='object')return false;const cur=old.data||{};for(const k of new Set([...Object.keys(cur),...Object.keys(base)])){if(keys.includes(k))continue;if(JSON.stringify(cur[k])!==JSON.stringify(base[k]))return false;}return ['title','content','area','state','privacy'].every(f=>input['base_'+f]===undefined||input['base_'+f]===old[f]);}
- save(input,entityId){const old=entityId?this.get(entityId):null;if(old&&input.revision!==old.revision){if(this.systemOnlyChange(old.kind,input,old)){const keys=SYSTEM_KEYS[old.kind],data={...(input.data||{})};for(const k of keys)if(k in (old.data||{}))data[k]=old.data[k];input={...input,data,revision:old.revision};}else throw new AppError('REVISION_CONFLICT','Este registro mudou em outro aparelho. Suas alterações não foram perdidas: reabra para conferir e salve de novo.',409);}
+ /** 0.3.186: a mesma ocorrencia de uma conta fixa/salario so existe uma vez por mes. Se ha mais de um
+  * registro da mesma serie no mesmo mes (sobra de versoes antigas), fica um so: o pago e, entre iguais,
+  * o original da serie. Os outros sao apagados. Nada de fora de series e tocado. */
+ repairFinanceDuplicates(){
+  const rows=this.db.prepare("SELECT id FROM entities WHERE kind='fin_tx' AND state!='archived'").all().map(r=>this.get(r.id));
+  const groups=new Map();
+  for(const e of rows){const d=e.data||{};const series=d.series_id||(d.recurrence&&d.recurrence!=='none'?e.id:'');if(!series||!d.date)continue;const key=series+'|'+String(d.date).slice(0,7);groups.set(key,[...(groups.get(key)||[]),e]);}
+  let removed=0;
+  for(const [key,list] of groups){
+   if(list.length<2)continue;
+   const series=key.split('|')[0];
+   const original=list.find(e=>e.id===series),anyPaid=list.some(e=>e.data&&e.data.paid);
+   // com o original da serie naquele mes, ele fica (pago se alguma copia estava paga); senao fica a copia paga mais antiga
+   const keep=original||[...list].sort((a,b)=>Number(!!b.data.paid)-Number(!!a.data.paid)||String(a.created_at).localeCompare(String(b.created_at)))[0];
+   if(original&&anyPaid&&!original.data.paid){try{this.save({revision:original.revision,data:{...original.data,paid:true}},original.id);}catch{/* fica como esta */}}
+   for(const e of list){if(e.id===keep.id)continue;try{this.deleteEntity(e.id);removed++;}catch{/* segue com os outros */}}
+  }
+  return {removed};
+ }
+ save(input,entityId){
+  // 0.3.185: uma ocorrencia de conta fixa/salario so pode existir uma vez por mes. Se ja existe um
+  // registro dessa serie no mesmo mes, o "novo" vira atualizacao dele (evita somar duas vezes).
+  if(!entityId&&input&&input.kind==='fin_tx'&&input.data&&input.data.series_id&&input.data.date){
+   const series=String(input.data.series_id),month=String(input.data.date).slice(0,7);
+   const dup=this.db.prepare("SELECT id FROM entities WHERE kind='fin_tx' AND state!='archived' AND (id=? OR json_extract(data,'$.series_id')=?) AND id!=? AND substr(json_extract(data,'$.date'),1,7)=? LIMIT 1").all(series,series,series,month).map(r=>this.get(r.id)).find(e=>e.state!=='archived'&&(e.id===series||(e.data&&e.data.series_id===series))&&e.id!==series&&String(e.data&&e.data.date||'').slice(0,7)===month);
+   if(dup){entityId=dup.id;input={...input,revision:dup.revision,data:{...dup.data,...input.data}};}
+  }
+  const old=entityId?this.get(entityId):null;if(old&&input.revision!==old.revision){if(this.systemOnlyChange(old.kind,input,old)){const keys=SYSTEM_KEYS[old.kind],data={...(input.data||{})};for(const k of keys)if(k in (old.data||{}))data[k]=old.data[k];input={...input,data,revision:old.revision};}else throw new AppError('REVISION_CONFLICT','Este registro mudou em outro aparelho. Suas alterações não foram perdidas: reabra para conferir e salve de novo.',409);}
  delete input.base_data;delete input.base_title;delete input.base_content;delete input.base_area;delete input.base_state;delete input.base_privacy;
    const v=this.validate(input,old);const inherited=this.s.privacyOf('message',input.source_id||old?.source_id);if(inherited==='local')v.privacy='local';else if(!input.privacy&&inherited==='shared'&&!CATALOG[v.kind].private)v.privacy='shared';else if(!input.privacy&&inherited==='private')v.privacy='private';const key=entityId||id(),revision=(old?.revision||0)+1,stamp=now();
    return this.s.tx(()=>{

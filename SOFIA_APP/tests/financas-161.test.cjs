@@ -42,7 +42,7 @@ test('telas: cartao Saldo, secao de contas fixas, meta e passo a passo com 7 eta
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes('>Saldo</Text>')&&s.includes('cycleRoom(d.txs, accountId, cycleRange(cycleDay, today)'),'cartao do ciclo');
   assert.ok(s.includes('além do que havia'),'mostra o estouro');
-  assert.ok(s.includes('<Title text="Contas fixas" />')&&s.includes('Total do ciclo'));
+  assert.ok(s.includes('<Title text="Contas fixas" />')&&s.includes('Total do mês'));
   assert.ok(s.includes('Meta: {show(outlook.target)}')&&s.includes('Para fechar no prazo:'));
   assert.ok(s.includes("{title: 'Quando você recebe'")&&s.includes("{title: 'Tudo pronto'"));
   assert.ok(s.includes('Passo {step + 1} de {steps.length}')&&s.includes('Pular o resto'));
@@ -161,4 +161,13 @@ test('0.3.182: Saldo, detalhes do saldo, listas de receitas e despesas, cartao n
   assert.ok(s.includes('>Saldo do ciclo</Text>'),'sem dois cartoes com o mesmo nome');
   assert.ok(lib.includes("{name: 'Contas', icon: '💳'")&&!lib.includes('💡'));
   assert.ok(s.includes('Recuperar itens apagados'));
+});
+
+test('0.3.186: sem aviso de repetido (o servidor nao deixa duplicar e corrige o antigo); contas fixas no mes da pagina',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(!s.includes('DuplicatesSheet')&&!s.includes('Lançamento repetido'),'nada de tela de repetidos');
+  assert.ok(s.includes('confirmTx(api, due.tx, d.txs)')&&s.includes('confirmTx(api, t, d.txs)'),'confirmar nao cria segundo registro');
+  assert.ok(s.includes("const range=useMemo(()=>({start:dayIn(month,1),end:dayIn(month,daysIn(month))"),'contas fixas no mes da pagina');
+  assert.ok(s.includes("const initialTouched = !acc || money0(balance) !== acc.initial;"),'refazer nao reescreve o saldo inicial');
+  assert.ok(s.includes('Não é um lançamento: é o valor informado no cadastro da conta'));
 });

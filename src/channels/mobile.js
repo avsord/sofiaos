@@ -154,6 +154,7 @@ function makeMobileApi(runtime, deps) {
     // "saldo acumulado" de cada conta até o início da janela: o app soma esse acumulado ao
     // saldo inicial e todos os cálculos continuam certos sem precisar do histórico inteiro.
     if (p === '/api/mobile/md/finance' && m === 'GET') {
+      try { workspace.repairFinanceDuplicates(); } catch { /* reparo e best-effort */ }
       const out = {};
       for (const kind of ['fin_account', 'fin_card', 'fin_tx', 'fin_budget', 'fin_goal', 'fin_reserve_move']) {
         const list = [];
@@ -360,10 +361,10 @@ function makeMobileApi(runtime, deps) {
       const exists = id => { try { workspace.get(id); return true; } catch { return false; } };
       // Ja restaurado (ou recriado igual)? Nao aparece de novo.
       const sig = e => [e.kind, String(e.title || '').trim().toLowerCase(), Number(e.data && e.data.amount) || 0, String(e.data && e.data.date || '')].join('|');
-      const now = new Set(); for (const k of ['fin_tx', 'fin_goal', 'fin_reserve_move', 'fin_account', 'fin_card']) { try { for (const e of workspace.list({kind: k, limit: 5000})) now.add(sig(e)); } catch { /* sem registros */ } }
+      const now = new Set(); for (const k of ['fin_tx', 'fin_goal', 'fin_reserve_move', 'fin_account', 'fin_card']) { try { for (const e of workspace.list({kind: k, limit: 500})) now.add(sig(e)); } catch { /* sem registros */ } }
       const items = (runtime.backups && runtime.backups.recoverable ? runtime.backups.recoverable(['fin_tx', 'fin_goal', 'fin_reserve_move', 'fin_account', 'fin_card'], exists) : []).filter(x => !now.has(sig(x)));
       const hidden = [];
-      for (const k of ['fin_tx', 'fin_goal', 'fin_account', 'fin_card']) { try { for (const e of workspace.list({kind: k, limit: 5000})) if (e.state === 'archived') hidden.push({id: e.id, kind: e.kind, title: e.title, data: e.data, state: 'archived', updated_at: e.updated_at, backup: ''}); } catch { /* sem registros */ } }
+      for (const k of ['fin_tx', 'fin_goal', 'fin_account', 'fin_card']) { try { for (const e of workspace.list({kind: k, limit: 500})) if (e.state === 'archived') hidden.push({id: e.id, kind: e.kind, title: e.title, data: e.data, state: 'archived', updated_at: e.updated_at, backup: ''}); } catch { /* sem registros */ } }
       return send({items: [...hidden, ...items.map(x => ({id: x.id, kind: x.kind, title: x.title, data: x.data, state: 'deleted', updated_at: x.updated_at, backup: x.backup}))].slice(0, 300)});
     }
     if (p === '/api/mobile/md/finance/recover' && m === 'POST') {
