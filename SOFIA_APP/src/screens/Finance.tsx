@@ -119,6 +119,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
     if (next === tab) return;
     setTabHistory(h => [...h, tab].slice(-16)); setTab(next);
   },[tab]);
+  const goHome = useCallback(() => { setManage(false); setEditing(null); setBillEditor(null); setAccountPicker(false); setTabHistory([]); setTab('home'); }, []);
   const backFinance = useCallback(() => {
     if (billEditor) {setBillEditor(null);return;}
     if (accountPicker) {setAccountPicker(false);return;}
@@ -199,7 +200,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
         </View>
 
         {!d ? <View style={{flex: 1, padding: 16, gap: 14}}>{error ? <View style={{padding: 20, gap: 12}}><Text style={{color: c.danger}}>{error}</Text><Button title="Tentar de novo" secondary onPress={() => void reload()} /></View> : <View style={{gap: 6}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Spinner size={16} stroke={1.8} /><Text style={{color: c.muted, fontSize: 13}}>Carregando suas finanças</Text></View><LoadingLines rows={5} /></View>}</View> : !d.accounts.length ? (
-          <Onboarding api={api} onDone={reload} />
+          <Onboarding api={api} onDone={reload} onFinished={goHome} />
         ) : (
           <ScrollView contentContainerStyle={{paddingHorizontal: 20, paddingTop: 2, paddingBottom: insets.bottom + 110, gap: 16}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>
             {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
@@ -228,7 +229,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
 
         {editing && d ? <TxEditor api={api} d={d} tx={editing} defaultAccountId={accountId} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} /> : null}
         {billEditor && d ? <BillEditor api={api} tx={billEditor === 'new' ? null : billEditor} accountId={accountId} onClose={() => setBillEditor(null)} onSaved={() => {setBillEditor(null);void reload();}} /> : null}
-        {manage && d ? <ManageSheet api={api} d={d} onClose={() => setManage(false)} reload={reload} /> : null}
+        {manage && d ? <ManageSheet api={api} d={d} onClose={() => setManage(false)} onFinished={goHome} reload={reload} /> : null}
         <Sheet visible={accountPicker} onClose={() => setAccountPicker(false)} label="Fechar seletor de contas">
           <View style={{gap:14,paddingBottom:12}}>
             <Text style={{fontSize:19,fontWeight:'800',color:c.text}}>Qual conta quer acompanhar?</Text>
@@ -250,7 +251,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
 // ============================ PRIMEIRO USO ============================
 /** 0.3.161: passo a passo da primeira configuracao. Tudo opcional menos a conta; "Pular" em
  * qualquer passo vai direto para o app. Reaberto depois em Contas e cartoes, ja preenchido. */
-function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: () => Promise<void>; existing?: {account: Account | null; reserve: Goal | null; fixed?: Tx[]} | null; onClose?: () => void}) {
+function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi; onDone: () => Promise<void>; existing?: {account: Account | null; reserve: Goal | null; fixed?: Tx[]} | null; onClose?: () => void; onFinished?: () => void}) {
   const c = useTheme(), acc = existing?.account || null, reserve = existing?.reserve || null;
   const [step, setStep] = useState(0), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [name, setName] = useState(acc?.name || 'Conta principal'), [balance, setBalance] = useState(acc ? finishMoneyInput(String(acc.initial).replace('.', ',')) : '');
@@ -332,7 +333,8 @@ function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: ()
         await api.saveEntity(reserve ? {...reserve.entity, data: {...reserve.entity.data, ...data}} : {kind: 'fin_goal', title: 'Dinheiro guardado', content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data});
       }
       await clearWizardDraft();
-      await onDone(); onClose?.();
+      await onDone();
+      if (onFinished) onFinished(); else onClose?.();
     } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
 
@@ -1366,7 +1368,7 @@ function ReportsTab({d, month, reserve}: {d: Data; month: string; reserve: Goal 
 }
 
 // ============================ CONTAS E CARTÕES ============================
-function ManageSheet({api, d, onClose, reload}: {api: SofiaApi; d: Data; onClose: () => void; reload: () => Promise<void>}) {
+function ManageSheet({api, d, onClose, reload, onFinished}: {api: SofiaApi; d: Data; onClose: () => void; reload: () => Promise<void>; onFinished?: () => void}) {
   const c = useTheme(), [edit, setEdit] = useState<{type: 'account'; item: Account | null} | {type: 'card'; item: Card | null} | null>(null);
   const [setup, setSetup] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -1376,7 +1378,7 @@ function ManageSheet({api, d, onClose, reload}: {api: SofiaApi; d: Data; onClose
         <View style={{paddingTop: 40, paddingBottom: 8, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: c.line}}>
           <IconButton name="back" label="Voltar" onPress={onClose} /><Text style={{flex: 1, fontSize: 17, fontWeight: '700', color: c.text}}>Contas e cartões</Text>
         </View>
-        {setup ? <Onboarding api={api} onDone={reload} onClose={() => setSetup(false)} existing={{account: d.accounts.find(a => !a.archived) || null, reserve: reserveOf(d.goals), fixed: d.txs.filter(t => t.manualDue && t.recurrence === 'monthly' && !t.virtual && t.kind === 'expense' && t.entity?.state !== 'archived')}} /> :
+        {setup ? <Onboarding api={api} onDone={reload} onClose={() => setSetup(false)} onFinished={() => { setSetup(false); onFinished ? onFinished() : onClose(); }} existing={{account: d.accounts.find(a => !a.archived) || null, reserve: reserveOf(d.goals), fixed: d.txs.filter(t => t.manualDue && t.recurrence === 'monthly' && !t.virtual && t.kind === 'expense' && t.entity?.state !== 'archived')}} /> :
         <ScrollView contentContainerStyle={{padding: 18, gap: 14}}>
           <Pressable accessibilityRole="button" onPress={() => setSetup(true)} style={{backgroundColor: c.surface, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: c.line, flexDirection: 'row', alignItems: 'center', gap: 10}}>
             <View style={{flex: 1, gap: 2}}>

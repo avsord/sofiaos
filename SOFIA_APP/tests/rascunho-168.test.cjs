@@ -63,3 +63,11 @@ test('0.3.173: depois da configuracao, a meta se edita direto (com seletor de da
   assert.ok(s.includes('Tirar a meta'));
   assert.ok(s.includes("} else if ((kind === 'plan' || kind === 'goal') && reserve) {"),'salva como a edicao dos aportes');
 });
+
+test('0.3.174: concluir os passos leva ao Resumo de Financas',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("const goHome = useCallback(() => { setManage(false); setEditing(null); setBillEditor(null); setAccountPicker(false); setTabHistory([]); setTab('home'); }, []);"));
+  assert.ok(s.includes('<Onboarding api={api} onDone={reload} onFinished={goHome} />'),'primeira configuracao');
+  assert.ok(s.includes('onFinished={goHome} reload={reload} />'),'refazer pela engrenagem');
+  assert.ok(s.includes('if (onFinished) onFinished(); else onClose?.();'),'cancelar continua so fechando');
+});
