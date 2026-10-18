@@ -257,13 +257,15 @@ function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: ()
   const [cycleDay, setCycleDay] = useState(acc?.cycleDay ? String(acc.cycleDay) : '');
   const [bills, setBills] = useState<{title: string; amount: string; day: string; parcels: string; at: string}[]>([]);
   const [billTitle, setBillTitle] = useState(''), [billAmount, setBillAmount] = useState(''), [billDay, setBillDay] = useState(''), [billParcels, setBillParcels] = useState(''), [billAt, setBillAt] = useState('');
+  const [billEditing, setBillEditing] = useState<number | null>(null);
   const [saved, setSaved] = useState(reserve ? finishMoneyInput(String(reserve.saved).replace('.', ',')) : '');
   const [plan, setPlan] = useState(reserve?.entity?.data?.monthly_plan ? finishMoneyInput(String(reserve.entity.data.monthly_plan).replace('.', ',')) : '');
   const [planDay, setPlanDay] = useState(String(reserve?.entity?.data?.plan_day || ''));
   const [goalValue, setGoalValue] = useState(reserve?.target ? finishMoneyInput(String(reserve.target).replace('.', ',')) : '');
   const [goalMonth, setGoalMonth] = useState(String(reserve?.entity?.data?.deadline || '').slice(0, 7));
   // 0.3.168: a configuracao tambem sobrevive a sair do app no meio do preenchimento.
-  const wizardForm = {step: String(step), name, balance, cycleDay, bills: JSON.stringify(bills), saved, plan, planDay, goalValue, goalMonth};
+  const wizardForm = {step: String(step), name, balance, cycleDay, bills: JSON.stringify(bills), saved, plan, planDay, goalValue, goalMonth,
+    billTitle, billAmount, billDay, billParcels, billAt};
   const {draft: wizardDraft, ready: wizardReady, clear: clearWizardDraft} = useFormDraft('financas:setup:' + (acc?.id || 'novo'), wizardForm);
   const wizardRestored = useRef(false);
   useEffect(() => {
@@ -279,6 +281,11 @@ function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: ()
     if (d.goalValue !== undefined) setGoalValue(d.goalValue);
     if (d.goalMonth !== undefined) setGoalMonth(d.goalMonth);
     if (d.bills) { try { const list = JSON.parse(d.bills); if (Array.isArray(list)) setBills(list); } catch { /* rascunho invalido */ } }
+    if (d.billTitle !== undefined) setBillTitle(d.billTitle);
+    if (d.billAmount !== undefined) setBillAmount(d.billAmount);
+    if (d.billDay !== undefined) setBillDay(d.billDay);
+    if (d.billParcels !== undefined) setBillParcels(d.billParcels);
+    if (d.billAt !== undefined) setBillAt(d.billAt);
     if (d.step) setStep(Math.max(0, Math.min(6, Number(d.step) || 0)));
   }, [wizardReady, wizardDraft]);
   const money0 = (v: string) => parseMoney(v) ?? 0;
@@ -318,11 +325,14 @@ function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: ()
     {title: 'Quando você recebe', hint: 'O dia do mês em que entra seu dinheiro. O Saldo passa a contar de um recebimento ao outro. Em branco, conta pelo mês do calendário.', body:
       <Field label="Dia em que você recebe" value={cycleDay} onChange={setCycleDay} placeholder="Ex.: 25" numeric />},
     {title: 'Contas fixas', hint: 'Aluguel, academia, imposto, assinaturas. Elas se repetem todo mês e a Sofia avisa no vencimento.', body: <>
-      {bills.map((b, i) => <View key={i} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderColor: c.line}}>
-        <View style={{flex: 1}}><Text style={{color: c.text, fontWeight: '600'}}>{b.title}</Text><Text style={{color: c.muted, fontSize: 11}}>dia {b.day || 1}{Number(b.parcels) > 1 ? ' · parcela ' + (Math.max(1, Number(b.at) || 1)) + ' de ' + Math.round(Number(b.parcels)) : ''}</Text></View>
+      {bills.map((b, i) => <Pressable key={i} accessibilityRole="button" accessibilityLabel={'Editar ' + b.title}
+        onPress={() => { setBillEditing(i); setBillTitle(b.title); setBillAmount(b.amount); setBillDay(b.day); setBillParcels(b.parcels); setBillAt(b.at); }}
+        style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderColor: billEditing === i ? c.accent : c.line}}>
+        <View style={{flex: 1}}><Text style={{color: billEditing === i ? c.accent : c.text, fontWeight: '600'}}>{b.title}</Text><Text style={{color: c.muted, fontSize: 11}}>dia {b.day || 1}{Number(b.parcels) > 1 ? ' · parcela ' + (Math.max(1, Number(b.at) || 1)) + ' de ' + Math.round(Number(b.parcels)) : ''}{billEditing === i ? ' · editando' : ''}</Text></View>
         <Text style={{color: c.text, fontWeight: '700'}}>{money(money0(b.amount))}</Text>
-        <IconButton name="trash" label={'Remover ' + b.title} onPress={() => setBills(list => list.filter((_, n) => n !== i))} />
-      </View>)}
+        <IconButton name="trash" label={'Remover ' + b.title} onPress={() => { setBills(list => list.filter((_, n) => n !== i)); if (billEditing === i) { setBillEditing(null); setBillTitle(''); setBillAmount(''); setBillDay(''); setBillParcels(''); setBillAt(''); } }} />
+      </Pressable>)}
+      {bills.length ? <Text style={{color: c.muted, fontSize: 11}}>Toque em uma conta para corrigir os dados dela.</Text> : null}
       <Field label="Conta" value={billTitle} onChange={setBillTitle} placeholder="Ex.: Aluguel" />
       <View style={{flexDirection: 'row', gap: 10}}>
         <View style={{flex: 1}}><Field label="Valor (R$)" value={billAmount} onChange={setBillAmount} placeholder="0,00" numeric /></View>
@@ -333,8 +343,13 @@ function Onboarding({api, onDone, existing, onClose}: {api: SofiaApi; onDone: ()
         {Number(billParcels) > 1 ? <View style={{flex: 1}}><Field label="Esta é a parcela nº" value={billAt} onChange={setBillAt} placeholder="1" numeric /></View> : null}
       </View>
       <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Conta com prazo (ex.: 10x)? Informe o total e em qual parcela você está. Ela acaba sozinha no fim e a Sofia avisa.</Text>
-      <Button title="Adicionar conta fixa" secondary disabled={!billTitle.trim() || !money0(billAmount)}
-        onPress={() => { setBills(list => [...list, {title: billTitle.trim(), amount: billAmount, day: billDay, parcels: billParcels, at: billAt}]); setBillTitle(''); setBillAmount(''); setBillDay(''); setBillParcels(''); setBillAt(''); }} />
+      <Button title={billEditing === null ? 'Adicionar conta fixa' : 'Salvar alteração'} secondary disabled={!billTitle.trim() || !money0(billAmount)}
+        onPress={() => {
+          const item = {title: billTitle.trim(), amount: billAmount, day: billDay, parcels: billParcels, at: billAt};
+          setBills(list => billEditing === null ? [...list, item] : list.map((b, n) => n === billEditing ? item : b));
+          setBillEditing(null); setBillTitle(''); setBillAmount(''); setBillDay(''); setBillParcels(''); setBillAt('');
+        }} />
+      {billEditing !== null ? <Pressable accessibilityRole="button" onPress={() => { setBillEditing(null); setBillTitle(''); setBillAmount(''); setBillDay(''); setBillParcels(''); setBillAt(''); }}><Text style={{color: c.muted, fontSize: 13, textAlign: 'center'}}>Cancelar a edição</Text></Pressable> : null}
       {bills.length ? <Text style={{color: c.muted, fontSize: 12}}>Total por mês: {money(fixedTotal)}</Text> : null}
     </>},
     {title: 'Dinheiro guardado', hint: 'Quanto você já tem guardado, esteja onde estiver. Esse valor fica separado do Saldo.', body:

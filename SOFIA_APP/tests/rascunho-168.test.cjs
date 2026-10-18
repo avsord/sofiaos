@@ -19,3 +19,14 @@ test('conta a pagar, reserva e configuracao restauram e limpam o rascunho ao sal
   assert.ok(s.includes('await clearWizardDraft();'));
   assert.ok(s.includes('if (d.step) setStep('),'volta no mesmo passo da configuracao');
 });
+
+test('0.3.169: no passo a passo, tocar numa conta fixa abre para editar (sem remover e criar de novo)',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("accessibilityLabel={'Editar ' + b.title}"));
+  assert.ok(s.includes("billEditing === null ? 'Adicionar conta fixa' : 'Salvar alteração'"));
+  assert.ok(s.includes('list.map((b, n) => n === billEditing ? item : b)'),'substitui no lugar');
+  assert.ok(s.includes('Cancelar a edição'));
+  assert.ok(s.includes('Toque em uma conta para corrigir os dados dela.'));
+  // a conta meio preenchida tambem entra no rascunho
+  assert.ok(s.includes('billTitle, billAmount, billDay, billParcels, billAt};'));
+});
