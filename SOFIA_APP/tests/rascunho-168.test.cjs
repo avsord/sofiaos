@@ -43,7 +43,7 @@ test('0.3.171: refazer a configuracao mostra o que existe e so substitui ao conf
   assert.ok(s.includes("appAlert('Substituir a configuração atual?'"),'confirmacao antes de alterar');
   assert.ok(s.includes("existing ? 'Substituir configuração' : 'Começar a usar'"));
   assert.ok(s.includes('Nada foi alterado ainda.'));
-  assert.ok(s.includes("await api.saveEntity({...old.entity, state: 'archived'})"),'removidas sao arquivadas, nao apagadas');
+  assert.ok(s.includes("jobs.push(api.saveEntity({...old.entity, state: 'archived'}))"),'removidas sao arquivadas, nao apagadas');
   assert.ok(s.includes('if (previous && previous.entity) {'),'as que ficaram sao atualizadas, sem duplicar');
 });
 
@@ -70,4 +70,13 @@ test('0.3.174: concluir os passos leva ao Resumo de Financas',()=>{
   assert.ok(s.includes('<Onboarding api={api} onDone={reload} onFinished={goHome} />'),'primeira configuracao');
   assert.ok(s.includes('onFinished={goHome} reload={reload} />'),'refazer pela engrenagem');
   assert.ok(s.includes('if (onFinished) onFinished(); else onClose?.();'),'cancelar continua so fechando');
+});
+
+test('0.3.175: "Paguei" fica pago na hora e o fim dos passos grava em paralelo',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes('local?.markPaid(due.tx);'),'marca na tela antes de esperar o servidor');
+  assert.ok(s.includes("void confirmTx(api, due.tx).then(() => reload()).catch(e => { appAlert('Finanças', errorText(e)); void reload(); });"),'se falhar, volta ao estado real');
+  assert.ok(s.includes('<FinanceLocal.Provider value={local}>'));
+  assert.ok(s.includes('await Promise.all(jobs);'),'gravacoes em paralelo');
+  assert.ok(s.includes('if (existing) { if (onFinished) onFinished(); else onClose?.(); void onDone(); }'),'ao refazer, vai para o Resumo sem esperar');
 });

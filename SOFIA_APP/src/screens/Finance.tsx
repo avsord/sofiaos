@@ -119,6 +119,12 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
     if (next === tab) return;
     setTabHistory(h => [...h, tab].slice(-16)); setTab(next);
   },[tab]);
+  const markPaid = useCallback((t: Tx) => setData(prev => {
+    if (!prev) return prev;
+    if (t.virtual) return {...prev, txs: [...prev.txs, {...t, id: 'local:' + t.id, virtual: false, paid: true, recurrence: 'none'} as Tx]};
+    return {...prev, txs: prev.txs.map(x => x.id === t.id ? {...x, paid: true} : x)};
+  }), []);
+  const local = useMemo(() => ({markPaid}), [markPaid]);
   const goHome = useCallback(() => { setManage(false); setEditing(null); setBillEditor(null); setAccountPicker(false); setTabHistory([]); setTab('home'); }, []);
   const backFinance = useCallback(() => {
     if (billEditor) {setBillEditor(null);return;}
@@ -173,6 +179,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
   },[active,api,d]);
 
   return (
+    <FinanceLocal.Provider value={local}>
     <InternalBackGesture enabled={active && !editing && !manage && !billEditor && !accountPicker} onBack={backFinance}>
       <View style={{flex: 1, backgroundColor: c.bg}}>
         <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 12, paddingBottom: 2}}>
@@ -245,6 +252,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
         </Sheet>
       </View>
     </InternalBackGesture>
+    </FinanceLocal.Provider>
   );
 }
 
@@ -307,34 +315,36 @@ function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi
       const account = await saveEntity(api, 'fin_account', name.trim() || 'Conta principal',
         {account_type: acc?.type || 'corrente', initial_balance: String(money0(balance)), color: acc?.color || FIN_COLORS[0], include_total: true, cycle_day: Math.min(31, Math.max(0, Number(cycleDay) || 0))}, acc?.entity);
       const kept = new Set(bills.map(b => b.id).filter(Boolean));
-      for (const old of existing?.fixed || []) if (old.entity && !kept.has(old.entity.id)) await api.saveEntity({...old.entity, state: 'archived'});
-      for (const b of bills) {
+      const jobs: Promise<unknown>[] = [];
+      for (const old of existing?.fixed || []) if (old.entity && !kept.has(old.entity.id)) jobs.push(api.saveEntity({...old.entity, state: 'archived'}));
+      for (const [n, b] of bills.entries()) {
         const day = Math.min(28, Math.max(1, Number(b.day) || 1)), month = monthOf(todayISO());
         const previous = b.id ? (existing?.fixed || []).find(t => t.entity?.id === b.id) : undefined;
         if (previous && previous.entity) {
           const parcels = Number(b.parcels) > 1 ? Math.min(360, Math.round(Number(b.parcels))) : '';
           const at = parcels ? Math.min(Number(parcels), Math.max(1, Math.round(Number(b.at)) || 1)) : '';
           const pdate = dayIn(monthOf(previous.date), day);
-          await api.saveEntity({...previous.entity, title: b.title.trim(), data: {...previous.entity.data, amount: money0(b.amount), date: pdate,
-            installments: parcels, installment: at, recurrence_end: parcels ? addMonths(monthOf(pdate), Number(parcels) - Number(at || 1)) : ''}});
+          jobs.push(api.saveEntity({...previous.entity, title: b.title.trim(), data: {...previous.entity.data, amount: money0(b.amount), date: pdate,
+            installments: parcels, installment: at, recurrence_end: parcels ? addMonths(monthOf(pdate), Number(parcels) - Number(at || 1)) : ''}}));
           continue;
         }
-        await api.saveEntity({kind: 'fin_tx', title: b.title.trim(), content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [],
+        jobs.push(api.saveEntity({kind: 'fin_tx', title: b.title.trim(), content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [],
           data: {kind: 'expense', amount: money0(b.amount), date: dayIn(month, day), account_id: account.id, paid: false, category: 'Contas', recurrence: 'monthly',
             installments: Number(b.parcels) > 1 ? Math.min(360, Math.round(Number(b.parcels))) : '',
             installment: Number(b.parcels) > 1 ? Math.min(Math.round(Number(b.parcels)), Math.max(1, Math.round(Number(b.at)) || 1)) : '',
             recurrence_end: Number(b.parcels) > 1 ? addMonths(month, Math.round(Number(b.parcels)) - Math.max(1, Math.round(Number(b.at)) || 1)) : '',
-            import_id: 'sofia-pendencia:' + Date.now() + ':' + day, remind_days: 0}});
+            import_id: 'sofia-pendencia:' + Date.now() + ':' + n + ':' + day, remind_days: 0}}));
       }
       if (money0(saved) > 0 || money0(plan) > 0 || money0(goalValue) > 0) {
         const data: Record<string, unknown> = {role: 'reserve', saved: money0(saved), monthly_plan: money0(plan), color: GOOD, account_id: account.id,
           plan_day: Math.min(28, Math.max(1, Number(planDay) || Number(cycleDay) || 5)), remind_time: '09:00', remind_before_days: 0, remind_repeat_days: 0,
           target: money0(goalValue) || '', deadline: /^\d{4}-\d{2}-\d{2}$/.test(goalMonth) ? goalMonth : ''};
-        await api.saveEntity(reserve ? {...reserve.entity, data: {...reserve.entity.data, ...data}} : {kind: 'fin_goal', title: 'Dinheiro guardado', content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data});
+        jobs.push(api.saveEntity(reserve ? {...reserve.entity, data: {...reserve.entity.data, ...data}} : {kind: 'fin_goal', title: 'Dinheiro guardado', content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data}));
       }
+      await Promise.all(jobs);
       await clearWizardDraft();
-      await onDone();
-      if (onFinished) onFinished(); else onClose?.();
+      if (existing) { if (onFinished) onFinished(); else onClose?.(); void onDone(); }
+      else { await onDone(); if (onFinished) onFinished(); else onClose?.(); }
     } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
 
@@ -907,14 +917,21 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
 function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; reload: () => Promise<void>; onTx: (t: Partial<Tx>) => void}) {
   const c = useTheme(), [busy, setBusy] = useState(false), [pick, setPick] = useState(false);
   const color = due.kind === 'receber' ? GOOD : due.late ? BAD : due.kind === 'fatura' ? c.accent : WARN;
+  const local = React.useContext(FinanceLocal);
   async function settle(accountId?: string) {
     setBusy(true);
     try {
       if (due.invoice) {
         const acc = accountId || due.invoice.card.accountId || d.accounts[0]?.id;
         await saveEntity(api, 'fin_tx', 'Fatura ' + due.invoice.card.name + ' ' + due.invoice.month.slice(5, 7) + '/' + due.invoice.month.slice(0, 4), {kind: 'card_payment', amount: due.amount, date: todayISO(), card_id: due.invoice.card.id, invoice_month: due.invoice.month, account_id: acc, paid: true, category: 'Fatura do cartão'});
-      } else if (due.tx) await confirmTx(api, due.tx);
-      await reload();
+        await reload();
+      } else if (due.tx) {
+        // Fica "pago" na hora; o servidor grava em seguida. Se falhar, a tela volta ao estado real.
+        local?.markPaid(due.tx);
+        setBusy(false);
+        void confirmTx(api, due.tx).then(() => reload()).catch(e => { appAlert('Finanças', errorText(e)); void reload(); });
+        return;
+      }
     } catch (e) { appAlert('Finanças', errorText(e)); } finally { setBusy(false); }
   }
   return (
@@ -936,6 +953,8 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
   );
 }
 /** Pagar/receber: lançamento real vira pago; repetição prevista vira um lançamento real daquele mês. */
+// 0.3.175: atualizacoes locais imediatas (o servidor confirma por tras, sem a pessoa esperar).
+const FinanceLocal = React.createContext<{markPaid: (t: Tx) => void} | null>(null);
 async function confirmTx(api: SofiaApi, t: Tx) {
   if (t.virtual) {
     const data: Record<string, any> = {kind: t.kind, amount: t.amount, date: t.date, category: t.category, account_id: t.accountId, paid: true, series_id: t.seriesId, recurrence: 'none'};
