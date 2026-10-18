@@ -171,3 +171,14 @@ test('0.3.186: sem aviso de repetido (o servidor nao deixa duplicar e corrige o 
   assert.ok(s.includes("const initialTouched = !acc || money0(balance) !== acc.initial;"),'refazer nao reescreve o saldo inicial');
   assert.ok(s.includes('Não é um lançamento: é o valor informado no cadastro da conta'));
 });
+
+test('0.3.188: aporte como conta a fazer (valor sugerido e editavel), no + e em Pendentes; folha da reserva com respiro',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("[amount, setAmount] = useState(kind === 'in' && split && split.missing > 0 ? finishMoneyInput(String(split.missing).replace('.', ',')) : '')"),'abre com o valor que falta');
+  assert.ok(s.includes("kind === 'in' ? 'Aportar' :"));
+  assert.ok(s.includes("toque para aportar este ou outro valor"),'sugestao no Resumo');
+  assert.ok(s.includes("🔒 Aporte (guardar dinheiro)"),'opcao no +');
+  assert.ok(s.includes("🔒 Aporte do mês")&&s.includes("✓ Aportado"),'em Pendentes, amarelo/verde');
+  assert.ok(s.includes('<ScrollView contentContainerStyle={{gap: 14, paddingBottom: 28}}>'),'Sua reserva rola e tem respiro no fim');
+  assert.ok(!s.includes('não entra no saldo geral'),'sem "saldo geral"');
+});

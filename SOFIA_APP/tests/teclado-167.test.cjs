@@ -13,7 +13,7 @@ test('a folha mede o teclado e se afasta dele',()=>{
 test('0.3.170: o painel encolhe para caber acima do teclado e o conteudo rola, sem altura fixa',()=>{
   const sheet=read('src/components/Sheet.tsx'),fin=read('src/screens/Finance.tsx');
   assert.ok(sheet.includes('maxHeight:Math.max(220,(rootH||windowHeight)-keyboard-insets.top-24)'),'o painel cabe no que sobra');
-  assert.ok(sheet.includes('paddingBottom:kbOpen?16:Math.max(20,insets.bottom+12)'));
+  assert.ok(sheet.includes('paddingBottom:kbOpen?16:Math.max(28,insets.bottom+24)'),'0.3.188: respiro maior no fim');
   assert.ok(fin.includes('<ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap:13,paddingBottom:24}}'));
   assert.ok(!/style=\{\{maxHeight: ?\d{3}\}\}/.test(fin),'nenhuma folha com altura fixa');
 });

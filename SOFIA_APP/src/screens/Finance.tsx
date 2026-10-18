@@ -169,7 +169,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
     return {...d, accounts: [{...account, include: true}], cards: d.cards.filter(card => card.accountId === account.id && !card.archived),
       txs: transactionsForAccount(d.txs,d.cards,account.id)};
   },[d,accountId]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [newMenu, setNewMenu] = useState(false);
+  const [newMenu, setNewMenu] = useState(false), [aporteKey, setAporteKey] = useState(0);
   const newTx = (kind: TxKind = 'expense') => setEditing({kind, date: todayISO(), accountId, paid: true});
   useEffect(() => {
     if (!active || !d) return;
@@ -211,8 +211,8 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
         ) : (
           <ScrollView contentContainerStyle={{paddingHorizontal: 20, paddingTop: 2, paddingBottom: insets.bottom + 110, gap: 16}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>
             {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
-            {tab === 'home' ? <HomeTab d={scoped || d} month={month} api={api} reload={reload} onTx={setEditing} onTab={navigateFinance} accountId={accountId} isPrimary={isPrimary} onBill={t => setBillEditor(t || 'new')} />
-              : tab === 'bills' ? <PendingTab d={scoped || d} api={api} month={month} accountId={accountId} warning={notificationWarning} onBill={setBillEditor} reload={reload} />
+            {tab === 'home' ? <HomeTab d={scoped || d} month={month} api={api} reload={reload} onTx={setEditing} onTab={navigateFinance} accountId={accountId} isPrimary={isPrimary} onBill={t => setBillEditor(t || 'new')} aporteKey={aporteKey} />
+              : tab === 'bills' ? <PendingTab d={scoped || d} api={api} month={month} accountId={accountId} isPrimary={isPrimary} onAporte={() => { navigateFinance('home'); setAporteKey(k => k + 1); }} warning={notificationWarning} onBill={setBillEditor} reload={reload} />
               : tab === 'cards' ? <CardsTab d={scoped || d} api={api} reload={reload} onTx={setEditing} onManage={() => setManage(true)} />
               : <ReportsTab d={scoped || d} month={month} reserve={reserveFor((scoped || d).goals, accountId, isPrimary)} />}
           </ScrollView>
@@ -229,6 +229,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
               <Text style={{fontSize: 18, fontWeight: '800', color: c.text, marginBottom: 6}}>Novo lançamento</Text>
               {([['expense', '↓ Despesa', BAD], ['income', '↑ Receita', GOOD], ['transfer', '⇄ Transferência entre contas', c.accent]] as const).map(([k, label, color]) =>
                 <Pressable key={k} accessibilityRole="button" onPress={() => { setNewMenu(false); newTx(k as TxKind); }} style={{paddingVertical: 15, borderBottomWidth: 1, borderColor: c.line}}><Text style={{color, fontSize: 16, fontWeight: '700'}}>{label}</Text></Pressable>)}
+              <Pressable accessibilityRole="button" onPress={() => { setNewMenu(false); navigateFinance('home'); setAporteKey(k => k + 1); }} style={{paddingVertical: 15, borderBottomWidth: 1, borderColor: c.line}}><Text style={{color: GUARD, fontSize: 16, fontWeight: '700'}}>🔒 Aporte (guardar dinheiro)</Text></Pressable>
               <Pressable accessibilityRole="button" onPress={() => { setNewMenu(false); setBillEditor('new'); }} style={{paddingVertical: 15}}><Text style={{color: c.text, fontSize: 16, fontWeight: '700'}}>⏰ Conta a pagar ou receber</Text></Pressable>
             </View>
           </Sheet>
@@ -521,7 +522,8 @@ function ReserveHistorySheet({api, reserve, moves, show, onClose, reload}: {api:
 
 function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = ''}: {accountId?: string; api: SofiaApi; kind: 'setup' | 'in' | 'out' | 'plan' | 'goal'; reserve: Goal | null; split: ReturnType<typeof moneySplit> | null; onClose: () => void; onDone: () => Promise<void>}) {
   const c = useTheme();
-  const [name, setName] = useState(reserve?.name || 'Dinheiro guardado'), [amount, setAmount] = useState(''), [note, setNote] = useState(''),
+  // 0.3.188: aportar abre ja com o valor que falta no mes (ex.: R$ 4.000,00); da para trocar na hora
+  const [name, setName] = useState(reserve?.name || 'Dinheiro guardado'), [amount, setAmount] = useState(kind === 'in' && split && split.missing > 0 ? finishMoneyInput(String(split.missing).replace('.', ',')) : ''), [note, setNote] = useState(''),
     [plan, setPlan] = useState(reserve?.entity?.data?.monthly_plan ? finishMoneyInput(String(reserve.entity.data.monthly_plan).replace('.', ',')) : ''),
     [goalValue, setGoalValue] = useState(reserve?.target ? finishMoneyInput(String(reserve.target).replace('.', ',')) : ''),
     [goalMonth, setGoalMonth] = useState(String(reserve?.entity?.data?.deadline || '').slice(0, 10)),
@@ -554,7 +556,7 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
     if (d.name !== undefined) setName(String(d.name));
     if (typeof d.plannedOut === 'boolean') setPlannedOut(d.plannedOut);
   }, [reserveReady, reserveDraft]);
-  const title = kind === 'setup' ? 'Separar o dinheiro guardado' : kind === 'in' ? 'Guardar dinheiro' : kind === 'plan' ? 'Valor dos aportes' : kind === 'goal' ? 'Meta' : 'Retirar da reserva';
+  const title = kind === 'setup' ? 'Separar o dinheiro guardado' : kind === 'in' ? 'Aportar' : kind === 'plan' ? 'Valor dos aportes' : kind === 'goal' ? 'Meta' : 'Retirar da reserva';
   async function save() {
     setBusy(true); setError('');
     try {
@@ -606,7 +608,7 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
       <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>{title}</Text>
       {error ? <Text style={{color: BAD}}>{error}</Text> : null}
       {kind === 'setup' ? <>
-        <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Informe quanto você tem guardado, esteja onde estiver. Esse valor fica separado: não entra no saldo geral, que continua sendo o que você tem para usar. Depois é só registrar cada aporte em “Guardar dinheiro”.</Text>
+        <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Informe quanto você tem guardado, esteja onde estiver. Esse valor fica separado: não entra no Saldo, que continua sendo o que você tem para usar. Depois é só registrar cada aporte em “Guardar dinheiro”.</Text>
         {input('Nome', name, setName, 'Dinheiro guardado')}
         {input('Já guardado hoje', amount, setAmount, 'Ex.: 15.000')}
         {input('Aportes de (por mês, opcional)', plan, setPlan, 'Ex.: 4.000')}
@@ -644,10 +646,13 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
 }
 
 // ============================ PENDENTES MANUAIS ============================
-function PendingTab({d,api,month,accountId,warning,onBill,reload}: {d:Data;api:SofiaApi;month:string;accountId:string;warning:string;onBill:(t:Tx|'new')=>void;reload:()=>Promise<void>}) {
+function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,onAporte}: {d:Data;api:SofiaApi;month:string;accountId:string;warning:string;onBill:(t:Tx|'new')=>void;reload:()=>Promise<void>;isPrimary?:boolean;onAporte?:()=>void}) {
   // A aba segue o mes escolhido no topo; cada mes mostra so as suas contas (0.3.180)
   const c=useTheme(),today=todayISO(),list=useMemo(()=>monthDues(d.txs,accountId,month,today),[d,accountId,month,today]);
   const open=list.filter(row=>!row.paid),total=open.reduce((sum,row)=>sum+row.amount,0),paidCount=list.length-open.length;
+  // 0.3.188: o aporte do mes entra junto das contas: amarelo enquanto falta, verde quando feito
+  const reserve=reserveFor(d.goals,accountId,isPrimary);
+  const aporte=useMemo(()=>reserve?moneySplit(reserve,d.moves||[],d.accounts,d.txs,d.cards,month,today):null,[reserve,d,month,today]);
   // 0.3.161: as pendencias marcadas como "todo mes" sao as contas fixas; aqui elas aparecem juntas,
   // com o total do ciclo, o quanto ja foi pago e quanto representam do que entrou.
   const cycleDay=d.accounts.find(a=>a.id===accountId)?.cycleDay||0;
@@ -689,6 +694,19 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload}: {d:Data;api:S
     </Card_> : null}
     <Card_>
       <Title text={month===monthOf(today)?'A vencer e atrasadas':'Pendentes de '+monthLabel(month).split(' ')[0].toLowerCase()} />
+      {aporte&&aporte.monthTarget>0?(aporte.missing>0
+        ?<View style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:8,paddingHorizontal:10,borderRadius:14,backgroundColor:WARN+'1a'}}>
+          <View style={{width:4,height:36,borderRadius:2,backgroundColor:WARN}} />
+          <View style={{flex:1,gap:2}}><Text style={{color:c.text,fontWeight:'600'}}>🔒 Aporte do mês</Text><Text style={{fontSize:11,color:c.muted}}>{aporte.planDay?'dia '+aporte.planDay+' · ':''}{aporte.realized>0?'já aportou '+money(aporte.realized)+' · ':''}falta</Text></View>
+          <Text style={{color:c.text,fontWeight:'700'}}>{money(aporte.missing)}</Text>
+          {month===monthOf(today)&&onAporte?<Pressable accessibilityRole="button" onPress={onAporte} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:99,backgroundColor:WARN+'33'}}><Text style={{color:c.text,fontWeight:'800',fontSize:12}}>Aportar</Text></Pressable>:null}
+        </View>
+        :<View style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:8,paddingHorizontal:10,borderRadius:14,backgroundColor:GOOD+'1a'}}>
+          <View style={{width:4,height:36,borderRadius:2,backgroundColor:GOOD}} />
+          <View style={{flex:1,gap:2}}><Text style={{color:c.text,fontWeight:'600'}}>🔒 Aporte do mês</Text><Text style={{fontSize:11,color:GOOD}}>Aportado</Text></View>
+          <Text style={{color:GOOD,fontWeight:'700'}}>{money(aporte.realized)}</Text>
+          <Text style={{color:GOOD,fontWeight:'800',fontSize:12}}>✓ Aportado</Text>
+        </View>):null}
       {list.length ? list.map(due=><DueRow key={due.id} due={due} d={d} api={api} reload={reload} onTx={t=>onBill(t as Tx)} />)
         : <Text style={{color:c.muted,fontSize:13,lineHeight:20}}>{month===monthOf(today)?'Nada a pagar ou receber neste mês.':'Nada pendente em '+monthLabel(month).split(' ')[0].toLowerCase()+'.'} Para ver outro mês, troque o mês no topo.</Text>}
       <Text style={{fontSize:11,color:c.muted}}>Os avisos locais saem às 9h do vencimento (e, se você escolher, alguns dias antes), com a permissão de notificações do Android. Confirmar o pagamento ou o recebimento tira o item dos pendentes e o inclui no extrato.</Text>
@@ -793,7 +811,7 @@ function planReminder(d: Data, today: string) {
   return {split: moneySplit(reserve, d.moves || [], d.accounts, d.txs, d.cards, monthOf(today), today), title: reserve.name};
 }
 
-function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBill}: {d: Data; month: string; api: SofiaApi; reload: () => Promise<void>; onTx: (t: Partial<Tx>) => void; onTab: (t: Tab) => void; accountId: string; isPrimary: boolean; onBill: (t?: Tx) => void}) {
+function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBill, aporteKey = 0}: {aporteKey?: number; d: Data; month: string; api: SofiaApi; reload: () => Promise<void>; onTx: (t: Partial<Tx>) => void; onTab: (t: Tab) => void; accountId: string; isPrimary: boolean; onBill: (t?: Tx) => void}) {
   const c = useTheme(), today = todayISO();
   // Contas pesadas só quando os dados ou o mês mudam (não a cada toque, como esconder valores).
   const {s, total: accountsTotal, forecast: accountsForecast, dues} = useMemo(() => ({s: monthSummary(d.txs, month), total: totalBalance(d.accounts, d.txs), forecast: forecastBalance(d.accounts, d.txs, month, d.cards),
@@ -813,6 +831,10 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
     d.accounts.filter(a => (!accountId || a.id === accountId) && a.include).reduce((s, a) => s + a.initial, 0)), [d, accountId, cycleDay, today, split?.planned]);
   const net = split ? split.net : 0, total = Math.round((accountsTotal - net) * 100) / 100, forecast = Math.round((accountsForecast - net) * 100) / 100;
   const [reserveMenu, setReserveMenu] = useState(false), [breakdown, setBreakdown] = useState<'saldo' | 'income' | 'expense' | null>(null);
+  const lastAporteKey = useRef(aporteKey);
+  useEffect(() => { if (aporteKey === lastAporteKey.current) return; lastAporteKey.current = aporteKey; setReserveSheet(reserve ? 'in' : 'setup'); }, [aporteKey, reserve]);
+  // aporte em aberto no mes atual: aparece 3 dias antes do dia do aporte (ou do aviso, se for antes) ate ser feito
+  const aporteDue = !!split && split.planned > 0 && split.missing > 0 && month === monthOf(today) && Number(today.slice(8, 10)) >= Math.max(1, (split.planDay || 1) - Math.max(3, split.remindBefore || 0));
   return (
     <>
       {breakdown ? <MonthBreakdown kind={breakdown} d={d} month={month} show={show} net={net} onTx={(t: Tx) => { setBreakdown(null); onTx(t); }} onClose={() => setBreakdown(null)} /> : null}
@@ -843,11 +865,11 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
       </View>
       </View>
       <Sheet visible={reserveMenu} onClose={() => setReserveMenu(false)} label="Fechar detalhes da reserva">
-        <View style={{gap: 14, paddingBottom: 12}}>
+        <ScrollView contentContainerStyle={{gap: 14, paddingBottom: 28}}>
           <Text style={{fontSize: 18, fontWeight: '800', color: c.text}}>Sua reserva</Text>
           {split ? <>
             <Text style={{fontSize: 29, fontWeight: '800', color: c.text}}>{show(split.saved)}</Text>
-            <Text style={{fontSize: 12, lineHeight: 18, color: c.muted}}>Esse valor é separado das suas contas: não entra no saldo geral. O saldo geral é o que você tem para usar. Guardar dinheiro tira do saldo geral; retirar devolve. É uma organização da Sofia, não bloqueia nada no banco.</Text>
+            <Text style={{fontSize: 12, lineHeight: 18, color: c.muted}}>Esse valor é separado das suas contas: não entra no Saldo, que é o que você tem para usar. Aportar tira do Saldo e soma aqui; retirar devolve. É uma organização da Sofia, não bloqueia nada no banco.</Text>
             {outlook ? <Pressable accessibilityRole="button" accessibilityLabel="Editar meta" onPress={() => { setReserveMenu(false); setReserveSheet('goal'); }} style={{backgroundColor: GUARD + '1f', borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: GUARD + '55'}}>
               <Text style={{color: c.text, fontWeight: '800', fontSize: 14}}>Meta: {show(outlook.target)} até {outlook.deadline.split('-').reverse().join('/')}</Text>
               <View style={{height: 8, borderRadius: 4, backgroundColor: c.line, overflow: 'hidden'}}>
@@ -870,7 +892,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
             </View> : null}
             <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 10}}>
             <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Saldo (para usar)</Text><Text style={{color: split.daily < 0 ? BAD : c.text, fontWeight: '700'}}>{show(split.daily)}</Text></View>
-              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Guardado + saldo geral</Text><Text style={{color: c.text, fontWeight: '700'}}>{show(split.total)}</Text></View>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Guardado + Saldo</Text><Text style={{color: c.text, fontWeight: '700'}}>{show(split.total)}</Text></View>
               <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Despesas previstas do mês</Text><Text style={{color: c.text, fontWeight: '700'}}>{show(split.committed)}</Text></View>
               <View style={{height: 1, backgroundColor: c.line}} />
               <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '700', fontSize: 12}}>Livre após despesas previstas</Text><Text style={{color: split.free < 0 ? BAD : GOOD, fontWeight: '800'}}>{show(split.free)}</Text></View>
@@ -883,8 +905,19 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
               <Text style={{color: k === 'out' ? BAD : c.text, fontSize: 15, fontWeight: '600'}}>{label}  ›</Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
       </Sheet>
+
+      {/* 0.3.188: o aporte do mes aparece como uma conta a fazer, com o valor sugerido; tocar abre ja preenchido */}
+      {aporteDue && split ? <Pressable accessibilityRole="button" accessibilityLabel={'Aportar ' + show(split.missing)} onPress={() => setReserveSheet('in')}
+        style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: WARN + '1a', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: WARN}}>
+        <Text style={{fontSize: 18}}>🔒</Text>
+        <View style={{flex: 1, gap: 2}}>
+          <Text style={{color: c.text, fontWeight: '700', fontSize: 14}}>Aporte de {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
+          <Text style={{color: c.muted, fontSize: 12}}>{show(split.missing)} {split.planDay ? '· dia ' + split.planDay : ''} · toque para aportar este ou outro valor</Text>
+        </View>
+        <View style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: WARN + '33'}}><Text style={{color: c.text, fontWeight: '800', fontSize: 12}}>Aportar</Text></View>
+      </Pressable> : null}
 
       {/* 0.3.161: quanto ainda da para gastar neste ciclo, depois das contas fixas e do aporte */}
       {room && room.ceiling > 0 ? <Pressable accessibilityRole="button" accessibilityLabel="Ver contas fixas" onPress={() => onTab('bills')}
