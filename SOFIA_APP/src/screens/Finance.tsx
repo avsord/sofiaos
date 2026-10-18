@@ -441,7 +441,7 @@ function ReserveHistorySheet({api, reserve, moves, show, onClose, reload}: {api:
     if (!edit) return;
     const v = parseMoney(amount);
     if (!v || v <= 0) { setError('Informe o valor.'); return; }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { setError('Data no formato AAAA-MM-DD.'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { setError('Escolha a data.'); return; }
     setBusy(true); setError('');
     try { await api.saveEntity({...edit.entity, data: {...edit.entity.data, amount: v, date, note: note.trim(), planned: edit.direction === 'out' ? planned : false}}); setEdit(null); await reload(); }
     catch (e) { setError(errorText(e)); } finally { setBusy(false); }
@@ -464,7 +464,7 @@ function ReserveHistorySheet({api, reserve, moves, show, onClose, reload}: {api:
       <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Ao salvar, o dinheiro guardado e o aporte do mês são recalculados com o novo valor.</Text>
       {error ? <Text style={{color: BAD}}>{error}</Text> : null}
       {input('Valor', amount, setAmount, true)}
-      {input('Data (AAAA-MM-DD)', date, setDate)}
+      <DateTimeField label="Data" value={date} onChange={v => setDate(v || date)} dateOnly allowClear={false} />
       {input('Observação (opcional)', note, setNote)}
       {edit.direction === 'out' ? <View style={{gap: 8}}>
         <Text style={{color: c.muted, fontSize: 12}}>Essa retirada</Text>
@@ -580,7 +580,7 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
   const planEditor = <View style={{gap: 10}}>
     <View style={{flexDirection: 'row', gap: 10}}>
       <View style={{flex: 1}}>{input('Todo dia (1 a 28)', day, setDay, '5')}</View>
-      <View style={{flex: 1}}>{input('Avisar às', remindTime, setRemindTime, '09:00')}</View>
+      <View style={{flex: 1}}><DateTimeField label="Avisar às" value={remindTime} onChange={v => setRemindTime(v || remindTime)} timeOnly allowClear={false} /></View>
     </View>
     <Text style={{color: c.muted, fontSize: 12}}>Avisar também</Text>
     <Chips value={remindBefore} onChange={setRemindBefore} options={[{value: '0', label: 'No dia'}, {value: '1', label: '1 dia antes'}, {value: '2', label: '2 dias antes'}, {value: '5', label: '5 dias antes'}]} />

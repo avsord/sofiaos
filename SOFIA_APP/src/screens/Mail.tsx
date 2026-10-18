@@ -16,6 +16,7 @@ import {parseBill, parseMoney, todayISO, toAccount} from '../lib/finance';
 import {money} from '../lib/monitoring';
 import {openInGmail} from '../lib/open-gmail';
 import {appAlert} from '../lib/app-alert';
+import {DateTimeField} from '../components/DateTimeField';
 
 type Tab = 'hits' | 'rules' | 'accounts';
 const PROVIDERS: Array<{value: string; label: string; help: string; link?: string}> = [
@@ -323,7 +324,7 @@ function BillFromMail({api, hit, onDone}: {api: SofiaApi; hit: Entity; onDone: (
   async function create() {
     const v = parseMoney(amount);
     if (!v || v <= 0) { setMsg('Digite o valor.'); return; }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) { setMsg('Data no formato AAAA-MM-DD.'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) { setMsg('Escolha a data de vencimento.'); return; }
     setBusy(true); setMsg('');
     try {
       const accounts = (await api.entities('fin_account')).items.map(toAccount).filter(a => !a.archived);
@@ -338,7 +339,7 @@ function BillFromMail({api, hit, onDone}: {api: SofiaApi; hit: Entity; onDone: (
     <View style={{gap: 10, padding: 12, borderRadius: 14, backgroundColor: c.accentSoft}}>
       <Text style={{color: c.text, fontWeight: '700'}}>Conta a pagar</Text>
       <Field label="Valor (R$)" value={amount} onChange={setAmount} placeholder="0,00" />
-      <Field label="Vencimento (AAAA-MM-DD)" value={due} onChange={setDue} />
+      <DateTimeField label="Vencimento" value={due} onChange={v => setDue(v || due)} dateOnly allowClear={false} />
       {msg ? <Text style={{color: msg.startsWith('Conta a pagar criada') ? '#2fc58b' : c.danger}}>{msg}</Text> : null}
       <Button title="Criar em Finanças" loading={busy} onPress={() => void create()} />
     </View>

@@ -46,3 +46,10 @@ test('0.3.171: refazer a configuracao mostra o que existe e so substitui ao conf
   assert.ok(s.includes("await api.saveEntity({...old.entity, state: 'archived'})"),'removidas sao arquivadas, nao apagadas');
   assert.ok(s.includes('if (previous && previous.entity) {'),'as que ficaram sao atualizadas, sem duplicar');
 });
+
+test('0.3.172: datas e horas de registros ja criados tambem pelo seletor, nada digitado',()=>{
+  const fin=read('src/screens/Finance.tsx'),mail=read('src/screens/Mail.tsx'),ws=read('src/screens/Workspace.tsx');
+  assert.ok(!/AAAA-MM-DD\)/.test(fin)&&!/AAAA-MM-DD\)/.test(mail),'sem campo de data digitada');
+  assert.ok(mail.includes('<DateTimeField label="Vencimento" value={due}'));
+  assert.ok(ws.includes("if(field.type==='time')return <DateTimeField"),'hora nos apps pelo seletor');
+});

@@ -69,7 +69,7 @@ test('0.3.162: historico abre a edicao do movimento, com apagar',()=>{
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes("accessibilityLabel={'Editar ' + reserveMoveLabel(it) + ' de ' + show(it.amount)}"));
   assert.ok(s.includes('Apagar movimento'));assert.ok(s.includes('o dinheiro guardado volta ao valor de antes'));
-  assert.ok(s.includes("input('Data (AAAA-MM-DD)', date, setDate)"));
+  assert.ok(s.includes('<DateTimeField label="Data" value={date} onChange={v => setDate(v || date)} dateOnly allowClear={false} />'),'0.3.172: data pelo seletor');
   assert.ok(s.includes("Toque em um movimento para corrigir o valor, a data ou apagá-lo."));
 });
 
