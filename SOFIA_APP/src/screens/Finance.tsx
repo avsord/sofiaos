@@ -504,7 +504,7 @@ function ReserveHistorySheet({api, reserve, moves, show, onClose, reload}: {api:
   </Sheet>;
 }
 
-function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = ''}: {accountId?: string; api: SofiaApi; kind: 'setup' | 'in' | 'out' | 'plan'; reserve: Goal | null; split: ReturnType<typeof moneySplit> | null; onClose: () => void; onDone: () => Promise<void>}) {
+function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = ''}: {accountId?: string; api: SofiaApi; kind: 'setup' | 'in' | 'out' | 'plan' | 'goal'; reserve: Goal | null; split: ReturnType<typeof moneySplit> | null; onClose: () => void; onDone: () => Promise<void>}) {
   const c = useTheme();
   const [name, setName] = useState(reserve?.name || 'Dinheiro guardado'), [amount, setAmount] = useState(''), [note, setNote] = useState(''),
     [plan, setPlan] = useState(reserve?.entity?.data?.monthly_plan ? finishMoneyInput(String(reserve.entity.data.monthly_plan).replace('.', ',')) : ''),
@@ -539,7 +539,7 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
     if (d.name !== undefined) setName(String(d.name));
     if (typeof d.plannedOut === 'boolean') setPlannedOut(d.plannedOut);
   }, [reserveReady, reserveDraft]);
-  const title = kind === 'setup' ? 'Separar o dinheiro guardado' : kind === 'in' ? 'Guardar dinheiro' : kind === 'plan' ? 'Valor dos aportes' : 'Retirar da reserva';
+  const title = kind === 'setup' ? 'Separar o dinheiro guardado' : kind === 'in' ? 'Guardar dinheiro' : kind === 'plan' ? 'Valor dos aportes' : kind === 'goal' ? 'Meta' : 'Retirar da reserva';
   async function save() {
     setBusy(true); setError('');
     try {
@@ -547,7 +547,7 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
         const saved = parseMoney(amount) ?? 0, monthly = parseMoney(plan) ?? 0;
         if (saved < 0 || monthly < 0) throw Error('Use valores positivos.');
         await api.saveEntity({kind: 'fin_goal', title: name.trim() || 'Dinheiro guardado', content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {role: 'reserve', saved, ...planFields, ...goalFields, monthly_plan: monthly, color: GOOD, account_id: accountId || ''}});
-      } else if (kind === 'plan' && reserve) {
+      } else if ((kind === 'plan' || kind === 'goal') && reserve) {
         await api.saveEntity({...reserve.entity, data: {...reserve.entity.data, ...planFields, ...goalFields}});
       } else if (reserve) {
         const v = parseMoney(amount);
@@ -597,6 +597,10 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
         {input('Aportes de (por mês, opcional)', plan, setPlan, 'Ex.: 4.000')}
         {parseMoney(plan) ? planEditor : null}
         {goalEditor}
+      </> : kind === 'goal' ? <>
+        <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Quanto você quer juntar e até quando. A Sofia mostra se o aporte atual chega lá e quanto por mês fecharia no prazo.</Text>
+        {goalEditor}
+        {reserve?.target ? <Pressable accessibilityRole="button" onPress={() => { setGoalValue(''); setGoalMonth(''); }}><Text style={{color: BAD, fontSize: 13, fontWeight: '700'}}>Tirar a meta</Text></Pressable> : null}
       </> : kind === 'plan' ? <>
         <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>É quanto você pretende guardar por mês, e quando. O saldo só muda quando você registra o aporte em “Guardar dinheiro”. O que faltar não passa para o mês seguinte.</Text>
         {input('Aportes de (por mês)', plan, setPlan, 'Ex.: 4.000')}
@@ -777,7 +781,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
   // Contas pesadas só quando os dados ou o mês mudam (não a cada toque, como esconder valores).
   const {s, total: accountsTotal, forecast: accountsForecast, dues} = useMemo(() => ({s: monthSummary(d.txs, month), total: totalBalance(d.accounts, d.txs), forecast: forecastBalance(d.accounts, d.txs, month, d.cards),
     dues: manualDues(d.txs, accountId, today, 10)}), [d, accountId, month, today]);
-  const [hide, setHide] = useState(false), [reserveSheet, setReserveSheet] = useState<'setup' | 'in' | 'out' | 'plan' | null>(null), [reserveHistoryOpen, setReserveHistoryOpen] = useState(false);
+  const [hide, setHide] = useState(false), [reserveSheet, setReserveSheet] = useState<'setup' | 'in' | 'out' | 'plan' | 'goal' | null>(null), [reserveHistoryOpen, setReserveHistoryOpen] = useState(false);
   const show = (v: number) => hide ? 'R$ •••••' : money(v);
   // 0.3.151: cada conta tem o proprio guardado (a principal mantem a reserva antiga, sem conta).
   const reserve = reserveFor(d.goals, accountId, isPrimary);
@@ -826,7 +830,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
           {split ? <>
             <Text style={{fontSize: 29, fontWeight: '800', color: c.text}}>{show(split.saved)}</Text>
             <Text style={{fontSize: 12, lineHeight: 18, color: c.muted}}>Esse valor é separado das suas contas: não entra no saldo geral. O saldo geral é o que você tem para usar. Guardar dinheiro tira do saldo geral; retirar devolve. É uma organização da Sofia, não bloqueia nada no banco.</Text>
-            {outlook ? <View style={{backgroundColor: GUARD + '1f', borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: GUARD + '55'}}>
+            {outlook ? <Pressable accessibilityRole="button" accessibilityLabel="Editar meta" onPress={() => { setReserveMenu(false); setReserveSheet('goal'); }} style={{backgroundColor: GUARD + '1f', borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: GUARD + '55'}}>
               <Text style={{color: c.text, fontWeight: '800', fontSize: 14}}>Meta: {show(outlook.target)} até {outlook.deadline.split('-').reverse().join('/')}</Text>
               <View style={{height: 8, borderRadius: 4, backgroundColor: c.line, overflow: 'hidden'}}>
                 <View style={{width: `${Math.round(Math.min(1, split.saved / outlook.target) * 100)}%` as `${number}%`, height: 8, backgroundColor: GUARD}} />
@@ -836,7 +840,8 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
               {outlook.onTrack ? <Text style={{color: GOOD, fontWeight: '700', fontSize: 13}}>No ritmo atual você chega no prazo ✓</Text>
                 : <Text style={{color: c.text, fontWeight: '700', fontSize: 13}}>Para fechar no prazo: {show(outlook.neededMonthly)} por mês</Text>}
               {!outlook.onTrack && split.planned > 0 ? <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Você pode manter {show(split.planned)} e compensar com aportes maiores quando sobrar, ou ajustar o valor em “Editar aportes”.</Text> : null}
-            </View> : null}
+            </Pressable> : null}
+            {!outlook ? <Pressable accessibilityRole="button" onPress={() => { setReserveMenu(false); setReserveSheet('goal'); }}><Text style={{color: c.accent, fontSize: 13, fontWeight: '700'}}>+ Definir uma meta (quanto e até quando)</Text></Pressable> : null}
             {split.monthTarget > 0 || split.realized > 0 ? <View style={{backgroundColor: GUARD + '1f', borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: GUARD + '55'}}>
               <Text style={{color: c.text, fontWeight: '800', fontSize: 14}}>Aportes de {monthLabel(month)}</Text>
               {split.planned > 0 ? <Text style={{color: c.muted, fontSize: 12}}>{show(split.planned)} todo dia {split.planDay}, avisar às {split.remindTime}</Text> : null}
@@ -854,8 +859,8 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
             </View>
             {split.daily < 0 ? <Text style={{color: BAD, fontSize: 12}}>O saldo geral ficou negativo: o que foi guardado é maior que o dinheiro que estava disponível. Confira os valores.</Text> : null}
           </> : null}
-          {[['Guardar dinheiro', 'in'], ['Retirar da reserva', 'out'], ['Editar aportes', 'plan'], ['Histórico da reserva', 'history']].map(([label, k]) => (
-            <Pressable key={k} accessibilityRole="button" onPress={() => { setReserveMenu(false); if (k === 'history') setReserveHistoryOpen(true); else setReserveSheet(k as 'in' | 'out' | 'plan'); }}
+          {[['Guardar dinheiro', 'in'], ['Retirar da reserva', 'out'], ['Editar aportes', 'plan'], ['Editar meta', 'goal'], ['Histórico da reserva', 'history']].map(([label, k]) => (
+            <Pressable key={k} accessibilityRole="button" onPress={() => { setReserveMenu(false); if (k === 'history') setReserveHistoryOpen(true); else setReserveSheet(k as 'in' | 'out' | 'plan' | 'goal'); }}
               style={{paddingVertical: 13, borderBottomWidth: 1, borderColor: c.line}}>
               <Text style={{color: k === 'out' ? BAD : c.text, fontSize: 15, fontWeight: '600'}}>{label}  ›</Text>
             </Pressable>

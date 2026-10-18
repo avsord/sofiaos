@@ -53,3 +53,13 @@ test('0.3.172: datas e horas de registros ja criados tambem pelo seletor, nada d
   assert.ok(mail.includes('<DateTimeField label="Vencimento" value={due}'));
   assert.ok(ws.includes("if(field.type==='time')return <DateTimeField"),'hora nos apps pelo seletor');
 });
+
+test('0.3.173: depois da configuracao, a meta se edita direto (com seletor de data)',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("['Editar aportes', 'plan'], ['Editar meta', 'goal']"));
+  assert.ok(s.includes("kind === 'goal' ? 'Meta'"));
+  assert.ok(s.includes('accessibilityLabel="Editar meta" onPress={() => { setReserveMenu(false); setReserveSheet(\'goal\'); }}'),'tocar no quadro da meta abre a edicao');
+  assert.ok(s.includes('+ Definir uma meta (quanto e até quando)'));
+  assert.ok(s.includes('Tirar a meta'));
+  assert.ok(s.includes("} else if ((kind === 'plan' || kind === 'goal') && reserve) {"),'salva como a edicao dos aportes');
+});
