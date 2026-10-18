@@ -1469,7 +1469,7 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose}: {kind: 'sald
 // ============================ 0.3.182: RECUPERAR APAGADOS ============================
 function RecoverSheet({api, onClose, onRestored}: {api: SofiaApi; onClose: () => void; onRestored: () => void}) {
   const c = useTheme();
-  const [items, setItems] = useState<{id: string; kind: string; title: string; data: Record<string, any>; updated_at: string; backup: string}[] | null>(null);
+  const [items, setItems] = useState<{id: string; kind: string; title: string; data: Record<string, any>; state?: string; updated_at: string; backup: string}[] | null>(null);
   const [error, setError] = useState(''), [busy, setBusy] = useState(''), [done, setDone] = useState<string[]>([]);
   useEffect(() => { api.financeRecoverable().then(r => setItems(r.items)).catch(e => setError(errorText(e))); }, [api]);
   const kindLabel = (k: string, d: Record<string, any>) => k === 'fin_tx' ? (String(d.import_id || '').startsWith('sofia-pendencia:') ? (d.recurrence === 'monthly' ? 'Conta fixa' : 'Conta a pagar') : d.kind === 'income' ? 'Receita' : 'Despesa')
@@ -1481,14 +1481,14 @@ function RecoverSheet({api, onClose, onRestored}: {api: SofiaApi; onClose: () =>
   return <Sheet visible onClose={onClose} label="Fechar recuperar itens apagados">
     <ScrollView contentContainerStyle={{gap: 12, paddingBottom: 18}}>
       <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Recuperar itens apagados</Text>
-      <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Itens que estavam na cópia diária do servidor e foram apagados depois. Restaurar traz de volta com os mesmos dados.</Text>
+      <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Itens ocultos (arquivados) e itens apagados que ainda estão nas cópias diárias do servidor. Restaurar traz de volta com os mesmos dados.</Text>
       {error ? <Text style={{color: BAD}}>{error}</Text> : null}
       {!items && !error ? <ActivityIndicator color={c.accent} /> : null}
-      {items && !items.length ? <Text style={{color: c.muted, fontSize: 13}}>Nada para recuperar nas cópias dos últimos dias.</Text> : null}
+      {items && !items.length ? <Text style={{color: c.muted, fontSize: 13}}>Nada apagado ou oculto para recuperar. Se faltar alguma conta, é só cadastrar de novo.</Text> : null}
       {(items || []).map(it => <View key={it.id} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderColor: c.line}}>
         <View style={{flex: 1, gap: 2}}>
           <Text style={{color: c.text, fontWeight: '600'}}>{it.title}</Text>
-          <Text style={{color: c.muted, fontSize: 11}}>{kindLabel(it.kind, it.data)}{it.data?.amount ? ' · ' + money(Number(it.data.amount)) : ''}{it.data?.date ? ' · ' + String(it.data.date).split('-').reverse().join('/') : ''}</Text>
+          <Text style={{color: c.muted, fontSize: 11}}>{it.state === 'archived' ? 'Oculta' : 'Apagada'} · {kindLabel(it.kind, it.data)}{it.data?.amount ? ' · ' + money(Number(it.data.amount)) : ''}{it.data?.date ? ' · ' + String(it.data.date).split('-').reverse().join('/') : ''}</Text>
         </View>
         {done.includes(it.id) ? <Text style={{color: GOOD, fontWeight: '800', fontSize: 12}}>✓ Restaurado</Text>
           : <Pressable accessibilityRole="button" disabled={!!busy} onPress={() => void restore(it.id)} style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: c.accentSoft}}>

@@ -362,10 +362,14 @@ function makeMobileApi(runtime, deps) {
       const sig = e => [e.kind, String(e.title || '').trim().toLowerCase(), Number(e.data && e.data.amount) || 0, String(e.data && e.data.date || '')].join('|');
       const now = new Set(); for (const k of ['fin_tx', 'fin_goal', 'fin_reserve_move', 'fin_account', 'fin_card']) { try { for (const e of workspace.list({kind: k, limit: 5000})) now.add(sig(e)); } catch { /* sem registros */ } }
       const items = (runtime.backups && runtime.backups.recoverable ? runtime.backups.recoverable(['fin_tx', 'fin_goal', 'fin_reserve_move', 'fin_account', 'fin_card'], exists) : []).filter(x => !now.has(sig(x)));
-      return send({items: items.slice(0, 200).map(x => ({id: x.id, kind: x.kind, title: x.title, data: x.data, state: x.state, updated_at: x.updated_at, backup: x.backup}))});
+      const hidden = [];
+      for (const k of ['fin_tx', 'fin_goal', 'fin_account', 'fin_card']) { try { for (const e of workspace.list({kind: k, limit: 5000})) if (e.state === 'archived') hidden.push({id: e.id, kind: e.kind, title: e.title, data: e.data, state: 'archived', updated_at: e.updated_at, backup: ''}); } catch { /* sem registros */ } }
+      return send({items: [...hidden, ...items.map(x => ({id: x.id, kind: x.kind, title: x.title, data: x.data, state: 'deleted', updated_at: x.updated_at, backup: x.backup}))].slice(0, 300)});
     }
     if (p === '/api/mobile/md/finance/recover' && m === 'POST') {
       const b = await bodyJson(req, 1024);
+      // oculta (arquivada): so volta a ficar ativa
+      try { const cur = workspace.get(String(b.id || '')); if (cur && cur.state === 'archived') return send(workspace.save({...cur, state: 'active'}, cur.id)); } catch { /* nao existe mais: vem do backup */ }
       const exists = id => { try { workspace.get(id); return true; } catch { return false; } };
       const found = (runtime.backups && runtime.backups.recoverable ? runtime.backups.recoverable(['fin_tx', 'fin_goal', 'fin_reserve_move', 'fin_account', 'fin_card'], exists) : []).find(x => x.id === String(b.id || ''));
       if (!found) fail('NOT_FOUND', 'Esse item não está mais nos backups ou já foi restaurado.', 404);
