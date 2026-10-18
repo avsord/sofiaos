@@ -644,7 +644,7 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
 function PendingTab({d,api,month,accountId,warning,onBill,reload}: {d:Data;api:SofiaApi;month:string;accountId:string;warning:string;onBill:(t:Tx|'new')=>void;reload:()=>Promise<void>}) {
   // 0.3.176: a aba segue o mes escolhido no topo (no mes atual, junto com as atrasadas)
   const c=useTheme(),today=todayISO(),list=useMemo(()=>monthDues(d.txs,accountId,month,today),[d,accountId,month,today]);
-  const total=list.reduce((sum,row)=>sum+row.amount,0);
+  const open=list.filter(row=>!row.paid),total=open.reduce((sum,row)=>sum+row.amount,0),paidCount=list.length-open.length;
   // 0.3.161: as pendencias marcadas como "todo mes" sao as contas fixas; aqui elas aparecem juntas,
   // com o total do ciclo, o quanto ja foi pago e quanto representam do que entrou.
   const cycleDay=d.accounts.find(a=>a.id===accountId)?.cycleDay||0;
@@ -661,7 +661,7 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload}: {d:Data;api:S
         </Pressable>
       </View>
       <View style={{borderTopWidth:1,borderColor:c.line,paddingTop:14,flexDirection:'row',justifyContent:'space-between'}}>
-        <Text style={{color:c.muted,fontSize:12}}>{list.length} {list.length===1?'pendente':'pendentes'} em {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
+        <Text style={{color:c.muted,fontSize:12}}>{open.length} {open.length===1?'pendente':'pendentes'}{paidCount?' · '+paidCount+(paidCount===1?' paga':' pagas'):''} em {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
         <Text style={{color:c.text,fontWeight:'800'}}>{money(total)}</Text>
       </View>
       {warning ? <Text style={{fontSize:12,color:WARN}}>{warning}</Text> : null}
@@ -935,6 +935,17 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
       }
     } catch (e) { appAlert('Finanças', errorText(e)); } finally { setBusy(false); }
   }
+  if (due.paid) return (
+    <View style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 14, backgroundColor: GOOD + '1a'}}>
+      <View style={{width: 4, height: 36, borderRadius: 2, backgroundColor: GOOD}} />
+      <Pressable style={{flex: 1, gap: 2}} onPress={() => due.tx && onTx(due.tx)}>
+        <Text numberOfLines={1} style={{color: c.text, fontWeight: '600'}}>{due.title}</Text>
+        <Text style={{fontSize: 11, color: GOOD}}>{due.kind === 'receber' ? 'Recebido' : 'Pago'} · {dateBR(due.date)}</Text>
+      </Pressable>
+      <Text style={{color: GOOD, fontWeight: '700'}}>{money(due.amount)}</Text>
+      <Text style={{color: GOOD, fontWeight: '800', fontSize: 12}}>✓ {due.kind === 'receber' ? 'Recebido' : 'Pago'}</Text>
+    </View>
+  );
   return (
     <View style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4}}>
       <View style={{width: 4, height: 36, borderRadius: 2, backgroundColor: color}} />
@@ -958,7 +969,9 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
 const FinanceLocal = React.createContext<{markPaid: (t: Tx) => void} | null>(null);
 async function confirmTx(api: SofiaApi, t: Tx) {
   if (t.virtual) {
-    const data: Record<string, any> = {kind: t.kind, amount: t.amount, date: t.date, category: t.category, account_id: t.accountId, paid: true, series_id: t.seriesId, recurrence: 'none'};
+    const data: Record<string, any> = {kind: t.kind, amount: t.amount, date: t.date, category: t.category, account_id: t.accountId, paid: true, series_id: t.seriesId, recurrence: 'none',
+      // 0.3.177: a parcela paga continua aparecendo como pendencia (paga) daquele mes
+      import_id: t.manualDue ? 'sofia-pendencia:' + (t.seriesId || t.id) + ':' + t.date : ''};
     await saveEntity(api, 'fin_tx', t.desc, data);
   } else if (t.entity) await saveEntity(api, 'fin_tx', t.desc, {paid: true}, t.entity);
 }

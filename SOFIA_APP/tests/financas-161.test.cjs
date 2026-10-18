@@ -119,3 +119,15 @@ test('0.3.176: pendencias seguem o mes do topo; no mes atual entram as atrasadas
   assert.ok(s.includes('monthDues(d.txs,accountId,month,today)'));
   assert.ok(s.includes("'Pendentes de '+monthLabel(month)"));
 });
+
+test('0.3.177: ao pagar, a conta fica verde e continua na lista do mes',()=>{
+  const p=(id,date,paid=false)=>f.toTx({id,kind:'fin_tx',title:id,state:'active',data:{kind:'expense',amount:100,date,account_id:'a1',paid,category:'Contas',recurrence:'none',import_id:'sofia-pendencia:'+id}});
+  const list=f.monthDues([p('atrasada','2026-09-20'),p('paga-setembro','2026-09-05',true),p('outubro','2026-10-25'),p('paga-outubro','2026-10-02',true)],'a1','2026-10','2026-10-17');
+  assert.equal(list.map(d=>d.title).join(','),'atrasada,paga-outubro,outubro','paga de setembro nao vem para outubro');
+  const paga=list.find(d=>d.title==='paga-outubro');assert.equal(paga.paid,true);assert.equal(paga.late,false);
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("if (due.paid) return ("),'linha propria para paga');
+  assert.ok(s.includes("backgroundColor: GOOD + '1a'"),'verde');
+  assert.ok(s.includes("import_id: t.manualDue ? 'sofia-pendencia:' + (t.seriesId || t.id) + ':' + t.date : ''"),'repeticao paga continua pendencia daquele mes');
+  assert.ok(s.includes("paidCount?' · '+paidCount"),'cabecalho separa pendentes e pagas');
+});

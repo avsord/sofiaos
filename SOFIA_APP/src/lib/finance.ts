@@ -240,7 +240,7 @@ export function reserveSeries(reserve: Goal, moves: ReserveMove[], month: string
 }
 
 // ---------- Contas a pagar / receber ----------
-export type Due = {id: string; title: string; amount: number; date: string; kind: 'pagar' | 'receber' | 'fatura'; late: boolean; tx?: Tx; invoice?: Invoice};
+export type Due = {id: string; title: string; amount: number; date: string; kind: 'pagar' | 'receber' | 'fatura'; late: boolean; paid?: boolean; tx?: Tx; invoice?: Invoice};
 export function upcoming(txs: Tx[], cards: Card[], today = todayISO(), days = 7): Due[] {
   const until = addDays(today, days), months = [monthOf(today), monthOf(until)].filter((m, i, a) => a.indexOf(m) === i);
   const list: Due[] = [];
@@ -283,10 +283,11 @@ export function monthDues(txs: Tx[], accountId: string, month: string, today = t
   const current = monthOf(today), start = dayIn(month, 1), end = dayIn(month, daysIn(month));
   const seen = new Set<string>();
   return [...txs, ...expandRecurring(txs, month)]
-    .filter(t => t.manualDue && !t.paid && (t.kind === 'expense' || t.kind === 'income') && !t.cardId && (!accountId || t.accountId === accountId))
-    .filter(t => (t.date >= start && t.date <= end) || (month === current && t.date < start))
+    // 0.3.177: as pagas daquele mes continuam na lista (verdes), em vez de sumirem ao pagar
+    .filter(t => t.manualDue && (t.kind === 'expense' || t.kind === 'income') && !t.cardId && (!accountId || t.accountId === accountId))
+    .filter(t => (t.date >= start && t.date <= end) || (!t.paid && month === current && t.date < start))
     .filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; })
-    .map(t => ({id: t.id, title: t.desc, amount: t.amount, date: t.date, kind: (t.kind === 'income' ? 'receber' : 'pagar') as Due['kind'], late: t.date < today, tx: t}))
+    .map(t => ({id: t.id, title: t.desc, amount: t.amount, date: t.date, kind: (t.kind === 'income' ? 'receber' : 'pagar') as Due['kind'], late: !t.paid && t.date < today, paid: t.paid, tx: t}))
     .sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
 }
 export type FinanceInsight = {tone: 'good' | 'attention' | 'neutral'; text: string};
