@@ -3,7 +3,7 @@ import {useEffect,useRef} from 'react';
 import {AppState,NativeModules,Platform} from 'react-native';
 import * as Notifications from 'expo-notifications';
 import {capsuleStore} from './capsule-store';
-import {capsuleNotificationPlan,capsuleNotificationLimit} from './capsule-model';
+import {capsuleDay,capsuleNotificationPlan,capsuleNotificationLimit} from './capsule-model';
 import {enqueueNotifications,reconcileNotificationRequests,NOTIFICATION_CHANNEL_LIMIT,NOTIFICATION_SIGNATURE_VERSION,notificationFailure} from './notification-scheduler';
 import {ensureSystemNotificationPermission} from './system-notification-permission';
 import type {SofiaApi} from './api';
@@ -41,7 +41,14 @@ export function useCapsuleNotifications(api:SofiaApi,scope:string,enabled:boolea
    if(stopped||epoch!==generation)return;
    await reconcileNotificationRequests(Notifications,PREFIX,desired,()=>!stopped&&epoch===generation);
    const delivered=await Notifications.getPresentedNotificationsAsync().catch(()=>[]);
-   for(const n of delivered)if(n.request.identifier.startsWith(PREFIX)&&store.snapshot.history.some(h=>h.data.capsule_id===n.request.content.data?.planId&&h.data.day===n.request.content.data?.day&&h.data.time===n.request.content.data?.time))await Notifications.dismissNotificationAsync(n.request.identifier).catch(()=>{});
+   // 0.3.189: sai da bandeja a dose ja tomada E a de um dia que ja passou (antes ficava ate a pessoa tirar)
+   const today=capsuleDay(new Date());
+   for(const n of delivered){
+    if(!n.request.identifier.startsWith(PREFIX))continue;
+    const data=n.request.content.data||{},past=String(data.day||'')<today;
+    const taken=store.snapshot.history.some(h=>h.data.capsule_id===data.planId&&h.data.day===data.day&&h.data.time===data.time);
+    if(past||taken)await Notifications.dismissNotificationAsync(n.request.identifier).catch(()=>{});
+   }
    if(!stopped&&epoch===generation)capsuleNotificationWarning='';
   };
   const changed=()=>enqueueNotifications(reconcile).catch(error=>{if(!stopped&&epoch===generation)capsuleNotificationWarning=notificationFailure(error);});

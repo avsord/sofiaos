@@ -1,6 +1,6 @@
 import type {Entity,Notice,Task} from './types';
 import type {SnapshotStorage} from './startup-snapshot';
-import {capsuleDay,capsuleDoses} from './capsule-model';
+import {capsuleDay,capsuleDoseOfNotice,capsuleDoses} from './capsule-model';
 export type BellNotice=Notice&{entity_id?:string;dedup?:string;local?:boolean};
 export function notificationScope(scope:string){let hash=2166136261;for(const c of scope)hash=Math.imul(hash^c.charCodeAt(0),16777619);return (hash>>>0).toString(36);}
 export function routineOccurs(plan:Entity,day:string){const d=plan.data||{},date=new Date(day+'T12:00:00');if(plan.state!=='active'||!d.starts_on||day<d.starts_on||d.ends_on&&day>d.ends_on||!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(d.time)))return false;if(d.frequency==='weekly')return date.getDay()===Number(d.weekday);if(d.frequency==='monthly')return date.getDate()===Math.min(Number(d.monthday),new Date(date.getFullYear(),date.getMonth()+1,0).getDate());return d.frequency==='daily';}
@@ -16,6 +16,9 @@ export function dueNotices(plans:Entity[],history:Entity[],routines:Entity[],tas
 }
 export function presentedNotice(request:{identifier:string;content:{title?:string|null;body?:string|null;data?:Record<string,any>}},scope:string,date=Date.now()):BellNotice|null{
  const d=request.content.data||{};if(d.scope!==notificationScope(scope)||!(d.sofiaCapsule||d.sofiaAgenda||d.sofiaRoutine||d.sofiaMonitor))return null;
+ // 0.3.189: aviso de capsula de um dia que ja passou nao volta para o sino ao reabrir o app
+ // (antes entrava com a data de agora e ficava mais um dia inteiro)
+ if(d.sofiaCapsule&&String(d.day||'')<capsuleDay(new Date(date)))return null;
  const id=d.sofiaCapsule?'local:capsule:'+d.planId+':'+d.day+':'+d.time+(d.early?':early':''):'local:delivered:'+request.identifier;
  return {id,title:request.content.title||'Sofia',body:request.content.body||'',state:'unread',category:d.sofiaCapsule?'capsule':d.sofiaRoutine?'routine':d.sofiaMonitor?'monitor':'agenda',created_at:new Date(date).toISOString(),entity_id:d.planId||d.entityId||d.monitorId,local:true};
 }
@@ -30,5 +33,5 @@ export class BellInbox {
  readAll(){let changed=false;for(const [id,n] of this.records)if(n.state!=='read'){this.records.set(id,{...n,state:'read'});changed=true;}if(changed)this.publish();}
  dismiss(id:string){this.records.delete(id);this.hidden.set(id,this.now());this.publish();}
  clear(){for(const n of this.records.values())this.hidden.set(n.id,this.now());this.records.clear();this.publish();}
- private publish(){const cutoff=this.now()-30*86400000,dayStart=new Date(this.now()).setHours(0,0,0,0);for(const [id,n] of this.records)if(this.hidden.has(id)||(n.category==='capsule'&&Date.parse(n.created_at)<dayStart)||!Number.isFinite(Date.parse(n.created_at))||Date.parse(n.created_at)<cutoff)this.records.delete(id);for(const [id,at] of this.hidden)if(at<cutoff)this.hidden.delete(id);this.items=[...this.records.values()].sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at)).slice(0,1500);this.listeners.forEach(f=>f());void this.storage.write(this.scope,JSON.stringify({schema:1,items:this.items,hidden:[...this.hidden].slice(-3000)})).catch(()=>{});}
+ private publish(){const cutoff=this.now()-30*86400000,dayStart=new Date(this.now()).setHours(0,0,0,0);for(const [id,n] of this.records)if(this.hidden.has(id)||(n.category==='capsule'&&(Date.parse(n.created_at)<dayStart||String(capsuleDoseOfNotice(n.id)?.day||'9999')<capsuleDay(new Date(this.now()))))||!Number.isFinite(Date.parse(n.created_at))||Date.parse(n.created_at)<cutoff)this.records.delete(id);for(const [id,at] of this.hidden)if(at<cutoff)this.hidden.delete(id);this.items=[...this.records.values()].sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at)).slice(0,1500);this.listeners.forEach(f=>f());void this.storage.write(this.scope,JSON.stringify({schema:1,items:this.items,hidden:[...this.hidden].slice(-3000)})).catch(()=>{});}
 }

@@ -13,7 +13,7 @@ test('capsulas: dose some da vermelhidao depois de 6 h; sino so mostra o dia de 
   assert.equal(JSON.stringify(m.capsuleDoseOfNotice('local:capsule:abc-123:2026-10-16:21:30:early')),JSON.stringify({planId:'abc-123',day:'2026-10-16',time:'21:30'}));
   assert.equal(m.capsuleDoseOfNotice('local:routine:x'),null);
   const bell=read('src/lib/bell-inbox.ts');
-  assert.ok(bell.includes('i===0?capsuleDoses(plans,history,day,now):[]'));assert.ok(bell.includes("n.category==='capsule'&&Date.parse(n.created_at)<dayStart"));
+  assert.ok(bell.includes('i===0?capsuleDoses(plans,history,day,now):[]'));assert.ok(bell.includes("n.category==='capsule'&&(Date.parse(n.created_at)<dayStart"));
 });
 test('notificacoes: 1o arrastar = lida; arrastar de novo em aviso de capsula = tomei',()=>{
   const n=read('src/components/NotificationCenter.tsx');
@@ -31,4 +31,12 @@ test('janelas: 3 ou mais botoes viram lista em coluna com Cancelar separado',()=
   const a=read('src/lib/app-alert.tsx');
   assert.ok(a.includes("stacked=buttons.length>2||buttons.some(b=>(b.text||'').length>14)"));
   assert.ok(a.includes('{others.map((b,i)=>action(b,i,false,false))}'));
+});
+
+test('0.3.189: dose de um dia que ja passou sai sozinha da bandeja do Android, do sino e do Inicio',()=>{
+  const n=read('src/lib/capsule-notifications.ts'),b=read('src/lib/bell-inbox.ts');
+  assert.ok(n.includes("const data=n.request.content.data||{},past=String(data.day||'')<today;"),'bandeja: dia passado');
+  assert.ok(n.includes('if(past||taken)await Notifications.dismissNotificationAsync('),'tirada ou tomada');
+  assert.ok(b.includes("if(d.sofiaCapsule&&String(d.day||'')<capsuleDay(new Date(date)))return null;"),'nao volta ao reabrir o app');
+  assert.ok(b.includes("String(capsuleDoseOfNotice(n.id)?.day||'9999')<capsuleDay(new Date(this.now()))"),'as que ja estavam guardadas saem pelo dia da dose');
 });
