@@ -169,7 +169,7 @@ test('0.3.186: sem aviso de repetido (o servidor nao deixa duplicar e corrige o 
   assert.ok(s.includes('confirmTx(api, due.tx, d.txs)')&&s.includes('confirmTx(api, t, d.txs)'),'confirmar nao cria segundo registro');
   assert.ok(s.includes("const range=useMemo(()=>({start:dayIn(month,1),end:dayIn(month,daysIn(month))"),'contas fixas no mes da pagina');
   assert.ok(s.includes("const initialTouched = !acc || money0(balance) !== acc.initial;"),'refazer nao reescreve o saldo inicial');
-  assert.ok(s.includes('Não é um lançamento: é o valor informado no cadastro da conta'));
+  assert.ok(s.includes('Não é um lançamento: é o saldo inicial da conta'));
 });
 
 test('0.3.188: aporte como conta a fazer (valor sugerido e editavel), no + e em Pendentes; folha da reserva com respiro',()=>{
@@ -181,4 +181,37 @@ test('0.3.188: aporte como conta a fazer (valor sugerido e editavel), no + e em 
   assert.ok(s.includes("🔒 Aporte do mês")&&s.includes("✓ Aportado"),'em Pendentes, amarelo/verde');
   assert.ok(s.includes('<ScrollView contentContainerStyle={{gap: 14, paddingBottom: 28}}>'),'Sua reserva rola e tem respiro no fim');
   assert.ok(!s.includes('não entra no saldo geral'),'sem "saldo geral"');
+});
+
+test('0.3.192: contas fixas editaveis pela propria secao; mudar a data muda so o dia (o inicio fica)',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("accessibilityLabel={'Editar '+b.title} disabled={!original} onPress={()=>original&&onBill(original)}"),'toque abre a conta fixa original');
+  assert.ok(s.includes('Toque numa conta para mudar nome, valor, dia, parcelas ou avisos. Vale para todos os meses.'));
+  assert.ok(s.includes("const isSeries=!!tx&&!tx.virtual&&tx.recurrence==='monthly'&&!tx.seriesId&&repeat==='monthly';"));
+  assert.ok(s.includes("kind:flow,amount:value,date:finalDate,category,"),'grava com o mes de inicio original');
+  assert.ok(s.includes("'Vencimento (o dia vale para todos os meses)'"));
+});
+
+test('0.3.192: contas fixas editaveis, linha inteira das pendencias abre a edicao, voltar sempre para o Resumo',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("accessibilityLabel={'Editar '+b.title} disabled={!original} onPress={()=>original&&onBill(original)}"),'conta fixa abre a edicao da original');
+  assert.ok(s.includes('const target = due.tx?.virtual ? (d.txs.find(t => !t.virtual && t.id === (due.tx!.seriesId || due.tx!.id)) || due.tx) : due.tx;'),'repeticao abre a original');
+  assert.ok(s.includes("accessibilityLabel={'Editar ' + due.title} disabled={!target} onPress={openEdit}"),'linha inteira');
+  assert.ok(s.includes("const isSeries=!!tx&&!tx.virtual&&tx.recurrence==='monthly'&&!tx.seriesId&&repeat==='monthly';"),'mudar a data muda o dia, nao o inicio');
+  assert.ok(s.includes("if (tab !== 'home') {setTab('home');setTabHistory([]);return;}"),'voltar: aba -> Resumo -> Apps');
+});
+
+test('0.3.192: ajustar o Saldo ao valor do banco muda so o ponto de partida; lancamentos seguem contando',()=>{
+  // conta com saldo inicial 0, salario 7.821 e contas pagas 1.103,18 -> Saldo 6.717,82; banco tem 6.000
+  const acc=f.toAccount({id:'a1',kind:'fin_account',title:'C',state:'active',data:{account_type:'corrente',initial_balance:'0',include_total:true}});
+  const tx=(id,kind,amount,date)=>f.toTx({id,kind:'fin_tx',title:id,state:'active',data:{kind,amount,date,account_id:'a1',paid:true,category:'X',recurrence:'none'}});
+  const txs=[tx('sal','income',7821,'2026-09-25'),tx('contas','expense',1103.18,'2026-10-10')];
+  const current=f.totalBalance([acc],txs);assert.equal(current,6717.82);
+  const diff=Math.round((6000-current)*100)/100;
+  const adjusted=f.toAccount({...acc.entity,data:{...acc.entity.data,initial_balance:String(Math.round((acc.initial+diff)*100)/100)}});
+  assert.equal(f.totalBalance([adjusted],txs),6000,'Saldo vira o valor do banco');
+  assert.equal(f.totalBalance([adjusted],[...txs,tx('mercado','expense',200,'2026-10-20')]),5800,'e continua contando a partir dele');
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes('Ajustar saldo ao valor do banco'));
+  assert.ok(s.includes("initial_balance: String(Math.round((target.initial + diff) * 100) / 100)"),'sem lancamento falso');
 });

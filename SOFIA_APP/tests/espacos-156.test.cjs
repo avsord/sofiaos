@@ -12,5 +12,5 @@ test('cartoes e linhas com respiro interno coerente',()=>{
   assert.ok(s.includes("backgroundColor: c.accent, borderRadius: 24, padding: 20, gap: 16, elevation: 2"),'cartao do saldo');
   assert.ok(s.includes("borderRadius: 16, padding: 12, gap: 2}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↑ Receitas"),'caixas de receitas/despesas');
   assert.ok(s.includes("gap: 12, paddingVertical: 12, paddingHorizontal: 6, borderTopWidth: first ? 0 : 1"),'linha do extrato');
-  assert.ok(s.includes("gap: 12, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 14, backgroundColor: color + '1a'}}>"),'linha de vencimento (tinta da cor do estado)');
+  assert.ok(s.includes("gap: 12, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 14, backgroundColor: color + '1a', opacity: pressed ? 0.7 : 1})}>"),'linha de vencimento (tinta da cor do estado, toda tocavel)');
 });
