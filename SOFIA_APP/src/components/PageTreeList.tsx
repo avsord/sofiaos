@@ -22,7 +22,8 @@ type Props={roots:Entity[];children:Map<string,Entity[]>;expanded:Set<string>;to
 type Visible={page:Entity;depth:number;hasChildren:boolean;open:boolean};
 export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canParent,onDelete,compact=false,onInteractionChange,onDragChange,virtualized=!compact,header,footer,refreshControl,scrollEnabled=true}:Props){
  const c=useTheme(),host=useRef<View|null>(null),nodes=useRef(new Map<string,View>()),rects=useRef<PageRect[]>([]),origin=useRef({x:0,y:0,width:0});
- const drag=useRef<{page:Entity;startX:number;startY:number;lastX:number;lastY:number;dx:number;dy:number;moved:boolean;drop:PageDrop|null}|null>(null);
+ const drag=useRef<{page:Entity;startX:number;startY:number;lastX:number;lastY:number;dx:number;dy:number;moved:boolean;drop:PageDrop|null;switchY:number;switchAt:number}|null>(null);
+ const reducedMotion=useReducedMotion();
  const [ghost,setGhost]=useState<Visible|null>(null),[drop,setDrop]=useState<PageDrop|null>(null),[context,setContext]=useState<string|null>(null),[geometry,setGeometry]=useState(0),[limit,setLimit]=useState(INITIAL_ROWS);
  const pan=useRef(new Animated.ValueXY()).current;
  const all=useMemo(()=>[...new Map([...roots,...[...children.values()].flat()].map(p=>[p.id,p])).values()],[roots,children]);
@@ -58,13 +59,30 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
  useEffect(()=>()=>{drag.current=null;latest.current.onDragChange?.(false);latest.current.onInteractionChange?.(false);},[]);
  function begin(row:Visible,x:number,y:number){
   setContext(null);pan.setValue({x:0,y:0});
-  drag.current={page:row.page,startX:x,startY:y,lastX:x,lastY:y,dx:0,dy:0,moved:false,drop:null};
+  drag.current={page:row.page,startX:x,startY:y,lastX:x,lastY:y,dx:0,dy:0,moved:false,drop:null,switchY:y,switchAt:0};
   rects.current=[];setGhost(row);setDrop(null);latest.current.onDragChange?.(true);measure();
  }
- function move(x:number,y:number){const d=drag.current;if(!d)return;d.dx=x-d.startX;d.dy=y-d.startY;d.lastX=x;d.lastY=y;if(Math.abs(d.dx)+Math.abs(d.dy)>5)d.moved=true;pan.setValue({x:d.dx,y:d.dy});if(!d.moved)return;d.drop=projectPageDrop(latest.current.all,d.page,rects.current,x,y,d.dx);setDrop(d.drop);}
- function end(cancelled=false){const d=drag.current;if(!d)return;drag.current=null;setGhost(null);setDrop(null);pan.setValue({x:0,y:0});latest.current.onDragChange?.(false);
-  if(cancelled)return;if(!d.moved){setContext(d.page.id);return;}
-  if(d.drop&&latest.current.canParent(d.page.id,d.drop.parentId))void latest.current.onMove(d.page,d.drop.parentId,d.drop);
+ function move(x:number,y:number){const d=drag.current;if(!d)return;d.dx=x-d.startX;d.dy=y-d.startY;d.lastX=x;d.lastY=y;if(Math.abs(d.dx)+Math.abs(d.dy)>5)d.moved=true;pan.setValue({x:d.dx,y:d.dy});if(!d.moved)return;
+  // 0.3.201: antes cada milimetro redesenhava a lista inteira e, na divisa entre "antes" e "depois", o destino
+  // trocava sem parar (as linhas pulavam). Agora so muda quando o destino e outro E o dedo andou 8 px desde a
+  // ultima troca (ou passaram 90 ms) - suave e sem tremer.
+  const next=projectPageDrop(latest.current.all,d.page,rects.current,x,y,d.dx),prev=d.drop;
+  const same=!!next&&!!prev&&next.kind===prev.kind&&next.anchorId===prev.anchorId&&next.parentId===prev.parentId&&next.depth===prev.depth;
+  if(same||(!next&&!prev))return;
+  const now=Date.now();if(prev&&Math.abs(y-d.switchY)<8&&now-d.switchAt<90)return;
+  d.drop=next;d.switchY=y;d.switchAt=now;setDrop(next);}
+ function end(cancelled=false){const d=drag.current;if(!d)return;drag.current=null;
+  const finish=()=>{setGhost(null);setDrop(null);pan.setValue({x:0,y:0});latest.current.onDragChange?.(false);};
+  if(cancelled){finish();return;}if(!d.moved){finish();setContext(d.page.id);return;}
+  const target=d.drop&&latest.current.canParent(d.page.id,d.drop.parentId)?d.drop:null;
+  if(!target){finish();return;}
+  const commit=()=>{void latest.current.onMove(d.page,target.parentId,target);finish();};
+  const gr=rects.current.find(r=>r.page.id===d.page.id),anchor=rects.current.find(r=>r.page.id===target.anchorId);
+  let toY:number|null=null;
+  if(gr&&target.kind==='inside'&&anchor)toY=anchor.y-gr.y;
+  else if(gr){const raw=dropLineY(target,rects.current);if(raw!=null)toY=(gr.y<raw?raw-gr.height:raw)-gr.y;}
+  if(toY==null||reducedMotion){commit();return;}
+  Animated.timing(pan,{toValue:{x:target.kind==='inside'?PAGE_INDENT:0,y:toY},duration:140,easing:MOTION_EASE,useNativeDriver:false,isInteraction:false}).start(()=>commit());
  }
  function previewShift(id:string){if(!ghost||!drop||drop.kind==='inside')return 0;const source=visible.findIndex(r=>r.page.id===ghost.page.id),anchor=visible.findIndex(r=>r.page.id===drop.anchorId),row=visible.findIndex(r=>r.page.id===id),target=anchor+(drop.kind==='after'?1:0),height=rects.current.find(r=>r.page.id===ghost.page.id)?.height||46;return source<target&&row>source&&row<target?-height:source>=target&&row>=target&&row<source?height:0;}
  const ghostRect=ghost?rects.current.find(r=>r.page.id===ghost.page.id):null,rawLine=drop?dropLineY(drop,rects.current):null;

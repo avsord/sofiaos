@@ -1,4 +1,6 @@
 import React,{useState} from 'react';
+import {RemindersField} from './RemindersField';
+import {reminderFields} from '../lib/agenda-reminders';
 import {KeyboardAvoidingView,Platform,ScrollView,Switch,Text,TextInput,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {SofiaApi} from '../lib/api';
@@ -14,7 +16,7 @@ import {Button,ErrorBanner,IconButton,forms} from './UI';
 /** The initial calendar opens its own form without waiting for the remote catalog. */
 export function HomeCommitmentEditor({api,day,areas,onClose,onSaved}:{api:SofiaApi;day:string;areas:string[];onClose:()=>void;onSaved:()=>void}){
  const c=useTheme();
- const [title,setTitle]=useState(''),[description,setDescription]=useState(''),[start,setStart]=useState(()=>new Date(day+'T09:00:00').toISOString()),[end,setEnd]=useState(''),[priority,setPriority]=useState('none'),[area,setArea]=useState('Pessoal'),[google,setGoogle]=useState(false),[notify,setNotify]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState('');
+ const [title,setTitle]=useState(''),[description,setDescription]=useState(''),[start,setStart]=useState(()=>new Date(day+'T09:00:00').toISOString()),[end,setEnd]=useState(''),[priority,setPriority]=useState('none'),[area,setArea]=useState('Pessoal'),[google,setGoogle]=useState(true),[notify,setNotify]=useState(true),[reminders,setReminders]=useState<{reminders_json:string;remind_minutes:number|''}>(reminderFields([10])),[saving,setSaving]=useState(false),[error,setError]=useState('');
  async function save(){
   if(saving||!title.trim())return;
   setSaving(true);setError('');
@@ -25,7 +27,7 @@ export function HomeCommitmentEditor({api,day,areas,onClose,onSaved}:{api:SofiaA
    await api.saveEntity({
     kind:'commitment',title:title.trim(),content:description,area:area.trim()||'Pessoal',
     state:'planned',privacy:'private',tags:notify?[]:['sofia-notify-v1:off'],
-    data:{start_at:begin.toISOString(),...(finish?{end_at:finish.toISOString()}:{}),priority_level:priority,calendar_provider:google?'google':'local'}
+    data:{start_at:begin.toISOString(),...(finish?{end_at:finish.toISOString()}:{}),priority_level:priority,...reminders,calendar_provider:google?'google':'local'}
    });
    if(notify)void requestAgendaPermission().catch(()=>false);
    onSaved();
@@ -51,7 +53,7 @@ export function HomeCommitmentEditor({api,day,areas,onClose,onSaved}:{api:SofiaA
       <TextInput accessibilityLabel="Descrição do compromisso" multiline value={description} onChangeText={setDescription} style={[forms.input,{color:c.text,borderColor:c.line,backgroundColor:c.input,minHeight:88,textAlignVertical:'top'}]}/>
      </View>
      <GoogleCalendarProperty api={api} autoEnable value={google} onChange={setGoogle}/>
-     <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={{color:c.text}}>Notificar neste celular</Text><Switch accessibilityLabel="Notificar compromisso neste celular" value={notify} onValueChange={setNotify}/></View>
+     <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={{color:c.text}}>Notificar neste celular</Text><Switch accessibilityLabel="Notificar compromisso neste celular" value={notify} onValueChange={setNotify}/></View>{notify?<RemindersField data={reminders} onChange={setReminders}/>:null}
      <Button title="Salvar compromisso" loading={saving} disabled={!title.trim()} onPress={()=>void save()}/>
     </ScrollView>
    </KeyboardAvoidingView>

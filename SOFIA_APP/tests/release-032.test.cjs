@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),load=require('./load-ts.cjs');
-const {taskPriority,filterTasks}=load('src/lib/task-filters.ts');
+const {taskPriority,filterTasks}=load('src/lib/task-filters.ts',{'./fuzzy':load('src/lib/fuzzy.ts')});
 const tasks=[{id:'1',title:'Casa',area:'Pessoal',priority_level:'light'},{id:'2',title:'Projeto',description:'entrega',area:'Trabalho',priority_level:'important'},{id:'3',title:'Curso',area:'Estudos',priority_level:'medium'},{id:'4',title:'Ler',area:'Pessoal',priority_level:'none'}];
 const ids=filter=>Array.from(filterTasks(tasks,{query:'',area:'',priority:'',...filter}),t=>t.id);
 test('area, priority and description search combine without changing saved tasks',()=>{assert.deepEqual(ids({area:'Pessoal'}),['1','4']);assert.deepEqual(ids({priority:'none'}),['4']);assert.deepEqual(ids({area:'Trabalho',priority:'important',query:'ENTREGA'}),['2']);assert.deepEqual(ids({area:'Trabalho',priority:'light'}),[]);assert.deepEqual(ids({}),['1','2','3','4']);});

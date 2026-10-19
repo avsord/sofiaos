@@ -38,6 +38,11 @@ const breathe = () => new Promise(r => setImmediate(r));
 const iso = v => { const t = Date.parse(v); return Number.isFinite(t) ? new Date(t).toISOString() : ''; };
 const plusDays = (date, n) => { const d = new Date(date + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
+/** 0.3.201: lista de avisos de um compromisso (minutos antes), sem repetidos, ate 5 (limite do Google). */
+function reminderList(d) {
+  let list = []; try { list = JSON.parse(String(d.reminders_json || '[]')); } catch { list = []; }
+  return [...new Set((Array.isArray(list) ? list : []).map(Number).filter(n => Number.isFinite(n) && n >= 0).map(n => Math.min(40320, Math.round(n))))].sort((a, b) => a - b).slice(0, 5);
+}
 class GoogleService {
   constructor(store, workspace, config, options = {}) {
     this.s = store; this.db = store.db; this.w = workspace; this.config = config;
@@ -57,6 +62,24 @@ class GoogleService {
     if (typeof workspace.dropAttachment === 'function') {
       const dropOriginal = workspace.dropAttachment.bind(workspace);
       workspace.dropAttachment = (attId) => { const a = dropOriginal(attId); if (a && a.drive_id) this.call('DELETE', DRIVE + '/files/' + a.drive_id).catch(() => {}); return a; };
+    }
+    // 0.3.201: registra na agenda da Sofia e espelha no Google Agenda: com a conta conectada, compromisso
+    // novo sem agenda escolhida vai para o Google (quem quiser so na Sofia escolhe "local" de proposito).
+    const saveOriginal = workspace.save.bind(workspace);
+    workspace.save = (input, entityId) => {
+      if (!entityId && input && input.kind === 'commitment' && input.data && !input.data.calendar_provider) {
+        const l = this.link(); if (l?.refresh && /calendar/.test(l.scopes || '')) input = {...input, data: {...input.data, calendar_provider: 'google'}};
+      }
+      return saveOriginal(input, entityId);
+    };
+    if (store && typeof store.deleteTask === 'function') {
+      const deleteTaskOriginal = store.deleteTask.bind(store);
+      store.deleteTask = (taskId) => {
+        let ext = null; try { ext = this.db.prepare("SELECT external_calendar_id AS cal, external_event_id AS ev FROM task_details WHERE task_id=? AND COALESCE(external_event_id,'')!=''").get(taskId); } catch { /* sem detalhes */ }
+        const result = deleteTaskOriginal(taskId);
+        if (ext) try { this.db.prepare('INSERT OR IGNORE INTO google_tombstones VALUES(?,?,?)').run(ext.cal || 'primary', ext.ev, now()); } catch { /* sem tabela */ }
+        return result;
+      };
     }
     // Apagar na Sofia um evento ligado ao Google também apaga lá na próxima sincronização.
     const original = workspace.deleteEntity.bind(workspace);
@@ -181,7 +204,7 @@ class GoogleService {
     return {...base, syncing: this.busy, email: l.email, last_sync: l.last_sync, error: l.last_error || undefined, calendar_id: cal?.id || 'primary', calendar_name: cal?.summary || 'Principal',
       calendars, warnings, conflicts: l.conflicts || [], item_errors: l.item_errors || [], history: (l.history || []).slice(0, 10),
       gmail: {connected: /gmail\.readonly/.test(l.scopes || '')},
-      drive: {connected: /drive\.file/.test(l.scopes || ''), last_backup: l.drive?.last_backup, last_backup_error: l.drive?.last_error, backups: l.drive?.count || 0, folder: 'Sofia OS/Backups', folders: l.drive?.folders ? Object.keys(l.drive.folders) : [], attachments: this.attachmentStats(), voices: this.voiceStats(), pages: l.drive?.pages_exported || 0}};
+      drive: {connected: /drive\.file/.test(l.scopes || ''), portable: {configured: String(process.env.SOFIA_BACKUP_PASSPHRASE || '').length >= 12, at: l.drive?.portable_at || '', error: l.drive?.portable_error || ''}, last_backup: l.drive?.last_backup, last_backup_error: l.drive?.last_error, backups: l.drive?.count || 0, folder: 'Sofia OS/Backups', folders: l.drive?.folders ? Object.keys(l.drive.folders) : [], attachments: this.attachmentStats(), voices: this.voiceStats(), pages: l.drive?.pages_exported || 0}};
   }
   select(calendarId) {
     const l = this.link(); if (!l?.refresh) throw new AppError('GOOGLE_NOT_CONNECTED', 'Conta Google não conectada.', 409);
@@ -206,7 +229,7 @@ class GoogleService {
     let end = allDay ? new Date((ev.end?.date || plusDays(ev.start.date, 1)) + 'T03:00:00Z').toISOString() : iso(ev.end?.dateTime);
     if (end && start && end <= start) end = '';
     const popup = (ev.reminders?.overrides || []).find(r => r.method === 'popup');
-    return {start_at: start, end_at: end, location: String(ev.location || '').slice(0, 900), remind_minutes: popup ? popup.minutes : '', calendar_provider: 'google', calendar_id: calId,
+    return {start_at: start, end_at: end, location: String(ev.location || '').slice(0, 900), remind_minutes: popup ? popup.minutes : '', reminders_json: JSON.stringify([...new Set((ev.reminders?.overrides || []).filter(r => r.method === 'popup').map(r => Number(r.minutes)).filter(n => Number.isFinite(n) && n >= 0))].sort((a, b) => a - b).slice(0, 5)), calendar_provider: 'google', calendar_id: calId,
       external_event_id: ev.id, sync_state: readonly ? 'readonly' : 'synced', calendar_all_day: allDay, calendar_date_start: allDay ? ev.start.date : '', calendar_date_end: allDay ? (ev.end?.date || plusDays(ev.start.date, 1)) : '',
       // Aniversário e outros tipos especiais do Google (local de trabalho, foco, fora do
       // escritório, criado a partir de e-mail) têm edição restrita na própria API do Google,
@@ -249,6 +272,7 @@ class GoogleService {
       const r = await this.call('GET', CAL + '/calendars/' + encodeURIComponent(cal.id) + '/events?' + q.toString());
       for (const ev of r.items || []) {
         report.imported++;
+        if (ev.extendedProperties?.private?.sofia_task) continue; // 0.3.201: espelho de uma tarefa da Sofia
         if (report.imported % YIELD_EVERY === 0) await breathe();
         const key = cal.id + '|' + ev.id, existing = map.get(key);
         // Nada mudou no Google e nada mudou na Sofia: não regrava.
@@ -283,11 +307,40 @@ class GoogleService {
     const end = allDay ? {date: endDate} : {dateTime: new Date(Number.isFinite(endMs) && endMs > startMs ? endMs : startMs + 3600000).toISOString(), timeZone: TZ};
     const minutes = Number(d.remind_minutes), hasReminder = d.remind_minutes !== '' && d.remind_minutes != null && Number.isFinite(minutes) && minutes >= 0;
     return {summary: String(e.title || 'Compromisso').slice(0, 1000), description: e.content ? String(e.content).slice(0, 8000) : undefined, location: d.location ? String(d.location).slice(0, 1000) : undefined, start, end,
-      reminders: hasReminder ? {useDefault: false, overrides: [{method: 'popup', minutes: Math.min(40320, Math.round(minutes))}]}
+      // 0.3.201: varios avisos (como no Google Agenda): reminders_json manda; remind_minutes e o legado
+      reminders: (list => list.length ? {useDefault: false, overrides: list.map(m => ({method: 'popup', minutes: m}))} : null)(reminderList(d)) || (hasReminder ? {useDefault: false, overrides: [{method: 'popup', minutes: Math.min(40320, Math.round(minutes))}]}
         // PATCH mescla objetos: mandar só {useDefault:true} num evento que JÁ tem lembretes próprios
         // vira "useDefault + overrides" e o Google recusa ("Cannot specify both default reminders and
         // overrides"). Mandar overrides vazio limpa os próprios e deixa só o padrão.
-        : {useDefault: true, overrides: []}};
+        : {useDefault: true, overrides: []})};
+  }
+  /** 0.3.201: tarefa programada (com data) da Sofia vira evento no Google Agenda, com os lembretes dela.
+   * Concluida, cancelada, sem data ou apagada: sai do Google. A Sofia continua sendo a dona da tarefa. */
+  async pushTasks(calId, report) {
+    let rows = [];
+    try { rows = this.db.prepare("SELECT t.id, t.title, t.state, t.due_at, t.revision, COALESCE(d.description,'') AS description, COALESCE(d.location,'') AS location, COALESCE(d.notifications_json,'[]') AS notifications_json, COALESCE(d.external_calendar_id,'') AS cal, COALESCE(d.external_event_id,'') AS ev, COALESCE(d.sync_state,'') AS sync_state FROM tasks t LEFT JOIN task_details d ON d.task_id=t.id").all(); } catch { return; }
+    const mark = (id, provider, cal, ev, state) => this.db.prepare("INSERT INTO task_details(task_id,calendar_provider,external_calendar_id,external_event_id,sync_state) VALUES(?,?,?,?,?) ON CONFLICT(task_id) DO UPDATE SET calendar_provider=excluded.calendar_provider,external_calendar_id=excluded.external_calendar_id,external_event_id=excluded.external_event_id,sync_state=excluded.sync_state").run(id, provider, cal, ev, state);
+    for (const t of rows) {
+      const wanted = !!t.due_at && !['done', 'cancelled'].includes(t.state), done = 'synced:' + t.revision;
+      try {
+        if (!wanted) {
+          if (t.ev) { await this.call('DELETE', CAL + '/calendars/' + encodeURIComponent(t.cal || calId) + '/events/' + encodeURIComponent(t.ev)).catch(e => { if (![404, 410].includes(e.googleStatus)) throw e; }); mark(t.id, 'local', '', '', 'local'); report.removed++; }
+          continue;
+        }
+        if (t.ev && t.sync_state === done) continue;
+        await breathe();
+        let mins = []; try { mins = JSON.parse(t.notifications_json).map(Number).filter(n => Number.isFinite(n) && n >= 0); } catch { mins = []; }
+        const start = new Date(t.due_at), end = new Date(start.getTime() + 30 * 60000), target = t.cal || calId;
+        const body = {summary: String(t.title).slice(0, 1000), description: ((t.description ? t.description + '\n\n' : '') + 'Tarefa da Sofia OS').slice(0, 8000), location: t.location || undefined,
+          start: {dateTime: start.toISOString(), timeZone: 'America/Sao_Paulo'}, end: {dateTime: end.toISOString(), timeZone: 'America/Sao_Paulo'},
+          reminders: {useDefault: false, overrides: [...new Set(mins)].slice(0, 5).map(m => ({method: 'popup', minutes: Math.min(40320, Math.round(m))}))},
+          extendedProperties: {private: {sofia_task: t.id}}};
+        let ev;
+        try { ev = await this.call(t.ev ? 'PATCH' : 'POST', CAL + '/calendars/' + encodeURIComponent(target) + '/events' + (t.ev ? '/' + encodeURIComponent(t.ev) : ''), body); }
+        catch (e) { if (t.ev && [404, 410].includes(e.googleStatus)) ev = await this.call('POST', CAL + '/calendars/' + encodeURIComponent(target) + '/events', body); else throw e; }
+        mark(t.id, 'google', target, ev.id, done); report.sent++;
+      } catch (err) { report.errors.push('Enviar a tarefa "' + String(t.title).slice(0, 40) + '": ' + String(err.message).slice(0, 80)); }
+    }
   }
   async pushLocal(calId, report) {
     for (const t of this.db.prepare('SELECT * FROM google_tombstones').all()) {
@@ -350,6 +403,7 @@ class GoogleService {
         link.sync = await this.importCalendar(cal, cal.id !== main.id || !['owner', 'writer'].includes(cal.accessRole), map, report, link);
       }
       await this.pushLocal(main.id, report);
+      await this.pushTasks(main.id, report);
       report.ms = Date.now() - t0;
       link = {...this.link(), sync: link.sync, calendars, last_sync: now(), last_error: report.errors.length ? report.errors[0] : '', item_errors: report.itemErrors.slice(0, 20), conflicts: report.conflicts.slice(0, 50),
         history: [{...report, conflicts: report.conflicts.length, errors: report.errors.slice(0, 5)}, ...((this.link() || {}).history || [])].slice(0, 20)};
@@ -375,7 +429,7 @@ class GoogleService {
   //   Sofia OS/Áudios    (mensagens de voz da conversa com mais de 1 dia)
   //   Sofia OS/Páginas   (cada página sua como um arquivo .md legível, atualizado quando muda)
   // Os ids ficam guardados no link; nunca se cria pasta repetida (folder() reaproveita).
-  static FOLDERS = ['Backups', 'Anexos', 'Áudios', 'Páginas', 'Comprovantes'];
+  static FOLDERS = ['Backups', 'Anexos', 'Áudios', 'Páginas', 'Comprovantes', 'Backup com senha'];
   // offloadAttachments/offloadVoices/exportPages rodam juntos, sem esperar um pelo outro: se
   // cada um corresse ensureFolders() por conta própria, cada um buscaria "ainda não existe" ao
   // mesmo tempo e cada um criaria a própria pasta "Sofia OS" — foi assim que apareceram pastas
@@ -579,6 +633,30 @@ class GoogleService {
     return buf;
   }
 
+  /** 0.3.201: backup com a senha da variavel SOFIA_BACKUP_PASSPHRASE (12+ caracteres). Abre em qualquer
+   * lugar com o repositorio + a senha (scripts/restaurar-backup.cjs). Ficam os 7 mais novos e o guia junto. */
+  async uploadPortableBackup() {
+    const pass = String(process.env.SOFIA_BACKUP_PASSPHRASE || '');
+    if (pass.length < 12) return null;
+    const dir = await this.folderId('Backup com senha'); if (!dir) return null;
+    const bytes = this.backups.portable(pass), name = 'sofia-com-senha-' + now().slice(0, 10) + '.sofia-backup';
+    const up = async (fileName, mime, content, description) => {
+      const boundary = 'sofia' + id(), meta = JSON.stringify({name: fileName, parents: [dir], mimeType: mime, description});
+      const body = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`), content, Buffer.from(`\r\n--${boundary}--`)]);
+      return this.call('POST', UPLOAD + '/files?uploadType=multipart&fields=id', body, {'Content-Type': 'multipart/related; boundary=' + boundary});
+    };
+    const list = await this.call('GET', DRIVE + '/files?orderBy=createdTime desc&pageSize=100&fields=files(id,name)&q=' + encodeURIComponent(`'${dir}' in parents and trashed=false`));
+    const files = list.files || [];
+    // o do dia e substituido (um por dia)
+    for (const f of files.filter(f => f.name === name)) await this.call('DELETE', DRIVE + '/files/' + f.id).catch(() => {});
+    await up(name, 'application/octet-stream', bytes, 'Backup da Sofia OS com senha (abre sem o servidor)');
+    if (!files.some(f => f.name === 'COMO-RESTAURAR.md')) {
+      let guide = ''; try { guide = fs.readFileSync(path.join(__dirname, '..', '..', 'scripts', 'COMO-RESTAURAR.md')); } catch { guide = Buffer.from('Veja scripts/COMO-RESTAURAR.md no repositorio avsord/sofiaos (branch sofia-app-android).'); }
+      await up('COMO-RESTAURAR.md', 'text/markdown', Buffer.isBuffer(guide) ? guide : Buffer.from(guide), 'Como recolocar a Sofia OS no ar com este backup');
+    }
+    for (const old of files.filter(f => /^sofia-com-senha-/.test(f.name) && f.name !== name).slice(6)) await this.call('DELETE', DRIVE + '/files/' + old.id).catch(() => {});
+    return {name, bytes: bytes.length};
+  }
   async backupToDrive(force = false) {
     const l = this.link();
     if (!l?.refresh || !/drive\.file/.test(l.scopes || '') || !this.backups) return {skipped: true};
@@ -595,8 +673,11 @@ class GoogleService {
       for (const old of (list.files || []).slice(KEEP_BACKUPS)) await this.call('DELETE', DRIVE + '/files/' + old.id).catch(() => {});
       // No servidor ficam só os 3 mais novos: o Drive guarda o histórico.
       for (const b of this.backups.list().slice(3)) { try { fs.unlinkSync(path.join(this.backups.directory, b.name)); } catch { /* ignore */ } }
-      this.saveLink({...this.link(), drive: {last_backup: now(), last_error: '', count: Math.min(KEEP_BACKUPS, (list.files || []).length), bytes: bytes.length}});
-      return {ok: true, name: made.name, bytes: bytes.length};
+      // 0.3.201: tambem o backup COM SENHA, que abre sem este servidor (veja scripts/COMO-RESTAURAR.md)
+      let portable = {at: l.drive?.portable_at || '', error: ''};
+      try { const p = await this.uploadPortableBackup(); if (p) portable = {at: now(), error: ''}; } catch (e) { portable = {...portable, error: String(e.message).slice(0, 200)}; }
+      this.saveLink({...this.link(), drive: {last_backup: now(), last_error: '', count: Math.min(KEEP_BACKUPS, (list.files || []).length), bytes: bytes.length, portable_at: portable.at, portable_error: portable.error}});
+      return {ok: true, name: made.name, bytes: bytes.length, portable: !!portable.at && !portable.error};
     } catch (e) {
       const cur = this.link(); if (cur) this.saveLink({...cur, drive: {...(cur.drive || {}), last_error: String(e.message).slice(0, 200)}});
       throw e;

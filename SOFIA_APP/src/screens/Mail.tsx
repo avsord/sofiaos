@@ -109,10 +109,11 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
     setChecking(true); setInfo(rescanDays ? `Reavaliando os últimos ${rescanDays} dias…` : 'Verificando as contas…');
     try {
       const r = await api.mailCheck('', rescanDays);
-      const failed = r.errors.map(e => ((accounts || []).find(a => a.id === e.account)?.data?.address || 'Conta') + ': ' + e.error);
+      // 0.3.201: resposta "ja ha uma verificacao em andamento" vem sem a lista de erros
+      const failed = (r?.errors || []).map(e => ((accounts || []).find(a => a.id === e.account)?.data?.address || 'Conta') + ': ' + e.error);
       setInfo(r.skipped ? 'Uma verificação já está em andamento. Tente de novo em instantes.'
         : (failed.length && !r.scanned ? 'Falha de acesso — ' + failed.join(' · ')
-        : `Verificação concluída: ${r.scanned} e-mail(s) ${rescanDays ? 'reavaliados' : 'novos'} · ${r.hits} bateram com as regras${failed.length ? ' · Falha de acesso — ' + failed.join(' · ') : ''}.`));
+        : `Verificação concluída: ${r.scanned || 0} e-mail(s) ${rescanDays ? 'reavaliados' : 'novos'} · ${r.hits || 0} bateram com as regras${failed.length ? ' · Falha de acesso — ' + failed.join(' · ') : ''}.`));
       await load();
     }
     catch (e) { setInfo(errorText(e)); } finally { setChecking(false); }

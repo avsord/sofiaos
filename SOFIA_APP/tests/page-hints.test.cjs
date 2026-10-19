@@ -64,7 +64,7 @@ test('draggable rows retain static geometry while a separate ghost follows the f
  assert.ok(tree.includes('onResponderTerminationRequest={()=>!held.current}'));
  assert.ok(tree.includes('onResponderTerminate='));assert.ok(tree.includes('latest.current.onCancel()'));
  assert.ok(tree.includes('nodes.current.set(p.id,node)'));assert.ok(tree.includes('transform:pan.getTranslateTransform()'));
- assert.ok(tree.includes('if(cancelled)return;'));assert.ok(tree.includes('dropLineY(drop,rects.current)'));
+ assert.ok(tree.includes('if(cancelled){finish();return;}'),'cancelar ainda nao move nada');assert.ok(tree.includes('dropLineY(drop,rects.current)'));
 });
 
 test('body guide remains visible after the title is filled until the body itself has content',()=>{

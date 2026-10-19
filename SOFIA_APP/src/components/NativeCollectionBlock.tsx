@@ -32,6 +32,13 @@ function normalized(block:PageBlock):Data{
 function uniqueName(base:string,options:string[]){const clean=(base.trim()||'Nova coluna').slice(0,60);if(!options.includes(clean))return clean;let n=2;while(options.includes(clean+' '+n))n++;return clean+' '+n;}
 const alpha=(hex:string,a='22')=>hex.length===7?hex+a:hex;
 
+function BlockTitle({value,onCommit}:{value:string;onCommit:(v:string)=>void}){
+ const c=useTheme(),[text,setText]=useState(value),last=useRef(value);
+ if(value!==last.current){last.current=value;if(text!==value)setText(value);}
+ const done=()=>{const t=text.trim();if(t!==value.trim())onCommit(t||value);else if(!t)setText(value);};
+ return <TextInput accessibilityLabel="Título do bloco" value={text} onChangeText={setText} onEndEditing={done} onBlur={done} returnKeyType="done" blurOnSubmit placeholder="Sem título" placeholderTextColor={c.muted}
+  style={{fontSize:15,fontWeight:'700',color:c.text,marginBottom:7,paddingVertical:2}}/>;
+}
 export function NativeCollectionBlock({block,onChange,onDelete,onInteractionChange}:{onDelete?:()=>void;onInteractionChange?:(active:boolean)=>void;block:PageBlock;onChange:(data:Record<string,any>,group?:string)=>void}){
  const c=useTheme(),d=useMemo(()=>normalized(block),[block]),active=d.views.find(v=>v.id===d.active_view)||d.views[0];
  const [statusEdit,setStatusEdit]=useState<{propKey:string;value:string|null;title:string;color:string}|null>(null);
@@ -88,7 +95,8 @@ export function NativeCollectionBlock({block,onChange,onDelete,onInteractionChan
  };
  if(d.mode==='notebooks'||active?.type==='pages')return <NotebookBlock data={d} onChange={onChange} onDelete={onDelete}/>;
  return <View style={{marginVertical:5}}>
-  {d.show_title&&d.title?<Text style={{fontSize:15,fontWeight:'700',color:c.text,marginBottom:7}}>{d.title}</Text>:null}
+  {/* 0.3.201: o titulo do bloco que veio do template (Kanban, Formulario...) agora se edita com um toque */}
+  {d.show_title?<BlockTitle value={d.title||''} onCommit={(title:string)=>{const next=clone(d);next.title=title;commit(next,'collection-title:'+block.id);}}/>:null}
   <View style={{flexDirection:'row',alignItems:'center',gap:6,marginBottom:8}}>
    {d.views.map(v=><Pressable key={v.id} onPress={()=>{const next=clone(d);next.active_view=v.id;commit(next);}} style={{paddingVertical:6,paddingHorizontal:10,borderRadius:8,backgroundColor:v.id===active?.id?c.input:'transparent'}}><Text style={{fontSize:11,color:v.id===active?.id?c.text:c.muted}}>{v.type==='table'&&v.id==='links'&&v.label==='Coleção'?'Formulário':v.label}</Text></Pressable>)}
    <View style={{flex:1}}/>{onDelete?<IconButton name="trash" label="Excluir bloco" size={32} onPress={onDelete}/>:null}

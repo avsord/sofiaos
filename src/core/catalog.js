@@ -79,6 +79,19 @@ const CATALOG={
       "cancelled"
     ],
     "fields": [
+      {
+        "key": "alarm_mode",
+        "label": "Tipo de aviso",
+        "type": "select",
+        "options": ["none", "once", "ring"]
+      },
+      {
+        "key": "reminders_json",
+        "label": "Notificações (minutos antes)",
+        "type": "text",
+        "max": 400,
+        "developerOnly": true
+      },
       {"key": "calendar_all_day", "label": "Dia inteiro", "type": "checkbox"},
       {"key": "calendar_date_start", "label": "Dia inicial", "type": "date"},
       {"key": "calendar_date_end", "label": "Dia final (exclusivo)", "type": "date"},
@@ -145,6 +158,12 @@ const CATALOG={
       "archived"
     ],
     "fields": [
+      {
+        "key": "alarm_mode",
+        "label": "Tipo de aviso",
+        "type": "select",
+        "options": ["none", "once", "ring"]
+      },
       {
         "key": "remind_at",
         "label": "Quando lembrar",
@@ -894,6 +913,19 @@ const CATALOG={
     "group": "user",
     "states": ["active","archived"],
     "fields": [
+      {
+        "key": "sort_order",
+        "label": "Ordem na lista de páginas",
+        "type": "number",
+        "developerOnly": true
+      },
+      {
+        "key": "template_id",
+        "label": "Modelo de origem",
+        "type": "text",
+        "max": 80,
+        "developerOnly": true
+      },
       {"key":"icon","label":"Ícone / símbolo","type":"text"},
       {"key":"icon_mode","label":"Modo do ícone","type":"select","options":["default","emoji","icon","upload"]},
       {"key":"cover_type","label":"Tipo de capa","type":"select","options":["preset","attachment","color","gradient"]},

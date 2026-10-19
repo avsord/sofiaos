@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sofia OS",
     "slug": "sofia-app",
-    "version": "0.3.200",
+    "version": "0.3.201",
     "scheme": "sofiaapp",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.avsord.sofiaapp",
-      "versionCode": 205,
+      "versionCode": 206,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.RECORD_AUDIO",
@@ -54,7 +54,10 @@
         "expo-notifications",
         {
           "color": "#7258E8",
-          "defaultChannel": "sofia-agenda"
+          "defaultChannel": "sofia-agenda",
+          "sounds": [
+            "./assets/sounds/sofia_alarm.wav"
+          ]
         }
       ],
       "./plugins/with-sofia-alarms.cjs",

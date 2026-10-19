@@ -30,9 +30,9 @@ test('Pages + offers blank/template and renders collection blocks in the app',()
 
 test('stationary long press exposes a named delete action without reparenting',()=>{
  const tree=fs.readFileSync(path.join(__dirname,'../src/components/PageTreeList.tsx'),'utf8');
- assert.ok(tree.includes('if(!d.moved){setContext(d.page.id);return;}'));
+ assert.ok(tree.includes('if(!d.moved){finish();setContext(d.page.id);return;}'),'segurar parado ainda abre a acao de excluir');
  assert.ok(tree.includes('Excluir “{p.title}”'));assert.ok(tree.includes('onDelete(p)'));
- assert.ok(tree.includes('if(cancelled)return;'));
+ assert.ok(tree.includes('if(cancelled){finish();return;}'));
 });
 
 test('page editor has no hidden back swipe or costly previous-page backdrop',()=>{

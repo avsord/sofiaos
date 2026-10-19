@@ -102,6 +102,44 @@ test('lote grande não trava: o servidor continua respondendo durante a sincroni
  assert.ok(ticks>=3,'o event loop rodou outras tarefas no meio ('+ticks+')');
 });
 
+test('0.3.201: varios avisos (como no Google Agenda) vao e voltam do Google',async t=>{
+ const {svc,core,g}=await connected(t);const w=core.workspace;
+ w.save({kind:'commitment',title:'Reunião',area:'Pessoal',data:{start_at:'2026-11-05T13:00:00.000Z',end_at:'2026-11-05T14:00:00.000Z',calendar_provider:'google',remind_minutes:10,reminders_json:'[1440,10,120]'}});
+ await svc.sync();
+ const ev=g.events.primary.find(e=>e.summary==='Reunião');
+ assert.equal(ev.reminders.useDefault,false);assert.equal(ev.reminders.overrides.map(o=>o.minutes).join(','),'10,120,1440');
+ // do Google para a Sofia: os avisos do evento viram a lista
+ ev.reminders={useDefault:false,overrides:[{method:'popup',minutes:5},{method:'popup',minutes:2880},{method:'email',minutes:60}]};ev.updated=new Date(Date.now()+60000).toISOString();ev.etag='"novo"';
+ g.changes=g.changes||{};g.changes.primary=[...(g.changes.primary||[]),ev];
+ await svc.sync();
+ const back=w.list({kind:'commitment',limit:50}).find(e=>e.title==='Reunião');
+ assert.equal(back.data.reminders_json,'[5,2880]','so os avisos de notificacao (popup), em ordem');assert.equal(Number(back.data.remind_minutes),5);
+});
+
+test('0.3.201: agenda da Sofia espelhada no Google - compromisso novo ja sincroniza; tarefa programada vira evento e nao volta duplicada',async t=>{
+ const {svc,core,g,store}=await connected(t);const w=core.workspace;const st=store||core.store;
+ const c=w.save({kind:'commitment',title:'Barbeiro',area:'Pessoal',data:{start_at:'2026-11-06T13:00:00.000Z',end_at:'2026-11-06T14:00:00.000Z'}});
+ assert.equal(c.data.calendar_provider,'google','sem escolher, vai para o Google');
+ const loc=w.save({kind:'commitment',title:'Só aqui',area:'Pessoal',data:{start_at:'2026-11-06T15:00:00.000Z',calendar_provider:'local'}});assert.equal(loc.data.calendar_provider,'local','quem escolhe local fica local');
+ const task=st.saveTask({title:'Tomar duda',area:'Pessoal',state:'todo',due_at:'2026-11-07T12:00:00.000Z',notifications:['10','1440']}).item||st.tasks().find(x=>x.title==='Tomar duda');
+ await svc.sync();
+ assert.ok(g.events.primary.some(e=>e.summary==='Barbeiro'));assert.ok(!g.events.primary.some(e=>e.summary==='Só aqui'));
+ const ev=g.events.primary.find(e=>e.summary==='Tomar duda');assert.ok(ev,'tarefa virou evento');
+ assert.equal(ev.extendedProperties.private.sofia_task,task.id);assert.equal(ev.reminders.overrides.map(o=>o.minutes).join(','),'10,1440');
+ const sent=g.events.primary.length;await svc.sync();assert.equal(g.events.primary.length,sent,'nao repete');
+ assert.ok(!w.list({kind:'commitment',limit:100}).some(e=>e.title==='Tomar duda'),'o evento da tarefa nao volta como compromisso');
+ // editar no app (sem mandar os campos do Google) mantem a ligacao: atualiza o mesmo evento
+ const cur=st.tasks().find(x=>x.id===task.id);st.saveTask({title:'Tomar duda e água',area:'Pessoal',state:'todo',due_at:'2026-11-08T12:00:00.000Z',revision:cur.revision},task.id);
+ await svc.sync();assert.equal(g.events.primary.filter(e=>/Tomar duda/.test(e.summary)).length,1,'mesmo evento');assert.ok(g.events.primary.some(e=>e.summary==='Tomar duda e água'));
+ // concluida sai do Google
+ const c2=st.tasks().find(x=>x.id===task.id);st.saveTask({title:c2.title,area:'Pessoal',state:'done',due_at:c2.due_at,revision:c2.revision},task.id);
+ await svc.sync();assert.ok(!g.events.primary.some(e=>/Tomar duda/.test(e.summary)),'concluida: saiu do Google');
+ // apagada tambem sai
+ const t2=st.saveTask({title:'Ligar pro banco',area:'Pessoal',state:'todo',due_at:'2026-11-09T12:00:00.000Z'}).item||st.tasks().find(x=>x.title==='Ligar pro banco');
+ await svc.sync();assert.ok(g.events.primary.some(e=>e.summary==='Ligar pro banco'));
+ st.deleteTask(t2.id);await svc.sync();assert.ok(!g.events.primary.some(e=>e.summary==='Ligar pro banco'),'apagada: saiu do Google');
+});
+
 test('Sofia → Google: novo, editado e apagado; conflito não sobrescreve nada',async t=>{
  const {svc,core,g}=await connected(t);const w=core.workspace;
  const novo=w.save({kind:'commitment',title:'Dentista',area:'Pessoal',data:{start_at:'2026-10-30T13:00:00.000Z',end_at:'2026-10-30T14:00:00.000Z',calendar_provider:'google',remind_minutes:30}});
@@ -121,6 +159,24 @@ test('Sofia → Google: novo, editado e apagado; conflito não sobrescreve nada'
  assert.ok(local);
 });
 
+test('0.3.201: backup com senha (abre sem o servidor) vai para Sofia OS/Backup com senha, com o guia de restauracao',async t=>{
+ const {openBackup}=require('../src/services/backup');
+ const old=process.env.SOFIA_BACKUP_PASSPHRASE;process.env.SOFIA_BACKUP_PASSPHRASE='senha-de-teste-123';t.after(()=>{if(old===undefined)delete process.env.SOFIA_BACKUP_PASSPHRASE;else process.env.SOFIA_BACKUP_PASSPHRASE=old;});
+ const {svc,g,core}=await connected(t);core.workspace.save({kind:'user_page',title:'Página que precisa voltar',area:'Pessoal',data:{blocks_json:'[]'}});
+ const r=await svc.backupToDrive(true);assert.equal(r.ok,true);assert.equal(r.portable,true);
+ const dir=await svc.folderId('Backup com senha');const inDir=g.driveFiles.filter(f=>!f.folder&&(f.parents||[]).includes(dir));
+ const bk=inDir.find(f=>/^sofia-com-senha-\d{4}-\d{2}-\d{2}\.sofia-backup$/.test(f.name));assert.ok(bk,'backup do dia');assert.ok(inDir.some(f=>f.name==='COMO-RESTAURAR.md'),'guia junto');
+ const up=g.uploads.find(u=>/sofia-com-senha-/.test(u.text||''));assert.ok(up);
+ const st=(await svc.status()).drive.portable;assert.equal(st.configured,true);assert.ok(st.at);assert.equal(st.error,'');
+ // sem a senha certa nao abre; com ela, abre e tem a pagina
+ const raw=Buffer.from(bk.bytes||[]);
+ if(raw.length){assert.throws(()=>openBackup(raw,{passphrase:'errada-errada-12'}));const snap=openBackup(raw,{passphrase:'senha-de-teste-123'});assert.ok(JSON.stringify(snap).includes('Página que precisa voltar'));}
+});
+test('0.3.201: sem a senha configurada (ou curta demais), o backup normal segue e o com senha nao e feito',async t=>{
+ const old=process.env.SOFIA_BACKUP_PASSPHRASE;process.env.SOFIA_BACKUP_PASSPHRASE='curta';t.after(()=>{if(old===undefined)delete process.env.SOFIA_BACKUP_PASSPHRASE;else process.env.SOFIA_BACKUP_PASSPHRASE=old;});
+ const {svc}=await connected(t);const r=await svc.backupToDrive(true);assert.equal(r.ok,true);assert.equal(r.portable,false);
+ assert.equal((await svc.status()).drive.portable.configured,false);
+});
 test('Drive: backup criptografado na pasta Sofia OS/Backups, guarda 14 e limpa o servidor',async t=>{
  const {svc,g,backups}=await connected(t);
  const dir=await svc.folderId('Backups'); // garante a pasta antes de semear "backups antigos" dentro dela
@@ -155,9 +211,9 @@ test('conexão pelo app: a janela do Google volta sozinha para o app (sofiaapp:/
 test('ao conectar, a Sofia cria a casa dela no Drive (Sofia OS/Backups, Anexos, Áudios, Páginas) sem repetir',async t=>{
  const {svc,g}=await connected(t);await new Promise(r=>setTimeout(r,80));
  const folders=g.driveFiles.filter(f=>f.folder).map(f=>f.name).sort();
- assert.deepEqual(folders,['Anexos','Backups','Comprovantes','Páginas','Sofia OS','Áudios']);
- await svc.ensureFolders();assert.equal(g.driveFiles.filter(f=>f.folder).length,6,'não cria pasta repetida (0.3.199: + Comprovantes)');
- const st=await svc.status();assert.deepEqual(st.drive.folders.sort(),['Anexos','Backups','Comprovantes','Páginas','root','Áudios']);
+ assert.deepEqual(folders,['Anexos','Backup com senha','Backups','Comprovantes','Páginas','Sofia OS','Áudios']);
+ await svc.ensureFolders();assert.equal(g.driveFiles.filter(f=>f.folder).length,7,'não cria pasta repetida (0.3.199: + Comprovantes; 0.3.201: + Backup com senha)');
+ const st=await svc.status();assert.deepEqual(st.drive.folders.sort(),['Anexos','Backup com senha','Backups','Comprovantes','Páginas','root','Áudios']);
 });
 test('anexos vão para Sofia OS/Anexos: aqui fica só a referência, a leitura busca no Drive (com cache) e apagar o registro apaga lá',async t=>{
  const {svc,core,g}=await connected(t);const w=core.workspace;await new Promise(r=>setTimeout(r,80));
@@ -299,7 +355,7 @@ test('pastas que rodam ao mesmo tempo (envio, anexos, voz, páginas) não criam 
  const {svc,g}=await connected(t);
  await Promise.all([svc.ensureFolders(),svc.ensureFolders(),svc.ensureFolders()]);
  assert.equal(g.driveFiles.filter(f=>f.folder&&f.name==='Sofia OS').length,1);
- assert.equal(g.driveFiles.filter(f=>f.folder).length,6,'raiz + Backups + Anexos + Áudios + Páginas + Comprovantes, uma vez cada');
+ assert.equal(g.driveFiles.filter(f=>f.folder).length,7,'raiz + Backups + Anexos + Áudios + Páginas + Comprovantes + Backup com senha, uma vez cada');
 });
 test('bagunça já feita (4 pastas "Sofia OS" de antes desta correção) se desfaz sozinha: fica uma, o conteúdo das outras é preservado',async t=>{
  const {svc,core,g}=await connected(t);const w=core.workspace;
