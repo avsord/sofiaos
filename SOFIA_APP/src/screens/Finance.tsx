@@ -26,7 +26,7 @@ import {
   trend, balanceSeries, upcoming, manualDues, transactionsForAccount, goalProgress, parseMoney, formatMoneyInput, finishMoneyInput, addDays,
   dayIn, daysIn} from '../lib/finance';
 import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove} from '../lib/finance';
-import {sinceReportStart, cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, monthDues, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove} from '../lib/finance';
+import {sinceReportStart, cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, monthDues, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove, effectiveCycleDay, periodBudget, salaryForecast} from '../lib/finance';
 import {syncFinanceDueNotifications} from '../lib/finance-notifications';
 import {appAlert} from '../lib/app-alert';
 import {useFormDraft} from '../lib/form-draft';
@@ -262,11 +262,13 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
 // ============================ PRIMEIRO USO ============================
 /** 0.3.161: passo a passo da primeira configuracao. Tudo opcional menos a conta; "Pular" em
  * qualquer passo vai direto para o app. Reaberto depois em Contas e cartoes, ja preenchido. */
-function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi; onDone: () => Promise<void>; existing?: {account: Account | null; reserve: Goal | null; fixed?: Tx[]} | null; onClose?: () => void; onFinished?: () => void}) {
+function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi; onDone: () => Promise<void>; existing?: {account: Account | null; reserve: Goal | null; fixed?: Tx[]; salary?: Tx | null} | null; onClose?: () => void; onFinished?: () => void}) {
   const c = useTheme(), acc = existing?.account || null, reserve = existing?.reserve || null;
   const [step, setStep] = useState(0), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [name, setName] = useState(acc?.name || 'Conta principal'), [balance, setBalance] = useState(acc ? finishMoneyInput(String(acc.initial).replace('.', ',')) : '');
   const [cycleDay, setCycleDay] = useState(acc?.cycleDay ? String(acc.cycleDay) : '');
+  const salaryTx = existing?.salary || null;
+  const [salary, setSalary] = useState(salaryTx ? finishMoneyInput(String(salaryTx.amount).replace('.', ',')) : '');
   // 0.3.171: ao refazer, as contas fixas que ja existem entram na lista; nada e alterado ate confirmar no fim.
   type WizardBill = {id?: string; title: string; amount: string; day: string; parcels: string; at: string};
   const [bills, setBills] = useState<WizardBill[]>(() => (existing?.fixed || []).filter(t => t.entity).map(t => ({id: t.entity!.id, title: t.desc, amount: finishMoneyInput(String(t.amount).replace('.', ',')),
@@ -279,7 +281,7 @@ function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi
   const [goalValue, setGoalValue] = useState(reserve?.target ? finishMoneyInput(String(reserve.target).replace('.', ',')) : '');
   const [goalMonth, setGoalMonth] = useState(String(reserve?.entity?.data?.deadline || '').slice(0, 10));
   // 0.3.168: a configuracao tambem sobrevive a sair do app no meio do preenchimento.
-  const wizardForm = {step: String(step), name, balance, cycleDay, bills: JSON.stringify(bills), saved, plan, planDay, goalValue, goalMonth,
+  const wizardForm = {step: String(step), name, balance, cycleDay, salary, bills: JSON.stringify(bills), saved, plan, planDay, goalValue, goalMonth,
     billTitle, billAmount, billDay, billParcels, billAt};
   const {draft: wizardDraft, ready: wizardReady, clear: clearWizardDraft} = useFormDraft('financas:setup:' + (acc?.id || 'novo'), wizardForm);
   const wizardRestored = useRef(false);
@@ -290,6 +292,7 @@ function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi
     if (d.name !== undefined) setName(d.name);
     if (d.balance !== undefined) setBalance(d.balance);
     if (d.cycleDay !== undefined) setCycleDay(d.cycleDay);
+    if (d.salary !== undefined) setSalary(d.salary);
     if (d.saved !== undefined) setSaved(d.saved);
     if (d.plan !== undefined) setPlan(d.plan);
     if (d.planDay !== undefined) setPlanDay(d.planDay);
@@ -319,6 +322,18 @@ function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi
       const initialTouched = !acc || money0(balance) !== acc.initial;
       const account = await saveEntity(api, 'fin_account', name.trim() || 'Conta principal',
         {account_type: acc?.type || 'corrente', initial_balance: String(initialTouched ? money0(balance) : acc!.initial), color: acc?.color || FIN_COLORS[0], include_total: true, cycle_day: Math.min(31, Math.max(0, Number(cycleDay) || 0))}, acc?.entity);
+      // 0.3.196: salario fixo do mes (valor cheio), a receber todo mes no dia informado
+      if (money0(salary) > 0) {
+        const today = todayISO(), payDay = Math.min(31, Math.max(1, Number(cycleDay) || Number(salaryTx?.date.slice(8, 10)) || 5));
+        const thisMonth = monthOf(today), first = dayIn(thisMonth, Math.min(payDay, daysIn(thisMonth))) >= today ? thisMonth : addMonths(thisMonth, 1);
+        if (salaryTx?.entity) {
+          const base = String(salaryTx.entity.data?.date || salaryTx.date).slice(0, 7);
+          await api.saveEntity({...salaryTx.entity, data: {...salaryTx.entity.data, amount: money0(salary), date: dayIn(base, Math.min(payDay, daysIn(base)))}});
+        } else {
+          await api.saveEntity({kind: 'fin_tx', title: 'Salário', content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [],
+            data: {kind: 'income', amount: money0(salary), date: dayIn(first, Math.min(payDay, daysIn(first))), account_id: account.id, paid: false, category: 'Salário', recurrence: 'monthly', import_id: 'sofia-pendencia:' + Date.now() + ':salario', remind_days: 0}});
+        }
+      }
       const kept = new Set(bills.map(b => b.id).filter(Boolean));
       const jobs: Promise<unknown>[] = [];
       for (const old of existing?.fixed || []) if (old.entity && !kept.has(old.entity.id)) jobs.push(api.saveEntity({...old.entity, state: 'archived'}));
@@ -359,8 +374,11 @@ function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi
       <Field label="Saldo inicial da conta (R$)" value={balance} onChange={setBalance} placeholder="0,00" numeric />
       <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>É o que está no banco agora, antes de qualquer lançamento na Sofia. Ele entra no Saldo. Em branco ou 0, a conta começa zerada.</Text>
     </>},
-    {title: 'Quando você recebe', hint: 'O dia do mês em que entra seu dinheiro. O Saldo passa a contar de um recebimento ao outro. Em branco, conta pelo mês do calendário.', body:
-      <Field label="Dia em que você recebe" value={cycleDay} onChange={setCycleDay} placeholder="Ex.: 25" numeric />},
+    {title: 'Quando e quanto você recebe', hint: 'O dia em que entra seu dinheiro e o valor do mês. A previsão e o controle de gastos contam de um recebimento ao outro.', body: <>
+      <Field label="Dia em que você recebe" value={cycleDay} onChange={setCycleDay} placeholder="Ex.: 25" numeric />
+      <Field label="Quanto você recebe por mês (R$)" value={salary} onChange={setSalary} placeholder="0,00" numeric />
+      <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Recebe em duas vezes ou tem vale? Some tudo e coloque o valor cheio do mês: no fim dá no mesmo e a conta fica simples. Um freela ou um valor a mais você lança quando entrar, e ele soma na previsão.</Text>
+    </>},
     {title: 'Contas fixas', hint: 'Aluguel, academia, imposto, assinaturas. Elas se repetem todo mês e a Sofia avisa no vencimento.', body: <>
       {bills.map((b, i) => <Pressable key={i} accessibilityRole="button" accessibilityLabel={'Editar ' + b.title}
         onPress={() => { setBillEditing(i); setBillTitle(b.title); setBillAmount(b.amount); setBillDay(b.day); setBillParcels(b.parcels); setBillAt(b.at); }}
@@ -401,7 +419,7 @@ function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi
     </>},
     {title: 'Tudo pronto', hint: 'Você pode mudar qualquer coisa depois.', body: <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 8}}>
       <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Conta</Text><Text style={{color: c.text, fontWeight: '700'}}>{name || 'Conta principal'} · {money(money0(balance))}</Text></View>
-      {cycleDay ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Ciclo</Text><Text style={{color: c.text, fontWeight: '700'}}>todo dia {cycleDay}</Text></View> : null}
+      {cycleDay ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Recebe</Text><Text style={{color: c.text, fontWeight: '700'}}>{money0(salary) > 0 ? money(money0(salary)) + ' · ' : ''}todo dia {cycleDay}</Text></View> : null}
       {bills.length ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Contas fixas</Text><Text style={{color: c.text, fontWeight: '700'}}>{bills.length} · {money(fixedTotal)}</Text></View> : null}
       {money0(saved) > 0 ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Guardado</Text><Text style={{color: c.text, fontWeight: '700'}}>{money(money0(saved))}</Text></View> : null}
       {money0(plan) > 0 ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Aporte</Text><Text style={{color: c.text, fontWeight: '700'}}>{money(money0(plan))} por mês</Text></View> : null}
@@ -851,9 +869,13 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
   const badge = split ? reserveBadge(split, today, money) : '';
   const outlook = useMemo(() => reserve && split ? reserveOutlook(reserve, split.saved, split.planned, today) : null, [reserve, split, today]);
   // 0.3.161: ciclo do dinheiro (comeca no dia em que a pessoa recebe) e a folga dele
-  const cycleDay = d.accounts.find(a => a.id === accountId)?.cycleDay || 0;
-  const room = useMemo(() => cycleRoom(d.txs, accountId, cycleRange(cycleDay, today), split?.planned || 0,
-    d.accounts.filter(a => (!accountId || a.id === accountId) && a.include).reduce((s, a) => s + a.initial, 0)), [d, accountId, cycleDay, today, split?.planned]);
+  // 0.3.195: cada pessoa no seu ciclo (dia informado na conta ou, se nao houver, o dia do salario fixo)
+  const cycleDay = useMemo(() => effectiveCycleDay(d.accounts, d.txs, accountId), [d, accountId]);
+  const plan = split?.planned || 0;
+  const cycleNow = useMemo(() => periodBudget(d.txs, d.cards, cycleRange(cycleDay, today), accountId, plan, today), [d, accountId, cycleDay, today, plan]);
+  const forecastP = useMemo(() => salaryForecast(d.txs, d.cards, cycleDay, plan, accountId, today), [d, accountId, cycleDay, today, plan]);
+  const [forecastOpen, setForecastOpen] = useState(false);
+  const periodLabel = (b: {start: string; end: string}) => b.start.slice(8, 10) + '/' + b.start.slice(5, 7) + ' a ' + b.end.slice(8, 10) + '/' + b.end.slice(5, 7);
   const net = split ? split.net : 0, total = Math.round((accountsTotal - net) * 100) / 100, forecast = Math.round((accountsForecast - net) * 100) / 100;
   const [reserveMenu, setReserveMenu] = useState(false), [breakdown, setBreakdown] = useState<'saldo' | 'income' | 'expense' | null>(null);
   const lastAporteKey = useRef(aporteKey);
@@ -863,6 +885,25 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
   return (
     <>
       {breakdown ? <MonthBreakdown kind={breakdown} d={d} month={month} show={show} net={net} api={api} accountId={accountId} reload={reload} onTx={(t: Tx) => { setBreakdown(null); afterSheet(() => onTx(t)); }} onClose={() => setBreakdown(null)} /> : null}
+      {forecastOpen ? <Sheet visible onClose={() => setForecastOpen(false)} label="Fechar previsão">
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 12, paddingBottom: 18}}>
+          <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Previsão de {periodLabel(forecastP)}</Text>
+          <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>{cycleDay ? 'O dinheiro do salário do dia ' + cycleDay + ' precisa durar até o próximo. ' : 'Sem dia de recebimento definido, a previsão usa o mês do calendário. '}Entra o que está previsto receber; saem as contas que já têm destino no período.</Text>
+          <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 6}}>
+            {([['Entra (salário e outras receitas)', forecastP.income, GOOD, '+'], ['Contas fixas', forecastP.fixed, BAD, '−'], ['Contas avulsas', forecastP.single, BAD, '−'], ['Fatura do cartão', forecastP.card, BAD, '−'], ['Aporte', forecastP.aporte, GUARD, '−']] as const)
+              .filter(([, v], i) => i === 0 || v > 0).map(([label, v, color, sign]) => <View key={label} style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+                <Text style={{color: c.muted, fontSize: 13}}>{sign} {label}</Text><Text style={{color, fontWeight: '700'}}>{show(v)}</Text></View>)}
+            <View style={{height: 1, backgroundColor: c.line, marginVertical: 4}} />
+            <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '800'}}>= Para usar no período</Text><Text style={{color: forecastP.available < 0 ? BAD : c.text, fontWeight: '800'}}>{show(forecastP.available)}</Text></View>
+            {!forecastP.upcoming ? <>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 13}}>− Já gastou (fora das contas previstas)</Text><Text style={{color: BAD, fontWeight: '700'}}>{show(forecastP.spent)}</Text></View>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '800'}}>= Ainda resta</Text><Text style={{color: forecastP.left < 0 ? BAD : c.text, fontWeight: '800'}}>{show(forecastP.left)}</Text></View>
+            </> : null}
+          </View>
+          {forecastP.income <= 0 ? <Text style={{color: WARN, fontSize: 12, lineHeight: 18}}>Não há receita prevista nesse período. Cadastre o salário em Pendentes como “A receber”, todo mês, no dia em que você recebe.</Text>
+            : forecastP.available < 0 ? <Text style={{color: BAD, fontSize: 12, lineHeight: 18}}>As saídas previstas passam {show(-forecastP.available)} do que entra nesse período.</Text> : null}
+        </ScrollView>
+      </Sheet> : null}
       {reserveHistoryOpen && reserve ? <ReserveHistorySheet api={api} reserve={reserve} moves={d.moves || []} show={show} reload={reload} onClose={() => setReserveHistoryOpen(false)} /> : null}
       {reserveSheet ? <ReserveSheet accountId={accountId} api={api} kind={reserveSheet} reserve={reserve} split={split} onClose={() => setReserveSheet(null)} onDone={async () => { setReserveSheet(null); await reload(); }} /> : null}
       {/* 0.3.153: cartao verde inteiro ATRAS do roxo (empilhados); o roxo cobre tudo menos a faixa de cima */}
@@ -881,7 +922,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
           <Pressable accessibilityLabel={hide ? 'Mostrar valores' : 'Esconder valores'} onPress={() => setHide(h => !h)}><Icon name="eye" size={18} color={c.onAccent + 'cc'} /></Pressable>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="Ver como o saldo é calculado" onPress={() => setBreakdown('saldo')}><Text style={{color: c.onAccent, fontSize: 32, fontWeight: '800'}}>{show(total)}</Text></Pressable>
-        <Text style={{color: c.onAccent + 'cc', fontSize: 12}}>Previsto no fim de {monthLabel(month).split(' ')[0].toLowerCase()}: <Text style={{color: c.onAccent, fontWeight: '700'}}>{show(forecast)}</Text></Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Ver a previsão" onPress={() => setForecastOpen(true)}><Text style={{color: c.onAccent + 'cc', fontSize: 12}}>{forecastP.upcoming ? 'Previsto de ' + periodLabel(forecastP) : 'Previsto até ' + forecastP.end.slice(8, 10) + '/' + forecastP.end.slice(5, 7)}: <Text style={{color: c.onAccent, fontWeight: '700'}}>{show(forecastP.upcoming ? forecastP.available : forecastP.left)}</Text> ›</Text></Pressable>
         <View style={{flexDirection: 'row', gap: 12}}>
           <Pressable accessibilityRole="button" accessibilityLabel="Ver receitas do mês" onPress={() => setBreakdown('income')} style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 16, padding: 12, gap: 2}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↑ Receitas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.income)}</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Ver despesas do mês" onPress={() => setBreakdown('expense')} style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 16, padding: 12, gap: 2}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↓ Despesas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.expense)}</Text></Pressable>
@@ -945,23 +986,26 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
       </Pressable> : null}
 
       {/* 0.3.161: quanto ainda da para gastar neste ciclo, depois das contas fixas e do aporte */}
-      {room && room.ceiling > 0 ? <Pressable accessibilityRole="button" accessibilityLabel="Ver contas fixas" onPress={() => onTab('bills')}
-        style={{backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 10, borderWidth: 1, borderColor: room.over > 0 ? BAD : c.line}}>
+      {(() => { const b = cycleNow, pct = b.available > 0 ? Math.max(0, Math.min(1, b.left / b.available)) : 0, over = b.left < 0;
+        return <Pressable accessibilityRole="button" accessibilityLabel="Ver contas fixas" onPress={() => onTab('bills')}
+        style={{backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 10, borderWidth: 1, borderColor: over ? BAD : c.line}}>
         <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8}}>
-          <Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 15}}>Saldo do ciclo</Text>
-          <Text style={{color: c.muted, fontSize: 11}}>{room.label}</Text>
+          <Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 15}}>Controle de gastos</Text>
+          <Text style={{color: c.muted, fontSize: 11}}>{periodLabel(b)}</Text>
         </View>
-        <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 6}}>
-          <Text style={{color: room.over > 0 ? BAD : c.text, fontWeight: '800', fontSize: 26}}>{room.over > 0 ? '−' + show(room.over) : show(room.left)}</Text>
-          <Text style={{color: c.muted, fontSize: 12}}>{room.over > 0 ? 'além do que havia' : 'de ' + show(room.ceiling)}</Text>
-          <View style={{flex: 1}} />
-          <Text style={{color: room.over > 0 ? BAD : room.pct <= 0.25 ? WARN : GOOD, fontWeight: '700', fontSize: 13}}>{Math.round(room.pct * 100)}%</Text>
-        </View>
-        <View style={{height: 10, borderRadius: 5, backgroundColor: c.line, overflow: 'hidden'}}>
-          <View style={{width: `${Math.round((room.over > 0 ? 1 : room.pct) * 100)}%` as `${number}%`, height: 10, borderRadius: 5, backgroundColor: room.over > 0 ? BAD : room.pct <= 0.25 ? WARN : GOOD}} />
-        </View>
-        <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Depois das contas fixas ({show(room.fixed)}){room.plan > 0 ? ' e do aporte (' + show(room.plan) + ')' : ''}. Já gastou {show(room.spent)} neste ciclo.</Text>
-      </Pressable> : null}
+        {b.income > 0 ? <>
+          <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 6}}>
+            <Text style={{color: over ? BAD : c.text, fontWeight: '800', fontSize: 26}}>{over ? '−' + show(-b.left) : show(b.left)}</Text>
+            <Text style={{color: c.muted, fontSize: 12}}>{over ? 'além do que havia' : 'de ' + show(Math.max(0, b.available))}</Text>
+            <View style={{flex: 1}} />
+            <Text style={{color: over ? BAD : pct <= 0.25 ? WARN : GOOD, fontWeight: '700', fontSize: 13}}>{Math.round(pct * 100)}%</Text>
+          </View>
+          <View style={{height: 10, borderRadius: 5, backgroundColor: c.line, overflow: 'hidden'}}>
+            <View style={{width: `${Math.round((over ? 1 : pct) * 100)}%` as `${number}%`, height: 10, borderRadius: 5, backgroundColor: over ? BAD : pct <= 0.25 ? WARN : GOOD}} />
+          </View>
+          <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Já gastou {show(b.spent)} desde o dia {b.start.slice(8, 10)}, fora das contas e do aporte. Cada gasto lançado diminui o que resta.</Text>
+        </> : <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Para acompanhar seus gastos, informe quanto e quando você recebe (engrenagem → Refazer a configuração) ou cadastre o salário em Pendentes como “A receber”, todo mês.</Text>}
+      </Pressable>; })()}
 
       {/* 0.3.152: vencimentos proximos viram uma linha so (o detalhe fica em Pendentes); cartoes ficam na aba Cartoes */}
       {dues.length ? <Pressable accessibilityRole="button" accessibilityLabel="Ver pendentes" onPress={() => onTab('bills')}
@@ -1639,7 +1683,8 @@ function ManageSheet({api, d, onClose, reload, onFinished}: {api: SofiaApi; d: D
         <View style={{paddingTop: 40, paddingBottom: 8, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: c.line}}>
           <IconButton name="back" label="Voltar" onPress={onClose} /><Text style={{flex: 1, fontSize: 17, fontWeight: '700', color: c.text}}>Contas e cartões</Text>
         </View>
-        {setup ? <Onboarding api={api} onDone={reload} onClose={() => setSetup(false)} onFinished={() => { setSetup(false); onFinished ? onFinished() : onClose(); }} existing={{account: d.accounts.find(a => !a.archived) || null, reserve: reserveOf(d.goals), fixed: d.txs.filter(t => t.manualDue && t.recurrence === 'monthly' && !t.virtual && t.kind === 'expense' && t.entity?.state !== 'archived')}} /> :
+        {setup ? <Onboarding api={api} onDone={reload} onClose={() => setSetup(false)} onFinished={() => { setSetup(false); onFinished ? onFinished() : onClose(); }} existing={{account: d.accounts.find(a => !a.archived) || null, reserve: reserveOf(d.goals), fixed: d.txs.filter(t => t.manualDue && t.recurrence === 'monthly' && !t.virtual && t.kind === 'expense' && t.entity?.state !== 'archived'),
+            salary: d.txs.filter(t => !t.virtual && t.kind === 'income' && t.recurrence === 'monthly' && !t.seriesId && t.entity?.state !== 'archived').sort((a, b) => b.amount - a.amount)[0] || null}} /> :
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 18, gap: 14}}>
           <Pressable accessibilityRole="button" onPress={() => setRecover(true)} style={{backgroundColor: c.surface, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: c.line, flexDirection: 'row', alignItems: 'center', gap: 10}}>
             <View style={{flex: 1, gap: 2}}>

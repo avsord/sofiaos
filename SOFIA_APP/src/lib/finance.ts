@@ -550,3 +550,44 @@ export function sinceReportStart(accounts: Account[], txs: Tx[]): Tx[] {
   const start = new Map(accounts.map(a => [a.id, a.reportStart]));
   return txs.filter(t => { const s = start.get(t.accountId) || ''; return !s || t.date >= s; });
 }
+
+// ---------- 0.3.195: periodo do salario (ex.: 25/10 a 24/11) ----------
+export type PeriodBudget = {start: string; end: string; income: number; fixed: number; single: number; card: number; aporte: number; available: number; spent: number; left: number};
+/** Orcamento de um periodo: o que entra - contas fixas - avulsas - fatura do cartao que vence nele - aporte.
+ * "spent" sao os gastos do dia a dia ja lancados (fora das contas previstas); "left" e o que ainda resta. */
+export function periodBudget(txs: Tx[], cards: Card[], range: {start: string; end: string}, accountId: string, plan: number, today = todayISO()): PeriodBudget {
+  const months: string[] = [];
+  for (let m = monthOf(range.start); m <= monthOf(range.end); m = addMonths(m, 1)) months.push(m);
+  const seen = new Set<string>();
+  const list = [...txs, ...months.flatMap(m => expandRecurring(txs, m))]
+    .filter(t => t.date >= range.start && t.date <= range.end && (!accountId || t.accountId === accountId) && !t.cardId)
+    .filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; });
+  const sum = (f: (t: Tx) => boolean) => round2(list.filter(f).reduce((s, t) => s + t.amount, 0));
+  const recurring = (t: Tx) => t.recurrence === 'monthly' || !!t.seriesId;
+  const income = sum(t => t.kind === 'income');
+  const fixed = sum(t => t.kind === 'expense' && recurring(t));
+  const single = sum(t => t.kind === 'expense' && !!t.manualDue && !recurring(t));
+  const spent = sum(t => t.kind === 'expense' && t.paid && !t.manualDue && !recurring(t));
+  let card = 0;
+  for (const c of cards) if (!accountId || !c.accountId || c.accountId === accountId) for (const i of cardInvoices(c, txs, today)) if (i.due >= range.start && i.due <= range.end) card += Math.max(0, i.total);
+  card = round2(card);
+  const aporte = round2(Math.max(0, plan)), available = round2(income - fixed - single - card - aporte);
+  return {start: range.start, end: range.end, income, fixed, single, card, aporte, available, spent, left: round2(available - spent)};
+}
+/** Previsao do salario: na ultima semana antes do proximo salario, o periodo que vai comecar; nos outros dias,
+ * o periodo em andamento. Sem dia de recebimento, usa o mes do calendario. */
+export function salaryForecast(txs: Tx[], cards: Card[], cycleDay: number, plan: number, accountId = '', today = todayISO()): PeriodBudget & {upcoming: boolean} {
+  const current = cycleRange(cycleDay, today), nextStart = addDays(current.end, 1);
+  const upcoming = Math.round((Date.parse(nextStart + 'T12:00:00Z') - Date.parse(today + 'T12:00:00Z')) / 86400000) <= 7;
+  return {...periodBudget(txs, cards, upcoming ? cycleRange(cycleDay, nextStart) : current, accountId, plan, today), upcoming};
+}
+
+/** 0.3.195: dia do ciclo de cada pessoa. Usa o dia informado na conta; se nao houver, o dia da receita fixa
+ * principal (o maior "a receber todo mes", ex.: salario do dia 5); se nao houver nenhuma, 0 = mes do calendario. */
+export function effectiveCycleDay(accounts: Account[], txs: Tx[], accountId = ''): number {
+  const acc = accountId ? accounts.find(a => a.id === accountId) : accounts.find(a => a.include && !a.archived && a.cycleDay);
+  if (acc?.cycleDay) return acc.cycleDay;
+  const salary = txs.filter(t => !t.virtual && t.kind === 'income' && t.recurrence === 'monthly' && !t.seriesId && (!accountId || t.accountId === accountId))
+    .sort((a, b) => b.amount - a.amount)[0];
+  return salary ? Number(salary.date.slice(8, 10)) || 0 : 0;
+}

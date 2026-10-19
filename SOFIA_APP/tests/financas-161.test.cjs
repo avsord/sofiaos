@@ -40,11 +40,11 @@ test('meta: projecao no ritmo atual e quanto por mes fecharia no prazo',()=>{
 });
 test('telas: cartao Saldo, secao de contas fixas, meta e passo a passo com 7 etapas',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('>Saldo</Text>')&&s.includes('cycleRoom(d.txs, accountId, cycleRange(cycleDay, today)'),'cartao do ciclo');
+  assert.ok(s.includes('>Controle de gastos</Text>')&&s.includes('periodBudget(d.txs, d.cards, cycleRange(cycleDay, today), accountId, plan, today)'),'cartao do ciclo');
   assert.ok(s.includes('além do que havia'),'mostra o estouro');
   assert.ok(s.includes('<Title text="Contas fixas" />')&&s.includes('Total do mês'));
   assert.ok(s.includes('Meta: {show(outlook.target)}')&&s.includes('Para fechar no prazo:'));
-  assert.ok(s.includes("{title: 'Quando você recebe'")&&s.includes("{title: 'Tudo pronto'"));
+  assert.ok(s.includes("{title: 'Quando e quanto você recebe'")&&s.includes("{title: 'Tudo pronto'"));
   assert.ok(s.includes('Passo {step + 1} de {steps.length}')&&s.includes('Pular o resto'));
   assert.ok(s.includes('Refazer a configuração'),'reabre ja preenchido em Contas e cartoes');
   assert.ok(s.includes('Dia em que você recebe (opcional)'),'campo no cadastro da conta');
@@ -158,7 +158,7 @@ test('0.3.182: Saldo, detalhes do saldo, listas de receitas e despesas, cartao n
   assert.ok(s.includes('accessibilityLabel="Ver receitas do mês"')&&s.includes('accessibilityLabel="Ver despesas do mês"'));
   assert.ok(s.includes("'Como o saldo é calculado'")||s.includes('Como o saldo é calculado'));
   assert.ok(s.includes('Transferências entre contas'),'a conta do saldo sempre fecha');
-  assert.ok(s.includes('>Saldo do ciclo</Text>'),'sem dois cartoes com o mesmo nome');
+  assert.ok(s.includes('>Controle de gastos</Text>'),'sem dois cartoes com o mesmo nome');
   assert.ok(lib.includes("{name: 'Contas', icon: '💳'")&&!lib.includes('💡'));
   assert.ok(s.includes('Recuperar itens apagados'));
 });
@@ -231,4 +231,34 @@ test('0.3.193: pela lista do mes a edicao vale so para aquele mes; conta paga co
   assert.equal(list.length,1);assert.equal(list[0].amount,60,'outubro com o valor alterado so para ele');
   const nov=f.fixedBills([t('mes','2026-10-17',{series_id:'next',amount:60}),t('next','2026-11-17',{recurrence:'monthly'})],'a1',{start:'2026-11-01',end:'2026-11-30'});
   assert.equal(nov[0].amount,47,'novembro segue com o valor de antes');
+});
+
+test('0.3.195: previsao do salario (periodo do proximo salario) e ciclo de cada pessoa',()=>{
+  const tx=(id,kind,amount,date,extra={})=>f.toTx({id,kind:'fin_tx',title:id,state:'active',data:{kind,amount,date,account_id:'a1',paid:false,category:'X',recurrence:'none',import_id:'sofia-pendencia:'+id,...extra}});
+  const txs=[tx('sal','income',7821,'2026-09-25',{recurrence:'monthly',paid:true}),tx('academia','expense',129,'2026-10-02',{recurrence:'monthly'}),tx('claude','expense',550,'2026-10-11',{recurrence:'monthly'}),tx('maislaser','expense',300,'2026-10-25',{recurrence:'monthly'}),tx('dentista','expense',200,'2026-11-10')];
+  const prev=f.salaryForecast(txs,[],25,4000,'a1','2026-10-19');
+  assert.equal(prev.upcoming,true,'semana antes do salario: previsao do proximo periodo');
+  assert.equal(prev.start,'2026-10-25');assert.equal(prev.end,'2026-11-24');
+  assert.equal(prev.income,7821);assert.equal(prev.fixed,979);assert.equal(prev.single,200);assert.equal(prev.available,2642);
+  const mid=f.salaryForecast([...txs,f.toTx({id:'mercado',kind:'fin_tx',title:'mercado',state:'active',data:{kind:'expense',amount:150,date:'2026-10-27',account_id:'a1',paid:true,category:'Mercado',recurrence:'none'}})],[],25,4000,'a1','2026-10-28');
+  assert.equal(mid.upcoming,false);assert.equal(mid.spent,150);assert.equal(mid.left,2492,'gasto do dia a dia diminui o que resta');
+  const sal5=[tx('sal5','income',3000,'2026-09-05',{recurrence:'monthly',paid:true}),tx('luz','expense',200,'2026-10-20',{recurrence:'monthly'})];
+  const p5=f.salaryForecast(sal5,[],5,0,'a1','2026-10-19');
+  assert.equal(p5.start,'2026-10-05');assert.equal(p5.end,'2026-11-04');assert.equal(p5.available,2800,'quem recebe dia 5: periodo de 05 a 04');
+  const acc=f.toAccount({id:'a1',kind:'fin_account',title:'C',state:'active',data:{account_type:'corrente',initial_balance:0,include_total:true}});
+  assert.equal(f.effectiveCycleDay([acc],sal5,'a1'),5,'sem dia informado: o dia do salario fixo');
+  assert.equal(f.effectiveCycleDay([acc],[],'a1'),0,'sem salario: mes do calendario');
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("'Previsto de ' + periodLabel(forecastP)"));
+  assert.ok(s.includes('Para acompanhar seus gastos, informe quanto e quando você recebe'),'o cartao nunca some');
+});
+
+test('0.3.196: Controle de gastos; passo a passo pede o valor cheio do salario e cria a receita fixa no dia',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("{title: 'Quando e quanto você recebe'"));
+  assert.ok(s.includes('Quanto você recebe por mês (R$)'));
+  assert.ok(s.includes('Recebe em duas vezes ou tem vale? Some tudo e coloque o valor cheio do mês'));
+  assert.ok(s.includes("category: 'Salário', recurrence: 'monthly', import_id: 'sofia-pendencia:' + Date.now() + ':salario'"),'cria o salario como a receber todo mes');
+  assert.ok(s.includes('if (salaryTx?.entity) {'),'ao refazer, atualiza o salario que ja existe (sem duplicar)');
+  assert.ok(s.includes('>Controle de gastos</Text>'));
 });
