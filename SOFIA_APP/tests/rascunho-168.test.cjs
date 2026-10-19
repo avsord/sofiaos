@@ -11,7 +11,7 @@ test('o rascunho e gravado com atraso, so depois de carregar, e apagado quando o
 });
 test('conta a pagar, reserva e configuracao restauram e limpam o rascunho ao salvar',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes("const draftKey='bill:'+(tx?.id||'novo')"));
+  assert.ok(s.includes("const draftKey='bill:'+(tx?.id||'novo:'+initialFlow);"));
   assert.ok(s.includes('await clearDraft();'),'conta a pagar limpa ao salvar');
   assert.ok(s.includes("useFormDraft('reserve:' + kind + ':' + (reserve?.id || 'novo')"));
   assert.ok(s.includes('await clearReserveDraft();'));

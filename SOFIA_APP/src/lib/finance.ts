@@ -591,3 +591,71 @@ export function effectiveCycleDay(accounts: Account[], txs: Tx[], accountId = ''
     .sort((a, b) => b.amount - a.amount)[0];
   return salary ? Number(salary.date.slice(8, 10)) || 0 : 0;
 }
+
+// ---------- 0.3.196: previsao e controle a partir do dinheiro real ----------
+export type MoneyPlan = {start: string; end: string; carry: number; toReceive: number; toPay: number; card: number; aporte: number;
+  income: number; fixed: number; single: number; left: number; spent: number; available: number};
+function periodList(txs: Tx[], range: {start: string; end: string}, accountId: string): Tx[] {
+  const months: string[] = [];
+  for (let m = monthOf(range.start); m <= monthOf(range.end); m = addMonths(m, 1)) months.push(m);
+  const seen = new Set<string>();
+  return [...txs, ...months.flatMap(m => expandRecurring(txs, m))]
+    .filter(t => t.date >= range.start && t.date <= range.end && (!accountId || t.accountId === accountId) && !t.cardId)
+    .filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; });
+}
+function cardDue(cards: Card[], txs: Tx[], range: {start: string; end: string}, accountId: string, today: string, openOnly: boolean): number {
+  let v = 0;
+  for (const c of cards) if (!accountId || !c.accountId || c.accountId === accountId) for (const i of cardInvoices(c, txs, today))
+    if (i.due >= range.start && i.due <= range.end && (!openOnly || i.status !== 'paga')) v += Math.max(0, openOnly ? i.total - i.paid : i.total);
+  return round2(v);
+}
+/** Periodo em andamento: parte do Saldo real. Resta = Saldo + o que ainda vai entrar - contas ainda por pagar
+ * no periodo (fixas, avulsas, fatura) - aporte ainda por fazer no periodo. Nunca passa do que a pessoa tem. */
+export function currentPlan(txs: Tx[], cards: Card[], range: {start: string; end: string}, accountId: string, saldo: number, aporteDate: string, aportePending: number, today = todayISO()): MoneyPlan {
+  const list = periodList(txs, range, accountId);
+  const sum = (f: (t: Tx) => boolean) => round2(list.filter(f).reduce((s, t) => s + t.amount, 0));
+  const recurring = (t: Tx) => t.recurrence === 'monthly' || !!t.seriesId;
+  const toReceive = sum(t => t.kind === 'income' && !t.paid);
+  const toPay = sum(t => t.kind === 'expense' && !t.paid);
+  const card = cardDue(cards, txs, range, accountId, today, true);
+  const aporte = aporteDate >= range.start && aporteDate <= range.end ? round2(Math.max(0, aportePending)) : 0;
+  const spent = sum(t => t.kind === 'expense' && t.paid && !t.manualDue && !recurring(t));
+  const left = round2(saldo + toReceive - toPay - card - aporte);
+  return {start: range.start, end: range.end, carry: saldo, toReceive, toPay, card, aporte, income: 0, fixed: 0, single: 0, left, spent, available: round2(left + spent)};
+}
+/** Proximo periodo do salario: o que sobra do periodo atual + o que entra no proximo - o que ja tem destino nele. */
+export function nextPlan(txs: Tx[], cards: Card[], range: {start: string; end: string}, accountId: string, carry: number, plan: number, today = todayISO()): MoneyPlan {
+  const list = periodList(txs, range, accountId);
+  const sum = (f: (t: Tx) => boolean) => round2(list.filter(f).reduce((s, t) => s + t.amount, 0));
+  const recurring = (t: Tx) => t.recurrence === 'monthly' || !!t.seriesId;
+  const income = sum(t => t.kind === 'income');
+  const fixed = sum(t => t.kind === 'expense' && recurring(t));
+  const single = sum(t => t.kind === 'expense' && !recurring(t));
+  const card = cardDue(cards, txs, range, accountId, today, false);
+  const aporte = round2(Math.max(0, plan));
+  const left = round2(carry + income - fixed - single - card - aporte);
+  return {start: range.start, end: range.end, carry: round2(carry), toReceive: 0, toPay: 0, card, aporte, income, fixed, single, left, spent: 0, available: left};
+}
+
+// ---------- 0.3.196: modelo simples (definido pelo Pedro) ----------
+/** Previsto do periodo do salario: receitas (salario e qualquer outra) - despesas lancadas - pendentes a pagar
+ * - fatura do cartao que vence no periodo - aporte do periodo. Sem o que sobrou do periodo anterior. */
+export type SimpleForecast = {start: string; end: string; income: number; expense: number; card: number; aporte: number; left: number};
+export function simpleForecast(txs: Tx[], cards: Card[], range: {start: string; end: string}, accountId: string, today = todayISO(), aporte = 0): SimpleForecast {
+  const list = periodList(txs, range, accountId);
+  const income = round2(list.filter(t => t.kind === 'income').reduce((s, t) => s + t.amount, 0));
+  const expense = round2(list.filter(t => t.kind === 'expense').reduce((s, t) => s + t.amount, 0));
+  const card = cardDue(cards, txs, range, accountId, today, false);
+  const ap = round2(Math.max(0, aporte));
+  return {start: range.start, end: range.end, income, expense, card, aporte: ap, left: round2(income - expense - card - ap)};
+}
+/** Controle de gastos: o que esta no Saldo. 100% = Saldo de agora + tudo o que ja saiu no periodo
+ * (despesas pagas, faturas pagas e aportes); cada saida diminui a porcentagem. */
+export type SpendControl = {start: string; end: string; left: number; out: number; available: number; pct: number};
+export function spendControl(txs: Tx[], moves: ReserveMove[], reserveId: string, range: {start: string; end: string}, accountId: string, saldo: number): SpendControl {
+  const mine = (t: Tx) => (!accountId || t.accountId === accountId) && t.paid && !t.virtual && t.date >= range.start && t.date <= range.end;
+  const spent = txs.filter(t => mine(t) && ((t.kind === 'expense' && !t.cardId) || t.kind === 'card_payment')).reduce((s, t) => s + t.amount, 0);
+  const aportes = reserveId ? moves.filter(m => m.goalId === reserveId && m.direction === 'in' && m.entity?.state !== 'archived' && m.date >= range.start && m.date <= range.end).reduce((s, m) => s + m.amount, 0) : 0;
+  const out = round2(spent + aportes), available = round2(saldo + out);
+  return {start: range.start, end: range.end, left: round2(saldo), out, available, pct: available > 0 ? Math.max(0, Math.min(1, saldo / available)) : 0};
+}

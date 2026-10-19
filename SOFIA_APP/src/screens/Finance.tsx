@@ -26,7 +26,7 @@ import {
   trend, balanceSeries, upcoming, manualDues, transactionsForAccount, goalProgress, parseMoney, formatMoneyInput, finishMoneyInput, addDays,
   dayIn, daysIn} from '../lib/finance';
 import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove} from '../lib/finance';
-import {sinceReportStart, cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, monthDues, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove, effectiveCycleDay, periodBudget, salaryForecast} from '../lib/finance';
+import {sinceReportStart, cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, monthDues, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove, effectiveCycleDay, periodBudget, salaryForecast, currentPlan, nextPlan, simpleForecast, spendControl} from '../lib/finance';
 import {syncFinanceDueNotifications} from '../lib/finance-notifications';
 import {appAlert} from '../lib/app-alert';
 import {useFormDraft} from '../lib/form-draft';
@@ -113,7 +113,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
   const [editing, setEditing] = useState<Partial<Tx> | null>(null), [manage, setManage] = useState(false);
   const [accountFilter, setAccountFilter] = useState<string>('');
   const [selectedAccount, setSelectedAccount] = useState(''), [accountPicker, setAccountPicker] = useState(false);
-  const [billScope, setBillScope] = useState<'month' | 'series'>('series');
+  const [billScope, setBillScope] = useState<'month' | 'series'>('series'), [billFlow, setBillFlow] = useState<'expense' | 'income'>('expense');
   const [billEditor, setBillEditor] = useState<Tx | 'new' | null>(null), [notificationWarning, setNotificationWarning] = useState('');
   const [tabHistory, setTabHistory] = useState<Tab[]>([]);
   const navigateFinance = useCallback((next: Tab) => {
@@ -214,7 +214,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingHorizontal: 20, paddingTop: 2, paddingBottom: insets.bottom + 110, gap: 16}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>
             {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
             {tab === 'home' ? <HomeTab d={scoped || d} month={month} api={api} reload={reload} onTx={setEditing} onTab={navigateFinance} accountId={accountId} isPrimary={isPrimary} onBill={t => { setBillScope('series'); setBillEditor(t || 'new'); }} aporteKey={aporteKey} />
-              : tab === 'bills' ? <PendingTab d={scoped || d} api={api} month={month} accountId={accountId} isPrimary={isPrimary} onAporte={() => { navigateFinance('home'); setAporteKey(k => k + 1); }} warning={notificationWarning} onBill={(t, scope) => { setBillScope(scope || 'series'); setBillEditor(t); }} reload={reload} />
+              : tab === 'bills' ? <PendingTab d={scoped || d} api={api} month={month} accountId={accountId} isPrimary={isPrimary} onAporte={() => { navigateFinance('home'); setAporteKey(k => k + 1); }} warning={notificationWarning} onBill={(t, scope) => { setBillScope(scope || 'series'); setBillFlow('expense'); setBillEditor(t); }} onNew={flow => { setBillScope('series'); setBillFlow(flow); setBillEditor('new'); }} onMonth={setMonth} reload={reload} />
               : tab === 'cards' ? <CardsTab d={scoped || d} api={api} reload={reload} onTx={setEditing} onManage={() => setManage(true)} />
               : <ReportsTab d={scoped || d} month={month} reserve={reserveFor((scoped || d).goals, accountId, isPrimary)} api={api} reload={reload} />}
           </ScrollView>
@@ -238,7 +238,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
         </> : null}
 
         {editing && d ? <TxEditor api={api} d={d} tx={editing} defaultAccountId={accountId} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} /> : null}
-        {billEditor && d ? <BillEditor api={api} scope={billScope} tx={billEditor === 'new' ? null : billEditor} accountId={accountId} onClose={() => setBillEditor(null)} onSaved={() => {setBillEditor(null);void reload();}} /> : null}
+        {billEditor && d ? <BillEditor api={api} scope={billScope} initialFlow={billFlow} tx={billEditor === 'new' ? null : billEditor} accountId={accountId} onClose={() => setBillEditor(null)} onSaved={() => {setBillEditor(null);void reload();}} /> : null}
         {manage && d ? <ManageSheet api={api} d={d} onClose={() => setManage(false)} onFinished={goHome} reload={reload} /> : null}
         <Sheet visible={accountPicker} onClose={() => setAccountPicker(false)} label="Fechar seletor de contas">
           <View style={{gap:14,paddingBottom:12}}>
@@ -662,10 +662,16 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
 }
 
 // ============================ PENDENTES MANUAIS ============================
-function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,onAporte}: {d:Data;api:SofiaApi;month:string;accountId:string;warning:string;onBill:(t:Tx|'new',scope?:'month'|'series')=>void;reload:()=>Promise<void>;isPrimary?:boolean;onAporte?:()=>void}) {
+function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,onAporte,onNew,onMonth}: {onMonth?:(m:string)=>void;onNew:(flow:'expense'|'income')=>void;d:Data;api:SofiaApi;month:string;accountId:string;warning:string;onBill:(t:Tx|'new',scope?:'month'|'series')=>void;reload:()=>Promise<void>;isPrimary?:boolean;onAporte?:()=>void}) {
   // A aba segue o mes escolhido no topo; cada mes mostra so as suas contas (0.3.180)
   const c=useTheme(),today=todayISO(),list=useMemo(()=>monthDues(d.txs,accountId,month,today),[d,accountId,month,today]);
   const open=list.filter(row=>!row.paid),total=open.reduce((sum,row)=>sum+row.amount,0),paidCount=list.length-open.length;
+  const toPay=open.filter(r=>r.kind!=='receber'),toGet=open.filter(r=>r.kind==='receber');
+  const payList=list.filter(r=>r.kind!=='receber'),getList=list.filter(r=>r.kind==='receber');
+  // contas do mes seguinte (ex.: o que entra no periodo do salario, mas ja em novembro) - para nada parecer oculto
+  const nextMonth=addMonths(month,1),nextList=useMemo(()=>monthDues(d.txs,accountId,nextMonth,today).filter(r=>!r.paid),[d,accountId,nextMonth,today]);
+  const nextHint=(kind:'pagar'|'receber')=>{const rows=nextList.filter(r=>kind==='receber'?r.kind==='receber':r.kind!=='receber');if(!rows.length||!onMonth)return null;
+    return <Pressable accessibilityRole="button" onPress={()=>onMonth(nextMonth)} style={{paddingVertical:6}}><Text style={{color:c.accent,fontSize:12,fontWeight:'700'}}>Em {monthLabel(nextMonth).split(' ')[0].toLowerCase()}: {rows.length} {kind==='receber'?'a receber':'a pagar'} · {money(rows.reduce((s,r)=>s+r.amount,0))} ›</Text></Pressable>;};
   // 0.3.188: o aporte do mes entra junto das contas: amarelo enquanto falta, verde quando feito
   const reserve=reserveFor(d.goals,accountId,isPrimary);
   const aporte=useMemo(()=>reserve?moneySplit(reserve,d.moves||[],d.accounts,d.txs,d.cards,month,today):null,[reserve,d,month,today]);
@@ -681,14 +687,19 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
       <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
         <View style={{flex:1,gap:6}}><Text style={{fontSize:17,fontWeight:'800',color:c.text}}>A pagar e a receber</Text>
         <Text style={{fontSize:12,color:c.muted,lineHeight:18}}>Cadastre cada vencimento manualmente. Compras e extratos não criam pendências.</Text></View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Cadastrar conta a pagar" onPress={()=>onBill('new')} style={{backgroundColor:c.accent,paddingHorizontal:13,paddingVertical:11,borderRadius:12}}>
-          <Text style={{color:c.onAccent,fontSize:13,fontWeight:'800'}}>＋ Nova</Text>
+      </View>
+      {/* 0.3.196: A pagar e A receber separados, cada um com o seu botao e o seu total */}
+      <View style={{flexDirection:'row',gap:10}}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Nova conta a pagar" onPress={()=>onNew('expense')} style={{flex:1,backgroundColor:BAD+'14',borderRadius:14,padding:12,gap:4,borderWidth:1,borderColor:BAD+'55'}}>
+          <Text style={{color:c.text,fontWeight:'800',fontSize:14}}>＋ A pagar</Text>
+          <Text style={{color:c.muted,fontSize:11}}>{toPay.length} em aberto · {money(toPay.reduce((s,r)=>s+r.amount,0))}</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Nova conta a receber" onPress={()=>onNew('income')} style={{flex:1,backgroundColor:GOOD+'14',borderRadius:14,padding:12,gap:4,borderWidth:1,borderColor:GOOD+'55'}}>
+          <Text style={{color:c.text,fontWeight:'800',fontSize:14}}>＋ A receber</Text>
+          <Text style={{color:c.muted,fontSize:11}}>{toGet.length} em aberto · {money(toGet.reduce((s,r)=>s+r.amount,0))}</Text>
         </Pressable>
       </View>
-      <View style={{borderTopWidth:1,borderColor:c.line,paddingTop:14,flexDirection:'row',justifyContent:'space-between'}}>
-        <Text style={{color:c.muted,fontSize:12}}>{open.length} {open.length===1?'pendente':'pendentes'}{paidCount?' · '+paidCount+(paidCount===1?' paga':' pagas'):''} em {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
-        <Text style={{color:c.text,fontWeight:'800'}}>{money(total)}</Text>
-      </View>
+      <Text style={{color:c.muted,fontSize:11}}>{paidCount?paidCount+(paidCount===1?' já paga ou recebida':' já pagas ou recebidas')+' em '+monthLabel(month).split(' ')[0].toLowerCase()+'.':''}</Text>
       {warning ? <Text style={{fontSize:12,color:WARN}}>{warning}</Text> : null}
     </Card_>
     {fixed.bills.length ? <Card_>
@@ -727,13 +738,20 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
           <Text style={{color:GOOD,fontWeight:'700'}}>{money(aporte.realized)}</Text>
           <Text style={{color:GOOD,fontWeight:'800',fontSize:12}}>✓ Aportado</Text>
         </View>):null}
-      {list.length ? list.map(due=><DueRow key={due.id} due={due} d={d} api={api} reload={reload} onTx={t=>onBill(t as Tx,'month')} />)
+      {list.length || nextList.length ? <>
+        <Text style={{color:c.muted,fontSize:12,fontWeight:'700',marginTop:4}}>A pagar</Text>
+        {payList.length?payList.map(due=><DueRow key={due.id} due={due} d={d} api={api} reload={reload} onTx={t=>onBill(t as Tx,'month')} />):<Text style={{color:c.muted,fontSize:12}}>Nada a pagar neste mês.</Text>}
+        {nextHint('pagar')}
+        <Text style={{color:c.muted,fontSize:12,fontWeight:'700',marginTop:8}}>A receber</Text>
+        {getList.length?getList.map(due=><DueRow key={due.id} due={due} d={d} api={api} reload={reload} onTx={t=>onBill(t as Tx,'month')} />):<Text style={{color:c.muted,fontSize:12}}>Nada a receber neste mês.</Text>}
+        {nextHint('receber')}
+      </>
         : <Text style={{color:c.muted,fontSize:13,lineHeight:20}}>{month===monthOf(today)?'Nada a pagar ou receber neste mês.':'Nada pendente em '+monthLabel(month).split(' ')[0].toLowerCase()+'.'} Para ver outro mês, troque o mês no topo.</Text>}
       <Text style={{fontSize:11,color:c.muted}}>Os avisos locais saem às 9h do vencimento (e, se você escolher, alguns dias antes), com a permissão de notificações do Android. Confirmar o pagamento ou o recebimento tira o item dos pendentes e o inclui no extrato.</Text>
     </Card_>
   </>;
 }
-function BillEditor({api,tx,accountId,onClose,onSaved,scope='series'}:{api:SofiaApi;tx:Tx|null;accountId:string;onClose:()=>void;onSaved:()=>void;scope?:'month'|'series'}) {
+function BillEditor({api,tx,accountId,onClose,onSaved,scope='series',initialFlow='expense'}:{api:SofiaApi;tx:Tx|null;accountId:string;onClose:()=>void;onSaved:()=>void;scope?:'month'|'series';initialFlow?:'expense'|'income'}) {
   const c=useTheme(),existing=!!tx?.entity&&!tx?.virtual;
   // 0.3.193: aberta por "A vencer e atrasadas", a edicao de uma conta que se repete vale SO para aquele mes;
   // por "Contas fixas", vale para todos os meses.
@@ -744,12 +762,13 @@ function BillEditor({api,tx,accountId,onClose,onSaved,scope='series'}:{api:Sofia
   const [date,setDate]=useState(tx?.date||todayISO()),[category,setCategory]=useState(tx?.category||'Contas');
   const [repeat,setRepeat]=useState(tx?.recurrence==='monthly'?'monthly':'none');
   // 0.3.151: tambem contas a receber, e aviso alguns dias antes (alem do aviso no dia)
-  const [flow,setFlow]=useState<'expense'|'income'>(tx?.kind==='income'?'income':'expense'),[before,setBefore]=useState(String(tx?.remindDays||0));
+  const [flow,setFlow]=useState<'expense'|'income'>(tx?tx.kind==='income'?'income':'expense':initialFlow),[before,setBefore]=useState(String(tx?.remindDays||0));
   // 0.3.165: conta fixa com prazo (ex.: 10 parcelas) - para de se repetir sozinha no fim
   const [parcels,setParcels]=useState(String(tx?.entity?.data?.installments||''));
   const [parcelNow,setParcelNow]=useState(String(tx?.entity?.data?.installment||''));
   // 0.3.168: se o app for para o fundo (ou for encerrado) no meio do preenchimento, nada se perde.
-  const draftKey='bill:'+(tx?.id||'novo');
+  // 0.3.196: rascunho separado para A pagar e A receber; antes um rascunho antigo podia trocar o tipo escolhido
+  const draftKey='bill:'+(tx?.id||'novo:'+initialFlow);
   const form={name,amount,date,category,repeat,flow,before,parcels,parcelNow};
   const {draft,ready,clear:clearDraft}=useFormDraft(draftKey,form);
   const restored=useRef(false);
@@ -761,7 +780,6 @@ function BillEditor({api,tx,accountId,onClose,onSaved,scope='series'}:{api:Sofia
     if(draft.category)setCategory(String(draft.category));
     if(draft.date)setDate(String(draft.date));
     if(draft.repeat)setRepeat(String(draft.repeat) as typeof repeat);
-    if(draft.flow)setFlow(draft.flow==='income'?'income':'expense');
     if(draft.before!==undefined)setBefore(String(draft.before));
     if(draft.parcels!==undefined)setParcels(String(draft.parcels));
     if(draft.parcelNow!==undefined)setParcelNow(String(draft.parcelNow));
@@ -872,11 +890,20 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
   // 0.3.195: cada pessoa no seu ciclo (dia informado na conta ou, se nao houver, o dia do salario fixo)
   const cycleDay = useMemo(() => effectiveCycleDay(d.accounts, d.txs, accountId), [d, accountId]);
   const plan = split?.planned || 0;
-  const cycleNow = useMemo(() => periodBudget(d.txs, d.cards, cycleRange(cycleDay, today), accountId, plan, today), [d, accountId, cycleDay, today, plan]);
-  const forecastP = useMemo(() => salaryForecast(d.txs, d.cards, cycleDay, plan, accountId, today), [d, accountId, cycleDay, today, plan]);
+  const net = split ? split.net : 0, total = Math.round((accountsTotal - net) * 100) / 100, forecast = Math.round((accountsForecast - net) * 100) / 100;
+  // 0.3.196: Controle de gastos = o que esta no Saldo; Previsto = receitas - despesas e pendentes - fatura - aporte que falta no periodo
+  const cycleNow = useMemo(() => spendControl(d.txs, d.moves || [], reserve?.id || '', cycleRange(cycleDay, today), accountId, total), [d, reserve, cycleDay, today, accountId, total]);
+  const forecastP = useMemo(() => {
+    const cur = cycleRange(cycleDay, today), nextStart = addDays(cur.end, 1), upcoming = Math.round((Date.parse(nextStart + 'T12:00:00Z') - Date.parse(today + 'T12:00:00Z')) / 86400000) <= 7;
+    // aporte do periodo (ja descontado o que foi aportado nele)
+    const range = upcoming ? cycleRange(cycleDay, nextStart) : cur, planDay = split?.planDay || 0;
+    const months: string[] = []; for (let m = monthOf(range.start); m <= monthOf(range.end); m = addMonths(m, 1)) months.push(m);
+    const due = planDay ? months.filter(m => { const dt = dayIn(m, Math.min(planDay, daysIn(m))); return dt >= range.start && dt <= range.end; }).length * plan : plan;
+    const done = reserve ? (d.moves || []).filter(m => m.goalId === reserve.id && m.direction === 'in' && m.entity?.state !== 'archived' && m.date >= range.start && m.date <= range.end).reduce((t, m) => t + m.amount, 0) : 0;
+    return {...simpleForecast(d.txs, d.cards, range, accountId, today, Math.max(0, due - done)), upcoming};
+  }, [d, accountId, cycleDay, today, plan, split?.planDay, reserve]);
   const [forecastOpen, setForecastOpen] = useState(false);
   const periodLabel = (b: {start: string; end: string}) => b.start.slice(8, 10) + '/' + b.start.slice(5, 7) + ' a ' + b.end.slice(8, 10) + '/' + b.end.slice(5, 7);
-  const net = split ? split.net : 0, total = Math.round((accountsTotal - net) * 100) / 100, forecast = Math.round((accountsForecast - net) * 100) / 100;
   const [reserveMenu, setReserveMenu] = useState(false), [breakdown, setBreakdown] = useState<'saldo' | 'income' | 'expense' | null>(null);
   const lastAporteKey = useRef(aporteKey);
   useEffect(() => { if (aporteKey === lastAporteKey.current) return; lastAporteKey.current = aporteKey; setReserveSheet(reserve ? 'in' : 'setup'); }, [aporteKey, reserve]);
@@ -888,20 +915,15 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
       {forecastOpen ? <Sheet visible onClose={() => setForecastOpen(false)} label="Fechar previsão">
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 12, paddingBottom: 18}}>
           <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Previsão de {periodLabel(forecastP)}</Text>
-          <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>{cycleDay ? 'O dinheiro do salário do dia ' + cycleDay + ' precisa durar até o próximo. ' : 'Sem dia de recebimento definido, a previsão usa o mês do calendário. '}Entra o que está previsto receber; saem as contas que já têm destino no período.</Text>
+          <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>{cycleDay ? 'O dinheiro do salário do dia ' + cycleDay + ' precisa durar até o próximo. ' : 'Sem dia de recebimento definido, a previsão usa o mês do calendário. '}Receitas do período (salário e qualquer outra) menos as despesas lançadas, as contas pendentes, a fatura e o aporte.</Text>
           <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 6}}>
-            {([['Entra (salário e outras receitas)', forecastP.income, GOOD, '+'], ['Contas fixas', forecastP.fixed, BAD, '−'], ['Contas avulsas', forecastP.single, BAD, '−'], ['Fatura do cartão', forecastP.card, BAD, '−'], ['Aporte', forecastP.aporte, GUARD, '−']] as const)
-              .filter(([, v], i) => i === 0 || v > 0).map(([label, v, color, sign]) => <View key={label} style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+            {([['Receitas (salário e outras)', forecastP.income, GOOD, '+'], ['Despesas e pendentes', forecastP.expense, BAD, '−'], ['Fatura do cartão', forecastP.card, BAD, '−'], ['Aporte', forecastP.aporte, GUARD, '−']] as const)
+              .filter(([, v], i) => i < 2 || v > 0).map(([label, v, color, sign]) => <View key={label} style={{flexDirection: 'row', justifyContent: 'space-between'}}>
                 <Text style={{color: c.muted, fontSize: 13}}>{sign} {label}</Text><Text style={{color, fontWeight: '700'}}>{show(v)}</Text></View>)}
             <View style={{height: 1, backgroundColor: c.line, marginVertical: 4}} />
-            <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '800'}}>= Para usar no período</Text><Text style={{color: forecastP.available < 0 ? BAD : c.text, fontWeight: '800'}}>{show(forecastP.available)}</Text></View>
-            {!forecastP.upcoming ? <>
-              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 13}}>− Já gastou (fora das contas previstas)</Text><Text style={{color: BAD, fontWeight: '700'}}>{show(forecastP.spent)}</Text></View>
-              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '800'}}>= Ainda resta</Text><Text style={{color: forecastP.left < 0 ? BAD : c.text, fontWeight: '800'}}>{show(forecastP.left)}</Text></View>
-            </> : null}
+            <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '800'}}>= Previsto</Text><Text style={{color: forecastP.left < 0 ? BAD : c.text, fontWeight: '800'}}>{show(forecastP.left)}</Text></View>
           </View>
-          {forecastP.income <= 0 ? <Text style={{color: WARN, fontSize: 12, lineHeight: 18}}>Não há receita prevista nesse período. Cadastre o salário em Pendentes como “A receber”, todo mês, no dia em que você recebe.</Text>
-            : forecastP.available < 0 ? <Text style={{color: BAD, fontSize: 12, lineHeight: 18}}>As saídas previstas passam {show(-forecastP.available)} do que entra nesse período.</Text> : null}
+          {forecastP.income <= 0 ? <Text style={{color: WARN, fontSize: 12, lineHeight: 18}}>Não há receita prevista nesse período. Informe quanto e quando você recebe (engrenagem → Refazer a configuração).</Text> : null}
         </ScrollView>
       </Sheet> : null}
       {reserveHistoryOpen && reserve ? <ReserveHistorySheet api={api} reserve={reserve} moves={d.moves || []} show={show} reload={reload} onClose={() => setReserveHistoryOpen(false)} /> : null}
@@ -922,7 +944,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
           <Pressable accessibilityLabel={hide ? 'Mostrar valores' : 'Esconder valores'} onPress={() => setHide(h => !h)}><Icon name="eye" size={18} color={c.onAccent + 'cc'} /></Pressable>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="Ver como o saldo é calculado" onPress={() => setBreakdown('saldo')}><Text style={{color: c.onAccent, fontSize: 32, fontWeight: '800'}}>{show(total)}</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Ver a previsão" onPress={() => setForecastOpen(true)}><Text style={{color: c.onAccent + 'cc', fontSize: 12}}>{forecastP.upcoming ? 'Previsto de ' + periodLabel(forecastP) : 'Previsto até ' + forecastP.end.slice(8, 10) + '/' + forecastP.end.slice(5, 7)}: <Text style={{color: c.onAccent, fontWeight: '700'}}>{show(forecastP.upcoming ? forecastP.available : forecastP.left)}</Text> ›</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Ver a previsão" onPress={() => setForecastOpen(true)}><Text style={{color: c.onAccent + 'cc', fontSize: 12}}>{forecastP.upcoming ? 'Previsto de ' + periodLabel(forecastP) : 'Previsto até ' + forecastP.end.slice(8, 10) + '/' + forecastP.end.slice(5, 7)}: <Text style={{color: c.onAccent, fontWeight: '700'}}>{show(forecastP.left)}</Text> ›</Text></Pressable>
         <View style={{flexDirection: 'row', gap: 12}}>
           <Pressable accessibilityRole="button" accessibilityLabel="Ver receitas do mês" onPress={() => setBreakdown('income')} style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 16, padding: 12, gap: 2}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↑ Receitas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.income)}</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Ver despesas do mês" onPress={() => setBreakdown('expense')} style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 16, padding: 12, gap: 2}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↓ Despesas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(s.expense)}</Text></Pressable>
@@ -986,25 +1008,23 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
       </Pressable> : null}
 
       {/* 0.3.161: quanto ainda da para gastar neste ciclo, depois das contas fixas e do aporte */}
-      {(() => { const b = cycleNow, pct = b.available > 0 ? Math.max(0, Math.min(1, b.left / b.available)) : 0, over = b.left < 0;
-        return <Pressable accessibilityRole="button" accessibilityLabel="Ver contas fixas" onPress={() => onTab('bills')}
+      {(() => { const b = cycleNow, pct = b.pct, over = b.left < 0;
+        return <Pressable accessibilityRole="button" accessibilityLabel="Ver despesas" onPress={() => setBreakdown('expense')}
         style={{backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 10, borderWidth: 1, borderColor: over ? BAD : c.line}}>
         <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8}}>
           <Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 15}}>Controle de gastos</Text>
           <Text style={{color: c.muted, fontSize: 11}}>{periodLabel(b)}</Text>
         </View>
-        {b.income > 0 ? <>
-          <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 6}}>
-            <Text style={{color: over ? BAD : c.text, fontWeight: '800', fontSize: 26}}>{over ? '−' + show(-b.left) : show(b.left)}</Text>
-            <Text style={{color: c.muted, fontSize: 12}}>{over ? 'além do que havia' : 'de ' + show(Math.max(0, b.available))}</Text>
-            <View style={{flex: 1}} />
-            <Text style={{color: over ? BAD : pct <= 0.25 ? WARN : GOOD, fontWeight: '700', fontSize: 13}}>{Math.round(pct * 100)}%</Text>
-          </View>
-          <View style={{height: 10, borderRadius: 5, backgroundColor: c.line, overflow: 'hidden'}}>
-            <View style={{width: `${Math.round((over ? 1 : pct) * 100)}%` as `${number}%`, height: 10, borderRadius: 5, backgroundColor: over ? BAD : pct <= 0.25 ? WARN : GOOD}} />
-          </View>
-          <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Já gastou {show(b.spent)} desde o dia {b.start.slice(8, 10)}, fora das contas e do aporte. Cada gasto lançado diminui o que resta.</Text>
-        </> : <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Para acompanhar seus gastos, informe quanto e quando você recebe (engrenagem → Refazer a configuração) ou cadastre o salário em Pendentes como “A receber”, todo mês.</Text>}
+        <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 6}}>
+          <Text style={{color: over ? BAD : c.text, fontWeight: '800', fontSize: 26}}>{over ? '−' + show(-b.left) : show(b.left)}</Text>
+          <Text style={{color: c.muted, fontSize: 12}}>de {show(Math.max(0, b.available))}</Text>
+          <View style={{flex: 1}} />
+          <Text style={{color: over ? BAD : pct <= 0.25 ? WARN : GOOD, fontWeight: '700', fontSize: 13}}>{Math.round(pct * 100)}%</Text>
+        </View>
+        <View style={{height: 10, borderRadius: 5, backgroundColor: c.line, overflow: 'hidden'}}>
+          <View style={{width: `${Math.round((over ? 1 : pct) * 100)}%` as `${number}%`, height: 10, borderRadius: 5, backgroundColor: over ? BAD : pct <= 0.25 ? WARN : GOOD}} />
+        </View>
+        <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>O que está no seu Saldo. Desde o dia {b.start.slice(8, 10)} já saíram {show(b.out)} (contas, gastos e aportes); cada saída diminui a porcentagem.</Text>
       </Pressable>; })()}
 
       {/* 0.3.152: vencimentos proximos viram uma linha so (o detalhe fica em Pendentes); cartoes ficam na aba Cartoes */}
