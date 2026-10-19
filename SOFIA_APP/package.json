@@ -1,6 +1,6 @@
 {
   "name": "sofia-app",
-  "version": "0.3.192",
+  "version": "0.3.193",
   "private": true,
   "main": "index.ts",
   "scripts": {

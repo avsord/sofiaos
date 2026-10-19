@@ -62,7 +62,7 @@ export function Reminders({api,active,onBack}:{api:SofiaApi;active:boolean;onBac
  return <View style={{flex:1}}>
   <ScreenTitle title="Lembretes" eyebrow="AVISOS · NA HORA CERTA" right={<View style={{flexDirection:'row'}}><IconButton name="back" label="Voltar aos apps" onPress={onBack}/><IconButton name="plus" label="Novo lembrete" onPress={()=>open()}/></View>}/>
   {error||records.error?<ErrorBanner text={error||records.error} onRetry={()=>void records.load()}/>:null}
-  <ScrollView contentContainerStyle={{padding:22,paddingTop:4,gap:18}}>
+  <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:22,paddingTop:4,gap:18}}>
    {section('Atrasados',groups.late,true)}
    {section('Próximos',groups.upcoming)}
    {section('Concluídos',groups.done,false,true)}

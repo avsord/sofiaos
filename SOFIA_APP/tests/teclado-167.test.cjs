@@ -41,3 +41,12 @@ test('0.3.191: calendario dentro do formulario (sem janela por cima) e uma janel
   assert.ok(fin.includes("setNewMenu(false); afterSheet(() => setBillEditor('new'));"));
   assert.ok(fin.includes("setBreakdown(null); afterSheet(() => onTx(t));"));
 });
+
+test('0.3.193: com o teclado aberto, tocar num botao ja faz a acao (nao so fecha o teclado)',()=>{
+  const fs2=require('node:fs'),path2=require('node:path');
+  const walk=d=>fs2.readdirSync(d,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(path2.join(d,e.name)):e.name.endsWith('.tsx')?[path2.join(d,e.name)]:[]);
+  const faltando=[];
+  const tagAt=(s,i)=>{let depth=0;for(let j=i;j<s.length;j++){const ch=s[j];if(ch==='{')depth++;else if(ch==='}')depth--;else if(ch==='>'&&depth===0&&s[j-1]!=='=')return s.slice(i,j+1);}return '';};
+  for(const f of walk(path2.join(__dirname,'..','src'))){const s=fs2.readFileSync(f,'utf8');let i=-1;while((i=s.indexOf('<ScrollView',i+1))>=0){if(!/\s/.test(s[i+11]||''))continue;const t=tagAt(s,i);if(!t.includes('keyboardShouldPersistTaps')&&!t.includes('horizontal'))faltando.push(path2.basename(f));}}
+  assert.deepEqual([...new Set(faltando)],[],'toda lista rolavel deixa o toque passar com o teclado aberto');
+});

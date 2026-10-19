@@ -485,7 +485,7 @@ export function fixedBills(txs: Tx[], accountId: string, range: {start: string; 
   const months = [...new Set([monthOf(range.start), monthOf(range.end)])];
   const all = [...txs, ...months.flatMap(m => expandRecurring(txs, m))];
   const seen = new Set<string>();
-  return all.filter(t => t.recurrence === 'monthly' && t.kind === 'expense' && (!accountId || t.accountId === accountId) && t.date >= range.start && t.date <= range.end)
+  return all.filter(t => (t.recurrence === 'monthly' || !!t.seriesId) && t.kind === 'expense' && (!accountId || t.accountId === accountId) && t.date >= range.start && t.date <= range.end)
     .filter(t => { const k = t.desc + '|' + t.date; if (seen.has(k)) return false; seen.add(k); return true; })
     .sort((a, b) => a.date.localeCompare(b.date))
     .map(t => {

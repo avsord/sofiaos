@@ -56,7 +56,7 @@ export function DateTimeField({label,value,onChange,dateOnly=false,timeOnly=fals
    </MonthSwipe>:null}
    {!dateOnly?<View style={{flexDirection:'row',gap:12,marginTop:timeOnly?0:10}}>{(['hours','minutes'] as const).map(part=><View key={part} style={{flex:1}}>
     <Text style={{textAlign:'center',color:c.muted,marginBottom:6,fontSize:12}}>{part==='hours'?'Hora':'Minutos'}</Text>
-    <ScrollView showsVerticalScrollIndicator={false} style={{height:126,backgroundColor:c.surface,borderRadius:12}} nestedScrollEnabled contentOffset={{x:0,y:Math.max(0,(part==='hours'?selected.getHours():selected.getMinutes())*42-42)}}>
+    <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={{height:126,backgroundColor:c.surface,borderRadius:12}} nestedScrollEnabled contentOffset={{x:0,y:Math.max(0,(part==='hours'?selected.getHours():selected.getMinutes())*42-42)}}>
      {Array.from({length:part==='hours'?24:60},(_,i)=><Pressable key={i} accessibilityLabel={(part==='hours'?'Hora ':'Minuto ')+i} onPress={()=>change(part,i)} style={{height:42,alignItems:'center',justifyContent:'center',backgroundColor:(part==='hours'?selected.getHours():selected.getMinutes())===i?c.accentSoft:'transparent'}}><Text style={{color:c.text,fontSize:20,fontWeight:'600'}}>{pad(i)}</Text></Pressable>)}
     </ScrollView></View>)}</View>:null}
    {!dateOnly?<View style={{marginTop:12}}><Button title={'Confirmar '+(timeOnly?pad(selected.getHours())+':'+pad(selected.getMinutes()):dateDisplay(selected.toISOString(),false))} onPress={()=>commit(selected)}/></View>:null}

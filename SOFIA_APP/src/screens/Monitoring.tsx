@@ -115,7 +115,7 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
           <IconButton name="plus" label="Adicionar produto" filled onPress={() => setAdding(true)} />
         </View>
 
-        <ScrollView contentContainerStyle={{padding: 18, paddingTop: 8, paddingBottom: insets.bottom + 40, gap: 16}}
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 18, paddingTop: 8, paddingBottom: insets.bottom + 40, gap: 16}}
           refreshControl={<RefreshControl refreshing={false} onRefresh={() => void runCollection(api, {force: true, scope})} />}>
           <Pressable accessibilityRole="button" accessibilityLabel="Atualizar preços agora" disabled={col.running} onPress={() => void runCollection(api, {force: true, scope})}
             style={{flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, borderRadius: 99, paddingHorizontal: 12, paddingVertical: 6}}>

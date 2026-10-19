@@ -53,7 +53,7 @@ export function Routines({api,active,onBack}:{api:SofiaApi;active:boolean;onBack
  return <View style={{flex:1}}>
   <ScreenTitle title="Rotinas" eyebrow="HÁBITOS · CUIDADOS" right={<View style={{flexDirection:'row'}}><IconButton name="back" label="Voltar aos apps" onPress={onBack}/><IconButton name="plus" label="Nova rotina" onPress={()=>open()}/></View>}/>
   {error||records.error?<ErrorBanner text={error||records.error} onRetry={()=>void records.load()}/>:null}
-  <ScrollView contentContainerStyle={{padding:22,paddingTop:4,gap:12}}>
+  <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:22,paddingTop:4,gap:12}}>
    {groups.map(([group,list])=><View key={group} style={{gap:12}}>
     <View style={{flexDirection:'row',alignItems:'center',gap:10,paddingHorizontal:6,paddingTop:6}}><View style={{width:30,height:30,borderRadius:10,alignItems:'center',justifyContent:'center',backgroundColor:c.accentSoft}}><Icon name="grid" color={c.accent}/></View><Text style={{flex:1,color:c.text,fontSize:13,fontWeight:'700',letterSpacing:0.3}}>{group}</Text><Text style={{color:c.muted,fontSize:11}}>{list.length}</Text></View>
    {list.map(item=><Pressable key={item.id} accessibilityRole="button" accessibilityLabel={'Editar rotina '+item.title} onPress={()=>open(item)} style={({pressed})=>({minHeight:82,borderRadius:34,paddingHorizontal:16,paddingVertical:13,flexDirection:'row',alignItems:'center',gap:12,backgroundColor:item.state==='active'?c.accentSoft:c.surface,borderWidth:1,borderColor:item.state==='active'?c.accent:c.line,opacity:pressed?0.82:1})}>

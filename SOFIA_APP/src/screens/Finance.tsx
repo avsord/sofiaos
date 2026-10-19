@@ -86,7 +86,7 @@ function Chips<T extends string | number>({value, options, onChange, scroll = fa
     </Pressable>
   ));
   const box = {flexDirection: 'row' as const, backgroundColor: c.input, borderRadius: 99, padding: 3};
-  return scroll ? <ScrollView horizontal showsHorizontalScrollIndicator={false}><View style={box}>{inner}</View></ScrollView> : <View style={box}>{inner}</View>;
+  return scroll ? <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false}><View style={box}>{inner}</View></ScrollView> : <View style={box}>{inner}</View>;
 }
 function Card_({children, style}: {children: React.ReactNode; style?: any}) {
   const c = useTheme();
@@ -113,6 +113,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
   const [editing, setEditing] = useState<Partial<Tx> | null>(null), [manage, setManage] = useState(false);
   const [accountFilter, setAccountFilter] = useState<string>('');
   const [selectedAccount, setSelectedAccount] = useState(''), [accountPicker, setAccountPicker] = useState(false);
+  const [billScope, setBillScope] = useState<'month' | 'series'>('series');
   const [billEditor, setBillEditor] = useState<Tx | 'new' | null>(null), [notificationWarning, setNotificationWarning] = useState('');
   const [tabHistory, setTabHistory] = useState<Tab[]>([]);
   const navigateFinance = useCallback((next: Tab) => {
@@ -210,10 +211,10 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
         {!d ? <View style={{flex: 1, padding: 16, gap: 14}}>{error ? <View style={{padding: 20, gap: 12}}><Text style={{color: c.danger}}>{error}</Text><Button title="Tentar de novo" secondary onPress={() => void reload()} /></View> : <View style={{gap: 6}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Spinner size={16} stroke={1.8} /><Text style={{color: c.muted, fontSize: 13}}>Carregando suas finanças</Text></View><LoadingLines rows={5} /></View>}</View> : !d.accounts.length ? (
           <Onboarding api={api} onDone={reload} onFinished={goHome} />
         ) : (
-          <ScrollView contentContainerStyle={{paddingHorizontal: 20, paddingTop: 2, paddingBottom: insets.bottom + 110, gap: 16}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingHorizontal: 20, paddingTop: 2, paddingBottom: insets.bottom + 110, gap: 16}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>
             {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
-            {tab === 'home' ? <HomeTab d={scoped || d} month={month} api={api} reload={reload} onTx={setEditing} onTab={navigateFinance} accountId={accountId} isPrimary={isPrimary} onBill={t => setBillEditor(t || 'new')} aporteKey={aporteKey} />
-              : tab === 'bills' ? <PendingTab d={scoped || d} api={api} month={month} accountId={accountId} isPrimary={isPrimary} onAporte={() => { navigateFinance('home'); setAporteKey(k => k + 1); }} warning={notificationWarning} onBill={setBillEditor} reload={reload} />
+            {tab === 'home' ? <HomeTab d={scoped || d} month={month} api={api} reload={reload} onTx={setEditing} onTab={navigateFinance} accountId={accountId} isPrimary={isPrimary} onBill={t => { setBillScope('series'); setBillEditor(t || 'new'); }} aporteKey={aporteKey} />
+              : tab === 'bills' ? <PendingTab d={scoped || d} api={api} month={month} accountId={accountId} isPrimary={isPrimary} onAporte={() => { navigateFinance('home'); setAporteKey(k => k + 1); }} warning={notificationWarning} onBill={(t, scope) => { setBillScope(scope || 'series'); setBillEditor(t); }} reload={reload} />
               : tab === 'cards' ? <CardsTab d={scoped || d} api={api} reload={reload} onTx={setEditing} onManage={() => setManage(true)} />
               : <ReportsTab d={scoped || d} month={month} reserve={reserveFor((scoped || d).goals, accountId, isPrimary)} />}
           </ScrollView>
@@ -237,7 +238,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
         </> : null}
 
         {editing && d ? <TxEditor api={api} d={d} tx={editing} defaultAccountId={accountId} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} /> : null}
-        {billEditor && d ? <BillEditor api={api} tx={billEditor === 'new' ? null : billEditor} accountId={accountId} onClose={() => setBillEditor(null)} onSaved={() => {setBillEditor(null);void reload();}} /> : null}
+        {billEditor && d ? <BillEditor api={api} scope={billScope} tx={billEditor === 'new' ? null : billEditor} accountId={accountId} onClose={() => setBillEditor(null)} onSaved={() => {setBillEditor(null);void reload();}} /> : null}
         {manage && d ? <ManageSheet api={api} d={d} onClose={() => setManage(false)} onFinished={goHome} reload={reload} /> : null}
         <Sheet visible={accountPicker} onClose={() => setAccountPicker(false)} label="Fechar seletor de contas">
           <View style={{gap:14,paddingBottom:12}}>
@@ -496,7 +497,7 @@ function ReserveHistorySheet({api, reserve, moves, show, onClose, reload}: {api:
     </ScrollView>
   </Sheet>;
   return <Sheet visible onClose={onClose} label="Fechar histórico da reserva">
-    <ScrollView contentContainerStyle={{gap: 16, paddingBottom: 18}}>
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 16, paddingBottom: 18}}>
       <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Histórico da reserva</Text>
       <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Toque em um movimento para corrigir o valor, a data ou apagá-lo.</Text>
       {months.length ? months.map(m => <View key={m.month} style={{gap: 8}}>
@@ -643,7 +644,7 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
 }
 
 // ============================ PENDENTES MANUAIS ============================
-function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,onAporte}: {d:Data;api:SofiaApi;month:string;accountId:string;warning:string;onBill:(t:Tx|'new')=>void;reload:()=>Promise<void>;isPrimary?:boolean;onAporte?:()=>void}) {
+function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,onAporte}: {d:Data;api:SofiaApi;month:string;accountId:string;warning:string;onBill:(t:Tx|'new',scope?:'month'|'series')=>void;reload:()=>Promise<void>;isPrimary?:boolean;onAporte?:()=>void}) {
   // A aba segue o mes escolhido no topo; cada mes mostra so as suas contas (0.3.180)
   const c=useTheme(),today=todayISO(),list=useMemo(()=>monthDues(d.txs,accountId,month,today),[d,accountId,month,today]);
   const open=list.filter(row=>!row.paid),total=open.reduce((sum,row)=>sum+row.amount,0),paidCount=list.length-open.length;
@@ -677,7 +678,7 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
       <Text style={{fontSize:12,color:c.muted,lineHeight:18}}>As pendências marcadas como “Todo mês”, em {range.label}.</Text>
       {/* 0.3.192: tocar numa conta fixa abre a edicao dela (nome, valor, dia, parcelas, avisos) - vale para todos os meses */}
       {fixed.bills.map(b=>{const original=d.txs.find(t=>!t.virtual&&t.id===(b.tx.seriesId||b.tx.id))||(!b.tx.virtual?b.tx:null);
-        return <Pressable key={b.id+b.date} accessibilityRole="button" accessibilityLabel={'Editar '+b.title} disabled={!original} onPress={()=>original&&onBill(original)} style={({pressed})=>({flexDirection:'row',alignItems:'center',gap:10,paddingVertical:9,borderTopWidth:1,borderColor:c.line,opacity:pressed?0.6:1})}>
+        return <Pressable key={b.id+b.date} accessibilityRole="button" accessibilityLabel={'Editar '+b.title} disabled={!original} onPress={()=>original&&onBill(original,'series')} style={({pressed})=>({flexDirection:'row',alignItems:'center',gap:10,paddingVertical:9,borderTopWidth:1,borderColor:c.line,opacity:pressed?0.6:1})}>
         <View style={{flex:1,gap:2}}>
           <Text style={{color:c.text,fontSize:14,fontWeight:'600'}}>{b.title}</Text>
           <Text style={{color:c.muted,fontSize:11}}>dia {b.day}{b.cardId?' · cartão':''} · {b.paid?'paga':'a pagar'}{b.installments?' · parcela '+b.index+' de '+b.installments+(b.left?' · faltam '+b.left:' · última'):''}</Text>
@@ -708,14 +709,19 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
           <Text style={{color:GOOD,fontWeight:'700'}}>{money(aporte.realized)}</Text>
           <Text style={{color:GOOD,fontWeight:'800',fontSize:12}}>✓ Aportado</Text>
         </View>):null}
-      {list.length ? list.map(due=><DueRow key={due.id} due={due} d={d} api={api} reload={reload} onTx={t=>onBill(t as Tx)} />)
+      {list.length ? list.map(due=><DueRow key={due.id} due={due} d={d} api={api} reload={reload} onTx={t=>onBill(t as Tx,'month')} />)
         : <Text style={{color:c.muted,fontSize:13,lineHeight:20}}>{month===monthOf(today)?'Nada a pagar ou receber neste mês.':'Nada pendente em '+monthLabel(month).split(' ')[0].toLowerCase()+'.'} Para ver outro mês, troque o mês no topo.</Text>}
       <Text style={{fontSize:11,color:c.muted}}>Os avisos locais saem às 9h do vencimento (e, se você escolher, alguns dias antes), com a permissão de notificações do Android. Confirmar o pagamento ou o recebimento tira o item dos pendentes e o inclui no extrato.</Text>
     </Card_>
   </>;
 }
-function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;accountId:string;onClose:()=>void;onSaved:()=>void}) {
+function BillEditor({api,tx,accountId,onClose,onSaved,scope='series'}:{api:SofiaApi;tx:Tx|null;accountId:string;onClose:()=>void;onSaved:()=>void;scope?:'month'|'series'}) {
   const c=useTheme(),existing=!!tx?.entity&&!tx?.virtual;
+  // 0.3.193: aberta por "A vencer e atrasadas", a edicao de uma conta que se repete vale SO para aquele mes;
+  // por "Contas fixas", vale para todos os meses.
+  const recurring=!!tx&&(tx.virtual||tx.recurrence==='monthly'||!!tx.seriesId);
+  const monthOnly=scope==='month'&&recurring;
+  const isTemplate=!!tx&&!tx.virtual&&tx.recurrence==='monthly'&&!tx.seriesId;
   const [name,setName]=useState(tx?.desc||''),[amount,setAmount]=useState(tx?.amount?finishMoneyInput(String(tx.amount).replace('.',',')):'');
   const [date,setDate]=useState(tx?.date||todayISO()),[category,setCategory]=useState(tx?.category||'Contas');
   const [repeat,setRepeat]=useState(tx?.recurrence==='monthly'?'monthly':'none');
@@ -753,15 +759,27 @@ function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;
     try{
       // 0.3.192: conta fixa ja existente - a data escolhida define o novo DIA; o mes de inicio continua o mesmo
       // (assim o historico dos meses ja pagos nao se move)
+      // So este mes, sendo o registro original da conta fixa: ele vira o registro daquele mes e a conta fixa
+      // continua a partir do mes seguinte, com o valor de antes (nada muda nos outros meses).
+      if(monthOnly&&isTemplate&&tx?.entity){
+        const old=tx.entity.data||{},nextDate=addMonths(monthOf(tx.date),1)+'-'+String(Math.min(Number(tx.date.slice(8,10)),daysIn(addMonths(monthOf(tx.date),1)))).padStart(2,'0');
+        const total=Number(old.installments)||0,at=Number(old.installment)||1;
+        const continues=!total||at<total;
+        let nextId='';
+        if(continues){const next=await api.saveEntity({kind:'fin_tx',title:tx.desc,content:'',area:tx.entity.area||'Pessoal',privacy:'private',state:'active',tags:[],
+          data:{...old,date:nextDate,paid:false,recurrence:'monthly',series_id:'',installment:total?at+1:'',import_id:'sofia-pendencia:'+uid()}});nextId=next.id;}
+        await api.saveEntity({...tx.entity,title:name.trim(),data:{...old,kind:flow,amount:value,date,category,remind_days:Number(before)||0,recurrence:'none',series_id:nextId,installments:'',installment:'',recurrence_end:''}});
+        await clearDraft();onSaved();return;
+      }
       const isSeries=!!tx&&!tx.virtual&&tx.recurrence==='monthly'&&!tx.seriesId&&repeat==='monthly';
       const finalDate=isSeries&&tx?String(tx.entity?.data?.date||tx.date).slice(0,7)+'-'+String(Math.min(Number(date.slice(8,10)),daysIn(String(tx.entity?.data?.date||tx.date).slice(0,7)))).padStart(2,'0'):date;
       const data={
         kind:flow,amount:value,date:finalDate,category,account_id:tx?.accountId||accountId,remind_days:Number(before)||0,
-        installments:repeat==='monthly'&&Number(parcels)>1?Math.min(360,Math.round(Number(parcels))):'',
-        installment:repeat==='monthly'&&Number(parcels)>1?Math.min(Math.round(Number(parcels)),Math.max(1,Math.round(Number(parcelNow))||1)):'',
-        recurrence_end:repeat==='monthly'&&Number(parcels)>1?addMonths(monthOf(finalDate),Math.round(Number(parcels))-Math.max(1,Math.round(Number(parcelNow))||1)):'',
-        paid:false,card_id:'',to_account_id:'',
-        recurrence:tx?.virtual?'none':repeat,
+        installments:!monthOnly&&repeat==='monthly'&&Number(parcels)>1?Math.min(360,Math.round(Number(parcels))):'',
+        installment:!monthOnly&&repeat==='monthly'&&Number(parcels)>1?Math.min(Math.round(Number(parcels)),Math.max(1,Math.round(Number(parcelNow))||1)):'',
+        recurrence_end:!monthOnly&&repeat==='monthly'&&Number(parcels)>1?addMonths(monthOf(finalDate),Math.round(Number(parcels))-Math.max(1,Math.round(Number(parcelNow))||1)):'',
+        paid:existing?!!tx?.paid:false,card_id:'',to_account_id:'',
+        recurrence:tx?.virtual||monthOnly?'none':repeat,
         series_id:tx?.seriesId||'',
         import_id:existing?String(tx?.entity?.data?.import_id||''): 'sofia-pendencia:'+uid(),
       };
@@ -779,7 +797,7 @@ function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;
   }
   return <Sheet visible onClose={onClose} label="Fechar cadastro de vencimento">
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap:13,paddingBottom:24}}>
-      <Text style={{fontSize:20,fontWeight:'800',color:c.text}}>{existing?'Editar vencimento':'Novo vencimento'}</Text>
+      <Text style={{fontSize:20,fontWeight:'800',color:c.text}}>{monthOnly?'Editar só '+monthLabel(monthOf(tx!.date)).split(' ')[0].toLowerCase():existing?'Editar vencimento':'Novo vencimento'}</Text>
       <Text style={{fontSize:13,lineHeight:19,color:c.muted}}>Este registro só afeta o saldo depois que você confirmar o pagamento. Não vem automaticamente do extrato bancário.</Text>
       <Chips value={flow} onChange={setFlow} options={[{value:'expense',label:'A pagar'},{value:'income',label:'A receber'}]}/>
       <Field label={flow==='income'?'Conta a receber':'Conta a pagar'} value={name} onChange={setName} placeholder={flow==='income'?'Ex.: Freela, aluguel recebido, reembolso':'Ex.: Boleto de energia, dívida, aluguel'} />
@@ -787,7 +805,8 @@ function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;
       <DateTimeField label={tx&&!tx.virtual&&tx.recurrence==='monthly'&&!tx.seriesId?'Vencimento (o dia vale para todos os meses)':'Vencimento'} value={date} onChange={v=>v&&setDate(v)} dateOnly allowClear={false} />
       <Text style={{color:c.muted,fontSize:12}}>Categoria</Text>
       <Chips scroll value={category} onChange={setCategory} options={['Contas','Moradia','Saúde','Impostos','Outros'].map(x=>({value:x,label:x}))}/>
-      <Text style={{color:c.muted,fontSize:12}}>Repetição</Text>
+      {monthOnly?null:<Text style={{color:c.muted,fontSize:12}}>Repetição</Text>}
+      {monthOnly?<Text style={{color:c.muted,fontSize:12,lineHeight:18}}>Esta alteração vale só para {monthLabel(monthOf(tx!.date)).split(' ')[0].toLowerCase()}. Para mudar todos os meses, edite a conta em Contas fixas.</Text>:<>
       <Chips value={repeat} onChange={setRepeat} options={[{value:'none',label:'Só esta vez'},{value:'monthly',label:'Todo mês'}]}/>
       {repeat==='monthly'?<>
         <View style={{flexDirection:'row',gap:10}}>
@@ -796,6 +815,7 @@ function BillEditor({api,tx,accountId,onClose,onSaved}:{api:SofiaApi;tx:Tx|null;
         </View>
         <Text style={{color:c.muted,fontSize:11,lineHeight:16}}>{Number(parcels)>1?'Acaba sozinha na '+Math.round(Number(parcels))+'ª parcela, em '+monthLabel(addMonths(monthOf(date),Math.round(Number(parcels))-Math.max(1,Math.round(Number(parcelNow))||1)))+'. A Sofia avisa quando terminar.':'Em branco, se repete todo mês sem prazo. Já tem parcelas pagas? Informe o total e em qual você está.'}</Text>
       </>:null}
+      </>}
       <Text style={{color:c.muted,fontSize:12}}>Avisar</Text>
       <Chips value={before} onChange={setBefore} options={[{value:'0',label:'No dia'},{value:'1',label:'1 dia antes'},{value:'3',label:'3 dias antes'},{value:'7',label:'7 dias antes'}]}/>
       <Text style={{color:c.muted,fontSize:11}}>{before==='0'?'Aviso às 9h do dia do vencimento.':'Aviso às 9h, '+before+(before==='1'?' dia':' dias')+' antes e de novo no dia.'}</Text>
@@ -870,7 +890,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
       </View>
       </View>
       <Sheet visible={reserveMenu} onClose={() => setReserveMenu(false)} label="Fechar detalhes da reserva">
-        <ScrollView contentContainerStyle={{gap: 14, paddingBottom: 28}}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 14, paddingBottom: 28}}>
           <Text style={{fontSize: 18, fontWeight: '800', color: c.text}}>Sua reserva</Text>
           {split ? <>
             <Text style={{fontSize: 29, fontWeight: '800', color: c.text}}>{show(split.saved)}</Text>
@@ -980,7 +1000,8 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
     } catch (e) { appAlert('Finanças', errorText(e)); } finally { setBusy(false); }
   }
   // 0.3.192: tocar em qualquer parte da linha abre a edicao; numa repeticao, abre a conta fixa original
-  const target = due.tx?.virtual ? (d.txs.find(t => !t.virtual && t.id === (due.tx!.seriesId || due.tx!.id)) || due.tx) : due.tx;
+  // 0.3.193: pela lista do mes, a edicao vale so para aquele mes (a conta fixa inteira muda em Contas fixas)
+  const target = due.tx;
   const openEdit = () => { if (target) onTx(target); };
   if (due.paid) return (
     <Pressable accessibilityRole="button" accessibilityLabel={'Editar ' + due.title} disabled={!target} onPress={openEdit}
@@ -1358,7 +1379,7 @@ function BudgetSheet({api, budget, used, onClose, onSaved}: {api: SofiaApi; budg
   const c = useTheme(), [cat, setCat] = useState(budget?.category || ''), [limit, setLimit] = useState(budget ? finishMoneyInput(String(budget.limit).replace('.', ',')) : ''), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   return (
     <Sheet visible onClose={onClose} label="Fechar orçamento">
-      <ScrollView contentContainerStyle={{gap: 12}}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 12}}>
         <Text style={{fontSize: 18, fontWeight: '700', color: c.text}}>{budget ? 'Editar orçamento' : 'Novo orçamento'}</Text>
         <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
           {EXPENSE_CATEGORIES.filter(x => x.name === budget?.category || !used.includes(x.name)).map(x => <Pressable key={x.name} onPress={() => setCat(x.name)} style={{flexDirection: 'row', gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 99, borderWidth: 1, borderColor: cat === x.name ? x.color : c.line, backgroundColor: cat === x.name ? x.color + '22' : 'transparent'}}><Text>{x.icon}</Text><Text style={{color: c.text, fontSize: 13}}>{x.name}</Text></Pressable>)}
@@ -1376,7 +1397,7 @@ function GoalSheet({api, goal, onClose, onSaved}: {api: SofiaApi; goal: Goal | n
   const [deadline, setDeadline] = useState(goal?.deadline || ''), [color, setColor] = useState(goal?.color || FIN_COLORS[1]), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   return (
     <Sheet visible onClose={onClose} label="Fechar objetivo">
-      <ScrollView contentContainerStyle={{gap: 12}}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 12}}>
         <Text style={{fontSize: 18, fontWeight: '700', color: c.text}}>{goal ? 'Editar objetivo' : 'Novo objetivo'}</Text>
         <Field label="Nome" value={name} onChange={setName} placeholder="Ex.: Reserva de emergência" />
         <Field label="Valor do objetivo (R$)" value={target} onChange={setTarget} numeric placeholder="0,00" />
@@ -1506,7 +1527,7 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountI
     <Text style={{color: strong ? c.text : c.muted, fontSize: strong ? 14 : 13, fontWeight: strong ? '800' : '400'}}>{label}</Text>
     <Text style={{color: color || c.text, fontSize: strong ? 15 : 13, fontWeight: strong ? '800' : '700'}}>{value}</Text></View>;
   return <Sheet visible onClose={onClose} label="Fechar detalhes">
-    <ScrollView contentContainerStyle={{gap: 12, paddingBottom: 18}}>
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 12, paddingBottom: 18}}>
       {parts ? <>
         <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Saldo</Text>
         {target && api ? (adjusting ? <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 10}}>
@@ -1561,7 +1582,7 @@ function RecoverSheet({api, onClose, onRestored}: {api: SofiaApi; onClose: () =>
     try { await api.financeRecover(id); setDone(list => [...list, id]); onRestored(); } catch (e) { setError(errorText(e)); } finally { setBusy(''); }
   }
   return <Sheet visible onClose={onClose} label="Fechar recuperar itens apagados">
-    <ScrollView contentContainerStyle={{gap: 12, paddingBottom: 18}}>
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 12, paddingBottom: 18}}>
       <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Recuperar itens apagados</Text>
       <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Itens ocultos (arquivados) e itens apagados que ainda estão nas cópias diárias do servidor. Restaurar traz de volta com os mesmos dados.</Text>
       {error ? <Text style={{color: BAD}}>{error}</Text> : null}
@@ -1593,7 +1614,7 @@ function ManageSheet({api, d, onClose, reload, onFinished}: {api: SofiaApi; d: D
           <IconButton name="back" label="Voltar" onPress={onClose} /><Text style={{flex: 1, fontSize: 17, fontWeight: '700', color: c.text}}>Contas e cartões</Text>
         </View>
         {setup ? <Onboarding api={api} onDone={reload} onClose={() => setSetup(false)} onFinished={() => { setSetup(false); onFinished ? onFinished() : onClose(); }} existing={{account: d.accounts.find(a => !a.archived) || null, reserve: reserveOf(d.goals), fixed: d.txs.filter(t => t.manualDue && t.recurrence === 'monthly' && !t.virtual && t.kind === 'expense' && t.entity?.state !== 'archived')}} /> :
-        <ScrollView contentContainerStyle={{padding: 18, gap: 14}}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 18, gap: 14}}>
           <Pressable accessibilityRole="button" onPress={() => setRecover(true)} style={{backgroundColor: c.surface, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: c.line, flexDirection: 'row', alignItems: 'center', gap: 10}}>
             <View style={{flex: 1, gap: 2}}>
               <Text style={{color: c.text, fontWeight: '700', fontSize: 14}}>Recuperar itens apagados</Text>
@@ -1755,7 +1776,7 @@ function ImportSheet({api, d, onClose, onDone}: {api: SofiaApi; d: Data; onClose
             {preview ? (
               <View style={{gap: 6}}>
                 <Text style={{fontSize: 12, color: c.muted, fontWeight: '700'}}>3. Confira ({chosenItems.length} de {preview.length} marcados · {money(Math.abs(sum))} {sum >= 0 ? 'de entrada' : 'de saída'})</Text>
-                <View><ScrollView nestedScrollEnabled>
+                <View><ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
                   {preview.map(i => <Pressable key={i.import_id} disabled={!!i.skip} onPress={() => toggle(i.import_id)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderColor: c.line, opacity: i.skip ? 0.45 : 1}}>
                     <View style={{width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: chosen.has(i.import_id) ? c.accent : c.line, backgroundColor: chosen.has(i.import_id) ? c.accent : 'transparent', alignItems: 'center', justifyContent: 'center'}}>{chosen.has(i.import_id) ? <Text style={{color: c.onAccent, fontSize: 13, fontWeight: '800'}}>✓</Text> : null}</View>
                     <View style={{flex: 1}}><Text style={{color: c.text}} numberOfLines={1}>{i.desc}</Text><Text style={{fontSize: 11, color: c.muted}}>{i.date.split('-').reverse().join('/')}{i.category ? ' · ' + i.category : ''}{i.duplicate ? ' · já importado' : ''}{i.skip ? ' · ' + i.skip : ''}</Text></View>

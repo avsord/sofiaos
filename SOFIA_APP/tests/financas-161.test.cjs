@@ -179,13 +179,13 @@ test('0.3.188: aporte como conta a fazer (valor sugerido e editavel), no + e em 
   assert.ok(s.includes("toque para aportar este ou outro valor"),'sugestao no Resumo');
   assert.ok(s.includes("🔒 Aporte (guardar dinheiro)"),'opcao no +');
   assert.ok(s.includes("🔒 Aporte do mês")&&s.includes("✓ Aportado"),'em Pendentes, amarelo/verde');
-  assert.ok(s.includes('<ScrollView contentContainerStyle={{gap: 14, paddingBottom: 28}}>'),'Sua reserva rola e tem respiro no fim');
+  assert.ok(s.includes('<ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 14, paddingBottom: 28}}>'),'Sua reserva rola e tem respiro no fim');
   assert.ok(!s.includes('não entra no saldo geral'),'sem "saldo geral"');
 });
 
 test('0.3.192: contas fixas editaveis pela propria secao; mudar a data muda so o dia (o inicio fica)',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes("accessibilityLabel={'Editar '+b.title} disabled={!original} onPress={()=>original&&onBill(original)}"),'toque abre a conta fixa original');
+  assert.ok(s.includes("accessibilityLabel={'Editar '+b.title} disabled={!original} onPress={()=>original&&onBill(original,'series')}"),'toque abre a conta fixa original');
   assert.ok(s.includes('Toque numa conta para mudar nome, valor, dia, parcelas ou avisos. Vale para todos os meses.'));
   assert.ok(s.includes("const isSeries=!!tx&&!tx.virtual&&tx.recurrence==='monthly'&&!tx.seriesId&&repeat==='monthly';"));
   assert.ok(s.includes("kind:flow,amount:value,date:finalDate,category,"),'grava com o mes de inicio original');
@@ -194,8 +194,8 @@ test('0.3.192: contas fixas editaveis pela propria secao; mudar a data muda so o
 
 test('0.3.192: contas fixas editaveis, linha inteira das pendencias abre a edicao, voltar sempre para o Resumo',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes("accessibilityLabel={'Editar '+b.title} disabled={!original} onPress={()=>original&&onBill(original)}"),'conta fixa abre a edicao da original');
-  assert.ok(s.includes('const target = due.tx?.virtual ? (d.txs.find(t => !t.virtual && t.id === (due.tx!.seriesId || due.tx!.id)) || due.tx) : due.tx;'),'repeticao abre a original');
+  assert.ok(s.includes("accessibilityLabel={'Editar '+b.title} disabled={!original} onPress={()=>original&&onBill(original,'series')}"),'conta fixa abre a edicao da original');
+  assert.ok(s.includes('const target = due.tx;'),'0.3.193: pela lista do mes, abre o proprio mes');
   assert.ok(s.includes("accessibilityLabel={'Editar ' + due.title} disabled={!target} onPress={openEdit}"),'linha inteira');
   assert.ok(s.includes("const isSeries=!!tx&&!tx.virtual&&tx.recurrence==='monthly'&&!tx.seriesId&&repeat==='monthly';"),'mudar a data muda o dia, nao o inicio');
   assert.ok(s.includes("if (tab !== 'home') {setTab('home');setTabHistory([]);return;}"),'voltar: aba -> Resumo -> Apps');
@@ -214,4 +214,21 @@ test('0.3.192: ajustar o Saldo ao valor do banco muda so o ponto de partida; lan
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes('Ajustar saldo ao valor do banco'));
   assert.ok(s.includes("initial_balance: String(Math.round((target.initial + diff) * 100) / 100)"),'sem lancamento falso');
+});
+
+test('0.3.193: pela lista do mes a edicao vale so para aquele mes; conta paga continua paga; botoes funcionam com teclado aberto',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("onTx={t=>onBill(t as Tx,'month')}"),'lista do mes: so o mes');
+  assert.ok(s.includes("const monthOnly=scope==='month'&&recurring;"));
+  assert.ok(s.includes("if(monthOnly&&isTemplate&&tx?.entity){"),'original da conta fixa: vira o mes e a serie continua no mes seguinte com o valor de antes');
+  assert.ok(s.includes("recurrence:tx?.virtual||monthOnly?'none':repeat,"),'so o mes nunca muda a repeticao');
+  assert.ok(s.includes("paid:existing?!!tx?.paid:false,"),'editar conta paga nao desmarca');
+  assert.ok(s.includes('Para mudar todos os meses, edite a conta em Contas fixas.'));
+  assert.ok(!/<ScrollView(?![^>]*keyboardShouldPersistTaps)[^>]*contentContainerStyle=\{\{gap: 12, paddingBottom: 18\}\}>/.test(s),'tela do saldo: toque em Salvar funciona com o teclado aberto');
+  // a conta fixa lista tambem os meses ja registrados da serie
+  const t=(id,date,extra={})=>f.toTx({id,kind:'fin_tx',title:'Vivo',state:'active',data:{kind:'expense',amount:47,date,account_id:'a1',paid:false,category:'Contas',recurrence:'none',import_id:'sofia-pendencia:'+id,...extra}});
+  const list=f.fixedBills([t('mes','2026-10-17',{series_id:'next',amount:60}),t('next','2026-11-17',{recurrence:'monthly'})],'a1',{start:'2026-10-01',end:'2026-10-31'});
+  assert.equal(list.length,1);assert.equal(list[0].amount,60,'outubro com o valor alterado so para ele');
+  const nov=f.fixedBills([t('mes','2026-10-17',{series_id:'next',amount:60}),t('next','2026-11-17',{recurrence:'monthly'})],'a1',{start:'2026-11-01',end:'2026-11-30'});
+  assert.equal(nov[0].amount,47,'novembro segue com o valor de antes');
 });

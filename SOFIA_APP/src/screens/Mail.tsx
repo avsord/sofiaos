@@ -135,7 +135,7 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
           <Chips value={tab} onChange={setTab} options={[{value: 'hits' as Tab, label: 'Encontrados' + (unread ? ' · ' + unread : '')}, {value: 'rules' as Tab, label: 'Regras ' + rules.length}, {value: 'accounts' as Tab, label: 'Contas ' + (accounts?.length || 0)}]} />
         </View>
         {accounts === null ? <View style={{padding: 16, gap: 6}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Spinner size={16} stroke={1.8} /><Text style={{color: c.muted, fontSize: 13}}>Carregando e-mails</Text></View><LoadingLines rows={4} /></View> : (
-          <ScrollView contentContainerStyle={{padding: 16, gap: 12, paddingBottom: insets.bottom + 40}} refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load()} />}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 16, gap: 12, paddingBottom: insets.bottom + 40}} refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load()} />}>
             {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
             {checking ? <View style={{flexDirection: 'row', gap: 8, alignItems: 'center'}}><ActivityIndicator color={c.accent} /><Text style={{color: c.muted}}>Lendo as caixas de entrada…</Text></View> : info ? <Text style={{color: c.muted, fontSize: 12}}>{info}</Text> : null}
             {!accounts.length ? (

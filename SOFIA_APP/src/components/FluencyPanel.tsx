@@ -20,7 +20,7 @@ export function FluencyPanel({onClose}:{onClose:()=>void}){
  function refresh(){setReport({...perfReport(),pending:idleWork.pending(),monitoring:monitorDiagnostics(),network:apiDiagnostics()});}
  async function copy(){try{await Clipboard.setStringAsync(JSON.stringify({version:APP_VERSION,nextMode:next,lastError,...report},null,2));appAlert('Relatório copiado','Contém tempos, contagens de cache e o estado do Monitoramento (só domínios das lojas, sem links, nomes de produtos, mensagens ou credenciais).');}catch{appAlert('Diagnóstico','Falha ao copiar.');}}
  const button=(label:string,onPress:()=>void)=><Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={{padding:14,backgroundColor:c.surface,borderRadius:12}}><Text style={{color:c.text}}>{label}</Text></Pressable>;
- return <Modal visible animationType="none" onRequestClose={onClose}><ScrollView style={{flex:1,backgroundColor:c.bg}} contentContainerStyle={{padding:24,paddingTop:48,gap:14}}>
+ return <Modal visible animationType="none" onRequestClose={onClose}><ScrollView keyboardShouldPersistTaps="handled" style={{flex:1,backgroundColor:c.bg}} contentContainerStyle={{padding:24,paddingTop:48,gap:14}}>
   <Text style={{fontSize:23,color:c.text,fontWeight:'700'}}>Diagnóstico de fluidez</Text>
   <Text style={{color:c.muted}}>Atual: {fluencyMode()==='new'?'Novo':'Antigo'}. Próxima abertura fria: {next==='new'?'Novo':'Antigo'}. Feche o app por completo para trocar. Antigo conserva a política da 0.3.107, com instrumentação idêntica.</Text>
   {button('Modo Novo',()=>void choose('new'))}{button('Modo Antigo',()=>void choose('old'))}
