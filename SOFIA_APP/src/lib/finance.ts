@@ -5,7 +5,7 @@ import type {Entity} from './types';
 
 export type TxKind = 'expense' | 'income' | 'transfer' | 'card_payment';
 export type Recurrence = 'none' | 'monthly' | 'weekly' | 'yearly';
-export type Account = {id: string; name: string; type: string; initial: number; color: string; include: boolean; archived: boolean; cycleDay: number; entity: Entity};
+export type Account = {id: string; name: string; type: string; initial: number; color: string; include: boolean; archived: boolean; cycleDay: number; reportStart: string; entity: Entity};
 export type Card = {id: string; name: string; limit: number; closing: number; due: number; color: string; accountId: string; archived: boolean; entity: Entity};
 export type Tx = {
   id: string; kind: TxKind; desc: string; amount: number; date: string; category: string; accountId: string; toAccountId: string; cardId: string;
@@ -63,7 +63,7 @@ export function addDays(date: string, n: number): string { const d = new Date(da
 // ---------- Leitura das entidades ----------
 export function toAccount(e: Entity): Account {
   return {id: e.id, name: e.title, type: String(e.data?.account_type || 'corrente'), initial: num(e.data?.initial_balance), color: String(e.data?.color || FIN_COLORS[0]),
-    include: e.data?.include_total !== false, archived: e.state === 'archived', cycleDay: Math.min(31, Math.max(0, num(e.data?.cycle_day))), entity: e};
+    include: e.data?.include_total !== false, archived: e.state === 'archived', cycleDay: Math.min(31, Math.max(0, num(e.data?.cycle_day))), reportStart: /^\d{4}-\d{2}-\d{2}$/.test(String(e.data?.report_start || '')) ? String(e.data.report_start) : '', entity: e};
 }
 export function toCard(e: Entity): Card {
   return {id: e.id, name: e.title, limit: num(e.data?.limit), closing: num(e.data?.closing_day) || 1, due: num(e.data?.due_day) || 10, color: String(e.data?.color || FIN_COLORS[2]),
@@ -542,4 +542,11 @@ export function monthsBetween(from: string, to: string): number {
 export function lastInstallmentMonth(firstDate: string, installments: number): string {
   const n = Math.max(1, Math.round(installments)) - 1;
   return addMonths(monthOf(firstDate), n);
+}
+
+/** 0.3.194: relatorios a partir de um ponto de partida por conta. Os lancamentos de antes continuam
+ * guardados (e no Saldo), so nao entram nos graficos e totais dos Relatorios. */
+export function sinceReportStart(accounts: Account[], txs: Tx[]): Tx[] {
+  const start = new Map(accounts.map(a => [a.id, a.reportStart]));
+  return txs.filter(t => { const s = start.get(t.accountId) || ''; return !s || t.date >= s; });
 }

@@ -41,3 +41,15 @@ test('filtro do historico: categorias que realmente existem, sem campo de digita
   const block=s.slice(s.indexOf('const catPresets = useMemo('),s.indexOf('const activeCat'));
   assert.ok(block.includes('for (const t of d.txs)'));assert.ok(!/Alimenta|Mercado|Transporte|Lazer/.test(block));
 });
+test('0.3.194: relatorios recomecam a partir de hoje sem apagar nada; graficos de saldo seguem com o valor real',()=>{
+  const {f,acc,tx}=base();
+  const a=f.toAccount({...acc.entity,data:{...acc.entity.data,report_start:'2026-10-19'}});
+  const txs=[tx('antes','expense',500,'2026-10-02'),tx('depois','expense',80,'2026-10-20')];
+  const since=f.sinceReportStart([a],txs);
+  assert.deepEqual(since.map(t=>t.id),['depois'],'so o que veio depois do ponto de partida entra nos relatorios');
+  assert.equal(f.sinceReportStart([acc],txs).length,2,'sem ponto de partida: todo o historico');
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes('Recomeçar de hoje')&&s.includes('Ver tudo'));
+  assert.ok(s.includes('Nada é apagado: os lançamentos de antes continuam no Histórico e no Saldo'));
+  assert.ok(s.includes('bal: fromStart(balanceSeries(full.accounts, full.txs, month'),'saldo do grafico com o historico inteiro');
+});

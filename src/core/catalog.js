@@ -1549,6 +1549,11 @@ const CATALOG={
     ],
     "fields": [
       {
+        "key": "report_start",
+        "label": "Relatórios a partir de",
+        "type": "date"
+      },
+      {
         "key": "cycle_day",
         "label": "Dia em que recebe (início do ciclo)",
         "type": "number"

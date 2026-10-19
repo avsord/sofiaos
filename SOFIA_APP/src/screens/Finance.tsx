@@ -26,7 +26,7 @@ import {
   trend, balanceSeries, upcoming, manualDues, transactionsForAccount, goalProgress, parseMoney, formatMoneyInput, finishMoneyInput, addDays,
   dayIn, daysIn} from '../lib/finance';
 import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove} from '../lib/finance';
-import {cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, monthDues, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove} from '../lib/finance';
+import {sinceReportStart, cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, monthDues, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove} from '../lib/finance';
 import {syncFinanceDueNotifications} from '../lib/finance-notifications';
 import {appAlert} from '../lib/app-alert';
 import {useFormDraft} from '../lib/form-draft';
@@ -216,7 +216,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
             {tab === 'home' ? <HomeTab d={scoped || d} month={month} api={api} reload={reload} onTx={setEditing} onTab={navigateFinance} accountId={accountId} isPrimary={isPrimary} onBill={t => { setBillScope('series'); setBillEditor(t || 'new'); }} aporteKey={aporteKey} />
               : tab === 'bills' ? <PendingTab d={scoped || d} api={api} month={month} accountId={accountId} isPrimary={isPrimary} onAporte={() => { navigateFinance('home'); setAporteKey(k => k + 1); }} warning={notificationWarning} onBill={(t, scope) => { setBillScope(scope || 'series'); setBillEditor(t); }} reload={reload} />
               : tab === 'cards' ? <CardsTab d={scoped || d} api={api} reload={reload} onTx={setEditing} onManage={() => setManage(true)} />
-              : <ReportsTab d={scoped || d} month={month} reserve={reserveFor((scoped || d).goals, accountId, isPrimary)} />}
+              : <ReportsTab d={scoped || d} month={month} reserve={reserveFor((scoped || d).goals, accountId, isPrimary)} api={api} reload={reload} />}
           </ScrollView>
         )}
 
@@ -1429,14 +1429,40 @@ function Donut({slices, size = 170}: {slices: Array<{value: number; color: strin
   });
   return <Svg width={size} height={size}>{arcs}</Svg>;
 }
-function ReportsTab({d, month, reserve}: {d: Data; month: string; reserve: Goal | null}) {
+function ReportsTab({d: full, month, reserve, api, reload}: {d: Data; month: string; reserve: Goal | null; api?: SofiaApi; reload?: () => Promise<void>}) {
   const c = useTheme(), [kind, setKind] = useState<'expense' | 'income'>('expense');
+  // 0.3.194: botao para recomecar os relatorios a partir de hoje (ponto de partida). Nada e apagado.
+  const accounts = full.accounts.filter(a => !a.archived);
+  const starts = [...new Set(accounts.map(a => a.reportStart).filter(Boolean))].sort();
+  const startLabel = starts.length ? starts[starts.length - 1].split('-').reverse().join('/') : '';
+  const d = useMemo(() => ({...full, txs: sinceReportStart(full.accounts, full.txs), moves: (full.moves || []).filter(m => !starts.length || m.date >= starts[0])}), [full]);
+  // saldo e guardado sao valores absolutos: vem do historico inteiro, mas o grafico so mostra a partir do ponto de partida
+  const startMs = starts.length ? Date.parse(starts[starts.length - 1] + 'T00:00:00Z') : 0;
+  const fromStart = (pts: Array<{t: number; v: number}>) => pts.filter(p => p.t >= startMs);
+  const [resetBusy, setResetBusy] = useState(false);
+  function setStart(date: string) {
+    if (!api) return;
+    const go = async () => {
+      setResetBusy(true);
+      try { await Promise.all(accounts.map(a => api.saveEntity({...a.entity, data: {...a.entity.data, report_start: date}}))); await reload?.(); }
+      catch (e) { appAlert('Finanças', errorText(e)); } finally { setResetBusy(false); }
+    };
+    if (!date) { void go(); return; }
+    appAlert('Recomeçar os relatórios a partir de hoje?', 'Os gráficos e totais passam a contar a partir de ' + date.split('-').reverse().join('/') + '. Nada é apagado: os lançamentos de antes continuam no Histórico e no Saldo, e dá para voltar ao histórico completo quando quiser.',
+      [{text: 'Cancelar', style: 'cancel'}, {text: 'Recomeçar', onPress: () => void go()}]);
+  }
   const cats = useMemo(() => byCategory(d.txs, month, kind), [d, month, kind]), total = cats.reduce((s, x) => s + x.total, 0);
-  const {t6, s, prev, bal, saved} = useMemo(() => ({t6: trend(d.txs, month, 6), s: monthSummary(d.txs, month), prev: monthSummary(d.txs, addMonths(month, -1)), bal: balanceSeries(d.accounts, d.txs, month, reserve ? {goalId: reserve.id, moves: d.moves || []} : undefined), saved: reserve ? reserveSeries(reserve, d.moves || [], month) : []}), [d, month, reserve]);
+  const {t6, s, prev, bal, saved} = useMemo(() => ({t6: trend(d.txs, month, 6), s: monthSummary(d.txs, month), prev: monthSummary(d.txs, addMonths(month, -1)), bal: fromStart(balanceSeries(full.accounts, full.txs, month, reserve ? {goalId: reserve.id, moves: full.moves || []} : undefined)), saved: reserve ? fromStart(reserveSeries(reserve, full.moves || [], month)) : []}), [d, full, month, reserve]);
   const max = Math.max(1, ...t6.flatMap(x => [x.income, x.expense]));
   const [w, setW] = useState(0);
   return (
     <>
+      {api ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.surface, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: c.line}}>
+        <Text style={{flex: 1, color: c.muted, fontSize: 12, lineHeight: 18}}>{startLabel ? 'Relatórios a partir de ' + startLabel : 'Relatórios com todo o histórico'}</Text>
+        {resetBusy ? <ActivityIndicator color={c.accent} /> : startLabel
+          ? <Pressable accessibilityRole="button" onPress={() => setStart('')}><Text style={{color: c.accent, fontWeight: '700', fontSize: 12}}>Ver tudo</Text></Pressable>
+          : <Pressable accessibilityRole="button" onPress={() => setStart(todayISO())} style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: c.accentSoft}}><Text style={{color: c.accent, fontWeight: '700', fontSize: 12}}>Recomeçar de hoje</Text></Pressable>}
+      </View> : null}
       <Card_>
         <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, fontSize: 16, fontWeight: '700', color: c.text}}>Por categoria</Text><Chips value={kind} onChange={setKind} options={[{value: 'expense' as const, label: 'Despesas'}, {value: 'income' as const, label: 'Receitas'}]} /></View>
         <View style={{alignItems: 'center', justifyContent: 'center'}}>
