@@ -1,6 +1,7 @@
 /** Vencimentos que a pessoa cadastrou manualmente; não derivados de extratos ou compras. */
 import * as Notifications from 'expo-notifications';
-import {manualDues,todayISO} from './finance';
+import {categoryAlerts,manualDues,monthOf,todayISO} from './finance';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type {MoneySplit,Tx} from './finance';
 import {ensureSystemNotificationPermission} from './system-notification-permission';
 import {enqueueNotifications,reconcileNotificationRequests,notificationFailure,NOTIFICATION_SIGNATURE_VERSION} from './notification-scheduler';
@@ -67,6 +68,25 @@ export async function syncFinanceDueNotifications(txs: Tx[], owner: string, now 
       });
     }
   }
+  // 0.3.199: resumo da semana - toda segunda as 9h
+  desired.push({identifier: PREFIX + key + ':semana',
+    content: {title: 'Seu resumo da semana', body: 'Veja quanto você gastou por categoria na semana que passou: Finanças → Relatórios.', sound: 'default',
+      data: {sofiaFinanceDue: true, scope: key, signature: JSON.stringify([NOTIFICATION_SIGNATURE_VERSION, 'semana'])}},
+    trigger: {type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday: 2, hour: 9, minute: 0, channelId: CHANNEL} as any});
+  // 0.3.199: gasto fora do padrao - um aviso por categoria por mes, quando passa do que a pessoa costuma gastar
+  try {
+    const month = monthOf(todayISO(now)), storeKey = 'sofia.fin.alerts:' + key + ':' + month;
+    const sent = new Set<string>(JSON.parse((await AsyncStorage.getItem(storeKey)) || '[]'));
+    const fresh = categoryAlerts(txs, '', month).filter(a => !sent.has(a.category)).slice(0, 2);
+    for (const a of fresh) {
+      desired.push({identifier: PREFIX + key + ':alerta:' + month + ':' + a.category,
+        content: {title: a.category + ': acima do seu normal', body: 'R$ ' + a.total.toFixed(2).replace('.', ',') + ' neste mês, ' + Math.round(a.pct * 100) + '% acima da sua média (R$ ' + a.average.toFixed(2).replace('.', ',') + ').', sound: 'default',
+          data: {sofiaFinanceDue: true, scope: key, signature: JSON.stringify([NOTIFICATION_SIGNATURE_VERSION, 'alerta', month, a.category])}},
+        trigger: {type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(now.getTime() + 8000), channelId: CHANNEL}});
+      sent.add(a.category);
+    }
+    if (fresh.length) await AsyncStorage.setItem(storeKey, JSON.stringify([...sent]));
+  } catch { /* alerta e extra: nunca impede os avisos de vencimento */ }
   try { await enqueueNotifications(()=>reconcileNotificationRequests(Notifications,PREFIX,desired,()=>epoch===generation));return ''; }
   catch(e){return notificationFailure(e);}
 }

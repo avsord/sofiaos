@@ -46,7 +46,7 @@ function bool(v){const s=fold(v);return ['true','1','sim','yes','on','ligado','a
 const WEEKNAME={domingo:0,segunda:1,terca:2,quarta:3,quinta:4,sexta:5,sabado:6};
 function nextWeekday(target,skipToday){let d=today();if(skipToday)d=addDays(d,1);while(new Date(d+'T12:00:00Z').getUTCDay()!==target)d=addDays(d,1);return d;}
 function dateOf(v){
- const s=fold(v);if(!s||s==='hoje')return today();if(s==='amanha')return addDays(today(),1);if(s==='depois de amanha')return addDays(today(),2);if(s==='ontem')return addDays(today(),-1);
+ const s=fold(v);if(!s||s==='hoje')return today();if(s==='amanha')return addDays(today(),1);if(s==='depois de amanha')return addDays(today(),2);if(s==='ontem')return addDays(today(),-1);if(s==='anteontem'||s==='antes de ontem')return addDays(today(),-2);
  if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);
  const daqui=/^daqui\s+a\s+(\d+)\s*dias?$/.exec(s);if(daqui)return addDays(today(),Number(daqui[1]));
  if(s==='semana que vem'||s==='proxima semana')return addDays(today(),7);
@@ -106,7 +106,7 @@ const APPS={
  fin_card:{app:'Finanças',names:['cartão','cartao','crédito','credito'],ui:'finance',describe:'Cartão de crédito. title=nome; data.limit=limite; data.closing_day=dia do fechamento; data.due_day=dia do vencimento; data.account_id=NOME da conta que paga a fatura.',defaults:{}},
  fin_tx:{app:'Finanças',names:['lançamento','lancamento','gasto','despesa','receita','paguei','gastei','recebi','comprei'],ui:'finance',
   describe:'Lançamento. title=descrição; data.kind=expense|income|transfer|card_payment; data.amount=valor (número); data.date (padrão hoje); data.category=UMA das categorias do app — escolha VOCÊ pela descrição, sem perguntar (despesa: Alimentação, Mercado, Transporte, Moradia, Contas, Saúde, Educação, Lazer, Compras, Assinaturas, Viagem, Pets, Presentes, Impostos, Trabalho, Outros; receita: Salário, Freelance, Investimentos, Vendas, Reembolso, Presente, Outros). Pense no que é: farmácia, drogaria, manipulação, médico, dentista, exame → Saúde; objeto, eletrônico, acessório, roupa, loja online (Amazon, Shopee, Mercado Livre, Ugreen) → Compras; restaurante, lanche, delivery, iFood → Alimentação; supermercado, feira, atacado → Mercado; Uber, 99, combustível, estacionamento, pedágio → Transporte; streaming, app, software (Netflix, Spotify, Adobe, Claude) → Assinaturas; curso, livro → Educação; veterinário, ração → Pets; DAS, DARF, IPVA, IPTU → Impostos; data.account_id=NOME da conta; data.card_id=NOME do cartão (compra no cartão); data.to_account_id=conta destino (transferência); data.paid (padrão: pago); data.installments=número de parcelas; data.recurrence=none|monthly|weekly|yearly (contas fixas).',
-  example:'"Gastei 45,90 no mercado hoje no cartão Nubank" → create_entity entity_kind=fin_tx title="Mercado" changes=[{field:"data.kind",value:"expense"},{field:"data.amount",value:"45,90"},{field:"data.category",value:"Mercado"},{field:"data.card_id",value:"Nubank"}]. "138,08 rastreador ugreen" → title="Rastreador Ugreen", data.category="Compras". "210,36 Oficialfarma" → title="Oficialfarma", data.category="Saúde" (farmácia de manipulação).',
+  example:'"Gastei 45,90 no mercado hoje no cartão Nubank" → create_entity entity_kind=fin_tx title="Mercado" changes=[{field:"data.kind",value:"expense"},{field:"data.amount",value:"45,90"},{field:"data.category",value:"Mercado"},{field:"data.card_id",value:"Nubank"}]. "138,08 rastreador ugreen" → title="Rastreador Ugreen", data.category="Compras". "210,36 Oficialfarma" → title="Oficialfarma", data.category="Saúde" (farmácia de manipulação). Entenda a frase inteira, sem perguntar: "ontem 45 no ifood" → data.date="ontem"; "anteontem"/"sexta" → data.date com essa palavra (dia que já passou); "300 na Amazon no cartão Nubank" → data.card_id="Nubank"; "1.200 notebook em 3x no Nubank" → data.amount="1.200" (valor TOTAL), data.installments=3, data.card_id="Nubank"; "recebi 800 do freela" → data.kind="income", data.category="Freelance".',
   defaults:{kind:'expense',paid:true,recurrence:'none'}},
  fin_budget:{app:'Finanças',names:['orçamento','orcamento','limite de gasto','meta de gasto'],ui:'finance',describe:'Orçamento mensal por categoria. title=categoria; data.category; data.limit=valor limite por mês.',defaults:{}},
  fin_goal:{app:'Finanças',names:['objetivo','meta','juntar','guardar dinheiro','reserva','dinheiro guardado'],ui:'finance',describe:'Objetivo de poupança. title=nome; data.target=valor a juntar; data.saved=já guardado; data.deadline=data. Com data.role=reserve é o Dinheiro guardado da pessoa (data.monthly_plan=aporte por mês; data.plan_day=dia do aporte).',defaults:{saved:0}},
@@ -221,6 +221,13 @@ function financeCategory(workspace,kind,title,given){
  for(const [re,cat] of (kind==='income'?FIN_INCOME_HINTS:FIN_HINTS))if(re.test(t)&&list.includes(cat))return cat;
  return g||'Outros';
 }
+/** 0.3.199: "1.200 em 3x" vira 3 lancamentos, um por mes, com os centavos que sobram na 1a parcela. */
+function installmentPlan(amount,n,firstDate){
+ const cents=Math.round(Number(amount)*100),base=Math.floor(cents/n),rest=cents-base*n,day=Number(String(firstDate).slice(8,10));
+ const [y0,m0]=String(firstDate).slice(0,7).split('-').map(Number);
+ return Array.from({length:n},(_,i)=>{const t=new Date(Date.UTC(y0,m0-1+i,1));const y=t.getUTCFullYear(),m=t.getUTCMonth()+1,last=new Date(Date.UTC(y,m,0)).getUTCDate();
+  return {amount:(base+(i===0?rest:0))/100,date:y+'-'+String(m).padStart(2,'0')+'-'+String(Math.min(day,last)).padStart(2,'0'),installment:i+1};});
+}
 function buildEntity(workspace,kind,action,fallbackTitle,store){
  const app=APPS[kind],def=CATALOG[kind];if(!def||!APP_KINDS.includes(kind))return null;
  const data={...(app?(typeof app.defaults==='function'?app.defaults():app.defaults):{})};
@@ -236,6 +243,9 @@ function buildEntity(workspace,kind,action,fallbackTitle,store){
  if(kind==='capsule'){if(!data.times_json&&action.time)data.times_json=coerce(kind,{key:'times_json',type:'text'},action.time,workspace,store);if(!data.start_date)data.start_date=today();if(data.repeat_type==='weekdays'&&!data.weekdays_json)data.weekdays_json='[1,2,3,4,5]';if(data.interval_days&&data.repeat_type!=='interval')data.repeat_type='interval';if(!data.times_json)throw new AppError('ACTION_NEEDS_TIME','Em que horário(s) tomar? Ex.: 15:00.',409);}
  if(kind==='fin_tx'){if(!data.date)data.date=action.date?dateOf(action.date):today();if(!(Number(data.amount)>0))throw new AppError('ACTION_INVALID','Qual é o valor do lançamento?',409);
   data.category=financeCategory(workspace,data.kind||'expense',action.title||'',data.category);
+  // 0.3.199: "sexta", "segunda"... num lancamento ja feito e a ultima, nao a proxima
+  {const raw=fold(String((changes.find(c=>c&&String(c.field).replace(/^data\./,'')==='date')||{}).value||action.date||''));
+   if(/^(domingo|segunda|terca|quarta|quinta|sexta|sabado)(-feira)?$/.test(raw)&&data.paid!==false&&data.date>today())data.date=addDays(data.date,-7);}
   // Absorve o hábito: mesma categoria (ou mesma descrição) → mesma conta/cartão da última vez.
   if(!data.account_id&&!data.card_id){const past=workspace.list({kind:'fin_tx',limit:300}).filter(e=>e.state!=='archived');const q=fold(data.category||''),tq=fold(action.title||'');const prev=past.find(e=>q&&fold(e.data.category||'')===q)||past.find(e=>tq&&fold(e.title)===tq);if(prev){if(prev.data.card_id)data.card_id=prev.data.card_id;else if(prev.data.account_id)data.account_id=prev.data.account_id;}}
   if(!data.account_id&&!data.card_id){const accounts=workspace.list({kind:'fin_account',limit:50}).filter(e=>e.state!=='archived');if(accounts.length===1)data.account_id=accounts[0].id;else throw new AppError('REF_NOT_FOUND',accounts.length?'Em qual conta ou cartão? Existem: '+accounts.map(a=>a.title).join(', ')+'.':'Crie uma conta em Apps → Finanças antes do primeiro lançamento.',409);}}
@@ -320,4 +330,4 @@ function query(workspace,store,target,action={}){
  return null;
 }
 
-module.exports={APPS,APP_KINDS,appsContext,buildEntity,describeCreated,resolveRef,coerce,query,today,dateOf,money,timeOf,weekdays};
+module.exports={installmentPlan,APPS,APP_KINDS,appsContext,buildEntity,describeCreated,resolveRef,coerce,query,today,dateOf,money,timeOf,weekdays};

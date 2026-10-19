@@ -8,6 +8,8 @@
 // criptografado diário na pasta "Sofia OS/Backups", guardando os 14 últimos.
 // Tokens ficam criptografados (AES-256-GCM) com SOFIA_CALENDAR_TOKEN_KEY.
 const crypto = require('node:crypto'), fs = require('node:fs'), path = require('node:path');
+const {makeThumb} = require('./thumb');
+function ensureThumbColumn(db) { try { db.prepare('ALTER TABLE attachments ADD COLUMN thumb BLOB').run(); } catch { /* ja existe */ } }
 const {AppError, now, id} = require('../core/util');
 const {CATALOG} = require('../core/catalog');
 // Antes de regravar a entidade depois de enviar ao Google, descarta qualquer chave que não é
@@ -368,7 +370,7 @@ class GoogleService {
   //   Sofia OS/Áudios    (mensagens de voz da conversa com mais de 1 dia)
   //   Sofia OS/Páginas   (cada página sua como um arquivo .md legível, atualizado quando muda)
   // Os ids ficam guardados no link; nunca se cria pasta repetida (folder() reaproveita).
-  static FOLDERS = ['Backups', 'Anexos', 'Áudios', 'Páginas'];
+  static FOLDERS = ['Backups', 'Anexos', 'Áudios', 'Páginas', 'Comprovantes'];
   // offloadAttachments/offloadVoices/exportPages rodam juntos, sem esperar um pelo outro: se
   // cada um corresse ensureFolders() por conta própria, cada um buscaria "ainda não existe" ao
   // mesmo tempo e cada um criaria a própria pasta "Sofia OS" — foi assim que apareceram pastas
@@ -510,10 +512,15 @@ class GoogleService {
     this.offloading = true; let moved = 0;
     try {
       const dir = await this.folderId('Anexos'); if (!dir) return {moved: 0};
-      const rows = this.db.prepare('SELECT id, entity_id, name, mime, bytes, blob FROM attachments WHERE drive_id IS NULL AND length(blob) > 0 ORDER BY created_at LIMIT ?').all(limit);
+      ensureThumbColumn(this.db);
+      const rows = this.db.prepare("SELECT a.id, a.entity_id, a.name, a.mime, a.bytes, a.blob, e.tags AS tags FROM attachments a LEFT JOIN entities e ON e.id=a.entity_id WHERE a.drive_id IS NULL AND length(a.blob) > 0 ORDER BY a.created_at LIMIT ?").all(limit);
       for (const a of rows) {
+        // 0.3.199: foto enviada na conversa (ex.: cupom) vai para "Sofia OS/Comprovantes"; a miniatura fica aqui
+        const fromChat = String(a.tags || '').includes('chat-attachment') && /^image\//.test(String(a.mime || ''));
+        const target = fromChat ? (await this.folderId('Comprovantes')) || dir : dir;
+        if (fromChat) { const t = makeThumb(Buffer.from(a.blob), a.mime); if (t) this.db.prepare('UPDATE attachments SET thumb=? WHERE id=?').run(t, a.id); }
         const boundary = 'sofia' + id();
-        const meta = JSON.stringify({name: a.name, parents: [dir], mimeType: a.mime || 'application/octet-stream', description: 'Anexo da Sofia OS (' + a.entity_id + ')', appProperties: {sofia_attachment: a.id, sofia_entity: a.entity_id}});
+        const meta = JSON.stringify({name: a.name, parents: [target], mimeType: a.mime || 'application/octet-stream', description: 'Anexo da Sofia OS (' + a.entity_id + ')', appProperties: {sofia_attachment: a.id, sofia_entity: a.entity_id}});
         const body = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${a.mime || 'application/octet-stream'}\r\n\r\n`), Buffer.from(a.blob), Buffer.from(`\r\n--${boundary}--`)]);
         const up = await this.call('POST', UPLOAD + '/files?uploadType=multipart&fields=id,size', body, {'Content-Type': 'multipart/related; boundary=' + boundary});
         if (!up.id) continue;
@@ -575,4 +582,4 @@ class GoogleService {
   stop() { if (this.timer) clearInterval(this.timer); this.timer = null; }
 }
 
-module.exports = {GoogleService, SCOPES, CALLBACK};
+module.exports = {ensureThumbColumn, GoogleService, SCOPES, CALLBACK};

@@ -155,9 +155,9 @@ test('conexão pelo app: a janela do Google volta sozinha para o app (sofiaapp:/
 test('ao conectar, a Sofia cria a casa dela no Drive (Sofia OS/Backups, Anexos, Áudios, Páginas) sem repetir',async t=>{
  const {svc,g}=await connected(t);await new Promise(r=>setTimeout(r,80));
  const folders=g.driveFiles.filter(f=>f.folder).map(f=>f.name).sort();
- assert.deepEqual(folders,['Anexos','Backups','Páginas','Sofia OS','Áudios']);
- await svc.ensureFolders();assert.equal(g.driveFiles.filter(f=>f.folder).length,5,'não cria pasta repetida');
- const st=await svc.status();assert.deepEqual(st.drive.folders.sort(),['Anexos','Backups','Páginas','root','Áudios']);
+ assert.deepEqual(folders,['Anexos','Backups','Comprovantes','Páginas','Sofia OS','Áudios']);
+ await svc.ensureFolders();assert.equal(g.driveFiles.filter(f=>f.folder).length,6,'não cria pasta repetida (0.3.199: + Comprovantes)');
+ const st=await svc.status();assert.deepEqual(st.drive.folders.sort(),['Anexos','Backups','Comprovantes','Páginas','root','Áudios']);
 });
 test('anexos vão para Sofia OS/Anexos: aqui fica só a referência, a leitura busca no Drive (com cache) e apagar o registro apaga lá',async t=>{
  const {svc,core,g}=await connected(t);const w=core.workspace;await new Promise(r=>setTimeout(r,80));
@@ -263,7 +263,7 @@ test('pastas que rodam ao mesmo tempo (envio, anexos, voz, páginas) não criam 
  const {svc,g}=await connected(t);
  await Promise.all([svc.ensureFolders(),svc.ensureFolders(),svc.ensureFolders()]);
  assert.equal(g.driveFiles.filter(f=>f.folder&&f.name==='Sofia OS').length,1);
- assert.equal(g.driveFiles.filter(f=>f.folder).length,5,'raiz + Backups + Anexos + Áudios + Páginas, uma vez cada');
+ assert.equal(g.driveFiles.filter(f=>f.folder).length,6,'raiz + Backups + Anexos + Áudios + Páginas + Comprovantes, uma vez cada');
 });
 test('bagunça já feita (4 pastas "Sofia OS" de antes desta correção) se desfaz sozinha: fica uma, o conteúdo das outras é preservado',async t=>{
  const {svc,core,g}=await connected(t);const w=core.workspace;

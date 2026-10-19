@@ -38,7 +38,7 @@ test('resumo curto da faixa muda conforme o mes',()=>{
   assert.equal(f.reserveBadge(split([mv('m2','in',4000,'2026-10-05')]),'2026-10-16'),'✓ em dia');
 });
 test('lembretes do aporte: antes, no dia e repetindo ate fechar',()=>{
-  const n=load('src/lib/finance-notifications.ts',{'./finance':require('./load-ts.cjs')('src/lib/finance.ts'),'expo-notifications':{SchedulableTriggerInputTypes:{DATE:'date'}},'./system-notification-permission':{ensureSystemNotificationPermission:async()=>true},'./notification-scheduler':{enqueueNotifications:async()=>'',reconcileNotificationRequests:async()=>({}),notificationFailure:()=>'',NOTIFICATION_SIGNATURE_VERSION:1}});
+  const n=load('src/lib/finance-notifications.ts',{'@react-native-async-storage/async-storage':{default:{getItem:async()=>null,setItem:async()=>{}}},'./finance':require('./load-ts.cjs')('src/lib/finance.ts'),'expo-notifications':{SchedulableTriggerInputTypes:{DATE:'date'}},'./system-notification-permission':{ensureSystemNotificationPermission:async()=>true},'./notification-scheduler':{enqueueNotifications:async()=>'',reconcileNotificationRequests:async()=>({}),notificationFailure:()=>'',NOTIFICATION_SIGNATURE_VERSION:1}});
   const {split}=fixture();
   const alarms=n.reservePlanAlarms(split([]),'Guardado',new Date(2026,9,1,8,0,0));
   const ids=alarms.map(a=>a.id);

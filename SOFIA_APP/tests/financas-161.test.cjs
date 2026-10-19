@@ -322,3 +322,16 @@ test('0.3.198: cada linha do previsto lista os lancamentos que a compoem (para a
   assert.ok(s.includes("setForecastOpenLine(l => l === label ? '' : label)"));
   assert.ok(s.includes("original.manualDue ? onBill(original) : onTx(original)"),'abre para corrigir ou excluir');
 });
+
+test('0.3.199: gasto fora do padrao e resumo da semana por categoria',()=>{
+  const tx=(id,amount,date,category)=>f.toTx({id,kind:'fin_tx',title:id,state:'active',data:{kind:'expense',amount,date,account_id:'a1',paid:true,category,recurrence:'none'}});
+  const txs=[tx('a1',300,'2026-07-10','Alimentação'),tx('a2',320,'2026-08-10','Alimentação'),tx('a3',280,'2026-09-10','Alimentação'),tx('a4',600,'2026-10-12','Alimentação'),tx('m',200,'2026-10-12','Mercado'),tx('m0',190,'2026-09-12','Mercado'),tx('s1',80,'2026-10-13','Alimentação'),tx('s2',40,'2026-10-15','Transporte')];
+  const al=f.categoryAlerts(txs,'a1','2026-10');
+  assert.equal(al.length,1,'so Alimentacao passou do normal (Mercado esta dentro)');assert.equal(al[0].category,'Alimentação');assert.equal(al[0].total,680);assert.equal(al[0].average,300);
+  const w=f.lastWeekByCategory(txs,'a1','2026-10-19');
+  assert.equal(w.start,'2026-10-12');assert.equal(w.end,'2026-10-18');assert.equal(w.total,920);assert.equal(w.lines[0].category,'Alimentação');
+  const s=read('src/screens/Finance.tsx'),n=read('src/lib/finance-notifications.ts');
+  assert.ok(s.includes('% acima do que você costuma gastar'));assert.ok(s.includes('<Title text="Semana passada" />'));
+  assert.ok(n.includes("weekday: 2, hour: 9, minute: 0"),'toda segunda as 9h');
+  assert.ok(n.includes("'sofia.fin.alerts:' + key + ':' + month"),'um aviso por categoria por mes');
+});

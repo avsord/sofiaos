@@ -26,7 +26,7 @@ import {
   trend, balanceSeries, upcoming, manualDues, transactionsForAccount, goalProgress, parseMoney, formatMoneyInput, finishMoneyInput, addDays,
   dayIn, daysIn} from '../lib/finance';
 import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove} from '../lib/finance';
-import {sinceReportStart, cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, monthDues, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove, effectiveCycleDay, periodBudget, salaryForecast, currentPlan, nextPlan, simpleForecast, spendControl} from '../lib/finance';
+import {sinceReportStart, cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, monthDues, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove, effectiveCycleDay, periodBudget, salaryForecast, currentPlan, nextPlan, simpleForecast, spendControl, categoryAlerts, lastWeekByCategory} from '../lib/finance';
 import {syncFinanceDueNotifications} from '../lib/finance-notifications';
 import {appAlert} from '../lib/app-alert';
 import {useFormDraft} from '../lib/form-draft';
@@ -899,6 +899,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
     const done = reserve ? (d.moves || []).filter(m => m.goalId === reserve.id && m.direction === 'in' && m.entity?.state !== 'archived' && m.date >= range.start && m.date <= range.end).reduce((t, m) => t + m.amount, 0) : 0;
     return {...simpleForecast(d.txs, d.cards, range, accountId, today, Math.max(0, due - done)), upcoming};
   }, [d, accountId, cycleDay, today, plan, split?.planDay, reserve]);
+  const catAlerts = useMemo(() => categoryAlerts(d.txs, accountId, month), [d, accountId, month]);
   const [forecastOpen, setForecastOpen] = useState(false), [forecastOpenLine, setForecastOpenLine] = useState('');
   const periodLabel = (b: {start: string; end: string}) => b.start.slice(8, 10) + '/' + b.start.slice(5, 7) + ' a ' + b.end.slice(8, 10) + '/' + b.end.slice(5, 7);
   const [reserveMenu, setReserveMenu] = useState(false), [breakdown, setBreakdown] = useState<'saldo' | 'income' | 'expense' | null>(null);
@@ -1034,6 +1035,16 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
         </View>
         <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>O que está no seu Saldo. Desde o dia {b.start.slice(8, 10)} já saíram {show(b.out)} (contas, gastos e aportes); cada saída diminui a porcentagem.</Text>
       </Pressable>; })()}
+
+      {/* 0.3.199: categoria que ja passou do que voce costuma gastar no mes */}
+      {month === monthOf(today) ? catAlerts.slice(0, 2).map(a => <Pressable key={a.category} accessibilityRole="button" onPress={() => setBreakdown('expense')}
+        style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: WARN + '1a', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: WARN}}>
+        <Text style={{fontSize: 18}}>{categoryOf(a.category).icon}</Text>
+        <View style={{flex: 1, gap: 2}}>
+          <Text style={{color: c.text, fontWeight: '700', fontSize: 13}}>{a.category}: {show(a.total)} em {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
+          <Text style={{color: c.muted, fontSize: 12}}>{Math.round(a.pct * 100)}% acima do que você costuma gastar ({show(a.average)} por mês)</Text>
+        </View>
+      </Pressable>) : null}
 
       {/* 0.3.152: vencimentos proximos viram uma linha so (o detalhe fica em Pendentes); cartoes ficam na aba Cartoes */}
       {dues.length ? <Pressable accessibilityRole="button" accessibilityLabel="Ver pendentes" onPress={() => onTab('bills')}
@@ -1512,6 +1523,7 @@ function ReportsTab({d: full, month, reserve, api, reload}: {d: Data; month: str
   const startMs = starts.length ? Date.parse(starts[starts.length - 1] + 'T00:00:00Z') : 0;
   const fromStart = (pts: Array<{t: number; v: number}>) => pts.filter(p => p.t >= startMs);
   const [resetBusy, setResetBusy] = useState(false);
+  const week = useMemo(() => lastWeekByCategory(full.txs, ''), [full]);
   function setStart(date: string) {
     if (!api) return;
     const go = async () => {
@@ -1529,6 +1541,16 @@ function ReportsTab({d: full, month, reserve, api, reload}: {d: Data; month: str
   const [w, setW] = useState(0);
   return (
     <>
+      {week.lines.length ? <Card_>
+        <Title text="Semana passada" />
+        <Text style={{color: c.muted, fontSize: 12}}>{week.start.split('-').reverse().slice(0, 2).join('/')} a {week.end.split('-').reverse().slice(0, 2).join('/')} · {money(week.total)} em gastos</Text>
+        {week.lines.slice(0, 6).map(l => <View key={l.category} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, borderTopWidth: 1, borderColor: c.line}}>
+          <Text style={{fontSize: 16}}>{categoryOf(l.category).icon}</Text>
+          <Text style={{flex: 1, color: c.text, fontSize: 13}}>{l.category}</Text>
+          {l.change !== null ? <Text style={{color: l.change > 0.3 ? WARN : l.change < -0.1 ? GOOD : c.muted, fontSize: 11, fontWeight: '700'}}>{l.change > 0 ? '+' : ''}{Math.round(l.change * 100)}% vs média</Text> : <Text style={{color: c.muted, fontSize: 11}}>novo</Text>}
+          <Text style={{color: c.text, fontWeight: '700', fontSize: 13}}>{money(l.total)}</Text>
+        </View>)}
+      </Card_> : null}
       {api ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.surface, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: c.line}}>
         <Text style={{flex: 1, color: c.muted, fontSize: 12, lineHeight: 18}}>{startLabel ? 'Relatórios a partir de ' + startLabel : 'Relatórios com todo o histórico'}</Text>
         {resetBusy ? <ActivityIndicator color={c.accent} /> : startLabel

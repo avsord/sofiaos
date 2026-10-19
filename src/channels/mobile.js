@@ -64,6 +64,19 @@ function makeMobileApi(runtime, deps) {
         voice: voice ? { mime: voice.mime, duration_ms: voice.duration_ms, audio_url: '/api/mobile/messages/' + m.id + '/audio' } : null };
     }), has_more: rows.length > 100 };
   }
+  async function chatImages(text) {
+    const ids = [...text.matchAll(/!\[[^\]\n]*\]\(https?:\/\/[^\s)]*\/api\/attachments\/([A-Za-z0-9_-]+)\?inline=1\)/g)].map(x => x[1]).slice(0, 4);
+    const out = [];
+    for (const id of ids) {
+      try {
+        const row = workspace.attachment(id);
+        if (!/^image\/(png|jpeg|webp|gif)$/.test(String(row.mime || ''))) continue;
+        const bytes = runtime.google && runtime.google.attachmentBytes ? await runtime.google.attachmentBytes(row) : Buffer.from(row.blob || []);
+        if (bytes.length && bytes.length <= 10 * 1024 * 1024) out.push({mime: row.mime, base64: bytes.toString('base64'), name: row.name});
+      } catch { /* sem a foto, a Sofia responde so pelo texto */ }
+    }
+    return out;
+  }
   function payload(b, text) {
     const c = conversation(b.conversation_id); validId(b.client_message_id);
     return { conversation_id: c.id, client_message_id: b.client_message_id, message: text, route: 'private', retry: b.retry === true,
@@ -277,7 +290,12 @@ function makeMobileApi(runtime, deps) {
     }
     if (p === '/api/mobile/messages' && m === 'POST') {
       rate(session, 'message'); const b = await bodyJson(req, MAX_MESSAGE_BODY);
-      return send(await receive(payload(b, cleanMessage(b.message, 'Mensagem'))));
+      // 0.3.199: a foto anexada na conversa vai para a Sofia LER (antes ela recebia so o link). Depois de lida,
+      // o original sobe para o Drive (Sofia OS/Comprovantes) e sai do servidor.
+      const images = await chatImages(String(b.message || ''));
+      const out = await receive({...payload(b, cleanMessage(b.message, 'Mensagem')), ...(images.length ? {images} : {})});
+      if (images.length && runtime.google && runtime.google.offloadAttachments) setTimeout(() => { runtime.google.offloadAttachments(10).catch(() => {}); }, 1500);
+      return send(out);
     }
     match = p.match(/^\/api\/mobile\/messages\/([\w-]+)$/);
     if (match && m === 'DELETE') { rate(session, 'delete', 30); const row=store.message(validId(match[1]));conversation(row.conversation_id);return send(store.deleteMessage(row.id)); }

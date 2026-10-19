@@ -662,3 +662,42 @@ export function spendControl(txs: Tx[], moves: ReserveMove[], reserveId: string,
   const out = round2(spent + aportes), available = round2(saldo + out);
   return {start: range.start, end: range.end, left: round2(saldo), out, available, pct: available > 0 ? Math.max(0, Math.min(1, saldo / available)) : 0};
 }
+
+// ---------- 0.3.199: resumo da semana e gasto fora do padrao ----------
+function expensesBetween(txs: Tx[], accountId: string, start: string, end: string): Map<string, number> {
+  const by = new Map<string, number>();
+  for (const t of txs) {
+    if (t.virtual || t.kind !== 'expense' || t.date < start || t.date > end || (accountId && t.accountId !== accountId)) continue;
+    const cat = t.category || 'Outros';
+    by.set(cat, round2((by.get(cat) || 0) + t.amount));
+  }
+  return by;
+}
+/** Ultima semana completa (segunda a domingo) por categoria, comparada com a media das 8 semanas anteriores. */
+export type WeekLine = {category: string; total: number; average: number; change: number | null};
+export function lastWeekByCategory(txs: Tx[], accountId = '', today = todayISO()): {start: string; end: string; total: number; lines: WeekLine[]} {
+  const dow = (new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7; // 0 = segunda
+  const start = addDays(today, -dow - 7), end = addDays(start, 6);
+  const week = expensesBetween(txs, accountId, start, end);
+  const avg = new Map<string, number>();
+  for (let i = 1; i <= 8; i++) { const s = addDays(start, -7 * i); for (const [c, v] of expensesBetween(txs, accountId, s, addDays(s, 6))) avg.set(c, (avg.get(c) || 0) + v / 8); }
+  const lines = [...week.entries()].map(([category, total]) => { const average = round2(avg.get(category) || 0); return {category, total, average, change: average > 0 ? (total - average) / average : null}; })
+    .sort((a, b) => b.total - a.total);
+  return {start, end, total: round2(lines.reduce((s, l) => s + l.total, 0)), lines};
+}
+/** Categoria que ja passou do que a pessoa costuma gastar no mes (media dos 3 meses anteriores com gasto):
+ * pelo menos 30% e R$ 50 acima. */
+export type CategoryAlert = {category: string; total: number; average: number; over: number; pct: number};
+export function categoryAlerts(txs: Tx[], accountId: string, month: string): CategoryAlert[] {
+  const now = expensesBetween(txs, accountId, dayIn(month, 1), dayIn(month, daysIn(month)));
+  const hist: Map<string, number>[] = [];
+  for (let i = 1; i <= 3; i++) { const m = addMonths(month, -i); hist.push(expensesBetween(txs, accountId, dayIn(m, 1), dayIn(m, daysIn(m)))); }
+  const out: CategoryAlert[] = [];
+  for (const [category, total] of now) {
+    const values = hist.map(h => h.get(category) || 0).filter(v => v > 0);
+    if (!values.length) continue;
+    const average = round2(values.reduce((a, b) => a + b, 0) / values.length), over = round2(total - average);
+    if (total >= average * 1.3 && over >= 50) out.push({category, total, average, over, pct: over / average});
+  }
+  return out.sort((a, b) => b.over - a.over);
+}

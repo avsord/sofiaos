@@ -27,3 +27,19 @@ test('a Sofia conhece as categorias do app',()=>{
  const ctx=bridge.appsContext({list:()=>[]},null).content;
  assert.match(ctx,/escolha VOCÊ pela descrição, sem perguntar/);assert.match(ctx,/Rastreador Ugreen.*Compras/);assert.match(ctx,/Oficialfarma.*Saúde/);
 });
+
+test('0.3.199: frase completa - anteontem, dia da semana passado, cartao, parcelas e receita',t=>{
+ const w=setup(t);
+ const b=(title,changes,action={})=>bridge.buildEntity(w,'fin_tx',{title,changes,...action},title).data;
+ const today=bridge.today();const add=(d,n)=>{const x=new Date(d+'T12:00:00Z');x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10);};
+ assert.equal(b('iFood',[{field:'data.amount',value:'45'},{field:'data.date',value:'anteontem'}]).date,add(today,-2));
+ const sexta=b('iFood',[{field:'data.amount',value:'45'},{field:'data.date',value:'sexta'}]).date;
+ assert.ok(sexta<=today&&sexta>add(today,-8),'sexta = a ultima sexta, nao a proxima');assert.equal(new Date(sexta+'T12:00:00Z').getUTCDay(),5);
+ const rec=b('Freela logo',[{field:'data.kind',value:'income'},{field:'data.amount',value:'800'}]);assert.equal(rec.kind,'income');assert.equal(rec.category,'Freelance');
+ const plan=bridge.installmentPlan(1000,3,'2026-01-31');
+ assert.equal(plan.map(p=>p.amount).join(','),'333.34,333.33,333.33','centavos na 1a parcela');
+ assert.equal(plan.map(p=>p.date).join(','),'2026-01-31,2026-02-28,2026-03-31','fim de mes respeita fevereiro');
+ const ctx=bridge.appsContext({list:()=>[]},null).content;assert.match(ctx,/em 3x no Nubank/);assert.match(ctx,/valor TOTAL/);
+ const core=require('node:fs').readFileSync(require('node:path').join(__dirname,'..','src/core/sofia-core.js'),'utf8');
+ assert.ok(core.includes("for(const p of bridge.installmentPlan(Number(built.data.amount),parts,built.data.date))"),'parcelas viram um lancamento por mes');
+});

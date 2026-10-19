@@ -29,9 +29,39 @@ import { Composer, deleteVoice } from '../components/Composer';
 import { VoicePlayer } from '../components/VoicePlayer';
 import {MountTimer} from '../components/MountTimer';
 import {appAlert} from '../lib/app-alert';
+// 0.3.199: a foto da conversa aparece desfocada (miniatura de poucos bytes); o original fica no Drive.
+// Tocar abre a foto nitida, com "Salvar no celular"; ao fechar, nada fica guardado no aparelho.
+function PhotoThumb({api,id}:{api:SofiaApi;id:string}){
+ const c=useTheme(),[failed,setFailed]=useState(false);
+ return <View style={{width:220,height:160,borderRadius:12,overflow:'hidden',marginBottom:6,backgroundColor:c.input,alignItems:'center',justifyContent:'center'}}>
+  {failed?null:<Image source={api.attachmentThumb(id)} blurRadius={6} resizeMode="cover" onError={()=>setFailed(true)} style={{position:'absolute',top:0,left:0,right:0,bottom:0}}/>}
+  <View style={{backgroundColor:'#00000066',paddingHorizontal:12,paddingVertical:6,borderRadius:99}}><Text style={{color:'#fff',fontWeight:'700',fontSize:12}}>🧾 Toque para ver</Text></View>
+ </View>;
+}
+function PhotoViewer({api,id,name,onSave,onClose}:{api:SofiaApi;id:string;name:string;onSave:()=>void;onClose:()=>void}){
+ const c=useTheme(),[loading,setLoading]=useState(true),[error,setError]=useState(false);
+ return <Sheet visible onClose={onClose} label="Fechar foto">
+  <View style={{gap:12}}>
+   <Text numberOfLines={1} style={{color:c.text,fontWeight:'800',fontSize:16}}>{name}</Text>
+   <View style={{height:420,borderRadius:14,overflow:'hidden',backgroundColor:c.input,alignItems:'center',justifyContent:'center'}}>
+    {error?<Text style={{color:c.muted,textAlign:'center',padding:20}}>Não consegui abrir a foto. Ela fica no seu Google Drive (Sofia OS/Comprovantes); confira a conexão com o Google em Perfil.</Text>
+     :<Image source={api.attachmentSource(id)} resizeMode="contain" onLoadEnd={()=>setLoading(false)} onError={()=>{setLoading(false);setError(true);}} style={{width:'100%',height:'100%'}}/>}
+    {loading&&!error?<ActivityIndicator style={{position:'absolute'}} color={c.accent}/>:null}
+   </View>
+   <Text style={{color:c.muted,fontSize:11,lineHeight:16}}>A foto original fica guardada no seu Google Drive, em Sofia OS/Comprovantes. Aqui ela só é mostrada; ao fechar, nada fica no celular.</Text>
+   <View style={{flexDirection:'row',gap:10}}>
+    <Pressable accessibilityRole="button" onPress={onSave} style={{flex:1,padding:14,borderRadius:14,backgroundColor:c.accentSoft,alignItems:'center'}}><Text style={{color:c.accent,fontWeight:'800'}}>Salvar no celular</Text></Pressable>
+    <Pressable accessibilityRole="button" onPress={onClose} style={{flex:1,padding:14,borderRadius:14,backgroundColor:c.input,alignItems:'center'}}><Text style={{color:c.text,fontWeight:'700'}}>Fechar</Text></Pressable>
+   </View>
+  </View>
+ </Sheet>;
+}
 function Bubble({message,previous,api,onRetry,selecting,selected,onSelect}:{message:Message;previous?:Message;api:SofiaApi;onRetry:(m:Message)=>void;selecting:boolean;selected:boolean;onSelect:(m:Message)=>void}) {
  const parsed=parseAttachments(message.content,SITE);
- async function openFile(id:string,name:string){try{const source=api.attachmentSource(id),safe=name.replace(/[^\p{L}\p{N}._-]/gu,'_');const file=await File.downloadFileAsync(source.uri,new File(Paths.cache,id+'-'+safe),{headers:source.headers,idempotent:true});await Sharing.shareAsync(file.uri);}catch(e){appAlert('Anexo',errorText(e));}}
+ const [viewing,setViewing]=useState<{id:string;name:string}|null>(null);
+ async function openFile(id:string,name:string){try{const source=api.attachmentSource(id),safe=name.replace(/[^\p{L}\p{N}._-]/gu,'_');const file=await File.downloadFileAsync(source.uri,new File(Paths.cache,id+'-'+safe),{headers:source.headers,idempotent:true});await Sharing.shareAsync(file.uri);
+ // 0.3.199: depois de salvar/compartilhar, a copia temporaria sai do celular (o original fica no Drive)
+ try{file.delete();}catch{/* o sistema limpa o cache depois */}}catch(e){appAlert('Anexo',errorText(e));}}
  const c=useTheme(),mine=message.role==='user',isNewDay=!previous||dayKey(previous.created_at)!==dayKey(message.created_at);
  // 0.3.140: mensagem nova entra deslizando e surgindo (so as recentes; o historico carrega parado)
  const fresh=React.useRef(Date.now()-new Date(message.created_at).getTime()<4000).current;
@@ -45,7 +75,7 @@ function Bubble({message,previous,api,onRetry,selecting,selected,onSelect}:{mess
   accessibilityHint={selecting?'Toque para alternar a seleção':'Segure para selecionar mensagens'}
   style={{maxWidth:'85%',minWidth:90,backgroundColor:mine?c.bubble:c.surface,borderWidth:mine?0:1,borderColor:selected?c.accent:c.line,borderRadius:19,borderBottomRightRadius:mine?5:19,borderBottomLeftRadius:mine?19:5,paddingHorizontal:14,paddingTop:12,paddingBottom:9,gap:8}}>
  <View pointerEvents={selecting?'none':'auto'}>{message.voice?<VoicePlayer source={api.audioSource(message.voice.audio_url)} duration={message.voice.duration_ms}/>:message.localVoice?<VoicePlayer source={{uri:message.localVoice.uri}} duration={message.localVoice.duration}/>:null}</View>
- {parsed.attachments.map(a=><Pressable key={a.id} accessibilityLabel={'Abrir anexo '+a.name} onPress={()=>{if(selecting)onSelect(message);else void openFile(a.id,a.name);}} onLongPress={()=>onSelect(message)}>{a.image?<Image source={api.attachmentSource(a.id)} resizeMode="cover" style={{width:220,height:180,borderRadius:10,marginBottom:6}}/>:null}<Text style={{color:c.accent,fontSize:14}}>📎 {a.name}</Text></Pressable>)}{message.localAttachments?.length&&!parsed.attachments.length?message.localAttachments.map((a,i)=><Text key={i} style={{color:c.muted}}>📎 {a.name}</Text>):null}
+ {viewing?<PhotoViewer api={api} id={viewing.id} name={viewing.name} onSave={()=>void openFile(viewing.id,viewing.name)} onClose={()=>setViewing(null)}/>:null}{parsed.attachments.map(a=><Pressable key={a.id} accessibilityLabel={'Abrir anexo '+a.name} onPress={()=>{if(selecting)onSelect(message);else if(a.image)setViewing(a);else void openFile(a.id,a.name);}} onLongPress={()=>onSelect(message)}>{a.image?<PhotoThumb api={api} id={a.id}/>:null}{a.image?null:<Text style={{color:c.accent,fontSize:14}}>📎 {a.name}</Text>}</Pressable>)}{message.localAttachments?.length&&!parsed.attachments.length?message.localAttachments.map((a,i)=><Text key={i} style={{color:c.muted}}>📎 {a.name}</Text>):null}
  {parsed.text?<Text style={{fontSize:15.5,lineHeight:23,color:c.text}}>{parsed.text}</Text>:null}{message.error?<Text style={{color:c.danger,fontSize:12,lineHeight:18}}>{message.error}</Text>:null}
  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'flex-end',gap:8}}><Text style={{color:c.muted,fontSize:10}}>{new Date(message.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}{mine?' · '+statusLabel(message.status):''}</Text></View></Pressable></View>
  {mine&&message.status==='failed'&&!selecting?<Pressable accessibilityRole="button" onPress={()=>onRetry(message)} style={{alignSelf:'flex-end',padding:10,minHeight:40}}><Text style={{color:c.danger,fontSize:12,fontWeight:'600'}}>Tentar novamente</Text></Pressable>:null}</Animated.View>;

@@ -265,6 +265,14 @@ class SofiaCore{
     }
     if(plan.intent==='create_entity'&&bridge.APP_KINDS.includes(a.entity_kind)&&!['idea','annotation','project','dream','course','recipe','film','music','video','reading'].includes(a.entity_kind)){
       const built=bridge.buildEntity(this.workspace,a.entity_kind,a,user.content.slice(0,120),this.store);
+      // 0.3.199: compra parcelada ("em 3x") vira um lancamento por mes, cada um com a sua parcela
+      const parts=a.entity_kind==='fin_tx'&&built.data.kind==='expense'?Math.round(Number(built.data.installments)||0):0;
+      if(parts>1&&parts<=48){
+        const items=[];
+        for(const p of bridge.installmentPlan(Number(built.data.amount),parts,built.data.date))
+          items.push(this.workspace.save({kind:'fin_tx',title:built.title,content:a.content||'',area:a.area||'Geral',privacy:route,source_id:user.id,state:built.state,data:{...built.data,amount:p.amount,date:p.date,installment:p.installment,installments:parts},tags:a.tags||[]}));
+        return {reply:bridge.describeCreated('fin_tx',items[0]).replace('. Está em',' (parcela 1 de '+parts+'; as outras '+(parts-1)+' já estão nos próximos meses). Está em'),ui_target:built.ui,items};
+      }
       const e=this.workspace.save({kind:a.entity_kind,title:built.title,content:a.content||'',area:a.area||'Geral',privacy:route,source_id:user.id,state:built.state,data:built.data,tags:a.tags||[]});
       return {reply:bridge.describeCreated(a.entity_kind,e),ui_target:built.ui,items:[e]};
     }

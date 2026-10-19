@@ -45,7 +45,14 @@ function makeApi45(runtime,{bodyJson,json}){const {store,workspace:w,routing,vau
     throw new AppError('BAD_ACTION','Ação não disponível.');
   }
  }
- match=p.match(/^\/api\/attachments\/([\w-]+)$/);if(m==='GET'&&match){const a=w.attachment(validId(match[1])),inline=url.searchParams.get('inline')==='1';res.setHeader('Content-Type',inline?(a.mime||'application/octet-stream'):'application/octet-stream');res.setHeader('Content-Disposition',(inline?'inline':'attachment')+"; filename*=UTF-8''"+encodeURIComponent(a.name));const bytes=(runtime&&runtime.google&&runtime.google.attachmentBytes)?await runtime.google.attachmentBytes(a):Buffer.from(a.blob);res.setHeader('Content-Length',String(bytes.length));res.end(bytes);return true;}
+ match=p.match(/^\/api\/attachments\/([\w-]+)$/);
+ // 0.3.199: ?thumb=1 entrega a miniatura minuscula (o chat mostra desfocada sem baixar a foto do Drive)
+ if(m==='GET'&&match&&url.searchParams.get('thumb')==='1'){const {makeThumb}=require('../services/thumb');try{w.db.prepare('ALTER TABLE attachments ADD COLUMN thumb BLOB').run();}catch{}
+  const a=w.attachment(validId(match[1]));let t=a.thumb&&a.thumb.length?Buffer.from(a.thumb):null;
+  if(!t){const bytes=(runtime&&runtime.google&&runtime.google.attachmentBytes)?await runtime.google.attachmentBytes(a):Buffer.from(a.blob||[]);t=makeThumb(bytes,a.mime);if(t)w.db.prepare('UPDATE attachments SET thumb=? WHERE id=?').run(t,a.id);}
+  if(!t)throw new AppError('NOT_FOUND','Sem miniatura para este anexo.',404);
+  res.setHeader('Content-Type','image/jpeg');res.setHeader('Cache-Control','private, max-age=31536000, immutable');res.setHeader('Content-Length',String(t.length));res.end(t);return true;}
+ if(m==='GET'&&match){const a=w.attachment(validId(match[1])),inline=url.searchParams.get('inline')==='1';res.setHeader('Content-Type',inline?(a.mime||'application/octet-stream'):'application/octet-stream');res.setHeader('Content-Disposition',(inline?'inline':'attachment')+"; filename*=UTF-8''"+encodeURIComponent(a.name));const bytes=(runtime&&runtime.google&&runtime.google.attachmentBytes)?await runtime.google.attachmentBytes(a):Buffer.from(a.blob);res.setHeader('Content-Length',String(bytes.length));res.end(bytes);return true;}
  if(m==='POST'&&p==='/api/relations')return send({items:w.link(await body())},201);
  if(m==='GET'&&p==='/api/relations')return send({items:w.links(url.searchParams.get('type'),validId(url.searchParams.get('id')))});
  if(m==='GET'&&p==='/api/timeline')return send({items:w.timeline({area:url.searchParams.get('area')||'',limit:Number(url.searchParams.get('limit')||100),offset:Number(url.searchParams.get('offset')||0)})});
