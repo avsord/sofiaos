@@ -105,8 +105,8 @@ const APPS={
  fin_account:{app:'Finanças',names:['finanças','financas','conta','banco','carteira'],ui:'finance',describe:'Conta (banco, carteira, poupança). title=nome; data.account_type=corrente|poupanca|carteira|investimento|outro; data.initial_balance=saldo inicial.',defaults:{account_type:'corrente',initial_balance:'0',include_total:true}},
  fin_card:{app:'Finanças',names:['cartão','cartao','crédito','credito'],ui:'finance',describe:'Cartão de crédito. title=nome; data.limit=limite; data.closing_day=dia do fechamento; data.due_day=dia do vencimento; data.account_id=NOME da conta que paga a fatura.',defaults:{}},
  fin_tx:{app:'Finanças',names:['lançamento','lancamento','gasto','despesa','receita','paguei','gastei','recebi','comprei'],ui:'finance',
-  describe:'Lançamento. title=descrição; data.kind=expense|income|transfer|card_payment; data.amount=valor (número); data.date (padrão hoje); data.category; data.account_id=NOME da conta; data.card_id=NOME do cartão (compra no cartão); data.to_account_id=conta destino (transferência); data.paid (padrão: pago); data.installments=número de parcelas; data.recurrence=none|monthly|weekly|yearly (contas fixas).',
-  example:'"Gastei 45,90 no mercado hoje no cartão Nubank" → create_entity entity_kind=fin_tx title="Mercado" changes=[{field:"data.kind",value:"expense"},{field:"data.amount",value:"45,90"},{field:"data.category",value:"Mercado"},{field:"data.card_id",value:"Nubank"}]',
+  describe:'Lançamento. title=descrição; data.kind=expense|income|transfer|card_payment; data.amount=valor (número); data.date (padrão hoje); data.category=UMA das categorias do app — escolha VOCÊ pela descrição, sem perguntar (despesa: Alimentação, Mercado, Transporte, Moradia, Contas, Saúde, Educação, Lazer, Compras, Assinaturas, Viagem, Pets, Presentes, Impostos, Trabalho, Outros; receita: Salário, Freelance, Investimentos, Vendas, Reembolso, Presente, Outros). Pense no que é: farmácia, drogaria, manipulação, médico, dentista, exame → Saúde; objeto, eletrônico, acessório, roupa, loja online (Amazon, Shopee, Mercado Livre, Ugreen) → Compras; restaurante, lanche, delivery, iFood → Alimentação; supermercado, feira, atacado → Mercado; Uber, 99, combustível, estacionamento, pedágio → Transporte; streaming, app, software (Netflix, Spotify, Adobe, Claude) → Assinaturas; curso, livro → Educação; veterinário, ração → Pets; DAS, DARF, IPVA, IPTU → Impostos; data.account_id=NOME da conta; data.card_id=NOME do cartão (compra no cartão); data.to_account_id=conta destino (transferência); data.paid (padrão: pago); data.installments=número de parcelas; data.recurrence=none|monthly|weekly|yearly (contas fixas).',
+  example:'"Gastei 45,90 no mercado hoje no cartão Nubank" → create_entity entity_kind=fin_tx title="Mercado" changes=[{field:"data.kind",value:"expense"},{field:"data.amount",value:"45,90"},{field:"data.category",value:"Mercado"},{field:"data.card_id",value:"Nubank"}]. "138,08 rastreador ugreen" → title="Rastreador Ugreen", data.category="Compras". "210,36 Oficialfarma" → title="Oficialfarma", data.category="Saúde" (farmácia de manipulação).',
   defaults:{kind:'expense',paid:true,recurrence:'none'}},
  fin_budget:{app:'Finanças',names:['orçamento','orcamento','limite de gasto','meta de gasto'],ui:'finance',describe:'Orçamento mensal por categoria. title=categoria; data.category; data.limit=valor limite por mês.',defaults:{}},
  fin_goal:{app:'Finanças',names:['objetivo','meta','juntar','guardar dinheiro','reserva','dinheiro guardado'],ui:'finance',describe:'Objetivo de poupança. title=nome; data.target=valor a juntar; data.saved=já guardado; data.deadline=data. Com data.role=reserve é o Dinheiro guardado da pessoa (data.monthly_plan=aporte por mês; data.plan_day=dia do aporte).',defaults:{saved:0}},
@@ -191,6 +191,36 @@ function coerce(kind,field,value,workspace,store){
 }
 
 /** Monta title/data/state de um registro de app a partir do que a IA estruturou. */
+// 0.3.198: categoria de lancamento sempre uma das do app. Ordem: (1) o que a pessoa ja usou para a mesma
+// descricao (aprende com as correcoes dela); (2) a categoria que a Sofia escolheu, normalizada;
+// (3) palavras da descricao; (4) Outros.
+const FIN_CATS={expense:['Alimentação','Mercado','Transporte','Moradia','Contas','Saúde','Educação','Lazer','Compras','Assinaturas','Viagem','Pets','Presentes','Impostos','Trabalho','Outros'],income:['Salário','Freelance','Investimentos','Vendas','Reembolso','Presente','Outros']};
+const FIN_HINTS=[
+ [/farma|drogaria|droga ?raia|pague ?menos|manipula|remedio|medic|clinica|consulta|dentista|odonto|exame|laborat|hospital|psicolog|terapia|plano de saude|unimed|amil/,'Saúde'],
+ [/ifood|rappi|restaurante|lanche|lanchonete|padaria|pizza|burger|hamburg|sushi|cafe|cafeteria|delivery|almoco|jantar|\bbar\b|boteco|acai/,'Alimentação'],
+ [/supermerc|mercado|atacad|assai|carrefour|pao de acucar|feira|hortifruti|sacolao/,'Mercado'],
+ [/uber|\b99\b|taxi|combust|gasolina|etanol|posto|shell|ipiranga|estaciona|pedagio|sem parar|onibus|metro|bilhete unico|oficina|mecanic/,'Transporte'],
+ [/netflix|spotify|youtube|prime video|disney|hbo|deezer|adobe|claude|chatgpt|openai|icloud|google one|assinatura|software|canva|notion|figma|dropbox/,'Assinaturas'],
+ [/aluguel|condominio|energia|\bluz\b|enel|sabesp|\bagua\b|comgas|internet|\bvivo\b|\bclaro\b|\btim\b/,'Contas'],
+ [/\bdas\b|darf|ipva|iptu|imposto|tributo|inss|irpf|receita federal|simples nacional/,'Impostos'],
+ [/curso|livro|livraria|escola|faculdade|udemy|alura/,'Educação'],
+ [/veterin|petshop|pet shop|racao|cobasi|petz/,'Pets'],
+ [/cinema|\bshow\b|ingresso|teatro|steam|playstation|xbox|parque/,'Lazer'],
+ [/hotel|passagem|aereo|airbnb|booking|latam|hostel/,'Viagem'],
+ [/presente|lembranca/,'Presentes'],
+ [/amazon|shopee|mercado livre|aliexpress|shein|magalu|magazine|americanas|casas bahia|kabum|ugreen|xiaomi|samsung|apple|eletron|rastreador|fone|carregador|\bcabo\b|capinha|teclado|mouse|roupa|tenis|\bloja\b|compra/,'Compras'],
+];
+const FIN_INCOME_HINTS=[[/salario|holerite|folha/,'Salário'],[/freela|\bjob\b|cliente|projeto|nota fiscal/,'Freelance'],[/reembolso|estorno|devolu/,'Reembolso'],[/venda|vendi/,'Vendas'],[/rendimento|dividendo|juros|\bcdb\b|tesouro|investiment/,'Investimentos']];
+function financeCategory(workspace,kind,title,given){
+ const list=kind==='income'?FIN_CATS.income:FIN_CATS.expense,t=fold(title||'');
+ const canon=v=>{const f=fold(v||'');return list.find(c=>fold(c)===f)||'';};
+ if(t){try{const prev=workspace.list({kind:'fin_tx',limit:300}).find(e=>e.state!=='archived'&&fold(e.title)===t&&e.data&&(e.data.kind||'expense')===kind&&canon(e.data.category));if(prev)return canon(prev.data.category);}catch{/* sem historico */}}
+ const g=canon(given);if(g&&g!=='Outros')return g;
+ const synonyms={farmacia:'Saúde',saude:'Saúde',remedio:'Saúde',remedios:'Saúde',eletronicos:'Compras',eletronico:'Compras',objetos:'Compras',lojas:'Compras',restaurante:'Alimentação',comida:'Alimentação',combustivel:'Transporte',streaming:'Assinaturas',casa:'Moradia'};
+ const syn=synonyms[fold(given||'')];if(syn&&list.includes(syn))return syn;
+ for(const [re,cat] of (kind==='income'?FIN_INCOME_HINTS:FIN_HINTS))if(re.test(t)&&list.includes(cat))return cat;
+ return g||'Outros';
+}
 function buildEntity(workspace,kind,action,fallbackTitle,store){
  const app=APPS[kind],def=CATALOG[kind];if(!def||!APP_KINDS.includes(kind))return null;
  const data={...(app?(typeof app.defaults==='function'?app.defaults():app.defaults):{})};
@@ -205,7 +235,7 @@ function buildEntity(workspace,kind,action,fallbackTitle,store){
  // Atalhos que a IA costuma preencher fora de changes.
  if(kind==='capsule'){if(!data.times_json&&action.time)data.times_json=coerce(kind,{key:'times_json',type:'text'},action.time,workspace,store);if(!data.start_date)data.start_date=today();if(data.repeat_type==='weekdays'&&!data.weekdays_json)data.weekdays_json='[1,2,3,4,5]';if(data.interval_days&&data.repeat_type!=='interval')data.repeat_type='interval';if(!data.times_json)throw new AppError('ACTION_NEEDS_TIME','Em que horário(s) tomar? Ex.: 15:00.',409);}
  if(kind==='fin_tx'){if(!data.date)data.date=action.date?dateOf(action.date):today();if(!(Number(data.amount)>0))throw new AppError('ACTION_INVALID','Qual é o valor do lançamento?',409);
-  if(!data.category){const tq=fold(action.title||'');const prevSame=tq&&workspace.list({kind:'fin_tx',limit:300}).find(e=>e.state!=='archived'&&fold(e.title)===tq&&e.data.category);if(prevSame)data.category=prevSame.data.category;}
+  data.category=financeCategory(workspace,data.kind||'expense',action.title||'',data.category);
   // Absorve o hábito: mesma categoria (ou mesma descrição) → mesma conta/cartão da última vez.
   if(!data.account_id&&!data.card_id){const past=workspace.list({kind:'fin_tx',limit:300}).filter(e=>e.state!=='archived');const q=fold(data.category||''),tq=fold(action.title||'');const prev=past.find(e=>q&&fold(e.data.category||'')===q)||past.find(e=>tq&&fold(e.title)===tq);if(prev){if(prev.data.card_id)data.card_id=prev.data.card_id;else if(prev.data.account_id)data.account_id=prev.data.account_id;}}
   if(!data.account_id&&!data.card_id){const accounts=workspace.list({kind:'fin_account',limit:50}).filter(e=>e.state!=='archived');if(accounts.length===1)data.account_id=accounts[0].id;else throw new AppError('REF_NOT_FOUND',accounts.length?'Em qual conta ou cartão? Existem: '+accounts.map(a=>a.title).join(', ')+'.':'Crie uma conta em Apps → Finanças antes do primeiro lançamento.',409);}}

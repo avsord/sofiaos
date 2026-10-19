@@ -899,7 +899,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
     const done = reserve ? (d.moves || []).filter(m => m.goalId === reserve.id && m.direction === 'in' && m.entity?.state !== 'archived' && m.date >= range.start && m.date <= range.end).reduce((t, m) => t + m.amount, 0) : 0;
     return {...simpleForecast(d.txs, d.cards, range, accountId, today, Math.max(0, due - done)), upcoming};
   }, [d, accountId, cycleDay, today, plan, split?.planDay, reserve]);
-  const [forecastOpen, setForecastOpen] = useState(false);
+  const [forecastOpen, setForecastOpen] = useState(false), [forecastOpenLine, setForecastOpenLine] = useState('');
   const periodLabel = (b: {start: string; end: string}) => b.start.slice(8, 10) + '/' + b.start.slice(5, 7) + ' a ' + b.end.slice(8, 10) + '/' + b.end.slice(5, 7);
   const [reserveMenu, setReserveMenu] = useState(false), [breakdown, setBreakdown] = useState<'saldo' | 'income' | 'expense' | null>(null);
   const lastAporteKey = useRef(aporteKey);
@@ -914,9 +914,20 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
           <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Previsão de {periodLabel(forecastP)}</Text>
           <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>{cycleDay ? 'O dinheiro do salário do dia ' + cycleDay + ' precisa durar até o próximo. ' : 'Sem dia de recebimento definido, a previsão usa o mês do calendário. '}Receitas do período (salário e qualquer outra) menos as despesas lançadas, as contas pendentes, a fatura e o aporte.</Text>
           <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 6}}>
-            {([['Receitas (salário e outras)', forecastP.income, GOOD, '+'], ['Despesas e pendentes', forecastP.expense, BAD, '−'], ['Fatura do cartão', forecastP.card, BAD, '−'], ['Aporte', forecastP.aporte, GUARD, '−']] as const)
-              .filter(([, v], i) => i < 2 || v > 0).map(([label, v, color, sign]) => <View key={label} style={{flexDirection: 'row', justifyContent: 'space-between'}}>
-                <Text style={{color: c.muted, fontSize: 13}}>{sign} {label}</Text><Text style={{color, fontWeight: '700'}}>{show(v)}</Text></View>)}
+            {([['Receitas (salário e outras)', forecastP.income, GOOD, '+', forecastP.incomeItems], ['Despesas e pendentes', forecastP.expense, BAD, '−', forecastP.expenseItems], ['Fatura do cartão', forecastP.card, BAD, '−', [] as Tx[]], ['Aporte', forecastP.aporte, GUARD, '−', [] as Tx[]]] as const)
+              .filter(([, v], i) => i < 2 || v > 0).map(([label, v, color, sign, items]) => <View key={label} style={{gap: 4}}>
+                <Pressable accessibilityRole="button" disabled={!items.length} onPress={() => setForecastOpenLine(l => l === label ? '' : label)} style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+                  <Text style={{color: c.muted, fontSize: 13}}>{sign} {label}{items.length ? (forecastOpenLine === label ? ' ▾' : ' ▸') : ''}</Text><Text style={{color, fontWeight: '700'}}>{show(v)}</Text>
+                </Pressable>
+                {/* 0.3.198: abre a lista do que compoe a linha; tocar num item abre para corrigir ou excluir */}
+                {forecastOpenLine === label ? items.map(t => { const original = t.virtual ? (d.txs.find(x => !x.virtual && x.id === (t.seriesId || t.id)) || t) : t;
+                  return <Pressable key={t.id} accessibilityRole="button" accessibilityLabel={'Abrir ' + t.desc} onPress={() => { setForecastOpen(false); afterSheet(() => original.manualDue ? onBill(original) : onTx(original)); }}
+                    style={{flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 12, paddingVertical: 4}}>
+                    <Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 12}}>{t.desc}</Text>
+                    <Text style={{color: c.muted, fontSize: 11}}>{t.date.slice(8, 10)}/{t.date.slice(5, 7)}{t.virtual || t.recurrence === 'monthly' ? ' · 🔁' : ''}{t.paid ? ' · ✓' : ''}</Text>
+                    <Text style={{color: c.text, fontSize: 12, fontWeight: '700'}}>{show(t.amount)}</Text>
+                  </Pressable>; }) : null}
+              </View>)}
             <View style={{height: 1, backgroundColor: c.line, marginVertical: 4}} />
             <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '800'}}>= Previsto</Text><Text style={{color: forecastP.left < 0 ? BAD : c.text, fontWeight: '800'}}>{show(forecastP.left)}</Text></View>
           </View>

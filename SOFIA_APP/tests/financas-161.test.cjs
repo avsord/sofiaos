@@ -293,7 +293,7 @@ test('0.3.196: modelo simples - previsto = receitas - despesas e pendentes - fat
   const ctl=f.spendControl(txs,[],'',f.cycleRange(25,'2026-10-19'),'a1',1779.53);
   assert.equal(ctl.left,1779.53,'controle de gastos e o Saldo');assert.equal(ctl.out,803.18);assert.equal(ctl.available,2582.71);assert.equal(Math.round(ctl.pct*100),69);
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes("['Aporte', forecastP.aporte, GUARD, '−']"),'aporte aparece na conta do previsto');
+  assert.ok(s.includes("['Aporte', forecastP.aporte, GUARD, '−', [] as Tx[]]"),'aporte aparece na conta do previsto');
 });
 
 test('0.3.197: Pendentes com seletor A pagar | A receber, mesmo esquema nos dois lados',()=>{
@@ -310,4 +310,15 @@ test('0.3.197: Pendentes com seletor A pagar | A receber, mesmo esquema nos dois
   const inc=f.fixedSummary([sal],'a1',{start:'2026-10-01',end:'2026-10-31'},'income');
   assert.equal(inc.bills.length,1);assert.equal(inc.total,7821);
   assert.equal(f.fixedSummary([sal],'a1',{start:'2026-10-01',end:'2026-10-31'}).bills.length,0,'nao entra nas contas fixas a pagar');
+});
+
+test('0.3.198: cada linha do previsto lista os lancamentos que a compoem (para achar receita a mais)',()=>{
+  const tx=(id,kind,amount,date,extra={})=>f.toTx({id,kind:'fin_tx',title:id,state:'active',data:{kind,amount,date,account_id:'a1',paid:false,category:'X',recurrence:'none',import_id:'sofia-pendencia:'+id,...extra}});
+  const txs=[tx('Salário','income',7821,'2026-09-25',{recurrence:'monthly',paid:true}),tx('Freela','income',2000,'2026-10-26',{recurrence:'monthly'}),tx('Reembolso','income',1707.08,'2026-11-03')];
+  const p=f.simpleForecast(txs,[],f.cycleRange(25,'2026-10-25'),'a1','2026-10-19',0);
+  assert.equal(p.income,11528.08);
+  assert.equal(p.incomeItems.map(t=>t.desc).join(','),'Salário,Freela,Reembolso','mostra cada receita do periodo');
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("setForecastOpenLine(l => l === label ? '' : label)"));
+  assert.ok(s.includes("original.manualDue ? onBill(original) : onTx(original)"),'abre para corrigir ou excluir');
 });

@@ -640,14 +640,17 @@ export function nextPlan(txs: Tx[], cards: Card[], range: {start: string; end: s
 // ---------- 0.3.196: modelo simples (definido pelo Pedro) ----------
 /** Previsto do periodo do salario: receitas (salario e qualquer outra) - despesas lancadas - pendentes a pagar
  * - fatura do cartao que vence no periodo - aporte do periodo. Sem o que sobrou do periodo anterior. */
-export type SimpleForecast = {start: string; end: string; income: number; expense: number; card: number; aporte: number; left: number};
+export type SimpleForecast = {start: string; end: string; income: number; expense: number; card: number; aporte: number; left: number; incomeItems: Tx[]; expenseItems: Tx[]};
 export function simpleForecast(txs: Tx[], cards: Card[], range: {start: string; end: string}, accountId: string, today = todayISO(), aporte = 0): SimpleForecast {
   const list = periodList(txs, range, accountId);
   const income = round2(list.filter(t => t.kind === 'income').reduce((s, t) => s + t.amount, 0));
   const expense = round2(list.filter(t => t.kind === 'expense').reduce((s, t) => s + t.amount, 0));
   const card = cardDue(cards, txs, range, accountId, today, false);
   const ap = round2(Math.max(0, aporte));
-  return {start: range.start, end: range.end, income, expense, card, aporte: ap, left: round2(income - expense - card - ap)};
+  // 0.3.198: os lancamentos de cada linha, para a pessoa ver (e corrigir) o que compoe o previsto
+  const byDate = (a: Tx, b: Tx) => a.date.localeCompare(b.date) || b.amount - a.amount;
+  return {start: range.start, end: range.end, income, expense, card, aporte: ap, left: round2(income - expense - card - ap),
+    incomeItems: list.filter(t => t.kind === 'income').sort(byDate), expenseItems: list.filter(t => t.kind === 'expense').sort(byDate)};
 }
 /** Controle de gastos: o que esta no Saldo. 100% = Saldo de agora + tudo o que ja saiu no periodo
  * (despesas pagas, faturas pagas e aportes); cada saida diminui a porcentagem. */
