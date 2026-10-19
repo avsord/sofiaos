@@ -174,6 +174,48 @@ class Workspace {
   return {removed};
  }
  save(input,entityId){
+  // 0.3.200: trocar ou tirar a capa de uma pagina apaga o arquivo da capa antiga (antes ele ficava para sempre)
+  let coverBefore='';try{if(entityId){const old=this.get(entityId);if(old.kind==='user_page')coverBefore=String(old.data&&old.data.cover_attachment_id||'');}}catch{/* o save reclama */}
+  const out=this.saveCore(input,entityId);
+  try{if(coverBefore&&out&&out.kind==='user_page'&&String(out.data&&out.data.cover_attachment_id||'')!==coverBefore)this.dropOldCover(out.id,coverBefore);}catch{/* limpeza e best-effort */}
+  return out;
+ }
+ /** Apaga um anexo (a capa antiga, por exemplo). O servico do Google apaga tambem a copia no Drive. */
+ dropAttachment(attId){let a;try{a=this.db.prepare('SELECT id,entity_id,drive_id FROM attachments WHERE id=?').get(attId);}catch{a=this.db.prepare('SELECT id,entity_id FROM attachments WHERE id=?').get(attId);}if(!a)return null;this.db.prepare('DELETE FROM attachments WHERE id=?').run(attId);return a;}
+ /** So apaga se for mesmo uma capa DESTA pagina e nenhuma outra pagina/registro usar o mesmo arquivo. */
+ dropOldCover(pageId,attId){
+  const a=this.db.prepare('SELECT id,entity_id,name FROM attachments WHERE id=?').get(attId);
+  if(!a||a.entity_id!==pageId||!/^capa\./.test(String(a.name||'')))return false;
+  const used=this.db.prepare("SELECT 1 AS x FROM entities WHERE id!=? AND instr(data,?)>0 LIMIT 1").get(pageId,attId);
+  if(used)return false;
+  this.dropAttachment(attId);return true;
+ }
+ /** Capas que sobraram de trocas antigas: anexo "capa.*" de uma pagina que nao e mais a capa atual dela. Ignora
+  * o que tem menos de 1 hora (o app envia a capa e so depois salva a pagina). */
+ cleanupOrphanCovers(){
+  const cutoff=new Date(Date.now()-3600*1000).toISOString();let removed=0;
+  const rows=this.db.prepare("SELECT a.id AS aid,a.entity_id AS pid,e.data AS data FROM attachments a JOIN entities e ON e.id=a.entity_id WHERE e.kind='user_page' AND a.name LIKE 'capa.%' AND a.created_at<?").all(cutoff);
+  for(const r of rows){let cur='';try{cur=String(JSON.parse(r.data||'{}').cover_attachment_id||'');}catch{continue;}
+   if(cur===r.aid)continue;try{if(this.dropOldCover(r.pid,r.aid))removed++;}catch{/* segue */}}
+  return {removed};
+ }
+ /** 0.3.200: reduz as capas JPEG que JA estao no servidor (as novas ja chegam reduzidas). Uma por vez, com pausa
+  * entre elas para o servidor continuar respondendo, e nunca enquanto o envio ao Drive esta rodando. */
+ async shrinkExistingCovers({isBusy=()=>false,max=40}={}){
+  const {shrinkJpeg,jpegSize}=require('../services/thumb');let shrunk=0,saved=0;
+  let rows;try{rows=this.db.prepare("SELECT id FROM attachments WHERE name LIKE 'capa.%' AND mime='image/jpeg' AND drive_id IS NULL AND length(blob)>200000 ORDER BY length(blob) DESC LIMIT ?").all(max);}
+  catch{rows=this.db.prepare("SELECT id FROM attachments WHERE name LIKE 'capa.%' AND mime='image/jpeg' AND length(blob)>200000 ORDER BY length(blob) DESC LIMIT ?").all(max);}
+  for(const r of rows){
+   if(isBusy())break;
+   const a=this.db.prepare('SELECT id,blob FROM attachments WHERE id=?').get(r.id);if(!a||!a.blob||!a.blob.length)continue;
+   const bytes=Buffer.from(a.blob),size=jpegSize(bytes);if(!size||size.width<=1600)continue;
+   const small=shrinkJpeg(bytes);
+   if(small){this.db.prepare('UPDATE attachments SET blob=?,bytes=?,sha256=? WHERE id=? AND length(blob)>0').run(small,small.length,crypto.createHash('sha256').update(small).digest('hex'),a.id);shrunk++;saved+=bytes.length-small.length;}
+   await new Promise(res=>setTimeout(res,250));
+  }
+  return {shrunk,saved};
+ }
+ saveCore(input,entityId){
   // 0.3.185: uma ocorrencia de conta fixa/salario so pode existir uma vez por mes. Se ja existe um
   // registro dessa serie no mesmo mes, o "novo" vira atualizacao dele (evita somar duas vezes).
   if(!entityId&&input&&input.kind==='fin_tx'&&input.data&&input.data.series_id&&input.data.date){
@@ -271,7 +313,9 @@ class Workspace {
    return {created,notice:'Lista gerada das quantidades informadas. Confira o que já tem em casa; nenhum estoque foi presumido.'};
  }
  checkout(key){const e=this.get(key);if(e.kind!=='checkout')throw new AppError('BAD_KIND','Selecione uma saída.');const a=(e.data.items||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean),b=(e.data.returned_items||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);return {original:a,returned:b,pending_confirmation:a.filter(x=>!b.some(y=>normalize(y)===normalize(x))),note:'Itens não confirmados não são classificados automaticamente como perdidos.'};}
- attach(key,{name,mime,base64}){this.get(key);name=cleanText(name,'Nome',160);if(/[\\/]/.test(name))throw new AppError('BAD_NAME','Use só o nome do arquivo.');if(!['audio/mpeg','audio/ogg','audio/wav','audio/mp4','audio/webm','application/pdf','application/json','application/zip','image/png','image/jpeg','image/webp','image/gif','text/plain','text/markdown','text/csv'].includes(mime))throw new AppError('BAD_MIME','Formato não permitido.');if(typeof base64!=='string'||base64.length>14*1024*1024||!/^[A-Za-z0-9+/]*={0,2}$/.test(base64))throw new AppError('BAD_ATTACHMENT','Arquivo inválido ou maior que 10 MB.');const bytes=Buffer.from(base64,'base64');if(!bytes.length||bytes.length>10*1024*1024)throw new AppError('BAD_ATTACHMENT','Use arquivo de 1 byte a 10 MB.');
+ attach(key,{name,mime,base64}){this.get(key);name=cleanText(name,'Nome',160);if(/[\\/]/.test(name))throw new AppError('BAD_NAME','Use só o nome do arquivo.');if(!['audio/mpeg','audio/ogg','audio/wav','audio/mp4','audio/webm','application/pdf','application/json','application/zip','image/png','image/jpeg','image/webp','image/gif','text/plain','text/markdown','text/csv'].includes(mime))throw new AppError('BAD_MIME','Formato não permitido.');if(typeof base64!=='string'||base64.length>14*1024*1024||!/^[A-Za-z0-9+/]*={0,2}$/.test(base64))throw new AppError('BAD_ATTACHMENT','Arquivo inválido ou maior que 10 MB.');let bytes=Buffer.from(base64,'base64');if(!bytes.length||bytes.length>10*1024*1024)throw new AppError('BAD_ATTACHMENT','Use arquivo de 1 byte a 10 MB.');
+   // 0.3.200: capa de pagina (JPEG largo) e reduzida para 1600 px: de 1 a 2 MB vira algo em torno de 150 a 400 KB
+   if(mime==='image/jpeg'&&/^capa\./.test(name)&&this.get(key).kind==='user_page'){const small=require('../services/thumb').shrinkJpeg(bytes);if(small)bytes=small;}
    const total=(()=>{try{return this.db.prepare('SELECT COALESCE(SUM(bytes),0) AS n FROM attachments WHERE drive_id IS NULL').get().n;}catch{return this.db.prepare('SELECT COALESCE(SUM(bytes),0) AS n FROM attachments').get().n;}})();if(total+bytes.length>50*1024*1024)throw new AppError('MEDIA_LIMIT','Limite local de anexos desta versão: 50 MB. Use referências externas para acervos maiores.');
    const a=id();this.db.prepare('INSERT INTO attachments(id,entity_id,name,mime,bytes,sha256,blob,created_at) VALUES(?,?,?,?,?,?,?,?)').run(a,key,name,mime,bytes.length,crypto.createHash('sha256').update(bytes).digest('hex'),bytes,now());this.event('entity',key,'attachment',this.get(key).area,'Original anexado localmente');return this.attachmentList(key).find(x=>x.id===a);
  }

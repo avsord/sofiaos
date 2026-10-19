@@ -176,6 +176,42 @@ test('anexos vão para Sofia OS/Anexos: aqui fica só a referência, a leitura b
  assert.ok(!g.driveFiles.some(f=>f.id===row.drive_id),'apagou no Drive também');
 });
 
+test('0.3.200: trocar a capa apaga a antiga tambem no Drive; a faxina limpa capas antigas que ja estavam la',async t=>{
+ const {svc,core,g}=await connected(t);const w=core.workspace;await new Promise(r=>setTimeout(r,80));
+ const page=w.save({kind:'user_page',title:'Capa',area:'Pessoal',data:{cover_type:'gradient',cover_value:'',cover_attachment_id:''}});
+ const a=w.attach(page.id,{name:'capa.png',mime:'image/png',base64:Buffer.from('CAPA-A').toString('base64')});
+ const b=w.attach(page.id,{name:'capa.png',mime:'image/png',base64:Buffer.from('CAPA-B').toString('base64')});
+ await svc.offloadAttachments();
+ const da=w.attachment(a.id).drive_id,db=w.attachment(b.id).drive_id;assert.ok(da&&db);
+ const set=id=>{const cur=w.get(page.id);return w.save({...cur,data:{...cur.data,cover_type:'attachment',cover_attachment_id:id}},page.id);};
+ set(a.id);set(b.id);await new Promise(r=>setTimeout(r,20));
+ assert.ok(!g.driveFiles.some(f=>f.id===da),'a capa antiga saiu do Drive');assert.ok(g.driveFiles.some(f=>f.id===db),'a atual continua la');
+ // capa velha que sobrou de antes desta versao (ja no Drive): a faxina apaga dos dois lados
+ const c=w.attach(page.id,{name:'capa.png',mime:'image/png',base64:Buffer.from('CAPA-C').toString('base64')});await svc.offloadAttachments();
+ const dc=w.attachment(c.id).drive_id;w.db.prepare('UPDATE attachments SET created_at=? WHERE id=?').run(new Date(Date.now()-5*3600*1000).toISOString(),c.id);
+ assert.equal(w.cleanupOrphanCovers().removed,1);await new Promise(r=>setTimeout(r,20));
+ assert.ok(!g.driveFiles.some(f=>f.id===dc),'a sobra saiu do Drive');assert.ok(g.driveFiles.some(f=>f.id===db),'a capa atual continua');
+});
+
+test('0.3.200: capas largas que ja estao no Drive sao reduzidas no proprio arquivo (sem criar outro)',async t=>{
+ const jpeg=require('jpeg-js');
+ const {svc,core,g}=await connected(t);const w=core.workspace;await new Promise(r=>setTimeout(r,80));
+ const W=3000,H=1000,data=Buffer.alloc(W*H*4);for(let i=0;i<W*H;i++){data[i*4]=(i%W)%256;data[i*4+1]=Math.floor(i/W)%256;data[i*4+2]=(i*7)%256;data[i*4+3]=255;}
+ const big=Buffer.from(jpeg.encode({data,width:W,height:H},78).data);
+ const page=w.save({kind:'user_page',title:'Capa',area:'Pessoal',data:{}});
+ const att=w.attach(page.id,{name:'foto.jpg',mime:'image/jpeg',base64:big.toString('base64')});
+ w.db.prepare("UPDATE attachments SET name='capa.jpg' WHERE id=?").run(att.id);
+ await svc.offloadAttachments();const row=w.attachment(att.id);assert.ok(row.drive_id);
+ const filesBefore=g.driveFiles.length;
+ const r=await svc.shrinkDriveCovers();assert.equal(r.shrunk,1);
+ assert.equal(g.driveFiles.length,filesBefore,'mesmo arquivo, nada novo no Drive');
+ const f=g.driveFiles.find(x=>x.id===row.drive_id),after=Buffer.from(f.bytes);
+ assert.equal(jpeg.decode(after).width,1600);assert.ok(after.length<big.length*0.6);
+ assert.equal(w.attachment(att.id).bytes,after.length,'tamanho gravado acompanha');
+ const again=await svc.attachmentBytes(w.attachment(att.id));assert.equal(again.length,after.length,'a leitura traz a versao reduzida (cache limpo)');
+ assert.equal((await svc.shrinkDriveCovers()).shrunk,0,'nao repete');
+});
+
 test('mensagens de voz com mais de 1 dia vão para Sofia OS/Áudios; as recentes ficam; leitura volta do Drive',async t=>{
  const {svc,core,g,store}=await connected(t);await new Promise(r=>setTimeout(r,80));
  const st=core.store||store;const conv=st.createConversation('Chat','mobile');

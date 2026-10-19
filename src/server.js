@@ -36,6 +36,8 @@ async function startServer(options={}) {
     runtime.mailWatch.start();
     runtime.packages.start();
     runtime.google.start();
+    // 0.3.200: capas que sobraram de trocas antigas saem do servidor (e do Drive) - 2 min depois de ligar e a cada 12 h
+    {const sweep=async()=>{try{const ws=runtime.core.workspace;ws.cleanupOrphanCovers();await ws.shrinkExistingCovers({isBusy:()=>!!(runtime.google&&runtime.google.offloading)});}catch{/* best-effort */}};setTimeout(sweep,120000).unref();setInterval(sweep,12*3600*1000).unref();}
     timer=setInterval(()=>{if(!runtime.core.busy){runtime.backups.daily();runtime.backups.prune();}},60000);timer.unref();
     const address=server.address(),port=address&&typeof address==='object'?address.port:PORT;
     console.log('Sofia OS online em http://'+HOST+':'+port);

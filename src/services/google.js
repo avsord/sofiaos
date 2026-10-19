@@ -53,6 +53,11 @@ class GoogleService {
     // sha256 guarda a impressão do áudio original para o reenvio idempotente continuar seguro sem o blob aqui.
     try { const cols = this.db.prepare('PRAGMA table_info(voice_messages)').all().map(c => c.name); if (!cols.includes('drive_id')) this.db.exec('ALTER TABLE voice_messages ADD COLUMN drive_id TEXT'); if (!cols.includes('sha256')) this.db.exec('ALTER TABLE voice_messages ADD COLUMN sha256 TEXT'); } catch { /* sem tabela de voz */ }
     this.blobCache = new Map(); this.blobCacheBytes = 0; this.offloading = false;
+    // 0.3.200: capa antiga apagada na Sofia tambem sai do Drive
+    if (typeof workspace.dropAttachment === 'function') {
+      const dropOriginal = workspace.dropAttachment.bind(workspace);
+      workspace.dropAttachment = (attId) => { const a = dropOriginal(attId); if (a && a.drive_id) this.call('DELETE', DRIVE + '/files/' + a.drive_id).catch(() => {}); return a; };
+    }
     // Apagar na Sofia um evento ligado ao Google também apaga lá na próxima sincronização.
     const original = workspace.deleteEntity.bind(workspace);
     workspace.deleteEntity = (entityId) => {
@@ -535,6 +540,31 @@ class GoogleService {
       throw e;
     } finally { this.offloading = false; }
   }
+  /** 0.3.200: reduz as capas JPEG que ja estao no Drive (baixa, reduz para 1600 px e troca o conteudo no mesmo
+   * arquivo). Poucas por rodada; cada capa e conferida uma vez por execucao do servidor. */
+  async shrinkDriveCovers(limit = 3) {
+    const l = this.link(); if (!l?.refresh || !/drive\.file/.test(l.scopes || '') || this.offloading || this.shrinking) return {shrunk: 0};
+    this.shrinking = true; let shrunk = 0; this.coversChecked = this.coversChecked || new Set();
+    try {
+      const {shrinkJpeg} = require('./thumb');
+      const rows = this.db.prepare("SELECT id, name, drive_id FROM attachments WHERE name LIKE 'capa.%' AND mime='image/jpeg' AND drive_id IS NOT NULL AND bytes > ? ORDER BY bytes DESC LIMIT 80").all(350 * 1024)
+        .filter(r => !this.coversChecked.has(r.id)).slice(0, limit);
+      for (const a of rows) {
+        this.coversChecked.add(a.id);
+        try {
+          const bytes = await this.attachmentBytes({id: a.id, blob: null, drive_id: a.drive_id});
+          const small = shrinkJpeg(bytes); if (!small) continue;
+          const boundary = 'sofia' + id();
+          const body = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({name: a.name})}\r\n--${boundary}\r\nContent-Type: image/jpeg\r\n\r\n`), small, Buffer.from(`\r\n--${boundary}--`)]);
+          await this.call('PATCH', UPLOAD + '/files/' + a.drive_id + '?uploadType=multipart&fields=id', body, {'Content-Type': 'multipart/related; boundary=' + boundary});
+          this.db.prepare('UPDATE attachments SET bytes=?, sha256=? WHERE id=?').run(small.length, require('node:crypto').createHash('sha256').update(small).digest('hex'), a.id);
+          const hit = this.blobCache.get(a.id); if (hit) { this.blobCacheBytes -= hit.buf.length; this.blobCache.delete(a.id); }
+          shrunk++;
+        } catch { /* uma capa com problema nao impede as outras; ela nao e tentada de novo nesta execucao */ }
+      }
+    } finally { this.shrinking = false; }
+    return {shrunk};
+  }
   /** Bytes de um anexo: do servidor se ainda estão aqui; senão do Drive (com cache de até 30 MB em memória). */
   async attachmentBytes(a) {
     if (a.blob && a.blob.length) return Buffer.from(a.blob);
@@ -575,7 +605,7 @@ class GoogleService {
 
   start(intervalMs = 15 * 60000) {
     if (this.timer) return;
-    const tick = () => { const l = this.link(); if (!l?.refresh || this.busy) return; this.offloadAttachments().catch(() => {}); this.offloadVoices().catch(() => {}); this.exportPages().catch(() => {}); this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); };
+    const tick = () => { const l = this.link(); if (!l?.refresh || this.busy) return; this.offloadAttachments().catch(() => {}); this.shrinkDriveCovers(3).catch(() => {}); this.offloadVoices().catch(() => {}); this.exportPages().catch(() => {}); this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); };
     this.timer = setInterval(tick, intervalMs); this.timer.unref?.();
     setTimeout(tick, 30000).unref?.();
   }
