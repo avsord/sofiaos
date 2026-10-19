@@ -667,9 +667,13 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
   const c=useTheme(),today=todayISO(),list=useMemo(()=>monthDues(d.txs,accountId,month,today),[d,accountId,month,today]);
   const open=list.filter(row=>!row.paid),total=open.reduce((sum,row)=>sum+row.amount,0),paidCount=list.length-open.length;
   const toPay=open.filter(r=>r.kind!=='receber'),toGet=open.filter(r=>r.kind==='receber');
+  const [side,setSide]=useState<'pagar'|'receber'>('pagar');
+  const sideOpen=side==='pagar'?toPay:toGet;
   const payList=list.filter(r=>r.kind!=='receber'),getList=list.filter(r=>r.kind==='receber');
   // contas do mes seguinte (ex.: o que entra no periodo do salario, mas ja em novembro) - para nada parecer oculto
   const nextMonth=addMonths(month,1),nextList=useMemo(()=>monthDues(d.txs,accountId,nextMonth,today).filter(r=>!r.paid),[d,accountId,nextMonth,today]);
+  const sideList=side==='pagar'?list.filter(r=>r.kind!=='receber'):list.filter(r=>r.kind==='receber');
+  const sideNext=nextList.some(r=>side==='receber'?r.kind==='receber':r.kind!=='receber');
   const nextHint=(kind:'pagar'|'receber')=>{const rows=nextList.filter(r=>kind==='receber'?r.kind==='receber':r.kind!=='receber');if(!rows.length||!onMonth)return null;
     return <Pressable accessibilityRole="button" onPress={()=>onMonth(nextMonth)} style={{paddingVertical:6}}><Text style={{color:c.accent,fontSize:12,fontWeight:'700'}}>Em {monthLabel(nextMonth).split(' ')[0].toLowerCase()}: {rows.length} {kind==='receber'?'a receber':'a pagar'} · {money(rows.reduce((s,r)=>s+r.amount,0))} ›</Text></Pressable>;};
   // 0.3.188: o aporte do mes entra junto das contas: amarelo enquanto falta, verde quando feito
@@ -681,46 +685,43 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
   // 0.3.185: mesmo periodo da lista de cima (o mes escolhido no topo), para nenhuma conta sumir de uma das duas
   const range=useMemo(()=>({start:dayIn(month,1),end:dayIn(month,daysIn(month)),label:monthLabel(month).split(' ')[0].toLowerCase()}),[month]);
   const fixed=useMemo(()=>fixedSummary(d.txs,accountId,range),[d,accountId,range]);
+  const fixedIn=useMemo(()=>fixedSummary(d.txs,accountId,range,'income'),[d,accountId,range]);
   const prevShare=useMemo(()=>{const out:number[]=[];for(let i=1;i<=3;i++){const m=addMonths(month,-i);const f=fixedSummary(d.txs,accountId,{start:dayIn(m,1),end:dayIn(m,daysIn(m))});if(f.share!==null)out.push(f.share);}return out.length?out.reduce((a,b)=>a+b,0)/out.length:null;},[d,accountId,month]);
+  const fx=side==='pagar'?fixed:fixedIn;
   return <>
     <Card_>
+      {/* 0.3.197: A pagar e A receber no mesmo esquema, separados por um seletor */}
+      <Chips value={side} onChange={setSide} options={[{value:'pagar',label:'A pagar'},{value:'receber',label:'A receber'}]}/>
       <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
-        <View style={{flex:1,gap:6}}><Text style={{fontSize:17,fontWeight:'800',color:c.text}}>A pagar e a receber</Text>
-        <Text style={{fontSize:12,color:c.muted,lineHeight:18}}>Cadastre cada vencimento manualmente. Compras e extratos não criam pendências.</Text></View>
-      </View>
-      {/* 0.3.196: A pagar e A receber separados, cada um com o seu botao e o seu total */}
-      <View style={{flexDirection:'row',gap:10}}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Nova conta a pagar" onPress={()=>onNew('expense')} style={{flex:1,backgroundColor:BAD+'14',borderRadius:14,padding:12,gap:4,borderWidth:1,borderColor:BAD+'55'}}>
-          <Text style={{color:c.text,fontWeight:'800',fontSize:14}}>＋ A pagar</Text>
-          <Text style={{color:c.muted,fontSize:11}}>{toPay.length} em aberto · {money(toPay.reduce((s,r)=>s+r.amount,0))}</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Nova conta a receber" onPress={()=>onNew('income')} style={{flex:1,backgroundColor:GOOD+'14',borderRadius:14,padding:12,gap:4,borderWidth:1,borderColor:GOOD+'55'}}>
-          <Text style={{color:c.text,fontWeight:'800',fontSize:14}}>＋ A receber</Text>
-          <Text style={{color:c.muted,fontSize:11}}>{toGet.length} em aberto · {money(toGet.reduce((s,r)=>s+r.amount,0))}</Text>
+        <View style={{flex:1,gap:4}}>
+          <Text style={{fontSize:17,fontWeight:'800',color:c.text}}>{side==='pagar'?'Contas a pagar':'Contas a receber'}</Text>
+          <Text style={{fontSize:12,color:c.muted}}>{sideOpen.length} em aberto em {monthLabel(month).split(' ')[0].toLowerCase()} · {money(sideOpen.reduce((s,r)=>s+r.amount,0))}</Text>
+        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel={side==='pagar'?'Nova conta a pagar':'Nova conta a receber'} onPress={()=>onNew(side==='pagar'?'expense':'income')} style={{backgroundColor:c.accent,paddingHorizontal:13,paddingVertical:11,borderRadius:12}}>
+          <Text style={{color:c.onAccent,fontSize:13,fontWeight:'800'}}>＋ Nova</Text>
         </Pressable>
       </View>
-      <Text style={{color:c.muted,fontSize:11}}>{paidCount?paidCount+(paidCount===1?' já paga ou recebida':' já pagas ou recebidas')+' em '+monthLabel(month).split(' ')[0].toLowerCase()+'.':''}</Text>
       {warning ? <Text style={{fontSize:12,color:WARN}}>{warning}</Text> : null}
     </Card_>
-    {fixed.bills.length ? <Card_>
-      <Title text="Contas fixas" />
-      <Text style={{fontSize:12,color:c.muted,lineHeight:18}}>As pendências marcadas como “Todo mês”, em {range.label}.</Text>
+    {fx.bills.length ? <Card_>
+      <Title text={side==='pagar'?'Contas fixas':'Receitas fixas'} />
+      <Text style={{fontSize:12,color:c.muted,lineHeight:18}}>{side==='pagar'?'As contas marcadas como “Todo mês”':'As receitas marcadas como “Todo mês” (ex.: salário)'}, em {range.label}.</Text>
       {/* 0.3.192: tocar numa conta fixa abre a edicao dela (nome, valor, dia, parcelas, avisos) - vale para todos os meses */}
-      {fixed.bills.map(b=>{const original=d.txs.find(t=>!t.virtual&&t.id===(b.tx.seriesId||b.tx.id))||(!b.tx.virtual?b.tx:null);
+      {fx.bills.map(b=>{const original=d.txs.find(t=>!t.virtual&&t.id===(b.tx.seriesId||b.tx.id))||(!b.tx.virtual?b.tx:null);
         return <Pressable key={b.id+b.date} accessibilityRole="button" accessibilityLabel={'Editar '+b.title} disabled={!original} onPress={()=>original&&onBill(original,'series')} style={({pressed})=>({flexDirection:'row',alignItems:'center',gap:10,paddingVertical:9,borderTopWidth:1,borderColor:c.line,opacity:pressed?0.6:1})}>
         <View style={{flex:1,gap:2}}>
           <Text style={{color:c.text,fontSize:14,fontWeight:'600'}}>{b.title}</Text>
-          <Text style={{color:c.muted,fontSize:11}}>dia {b.day}{b.cardId?' · cartão':''} · {b.paid?'paga':'a pagar'}{b.installments?' · parcela '+b.index+' de '+b.installments+(b.left?' · faltam '+b.left:' · última'):''}</Text>
+          <Text style={{color:c.muted,fontSize:11}}>dia {b.day}{b.cardId?' · cartão':''} · {side==='pagar'?(b.paid?'paga':'a pagar'):(b.paid?'recebida':'a receber')}{b.installments?' · parcela '+b.index+' de '+b.installments+(b.left?' · faltam '+b.left:' · última'):''}</Text>
         </View>
         <Text style={{color:b.paid?c.muted:c.text,fontWeight:'700',fontSize:14,textDecorationLine:b.paid?'line-through':'none'}}>{money(b.amount)}</Text>
         {original?<Text style={{color:c.muted,fontSize:16}}>›</Text>:null}
       </Pressable>;})}
       <Text style={{color:c.muted,fontSize:11}}>Toque numa conta para mudar nome, valor, dia, parcelas ou avisos. Vale para todos os meses.</Text>
       <View style={{borderTopWidth:1,borderColor:c.line,paddingTop:12,gap:6}}>
-        <View style={{flexDirection:'row'}}><Text style={{flex:1,color:c.text,fontWeight:'700'}}>Total do mês</Text><Text style={{color:c.text,fontWeight:'800'}}>{money(fixed.total)}</Text></View>
-        <View style={{flexDirection:'row'}}><Text style={{flex:1,color:c.muted,fontSize:12}}>Pagas</Text><Text style={{color:c.muted,fontSize:12}}>{money(fixed.paid)} · faltam {money(fixed.open)}</Text></View>
-        {fixed.share!==null?<Text style={{color:c.muted,fontSize:12,lineHeight:18}}>Suas fixas são {Math.round(fixed.share*100)}% do que entrou em {range.label} ({money(fixed.income)}){prevShare!==null?`, contra ${Math.round(prevShare*100)}% na média dos meses anteriores`:''}.</Text>
-          :<Text style={{color:c.muted,fontSize:12}}>Ainda não há receitas registradas em {range.label} para calcular a proporção.</Text>}
+        <View style={{flexDirection:'row'}}><Text style={{flex:1,color:c.text,fontWeight:'700'}}>Total do mês</Text><Text style={{color:c.text,fontWeight:'800'}}>{money(fx.total)}</Text></View>
+        <View style={{flexDirection:'row'}}><Text style={{flex:1,color:c.muted,fontSize:12}}>{side==='pagar'?'Pagas':'Recebidas'}</Text><Text style={{color:c.muted,fontSize:12}}>{money(fx.paid)} · faltam {money(fx.open)}</Text></View>
+        {side==='pagar'&&fx.share!==null?<Text style={{color:c.muted,fontSize:12,lineHeight:18}}>Suas fixas são {Math.round(fx.share*100)}% do que entrou em {range.label} ({money(fx.income)}){prevShare!==null?`, contra ${Math.round(prevShare*100)}% na média dos meses anteriores`:''}.</Text>
+          :side==='pagar'?<Text style={{color:c.muted,fontSize:12}}>Ainda não há receitas registradas em {range.label} para calcular a proporção.</Text>:null}
       </View>
     </Card_> : null}
     <Card_>
@@ -738,13 +739,9 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
           <Text style={{color:GOOD,fontWeight:'700'}}>{money(aporte.realized)}</Text>
           <Text style={{color:GOOD,fontWeight:'800',fontSize:12}}>✓ Aportado</Text>
         </View>):null}
-      {list.length || nextList.length ? <>
-        <Text style={{color:c.muted,fontSize:12,fontWeight:'700',marginTop:4}}>A pagar</Text>
-        {payList.length?payList.map(due=><DueRow key={due.id} due={due} d={d} api={api} reload={reload} onTx={t=>onBill(t as Tx,'month')} />):<Text style={{color:c.muted,fontSize:12}}>Nada a pagar neste mês.</Text>}
-        {nextHint('pagar')}
-        <Text style={{color:c.muted,fontSize:12,fontWeight:'700',marginTop:8}}>A receber</Text>
-        {getList.length?getList.map(due=><DueRow key={due.id} due={due} d={d} api={api} reload={reload} onTx={t=>onBill(t as Tx,'month')} />):<Text style={{color:c.muted,fontSize:12}}>Nada a receber neste mês.</Text>}
-        {nextHint('receber')}
+      {sideList.length || sideNext ? <>
+        {sideList.length?sideList.map(due=><DueRow key={due.id} due={due} d={d} api={api} reload={reload} onTx={t=>onBill(t as Tx,'month')} />):<Text style={{color:c.muted,fontSize:12}}>{side==='pagar'?'Nada a pagar neste mês.':'Nada a receber neste mês.'}</Text>}
+        {nextHint(side)}
       </>
         : <Text style={{color:c.muted,fontSize:13,lineHeight:20}}>{month===monthOf(today)?'Nada a pagar ou receber neste mês.':'Nada pendente em '+monthLabel(month).split(' ')[0].toLowerCase()+'.'} Para ver outro mês, troque o mês no topo.</Text>}
       <Text style={{fontSize:11,color:c.muted}}>Os avisos locais saem às 9h do vencimento (e, se você escolher, alguns dias antes), com a permissão de notificações do Android. Confirmar o pagamento ou o recebimento tira o item dos pendentes e o inclui no extrato.</Text>

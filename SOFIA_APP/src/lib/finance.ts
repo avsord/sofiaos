@@ -481,11 +481,11 @@ export function cycleRange(day: number, today = todayISO()): {start: string; end
 /** Contas fixas = pendencias marcadas como "todo mes". Previsto e o valor cadastrado; realizado, o confirmado. */
 export type FixedBill = {id: string; title: string; amount: number; paidAmount: number | null; day: number; date: string; paid: boolean; cardId: string;
   installments: number; index: number; left: number; last: boolean; tx: Tx};
-export function fixedBills(txs: Tx[], accountId: string, range: {start: string; end: string}): FixedBill[] {
+export function fixedBills(txs: Tx[], accountId: string, range: {start: string; end: string}, kind: 'expense' | 'income' = 'expense'): FixedBill[] {
   const months = [...new Set([monthOf(range.start), monthOf(range.end)])];
   const all = [...txs, ...months.flatMap(m => expandRecurring(txs, m))];
   const seen = new Set<string>();
-  return all.filter(t => (t.recurrence === 'monthly' || !!t.seriesId) && t.kind === 'expense' && (!accountId || t.accountId === accountId) && t.date >= range.start && t.date <= range.end)
+  return all.filter(t => (t.recurrence === 'monthly' || !!t.seriesId) && t.kind === kind && (!accountId || t.accountId === accountId) && t.date >= range.start && t.date <= range.end)
     .filter(t => { const k = t.desc + '|' + t.date; if (seen.has(k)) return false; seen.add(k); return true; })
     .sort((a, b) => a.date.localeCompare(b.date))
     .map(t => {
@@ -500,8 +500,8 @@ export function fixedBills(txs: Tx[], accountId: string, range: {start: string; 
     });
 }
 export type FixedSummary = {bills: FixedBill[]; total: number; paid: number; open: number; income: number; share: number | null};
-export function fixedSummary(txs: Tx[], accountId: string, range: {start: string; end: string}): FixedSummary {
-  const bills = fixedBills(txs, accountId, range);
+export function fixedSummary(txs: Tx[], accountId: string, range: {start: string; end: string}, kind: 'expense' | 'income' = 'expense'): FixedSummary {
+  const bills = fixedBills(txs, accountId, range, kind);
   const total = round2(bills.reduce((s, b) => s + b.amount, 0));
   const paid = round2(bills.filter(b => b.paid).reduce((s, b) => s + b.amount, 0));
   const income = round2(txs.filter(t => t.kind === 'income' && (!accountId || t.accountId === accountId) && t.date >= range.start && t.date <= range.end).reduce((s, t) => s + t.amount, 0));

@@ -42,7 +42,7 @@ test('telas: cartao Saldo, secao de contas fixas, meta e passo a passo com 7 eta
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes('>Controle de gastos</Text>')&&s.includes('spendControl(d.txs, d.moves || [], reserve?.id || \'\', cycleRange(cycleDay, today), accountId, total)'),'cartao do ciclo');
   assert.ok(s.includes("over ? '−' + show(-b.left) : show(b.left)"),'mostra quando o saldo fica negativo');
-  assert.ok(s.includes('<Title text="Contas fixas" />')&&s.includes('Total do mês'));
+  assert.ok(s.includes("<Title text={side==='pagar'?'Contas fixas':'Receitas fixas'} />")&&s.includes('Total do mês'));
   assert.ok(s.includes('Meta: {show(outlook.target)}')&&s.includes('Para fechar no prazo:'));
   assert.ok(s.includes("{title: 'Quando e quanto você recebe'")&&s.includes("{title: 'Tudo pronto'"));
   assert.ok(s.includes('Passo {step + 1} de {steps.length}')&&s.includes('Pular o resto'));
@@ -131,7 +131,7 @@ test('0.3.177: ao pagar, a conta fica verde e continua na lista do mes',()=>{
   assert.ok(s.includes("if (due.paid) return ("),'linha propria para paga');
   assert.ok(s.includes("backgroundColor: GOOD + '1a'"),'verde');
   assert.ok(s.includes("import_id: t.manualDue ? 'sofia-pendencia:' + (t.seriesId || t.id) + ':' + t.date : ''"),'repeticao paga continua pendencia daquele mes');
-  assert.ok(s.includes("paidCount?paidCount+(paidCount===1?' já paga ou recebida'"),'cabecalho separa abertas e pagas');
+  assert.ok(s.includes("{sideOpen.length} em aberto em"),'cabecalho mostra as abertas do lado escolhido');
 });
 
 test('0.3.178: apagar no historico um pagamento de pendencia desfaz o pagamento (volta como a pagar)',()=>{
@@ -296,12 +296,18 @@ test('0.3.196: modelo simples - previsto = receitas - despesas e pendentes - fat
   assert.ok(s.includes("['Aporte', forecastP.aporte, GUARD, '−']"),'aporte aparece na conta do previsto');
 });
 
-test('0.3.196: Pendentes separa A pagar e A receber, cada um com seu botao; conta do mes seguinte avisada',()=>{
+test('0.3.197: Pendentes com seletor A pagar | A receber, mesmo esquema nos dois lados',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('accessibilityLabel="Nova conta a pagar" onPress={()=>onNew(\'expense\')}')&&s.includes('accessibilityLabel="Nova conta a receber" onPress={()=>onNew(\'income\')}'));
-  assert.ok(s.includes(">A pagar</Text>")&&s.includes(">A receber</Text>"));
+  assert.ok(s.includes("<Chips value={side} onChange={setSide} options={[{value:'pagar',label:'A pagar'},{value:'receber',label:'A receber'}]}/>"),'seletor como no print');
+  assert.ok(s.includes("onPress={()=>onNew(side==='pagar'?'expense':'income')}"),'+ Nova abre no tipo do lado escolhido');
+  assert.ok(s.includes("const fx=side==='pagar'?fixed:fixedIn;"),'contas fixas ou receitas fixas');
   assert.ok(s.includes("tx?tx.kind==='income'?'income':'expense':initialFlow"),'o cadastro comeca no tipo escolhido');
   assert.ok(s.includes("const draftKey='bill:'+(tx?.id||'novo:'+initialFlow);"),'rascunho separado por tipo');
   assert.ok(!s.includes("if(draft.flow)setFlow("),'rascunho antigo nao troca mais o tipo');
-  assert.ok(s.includes("{kind==='receber'?'a receber':'a pagar'}"),'aviso das contas do mes seguinte');
+  assert.ok(s.includes('{nextHint(side)}'),'aviso das contas do mes seguinte');
+  // receitas fixas (salario) aparecem do lado A receber
+  const sal=f.toTx({id:'sal',kind:'fin_tx',title:'Salário',state:'active',data:{kind:'income',amount:7821,date:'2026-09-25',account_id:'a1',paid:false,category:'Salário',recurrence:'monthly',import_id:'sofia-pendencia:s'}});
+  const inc=f.fixedSummary([sal],'a1',{start:'2026-10-01',end:'2026-10-31'},'income');
+  assert.equal(inc.bills.length,1);assert.equal(inc.total,7821);
+  assert.equal(f.fixedSummary([sal],'a1',{start:'2026-10-01',end:'2026-10-31'}).bills.length,0,'nao entra nas contas fixas a pagar');
 });
