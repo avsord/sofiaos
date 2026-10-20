@@ -111,3 +111,16 @@ test('0.3.207: depois de salvar uma conta, vai ao mes e ao lado (A pagar/A receb
   assert.ok(s.includes('mas o servidor ainda não devolveu a conta'),'diagnostico se nao voltar');
   assert.ok(s.includes("side={pendingSide} onSide={setPendingSide}"),'o lado escolhido nao volta sozinho para A pagar');
 });
+
+test('0.3.208: meta com progresso de 0 ate a meta, marcos e projecao (Relatorios e Inicio)',()=>{
+  const g=require('./load-ts.cjs')('src/components/GoalProgress.tsx',{react:{},'react-native':{},'../lib/theme':{},'react/jsx-runtime':{jsx:()=>null,jsxs:()=>null}});
+  const st=g.goalStats({name:'Reserva',saved:15000,target:40000,monthly:4000,deadline:'2027-06-30',today:'2026-10-20'});
+  assert.equal(Math.round(st.pct*100),38);assert.equal(st.missing,25000);assert.equal(st.next,0.5);assert.equal(st.nextMissing,5000);
+  assert.equal(st.reach,'2027-05','4 mil por mes: chega em maio');assert.equal(st.diff,1,'1 mes antes do prazo');
+  assert.match(st.message,/Um quarto do caminho/);
+  assert.match(g.goalStats({name:'',saved:40000,target:40000,monthly:0,deadline:'',today:'2026-10-20'}).message,/Meta batida/);
+  const atras=g.goalStats({name:'',saved:1000,target:40000,monthly:500,deadline:'2027-06-30',today:'2026-10-20'});assert.ok(atras.diff<0&&atras.needed>4000,'atrasado: mostra quanto por mes precisa');
+  const f=read('src/screens/Finance.tsx'),h=read('src/screens/Home.tsx');
+  assert.ok(f.includes('{goal ? <GoalProgressCard g={goal} /> : null}'),'Relatorios');
+  assert.ok(h.includes("<FinanceGoalHome api={api} onOpen={()=>onOpenModule?onOpenModule('finance'):navigate('apps')}/>"),'Inicio');
+});

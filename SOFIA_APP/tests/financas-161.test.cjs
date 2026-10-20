@@ -40,7 +40,7 @@ test('meta: projecao no ritmo atual e quanto por mes fecharia no prazo',()=>{
 });
 test('telas: cartao Saldo, secao de contas fixas, meta e passo a passo com 7 etapas',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('>Controle de gastos</Text>')&&s.includes('spendControl(d.txs, d.moves || [], reserve?.id || \'\', cycleRange(cycleDay, today), accountId, total)'),'cartao do ciclo');
+  assert.ok(s.includes('>Controle de gastos</Text>')&&s.includes('moneyLeft(d.txs, d.cards, r, accountId, total, aportePendingIn(r), today)'),'cartao do ciclo');
   assert.ok(s.includes("over ? '−' + show(-b.left) : show(b.left)"),'mostra quando o saldo fica negativo');
   assert.ok(s.includes("<Title text={side==='pagar'?'Contas fixas':'Receitas fixas'} />")&&s.includes('Total do mês'));
   assert.ok(s.includes('Meta: {show(outlook.target)}')&&s.includes('Para fechar no prazo:'));
@@ -249,8 +249,8 @@ test('0.3.195: previsao do salario (periodo do proximo salario) e ciclo de cada 
   assert.equal(f.effectiveCycleDay([acc],sal5,'a1'),5,'sem dia informado: o dia do salario fixo');
   assert.equal(f.effectiveCycleDay([acc],[],'a1'),0,'sem salario: mes do calendario');
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes("'Previsto de ' + periodLabel(forecastP)"));
-  assert.ok(s.includes('O que está no seu Saldo. Desde o dia'),'o cartao nunca some (parte do Saldo)');
+  assert.ok(s.includes("{'Previsto até ' + forecastP.end.slice(8, 10)"));
+  assert.ok(s.includes('Pagar uma conta prevista não muda; cada gasto fora do previsto diminui'),'o cartao nunca some (sobra + saldo)');
 });
 
 test('0.3.196: Controle de gastos; passo a passo pede o valor cheio do salario e cria a receita fixa no dia',()=>{
@@ -293,12 +293,12 @@ test('0.3.196: modelo simples - previsto = receitas - despesas e pendentes - fat
   const ctl=f.spendControl(txs,[],'',f.cycleRange(25,'2026-10-19'),'a1',1779.53);
   assert.equal(ctl.left,1779.53,'controle de gastos e o Saldo');assert.equal(ctl.out,803.18);assert.equal(ctl.available,2582.71);assert.equal(Math.round(ctl.pct*100),69);
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes("['Aporte', forecastP.aporte, GUARD, '−', [] as Tx[]]"),'aporte aparece na conta do previsto');
+  assert.ok(s.includes("['Aporte que falta', forecastP.aporte, GUARD, '−', [] as Tx[]]"),'aporte aparece na conta do previsto');
 });
 
 test('0.3.197: Pendentes com seletor A pagar | A receber, mesmo esquema nos dois lados',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes("<Chips value={side} onChange={setSide} options={[{value:'pagar',label:'A pagar'},{value:'receber',label:'A receber'}]}/>"),'seletor como no print');
+  assert.ok(s.includes('accessibilityRole="tablist"')&&s.includes("[['pagar','A pagar',toPay.length],['receber','A receber',toGet.length]]"),'seletor de duas metades iguais');
   assert.ok(s.includes("onPress={()=>onNew(side==='pagar'?'expense':'income')}"),'+ Nova abre no tipo do lado escolhido');
   assert.ok(s.includes("const fx=side==='pagar'?fixed:fixedIn;"),'contas fixas ou receitas fixas');
   assert.ok(s.includes("tx?tx.kind==='income'?'income':'expense':initialFlow"),'o cadastro comeca no tipo escolhido');
@@ -331,7 +331,35 @@ test('0.3.199: gasto fora do padrao e resumo da semana por categoria',()=>{
   const w=f.lastWeekByCategory(txs,'a1','2026-10-19');
   assert.equal(w.start,'2026-10-12');assert.equal(w.end,'2026-10-18');assert.equal(w.total,920);assert.equal(w.lines[0].category,'Alimentação');
   const s=read('src/screens/Finance.tsx'),n=read('src/lib/finance-notifications.ts');
-  assert.ok(s.includes('% acima do que você costuma gastar'));assert.ok(s.includes('<Title text="Semana passada" />'));
+  assert.ok(s.includes('% acima do que você costuma gastar'));assert.ok(s.includes('<Fold id="semana" title="Semana passada">'));
   assert.ok(n.includes("weekday: 2, hour: 9, minute: 0"),'toda segunda as 9h');
   assert.ok(n.includes("'sofia.fin.alerts:' + key + ':' + month"),'um aviso por categoria por mes');
+});
+
+test('0.3.208: sobra = saldo + o que entra - o que falta pagar; pagar conta prevista nao muda; fatura nao conta duas vezes',()=>{
+  const tx=(id,kind,amount,date,extra={})=>f.toTx({id,kind:'fin_tx',title:id,state:'active',data:{kind,amount,date,account_id:'a1',paid:false,category:'X',recurrence:'none',import_id:'sofia-pendencia:'+id,...extra}});
+  const txs=[tx('sal','income',7821,'2026-09-25',{recurrence:'monthly',paid:true}),tx('darf','expense',836.31,'2026-10-22'),tx('mais','expense',300,'2026-10-25',{recurrence:'monthly'}),tx('nov','expense',1000,'2026-11-10'),
+    f.toTx({id:'mercado',kind:'fin_tx',title:'Mercado',state:'active',data:{kind:'expense',amount:100,date:'2026-10-18',account_id:'a1',paid:true,category:'Mercado',recurrence:'none'}})];
+  const cur=f.moneyLeft(txs,[],f.cycleRange(25,'2026-10-20'),'a1',783.78,0,'2026-10-20');
+  assert.equal(cur.left,-52.53);assert.equal(cur.spent,100);
+  const paid=txs.map(t=>t.id==='darf'?{...t,paid:true}:t);
+  assert.equal(f.moneyLeft(paid,[],f.cycleRange(25,'2026-10-20'),'a1',783.78-836.31,0,'2026-10-20').left,-52.53,'pagar a conta prevista nao muda a sobra');
+  const prev=f.moneyLeft(txs,[],{start:'2026-09-25',end:'2026-11-24'},'a1',783.78,4000,'2026-10-20');
+  assert.equal(prev.toReceive,7821);assert.equal(prev.toPay,2136.31);assert.equal(prev.left,2468.47,'saldo + salario - contas - aporte');
+  const card={id:'c1',name:'Nubank',accountId:'a1',closeDay:1,dueDay:5,limit:0,archived:false,color:'',entity:null};
+  const withBill=[...txs,tx('Fatura Nubank','expense',500,'2026-11-05')];
+  const r1=f.moneyLeft(withBill,[],{start:'2026-09-25',end:'2026-11-24'},'a1',783.78,0,'2026-10-20');assert.equal(r1.toPay,2636.31,'sem cartao, a fatura cadastrada conta como conta');
+});
+
+test('0.3.208: Relatorios com secoes que abrem e fecham (lembra a escolha), guardado primeiro, Recomecar so na engrenagem',()=>{
+  const s=read('src/screens/Finance.tsx');
+  for(const id of ['guardado','semana','comparado','seis','saldo'])assert.ok(s.includes('<Fold id="'+id+'"'),id);
+  assert.ok(s.includes("const FOLD_KEY = 'sofia_fin_folds_v1';")&&s.includes('SecureStore.setItemAsync(FOLD_KEY'),'lembra aberta/fechada');
+  const r=s.slice(s.indexOf('function ReportsTab('));assert.ok(r.indexOf('<Fold id="guardado"')<r.indexOf('<Fold id="saldo"'),'guardado em cima, saldo embaixo');
+  assert.ok(!r.slice(0,r.indexOf('\nfunction ',10)).includes('Recomeçar de hoje</Text>'),'fora dos Relatorios');
+  assert.ok(s.includes('Contando a partir de ')&&s.includes('Recomeçar de hoje</Text>'),'na engrenagem');
+  assert.ok(s.includes("manualDues(d.txs, accountId, today, 3)")&&s.includes('nos próximos 3 dias'),'vencimentos com 3 dias');
+  assert.ok(s.includes("label: 'Vencimentos'"),'aba Vencimentos');
+  assert.ok(s.includes('async function saveFresh(')&&s.includes("await saveFresh(api, t.desc, {paid: true}, t.entity)"),'Paguei sobre a versao atual');
+  assert.ok(s.includes('aparece {g.items.length} vezes'),'aviso de repetido');
 });

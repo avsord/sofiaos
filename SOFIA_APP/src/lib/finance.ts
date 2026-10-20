@@ -701,3 +701,21 @@ export function categoryAlerts(txs: Tx[], accountId: string, month: string): Cat
   }
   return out.sort((a, b) => b.over - a.over);
 }
+
+// ---------- 0.3.208: sobra = saldo + o que vai entrar - o que falta pagar (contas, fatura, aporte) ----------
+export type MoneyLeft = {start: string; end: string; saldo: number; toReceive: number; toPay: number; card: number; aporte: number; left: number; spent: number; available: number; incomeItems: Tx[]; expenseItems: Tx[]};
+/** Pagar uma conta prevista nao muda a sobra (o saldo cai e a conta sai do "a pagar" juntos). So gasto fora do
+ * previsto diminui; receita a mais aumenta. A fatura cadastrada como conta nao e contada duas vezes. */
+export function moneyLeft(txs: Tx[], cards: Card[], range: {start: string; end: string}, accountId: string, saldo: number, aportePending: number, today = todayISO()): MoneyLeft {
+  const list = periodList(txs, range, accountId);
+  const recurring = (t: Tx) => t.recurrence === 'monthly' || !!t.seriesId;
+  const card = cardDue(cards, txs, range, accountId, today, true);
+  const isInvoiceBill = (t: Tx) => card > 0 && /fatura/i.test(t.desc + ' ' + t.category);
+  const incomeItems = list.filter(t => t.kind === 'income' && !t.paid).sort((a, b) => a.date.localeCompare(b.date));
+  const expenseItems = list.filter(t => t.kind === 'expense' && !t.paid && !isInvoiceBill(t)).sort((a, b) => a.date.localeCompare(b.date));
+  const sum = (xs: Tx[]) => round2(xs.reduce((s, t) => s + t.amount, 0));
+  const toReceive = sum(incomeItems), toPay = sum(expenseItems), aporte = round2(Math.max(0, aportePending));
+  const spent = sum(list.filter(t => t.kind === 'expense' && t.paid && !t.manualDue && !recurring(t)));
+  const left = round2(saldo + toReceive - toPay - card - aporte);
+  return {start: range.start, end: range.end, saldo: round2(saldo), toReceive, toPay, card, aporte, left, spent, available: round2(Math.max(left, 0) + spent), incomeItems, expenseItems};
+}
