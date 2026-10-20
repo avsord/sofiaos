@@ -2,7 +2,7 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {GoalProgressCard} from '../components/GoalProgress';
 import type {GoalNumbers} from '../components/GoalProgress';
 import * as SecureStore from 'expo-secure-store';
-import {ActivityIndicator, Alert, BackHandler, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View} from 'react-native';
+import {ActivityIndicator, Alert, BackHandler, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View, Dimensions} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Svg, {Path, Rect, Line} from 'react-native-svg';
 import {useTheme, light} from '../lib/theme';
@@ -1998,7 +1998,12 @@ function ImportSheet({api, d, onClose, onDone}: {api: SofiaApi; d: Data; onClose
             {preview ? (
               <View style={{gap: 6}}>
                 <Text style={{fontSize: 12, color: c.muted, fontWeight: '700'}}>3. Confira ({chosenItems.length} de {preview.length} marcados · {money(Math.abs(sum))} {sum >= 0 ? 'de entrada' : 'de saída'})</Text>
-                <View><ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+                {/* 0.3.210: a lista rola por dentro e o botao Importar fica sempre visivel logo abaixo */}
+                <View style={{flexDirection: 'row', gap: 16}}>
+                  <Pressable accessibilityRole="button" onPress={() => setChosen(new Set(preview.filter(i => !i.skip && !i.duplicate).map(i => i.import_id)))}><Text style={{color: c.accent, fontWeight: '700', fontSize: 12}}>Marcar todos</Text></Pressable>
+                  <Pressable accessibilityRole="button" onPress={() => setChosen(new Set())}><Text style={{color: c.accent, fontWeight: '700', fontSize: 12}}>Desmarcar todos</Text></Pressable>
+                </View>
+                <View style={{maxHeight: Math.round(Dimensions.get('window').height * 0.42), borderRadius: 12, borderWidth: 1, borderColor: c.line, paddingHorizontal: 10}}><ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
                   {preview.map(i => <Pressable key={i.import_id} disabled={!!i.skip} onPress={() => toggle(i.import_id)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderColor: c.line, opacity: i.skip ? 0.45 : 1}}>
                     <View style={{width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: chosen.has(i.import_id) ? c.accent : c.line, backgroundColor: chosen.has(i.import_id) ? c.accent : 'transparent', alignItems: 'center', justifyContent: 'center'}}>{chosen.has(i.import_id) ? <Text style={{color: c.onAccent, fontSize: 13, fontWeight: '800'}}>✓</Text> : null}</View>
                     <View style={{flex: 1}}><Text style={{color: c.text}} numberOfLines={1}>{i.desc}</Text><Text style={{fontSize: 11, color: c.muted}}>{i.date.split('-').reverse().join('/')}{i.category ? ' · ' + i.category : ''}{i.duplicate ? ' · já importado' : ''}{i.match ? ' · já está no app: “' + i.match.title + '”' + (typeof i.match.amount === 'number' && Math.abs(i.match.amount - i.amount) > 0.004 ? ' (lá com ' + money(i.match.amount) + ')' : '') : ''}{i.before ? ' · antes do seu ponto de partida (já está no Saldo)' : ''}{i.skip ? ' · ' + i.skip : ''}</Text></View>

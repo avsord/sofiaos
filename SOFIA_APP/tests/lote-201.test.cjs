@@ -124,3 +124,10 @@ test('0.3.208: meta com progresso de 0 ate a meta, marcos e projecao (Relatorios
   assert.ok(f.includes('{goal ? <GoalProgressCard g={goal} /> : null}'),'Relatorios');
   assert.ok(h.includes("<FinanceGoalHome api={api} onOpen={()=>onOpenModule?onOpenModule('finance'):navigate('apps')}/>"),'Inicio');
 });
+
+test('0.3.210: importar extrato - lista com altura maxima (rola por dentro) e botao Importar sempre visivel',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("<View style={{maxHeight: Math.round(Dimensions.get('window').height * 0.42)"),'a lista nao empurra o botao para fora da tela');
+  assert.ok(s.includes('>Marcar todos</Text>')&&s.includes('>Desmarcar todos</Text>'));
+  const i=s.indexOf("maxHeight: Math.round(Dimensions.get('window').height * 0.42)"),b=s.indexOf("<Button title={'Importar ' + chosenItems.length",i);assert.ok(b>i,'botao logo depois da lista');
+});
