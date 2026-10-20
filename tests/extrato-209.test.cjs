@@ -30,3 +30,21 @@ test('0.3.211: desfazer a importacao tira so o que veio do extrato e devolve o s
  assert.equal(u.removed,2);assert.equal(u.amount,257.48);
  const left=w.list({kind:'fin_tx',limit:50}).filter(e=>e.state!=='archived');assert.equal(left.length,1);assert.equal(left[0].id,manual.id,'o lancado a mao fica');
 });
+
+test('0.3.212: zerar Financas apaga tudo do modulo (inclusive arquivados) e exige a palavra ZERAR',async t=>{
+ const http=require('node:http'),path=require('node:path');const {createRuntime}=require('../src/core/runtime');
+ const f=fixture(t);f.config.loginPassword='development-fixture-only-212';f.config.loginEmail='owner@example.com';
+ const runtime=createRuntime(f.config,{store:f.store,provider:f.provider,secureDir:path.join(f.dir,'secure')});
+ const server=http.createServer(runtime.handler);await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;f.config.publicBaseUrl=base;
+ t.after(async()=>{server.closeAllConnections();await new Promise(r=>server.close(r));});
+ const H=tok=>({'Content-Type':'application/json',Authorization:'Bearer '+tok});
+ const token=(await (await fetch(base+'/api/mobile/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'owner@example.com',password:'development-fixture-only-212'})})).json()).token;
+ const w=runtime.core.workspace;const conta=w.save({kind:'fin_account',title:'Conta',area:'Pessoal',data:{account_type:'corrente',initial_balance:'1949.15',include_total:true}});
+ w.save({kind:'fin_tx',title:'Vivo',area:'Pessoal',data:{kind:'expense',amount:47,date:'2026-10-17',account_id:conta.id,paid:true,category:'Contas',recurrence:'monthly'}});
+ const old=w.save({kind:'fin_tx',title:'Antiga',area:'Pessoal',data:{kind:'expense',amount:1,date:'2026-10-01',account_id:conta.id,paid:true,category:'Contas',recurrence:'none'}});w.changeState(old.id,'archived',old.revision);
+ w.save({kind:'fin_goal',title:'Reserva',area:'Pessoal',data:{target:40000}});
+ const bad=await fetch(base+'/api/mobile/md/finance/reset',{method:'POST',headers:H(token),body:JSON.stringify({confirm:'sim'})});assert.equal(bad.status,400);
+ const r=await (await fetch(base+'/api/mobile/md/finance/reset',{method:'POST',headers:H(token),body:JSON.stringify({confirm:'ZERAR'})})).json();
+ assert.equal(r.ok,true);assert.equal(r.removed,4);
+ for(const kind of ['fin_account','fin_tx','fin_goal'])assert.equal(w.list({kind,limit:50}).length,0,kind+' vazio');
+});

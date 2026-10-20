@@ -40,8 +40,8 @@ test('meta: projecao no ritmo atual e quanto por mes fecharia no prazo',()=>{
 });
 test('telas: cartao Saldo, secao de contas fixas, meta e passo a passo com 7 etapas',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('>Controle de gastos</Text>')&&s.includes('moneyLeft(d.txs, d.cards, r, accountId, total, aportePendingIn(r), today)'),'cartao do ciclo');
-  assert.ok(s.includes("over ? '−' + show(-b.left) : show(b.left)"),'mostra quando o saldo fica negativo');
+  assert.ok(s.includes('>Controle de gastos</Text>')&&s.includes('moneyLeft(d.txs, d.cards, monthRange, accountId, total, aportePendingIn(monthRange), today)'),'cartao do ciclo');
+  assert.ok(s.includes("'estourou ' + show(-b.left)"),'mostra quando estoura');
   assert.ok(s.includes("<Title text={side==='pagar'?'Contas fixas':'Receitas fixas'} />")&&s.includes('Total do mês'));
   assert.ok(s.includes('Meta: {show(outlook.target)}')&&s.includes('Para fechar no prazo:'));
   assert.ok(s.includes("{title: 'Quando e quanto você recebe'")&&s.includes("{title: 'Tudo pronto'"));
@@ -160,7 +160,7 @@ test('0.3.182: Saldo, detalhes do saldo, listas de receitas e despesas, cartao n
   assert.ok(s.includes('Transferências entre contas'),'a conta do saldo sempre fecha');
   assert.ok(s.includes('>Controle de gastos</Text>'),'sem dois cartoes com o mesmo nome');
   assert.ok(lib.includes("{name: 'Contas', icon: '💳'")&&!lib.includes('💡'));
-  assert.ok(s.includes('Recuperar itens apagados'));
+  assert.ok(!s.includes('Recuperar itens apagados'),'0.3.212: a recuperacao saiu da engrenagem');
 });
 
 test('0.3.186: sem aviso de repetido (o servidor nao deixa duplicar e corrige o antigo); contas fixas no mes da pagina',()=>{
@@ -249,8 +249,8 @@ test('0.3.195: previsao do salario (periodo do proximo salario) e ciclo de cada 
   assert.equal(f.effectiveCycleDay([acc],sal5,'a1'),5,'sem dia informado: o dia do salario fixo');
   assert.equal(f.effectiveCycleDay([acc],[],'a1'),0,'sem salario: mes do calendario');
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes("{'Previsto até ' + forecastP.end.slice(8, 10)"));
-  assert.ok(s.includes('Pagar uma conta prevista não muda; cada gasto fora do previsto diminui'),'o cartao nunca some (sobra + saldo)');
+  assert.ok(s.includes("{'Previsto no fim de ' + monthLabel(month).split(' ')[0].toLowerCase()}"));
+  assert.ok(s.includes('Começa em {show(b.available)} e desce com cada gasto'),'o cartao nunca some');
 });
 
 test('0.3.196: Controle de gastos; passo a passo pede o valor cheio do salario e cria a receita fixa no dia',()=>{
@@ -298,7 +298,7 @@ test('0.3.196: modelo simples - previsto = receitas - despesas e pendentes - fat
 
 test('0.3.197: Pendentes com seletor A pagar | A receber, mesmo esquema nos dois lados',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('accessibilityRole="tablist"')&&s.includes("[['pagar','A pagar',toPay.length],['receber','A receber',toGet.length]]"),'seletor de duas metades iguais');
+  assert.ok(s.includes('accessibilityRole="tablist"')&&s.includes("[['pagar','A pagar'],['receber','A receber']]"),'seletor de duas metades iguais, sem contagem');
   assert.ok(s.includes("onPress={()=>onNew(side==='pagar'?'expense':'income')}"),'+ Nova abre no tipo do lado escolhido');
   assert.ok(s.includes("const fx=side==='pagar'?fixed:fixedIn;"),'contas fixas ou receitas fixas');
   assert.ok(s.includes("tx?tx.kind==='income'?'income':'expense':initialFlow"),'o cadastro comeca no tipo escolhido');
@@ -357,9 +357,19 @@ test('0.3.208: Relatorios com secoes que abrem e fecham (lembra a escolha), guar
   assert.ok(s.includes("const FOLD_KEY = 'sofia_fin_folds_v1';")&&s.includes('SecureStore.setItemAsync(FOLD_KEY'),'lembra aberta/fechada');
   const r=s.slice(s.indexOf('function ReportsTab('));assert.ok(r.indexOf('<Fold id="guardado"')<r.indexOf('<Fold id="saldo"'),'guardado em cima, saldo embaixo');
   assert.ok(!r.slice(0,r.indexOf('\nfunction ',10)).includes('Recomeçar de hoje</Text>'),'fora dos Relatorios');
-  assert.ok(s.includes('Contando a partir de ')&&s.includes('Recomeçar de hoje</Text>'),'na engrenagem');
+  assert.ok(!s.includes('Recomeçar de hoje</Text>')&&!s.includes('Recuperar itens apagados</Text>'),'0.3.212: recomecar e recuperar sairam');assert.ok(s.includes('>Zerar Finanças</Text>'),'zerar Financas na engrenagem');
   assert.ok(s.includes("manualDues(d.txs, accountId, today, 3)")&&s.includes('nos próximos 3 dias'),'vencimentos com 3 dias');
   assert.ok(s.includes("label: 'Vencimentos'"),'aba Vencimentos');
   assert.ok(s.includes('async function saveFresh(')&&s.includes("await saveFresh(api, t.desc, {paid: true}, t.entity)"),'Paguei sobre a versao atual');
   assert.ok(s.includes('aparece {g.items.length} vezes'),'aviso de repetido');
+});
+
+test('0.3.212: previsto e controle pelo mes da tela; extrato do saldo; pular o passo a passo',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("const monthRange = useMemo(() => ({start: dayIn(month, 1), end: dayIn(month, daysIn(month))}), [month]);"));
+  assert.ok(s.includes("'estourou ' + show(-b.left)")&&!s.includes('além do que sobra'));
+  assert.ok(s.includes("'Extrato do saldo'")&&!s.includes('Conferir item por item'));
+  assert.ok(s.includes('Pular: só a conta. O resto a Sofia cadastra pelos seus prints'));
+  assert.ok(s.includes("api.financeReset()"));
+  const b=require('node:fs').readFileSync(require('node:path').join(__dirname,'..','..','src/core/app-bridge.js'),'utf8');assert.ok(b.includes('PRINT COM VARIAS CONTAS')&&b.includes('intent "compound" com UM create_entity fin_tx POR LINHA'));
 });

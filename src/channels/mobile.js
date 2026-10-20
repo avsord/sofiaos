@@ -200,6 +200,13 @@ function makeMobileApi(runtime, deps) {
       const b = await bodyJson(req, 5 * 1024 * 1024);
       return send(require('../services/bank-import').preview(workspace, { text: String(b.text || ''), target: b.target === 'card' ? 'card' : 'account', target_id: String(b.target_id || '') }));
     }
+    // 0.3.212: zerar Financas - apaga TUDO do modulo (contas, cartoes, lancamentos, reserva, metas) para comecar do zero
+    if (p === '/api/mobile/md/finance/reset' && m === 'POST') {
+      const b = await bodyJson(req, 4096); if (String(b.confirm || '') !== 'ZERAR') fail('CONFIRM', 'Confirme com a palavra ZERAR.', 400);
+      let removed = 0; const kinds = ['fin_tx', 'fin_reserve_move', 'fin_budget', 'fin_goal', 'fin_card', 'fin_account'];
+      for (const kind of kinds) for (let round = 0; round < 50; round++) { const page = workspace.list({ kind, limit: 500, offset: 0 }); if (!page.length) break; for (const e of page) { try { workspace.deleteEntity(e.id); removed++; } catch { /* segue */ } } }
+      return send({ ok: true, removed });
+    }
     if (p === '/api/mobile/md/finance/import/undo' && m === 'POST') {
       const b = await bodyJson(req, 65536);
       return send(require('../services/bank-import').undo(workspace, { target_id: String(b.target_id || '') }));

@@ -136,5 +136,5 @@ test('0.3.211: desfazer importacao na engrenagem e conferencia do Saldo item por
   const s=read('src/screens/Finance.tsx'),a=read('src/lib/api.ts');
   assert.ok(a.includes("financeImportUndo(targetId: string)"));
   assert.ok(s.includes('Desfazer importação de extrato</Text>')&&s.includes("api.financeImportUndo(acc ? acc.id : '')"));
-  assert.ok(s.includes("Conferir item por item (do ponto de partida até hoje)")&&s.includes("run = Math.round((run + r.delta) * 100) / 100"),'saldo depois de cada item');
+  assert.ok(s.includes("'Extrato do saldo'")&&s.includes("run = Math.round((run + r.delta) * 100) / 100"),'saldo depois de cada item');
 });

@@ -49,7 +49,7 @@ test('0.3.194: relatorios recomecam a partir de hoje sem apagar nada; graficos d
   assert.deepEqual(since.map(t=>t.id),['depois'],'so o que veio depois do ponto de partida entra nos relatorios');
   assert.equal(f.sinceReportStart([acc],txs).length,2,'sem ponto de partida: todo o historico');
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('Recomeçar de hoje')&&s.includes('Ver tudo'));
+  assert.ok(!s.includes('Recomeçar de hoje</Text>'),'0.3.212: o recomecar saiu');
   assert.ok(s.includes('Nada é apagado: os lançamentos de antes continuam no Histórico e no Saldo'));
   assert.ok(s.includes('bal: fromStart(balanceSeries(full.accounts, full.txs, month'),'saldo do grafico com o historico inteiro');
 });
