@@ -131,3 +131,10 @@ test('0.3.210: importar extrato - lista com altura maxima (rola por dentro) e bo
   assert.ok(s.includes('>Marcar todos</Text>')&&s.includes('>Desmarcar todos</Text>'));
   const i=s.indexOf("maxHeight: Math.round(Dimensions.get('window').height * 0.42)"),b=s.indexOf("<Button title={'Importar ' + chosenItems.length",i);assert.ok(b>i,'botao logo depois da lista');
 });
+
+test('0.3.211: desfazer importacao na engrenagem e conferencia do Saldo item por item',()=>{
+  const s=read('src/screens/Finance.tsx'),a=read('src/lib/api.ts');
+  assert.ok(a.includes("financeImportUndo(targetId: string)"));
+  assert.ok(s.includes('Desfazer importação de extrato</Text>')&&s.includes("api.financeImportUndo(acc ? acc.id : '')"));
+  assert.ok(s.includes("Conferir item por item (do ponto de partida até hoje)")&&s.includes("run = Math.round((run + r.delta) * 100) / 100"),'saldo depois de cada item');
+});

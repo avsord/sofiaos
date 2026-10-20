@@ -200,6 +200,10 @@ function makeMobileApi(runtime, deps) {
       const b = await bodyJson(req, 5 * 1024 * 1024);
       return send(require('../services/bank-import').preview(workspace, { text: String(b.text || ''), target: b.target === 'card' ? 'card' : 'account', target_id: String(b.target_id || '') }));
     }
+    if (p === '/api/mobile/md/finance/import/undo' && m === 'POST') {
+      const b = await bodyJson(req, 65536);
+      return send(require('../services/bank-import').undo(workspace, { target_id: String(b.target_id || '') }));
+    }
     if (p === '/api/mobile/md/finance/import/commit' && m === 'POST') {
       const b = await bodyJson(req, 5 * 1024 * 1024);
       return send(require('../services/bank-import').commit(workspace, { items: b.items, target: b.target === 'card' ? 'card' : 'account', target_id: String(b.target_id || ''), privacy: 'private', source_id: null }));

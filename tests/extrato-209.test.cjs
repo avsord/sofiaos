@@ -18,3 +18,15 @@ test('extrato: o que ja esta no app e o que e de antes do ponto de partida entra
  const das=r.items.find(i=>i.amount===469.26);assert.ok(das.match&&das.match.title==='DAS(imposto)'&&das.match.amount===469,'DAS com 26 centavos de diferenca: ja esta no app');assert.equal(das.checked,false);
  assert.equal(r.matched,2);assert.equal(r.before,2);
 });
+
+test('0.3.211: desfazer a importacao tira so o que veio do extrato e devolve o saldo; o que foi lancado a mao fica',t=>{
+ const {core}=fixture(t);const w=core.workspace;
+ const conta=w.save({kind:'fin_account',title:'Conta principal',area:'Pessoal',data:{account_type:'corrente',initial_balance:'1000',include_total:true}});
+ const manual=w.save({kind:'fin_tx',title:'Ugreen',area:'Pessoal',data:{kind:'expense',amount:138.08,date:'2026-10-19',account_id:conta.id,paid:true,category:'Compras',recurrence:'none',import_id:'sofia-pendencia:x'}});
+ const r=bank.preview(w,{text:ofx([['2026-10-07',-187.48,'Pix enviado: "Cp :10573521-PIX Marketplace"'],['2026-10-19',-70,'Pix enviado: "Cp :99999999-Estacionamento Modelo Ltda"']]),target:'account',target_id:conta.id});
+ bank.commit(w,{items:r.items,target:'account',target_id:conta.id});
+ assert.equal(w.list({kind:'fin_tx',limit:50}).filter(e=>e.state!=='archived').length,3);
+ const u=bank.undo(w,{target_id:conta.id});
+ assert.equal(u.removed,2);assert.equal(u.amount,257.48);
+ const left=w.list({kind:'fin_tx',limit:50}).filter(e=>e.state!=='archived');assert.equal(left.length,1);assert.equal(left[0].id,manual.id,'o lancado a mao fica');
+});

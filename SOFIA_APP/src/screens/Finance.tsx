@@ -1718,6 +1718,7 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountI
   }
   const list = useMemo(() => monthTxs(d.txs, month).filter(t => t.paid && t.kind === kind).sort((a, b) => b.date.localeCompare(a.date)), [d, month, kind]);
   const total = list.reduce((s, t) => s + t.amount, 0);
+  const [ledgerOpen, setLedgerOpen] = useState(false), reserve = reserveOf(d.goals);
   const parts = useMemo(() => {
     if (kind !== 'saldo') return null;
     const accounts = d.accounts.filter(a => a.include && !a.archived);
@@ -1761,6 +1762,22 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountI
           <View style={{height: 1, backgroundColor: c.line, marginVertical: 6}} />
           {row('= Saldo', show(parts.total), true)}
         </View>
+        {/* 0.3.211: conferencia item por item - cada valor que entrou e saiu desde o ponto de partida, com o saldo depois de cada um */}
+        <Pressable accessibilityRole="button" onPress={() => setLedgerOpen(v => !v)} style={{paddingVertical: 8}}><Text style={{color: c.accent, fontWeight: '700'}}>{ledgerOpen ? 'Esconder a conferência item por item' : 'Conferir item por item (do ponto de partida até hoje)'}</Text></Pressable>
+        {ledgerOpen && parts ? <View style={{backgroundColor: c.input, borderRadius: 16, padding: 12, gap: 4}}>
+          <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '700', fontSize: 12}}>Ponto de partida</Text><Text style={{color: c.text, fontWeight: '800', fontSize: 12}}>{show(parts.initial)}</Text></View>
+          {(() => { let run = parts.initial; const ids = new Set(d.accounts.filter(a => a.include && !a.archived).map(a => a.id));
+            const rows = [...d.txs.filter(t => t.paid && !t.virtual && ids.has(t.accountId) && !t.cardId && (t.kind === 'income' || t.kind === 'expense' || t.kind === 'card_payment')).map(t => ({date: t.date, desc: t.desc, delta: t.kind === 'income' ? t.amount : -t.amount, tx: t as Tx | null, note: t.manualDue ? 'conta' : /^(fitid:|h:)/.test(String(t.entity?.data?.import_id || '')) ? 'do extrato' : ''})),
+              ...(reserve ? (d.moves || []).filter(m => m.goalId === reserve.id && m.entity?.state !== 'archived').map(m => ({date: m.date, desc: m.direction === 'in' ? 'Aporte no guardado' : 'Retirada do guardado', delta: m.direction === 'in' ? -m.amount : m.amount, tx: null as Tx | null, note: 'reserva'})) : [])]
+              .sort((a, b) => a.date.localeCompare(b.date));
+            return rows.map((r, i) => { run = Math.round((run + r.delta) * 100) / 100; return <Pressable key={i} accessibilityRole="button" disabled={!r.tx} onPress={() => { if (r.tx) onTx(r.tx); }} style={{flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5, borderTopWidth: 1, borderColor: c.line}}>
+              <Text style={{color: c.muted, fontSize: 11, width: 38}}>{r.date.slice(8, 10)}/{r.date.slice(5, 7)}</Text>
+              <Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 12}}>{r.desc}{r.note ? <Text style={{color: c.muted}}> · {r.note}</Text> : null}</Text>
+              <Text style={{color: r.delta >= 0 ? GOOD : BAD, fontSize: 12, fontWeight: '700'}}>{r.delta >= 0 ? '+' : '−'}{show(Math.abs(r.delta))}</Text>
+              <Text style={{color: run < 0 ? BAD : c.text, fontSize: 11, width: 76, textAlign: 'right'}}>{show(run)}</Text>
+            </Pressable>; }); })()}
+          <Text style={{color: c.muted, fontSize: 11, lineHeight: 16, marginTop: 6}}>Toque num item para corrigir ou apagar. A última coluna é o saldo logo depois daquele item; onde ele ficar diferente do banco, o problema está ali.</Text>
+        </View> : null}
         <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Soma de tudo o que já foi pago ou recebido nas contas (não só deste mês). Se algum valor parecer errado, toque em Receitas ou Despesas para ver os lançamentos, ou confira o saldo inicial da conta em Contas e cartões.</Text>
       </> : <>
         <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>{kind === 'income' ? 'Receitas' : 'Despesas'} de {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
@@ -1833,6 +1850,14 @@ function ManageSheet({api, d, onClose, reload, onFinished}: {api: SofiaApi; d: D
             <Text style={{color: c.muted}}>›</Text>
           </Pressable>
           {recover ? <RecoverSheet api={api} onClose={() => setRecover(false)} onRestored={() => void reload()} /> : null}
+          {/* 0.3.211: tudo o que veio de extratos pode ser desfeito de uma vez */}
+          {(() => { const imported = d.txs.filter(t => !t.virtual && t.entity && /^(fitid:|h:)/.test(String(t.entity.data?.import_id || ''))); if (!imported.length) return null;
+            const total = imported.reduce((x, t) => x + (t.kind === 'income' ? t.amount : -t.amount), 0), acc = d.accounts.find(a => !a.archived && imported.some(t => t.accountId === a.id));
+            return <View style={{backgroundColor: BAD + '12', borderRadius: 18, padding: 14, borderWidth: 1, borderColor: BAD, gap: 10}}>
+              <View style={{gap: 2}}><Text style={{color: c.text, fontWeight: '700', fontSize: 14}}>Extrato importado</Text><Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>{imported.length} lançamentos vieram de extratos do banco (efeito no Saldo: {total >= 0 ? '+' : '−'}{money(Math.abs(total))}). Desfazer tira todos eles e o Saldo volta ao que era; o que você lançou à mão ou pela Sofia fica.</Text></View>
+              <Pressable accessibilityRole="button" onPress={() => appAlert('Desfazer a importação?', 'Os ' + imported.length + ' lançamentos que vieram de extratos serão apagados. O que foi lançado à mão ou pela Sofia continua.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Desfazer', style: 'destructive', onPress: () => void api.financeImportUndo(acc ? acc.id : '').then(r => { appAlert('Importação desfeita', r.removed + ' lançamentos apagados.'); return reload(); }).catch(e => appAlert('Finanças', errorText(e)))}])}
+                style={{paddingVertical: 10, borderRadius: 12, backgroundColor: BAD + '1f', alignItems: 'center'}}><Text style={{color: BAD, fontWeight: '700', fontSize: 13}}>Desfazer importação de extrato</Text></Pressable>
+            </View>; })()}
           {/* 0.3.208: recomecar os relatorios fica so aqui na engrenagem */}
           {(() => { const accs = d.accounts.filter(a => !a.archived), starts = [...new Set(accs.map(a => a.reportStart).filter(Boolean))].sort(), at = starts.length ? starts[starts.length - 1].split('-').reverse().join('/') : '';
             const setStart = (date: string) => { const go = () => void Promise.all(accs.map(a => api.saveEntity({...a.entity, data: {...a.entity.data, report_start: date}}))).then(() => reload()).catch(e => appAlert('Finanças', errorText(e)));

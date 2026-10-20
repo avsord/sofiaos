@@ -69,6 +69,16 @@ function parseCSV(text){
  return out;
 }
 
+/** 0.3.211: desfaz a importacao - apaga tudo o que entrou pelo extrato (import_id "fitid:"/"h:") da conta ou do
+ * cartao. O que a pessoa lancou a mao ou pela Sofia (import_id "sofia-...") nao e tocado. Devolve o Saldo ao que era. */
+function undo(workspace,{target_id=''}={}){
+ let removed=0,amount=0;const ids=[];
+ for(let offset=0;offset<20000;offset+=500){const page=workspace.list({kind:'fin_tx',limit:500,offset});
+  for(const e of page){const iid=String(e.data?.import_id||'');if(!/^(fitid:|h:)/.test(iid))continue;if(target_id&&e.data?.account_id!==target_id&&e.data?.card_id!==target_id)continue;ids.push(e);}
+  if(page.length<500)break;}
+ for(const e of ids){try{workspace.deleteEntity(e.id);removed++;amount+=Number(e.data?.amount)||0;}catch{/* ja saiu */}}
+ return {removed,amount:Math.round(amount*100)/100};
+}
 /** Lê o arquivo (OFX ou CSV) e monta a prévia para o app, já marcando o que já existe. */
 function preview(workspace,{text,target='account',target_id=''}){
  const raw=String(text||'');if(!raw.trim())throw new AppError('IMPORT_EMPTY','O arquivo está vazio.',400);
@@ -124,4 +134,4 @@ function commit(workspace,{items,target='account',target_id='',privacy='private'
  return {created,skipped,items:saved};
 }
 
-module.exports={preview,commit,parseOFX,parseCSV,guessCategory,num,dateISO};
+module.exports={undo,preview,commit,parseOFX,parseCSV,guessCategory,num,dateISO};
