@@ -28,7 +28,7 @@ test('rota ?thumb=1 entrega a miniatura e guarda para as proximas vezes',async t
 });
 test('a foto da conversa vai para a Sofia ler e depois para Comprovantes no Drive',()=>{
  const m=fs.readFileSync(path.join(__dirname,'..','src/channels/mobile.js'),'utf8'),g=fs.readFileSync(path.join(__dirname,'..','src/services/google.js'),'utf8');
- assert.ok(m.includes('const images = await chatImages(String(b.message'),'le as fotos anexadas');
+ assert.ok(m.includes('let images = await chatImages(String(b.message'),'le as fotos anexadas');
  assert.ok(m.includes("runtime.google.offloadAttachments(10)"),'sobe para o Drive logo depois');
  assert.ok(g.includes("'Comprovantes'")&&g.includes("(await this.folderId('Comprovantes')) || dir"),'pasta Comprovantes');
  assert.ok(g.includes("UPDATE attachments SET drive_id=?, blob=? WHERE id=?"),'o original sai do servidor depois que o Drive confirma');

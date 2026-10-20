@@ -292,7 +292,15 @@ function makeMobileApi(runtime, deps) {
       rate(session, 'message'); const b = await bodyJson(req, MAX_MESSAGE_BODY);
       // 0.3.199: a foto anexada na conversa vai para a Sofia LER (antes ela recebia so o link). Depois de lida,
       // o original sobe para o Drive (Sofia OS/Comprovantes) e sai do servidor.
-      const images = await chatImages(String(b.message || ''));
+      let images = await chatImages(String(b.message || ''));
+      // 0.3.203: "ta na imagem" logo depois de mandar a foto - a foto da mensagem anterior (ate 15 min) vai junto
+      if (!images.length && b.conversation_id) {
+        try {
+          const recent = store.messages(validId(b.conversation_id), 6).filter(x => x.role === 'user').reverse();
+          const last = recent.find(x => /!\[[^\]\n]*\]\(https?:\/\/[^\s)]*\/api\/attachments\//.test(String(x.content || '')));
+          if (last && Date.now() - Date.parse(last.created_at) < 15 * 60000) images = await chatImages(String(last.content));
+        } catch { /* sem a foto anterior, segue so com o texto */ }
+      }
       const out = await receive({...payload(b, cleanMessage(b.message, 'Mensagem')), ...(images.length ? {images} : {})});
       if (images.length && runtime.google && runtime.google.offloadAttachments) setTimeout(() => { runtime.google.offloadAttachments(10).catch(() => {}); }, 1500);
       return send(out);

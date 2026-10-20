@@ -451,7 +451,10 @@ class SofiaCore{
         }
         if(plan.intent==='respond'){
           const canReuse=(planned.context?.used||turnImages.length>0)&&(planned.context.route===route||(route==='private'&&planned.context.route==='shared'));
-          const responseContext=canReuse?planned.context:this.buildContext(user,route,plan.context_query||user.content,{includeSearch:Boolean(plan.needs_context||(planned.refs||[]).length),recentLimit:16});
+          let responseContext=canReuse?planned.context:this.buildContext(user,route,plan.context_query||user.content,{includeSearch:Boolean(plan.needs_context||(planned.refs||[]).length),recentLimit:16});
+          // 0.3.203: a foto do turno sempre vai junto para quem escreve a resposta (antes so o planejador a via,
+          // e a Sofia respondia que "nao conseguiu ler a imagem")
+          if(imageInput&&!(responseContext.input||[]).includes(imageInput))responseContext={...responseContext,input:[imageInput,...(responseContext.input||[])]};
           const natural=await this.naturalResponse(user,route,responseContext,attempt,plan);totalUsage=sumUsage(totalUsage,natural.usage);
           let clarification=null;
           if(pending){
