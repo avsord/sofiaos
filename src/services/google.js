@@ -572,7 +572,9 @@ class GoogleService {
     try {
       const dir = await this.folderId('Anexos'); if (!dir) return {moved: 0};
       ensureThumbColumn(this.db);
-      const rows = this.db.prepare("SELECT a.id, a.entity_id, a.name, a.mime, a.bytes, a.blob, e.tags AS tags FROM attachments a LEFT JOIN entities e ON e.id=a.entity_id WHERE a.drive_id IS NULL AND length(a.blob) > 0 ORDER BY a.created_at LIMIT ?").all(limit);
+      // 0.3.206: foto da conversa fica 24 h aqui (a Sofia le e voce abre na hora, sem depender do Drive); depois vai
+      const chatCutoff = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      const rows = this.db.prepare("SELECT a.id, a.entity_id, a.name, a.mime, a.bytes, a.blob, e.tags AS tags FROM attachments a LEFT JOIN entities e ON e.id=a.entity_id WHERE a.drive_id IS NULL AND length(a.blob) > 0 AND (COALESCE(e.tags,'') NOT LIKE '%chat-attachment%' OR a.created_at < ?) ORDER BY a.created_at LIMIT ?").all(chatCutoff, limit);
       for (const a of rows) {
         // 0.3.199: foto enviada na conversa (ex.: cupom) vai para "Sofia OS/Comprovantes"; a miniatura fica aqui
         const fromChat = String(a.tags || '').includes('chat-attachment') && /^image\//.test(String(a.mime || ''));

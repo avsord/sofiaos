@@ -64,16 +64,18 @@ function makeMobileApi(runtime, deps) {
         voice: voice ? { mime: voice.mime, duration_ms: voice.duration_ms, audio_url: '/api/mobile/messages/' + m.id + '/audio' } : null };
     }), has_more: rows.length > 100 };
   }
+  const IMAGE_LINK = /!\[[^\]\n]*\]\(https?:\/\/[^\s)]*\/api\/attachments\/[A-Za-z0-9_-]+\?inline=1\)/;
+  let lastImageError = '';
   async function chatImages(text) {
     const ids = [...text.matchAll(/!\[[^\]\n]*\]\(https?:\/\/[^\s)]*\/api\/attachments\/([A-Za-z0-9_-]+)\?inline=1\)/g)].map(x => x[1]).slice(0, 4);
-    const out = [];
+    const out = []; lastImageError = '';
     for (const id of ids) {
       try {
         const row = workspace.attachment(id);
         if (!/^image\/(png|jpeg|webp|gif)$/.test(String(row.mime || ''))) continue;
         const bytes = runtime.google && runtime.google.attachmentBytes ? await runtime.google.attachmentBytes(row) : Buffer.from(row.blob || []);
         if (bytes.length && bytes.length <= 10 * 1024 * 1024) out.push({mime: row.mime, base64: bytes.toString('base64'), name: row.name});
-      } catch { /* sem a foto, a Sofia responde so pelo texto */ }
+      } catch (e) { lastImageError = String(e && e.message || e).slice(0, 120); }
     }
     return out;
   }
@@ -292,17 +294,20 @@ function makeMobileApi(runtime, deps) {
       rate(session, 'message'); const b = await bodyJson(req, MAX_MESSAGE_BODY);
       // 0.3.199: a foto anexada na conversa vai para a Sofia LER (antes ela recebia so o link). Depois de lida,
       // o original sobe para o Drive (Sofia OS/Comprovantes) e sai do servidor.
-      let images = await chatImages(String(b.message || ''));
-      // 0.3.203: "ta na imagem" logo depois de mandar a foto - a foto da mensagem anterior (ate 15 min) vai junto
-      if (!images.length && b.conversation_id) {
+      const text = String(b.message || ''), hasLink = IMAGE_LINK.test(text);
+      let images = await chatImages(text), uiNote = '';
+      // 0.3.206: se ESTA mensagem traz foto e ela nao carregou, a Sofia avisa e pede para reenviar (nunca usa a
+      // foto de antes - era isso que fazia ela repetir a compra anterior)
+      if (hasLink && !images.length) uiNote = 'A foto anexada NESTA mensagem não pôde ser carregada pelo servidor' + (lastImageError ? ' (' + lastImageError + ')' : '') + '. Não use fotos nem compras de mensagens anteriores e não registre nada: diga que não conseguiu abrir a foto e peça para reenviar.';
+      // 0.3.203: "ta na imagem" (mensagem SEM foto) logo depois de mandar a foto - a foto anterior (ate 15 min) vai junto
+      if (!hasLink && !images.length && b.conversation_id) {
         try {
           const recent = store.messages(validId(b.conversation_id), 6).filter(x => x.role === 'user').reverse();
           const last = recent.find(x => /!\[[^\]\n]*\]\(https?:\/\/[^\s)]*\/api\/attachments\//.test(String(x.content || '')));
           if (last && Date.now() - Date.parse(last.created_at) < 15 * 60000) images = await chatImages(String(last.content));
         } catch { /* sem a foto anterior, segue so com o texto */ }
       }
-      const out = await receive({...payload(b, cleanMessage(b.message, 'Mensagem')), ...(images.length ? {images} : {})});
-      if (images.length && runtime.google && runtime.google.offloadAttachments) setTimeout(() => { runtime.google.offloadAttachments(10).catch(() => {}); }, 1500);
+      const out = await receive({...payload(b, cleanMessage(b.message, 'Mensagem')), ...(images.length ? {images} : {}), ...(uiNote ? {ui_context: uiNote} : {})});
       return send(out);
     }
     match = p.match(/^\/api\/mobile\/messages\/([\w-]+)$/);

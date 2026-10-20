@@ -265,6 +265,10 @@ class SofiaCore{
     }
     if(plan.intent==='create_entity'&&bridge.APP_KINDS.includes(a.entity_kind)&&!['idea','annotation','project','dream','course','recipe','film','music','video','reading'].includes(a.entity_kind)){
       const built=bridge.buildEntity(this.workspace,a.entity_kind,a,user.content.slice(0,120),this.store);
+      // 0.3.206: a mesma compra (mesmo nome, valor e data) registrada de novo em 30 min nao e lancada outra vez
+      if(a.entity_kind==='fin_tx'&&!/(de novo|outra (igual|vez|compra igual)|mais uma|duas vezes)/i.test(String(user.content||''))){const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim(),since=Date.now()-30*60000;
+        const dup=this.workspace.list({kind:'fin_tx',limit:60}).find(x=>x.state!=='archived'&&norm(x.title)===norm(built.title)&&Number(x.data.amount)===Number(built.data.amount)&&String(x.data.date)===String(built.data.date)&&String(x.data.kind||'expense')===String(built.data.kind||'expense')&&Date.parse(x.created_at)>since);
+        if(dup)return {reply:'Essa compra já está registrada: “'+dup.title+'”, '+Number(dup.data.amount).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})+(dup.data.category?' em '+dup.data.category:'')+'. Não lancei de novo. Se for outra compra igual, me diga “registra de novo”.',ui_target:built.ui,items:[dup]};}
       // 0.3.199: compra parcelada ("em 3x") vira um lancamento por mes, cada um com a sua parcela
       const parts=a.entity_kind==='fin_tx'&&built.data.kind==='expense'?Math.round(Number(built.data.installments)||0):0;
       if(parts>1&&parts<=48){
