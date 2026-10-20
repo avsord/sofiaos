@@ -43,3 +43,17 @@ test('0.3.199: frase completa - anteontem, dia da semana passado, cartao, parcel
  const core=require('node:fs').readFileSync(require('node:path').join(__dirname,'..','src/core/sofia-core.js'),'utf8');
  assert.ok(core.includes("for(const p of bridge.installmentPlan(Number(built.data.amount),parts,built.data.date))"),'parcelas viram um lancamento por mes');
 });
+
+test('0.3.204: categoria pela natureza do que foi comprado (remedio vai para Saude mesmo sem "farmacia" no nome)',t=>{
+ const w=setup(t);
+ const b=(title,content,category)=>bridge.buildEntity(w,'fin_tx',{title,content,changes:[{field:'data.kind',value:'expense'},{field:'data.amount',value:'34,97'},...(category?[{field:'data.category',value:category}]:[])]},title).data.category;
+ assert.equal(b('Bifarma – Tadalafila',''),'Saúde','loja de farmacia');
+ assert.equal(b('Tadalafila 5mg',''),'Saúde','so o remedio');
+ assert.equal(b('Pedido 5741','2 Tadalafila 5mg Eurofarma 30 Comprimidos'),'Saúde','pelos itens da nota');
+ assert.equal(b('Drogasil',''),'Saúde');assert.equal(b('Xarope e vitamina C',''),'Saúde');
+ assert.equal(b('Bifarma – Tadalafila','','Saúde'),'Saúde','a escolha certa da Sofia e mantida');
+ const ctx=bridge.appsContext({list:()=>[]},null).content;
+ assert.match(ctx,/FOTO DE COMPRA/);assert.match(ctx,/registre a despesa DIRETO, sem perguntar/);assert.match(ctx,/pela NATUREZA do que foi comprado/);
+ const core=require('node:fs').readFileSync(require('node:path').join(__dirname,'..','src/core/sofia-core.js'),'utf8');
+ assert.ok(core.includes('Se for FOTO DE COMPRA (cupom, nota fiscal, comprovante, pedido, Pix, recibo)'),'a regra vai junto com a foto');
+});
