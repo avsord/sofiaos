@@ -22,7 +22,7 @@ test('OFX: data, valor com vírgula ou ponto, descrição, FITID; pagamento de f
  const f=fixture(t);const r=imp.preview(f.core.workspace,{text:OFX,target:'account'});
  assert.equal(r.format,'ofx');assert.equal(r.items.length,3);
  const [a,b,c]=r.items;assert.equal(a.date,'2026-10-03');assert.equal(a.amount,45.9);assert.equal(a.kind,'expense');assert.equal(a.category,'Mercado');assert.equal(a.import_id,'fitid:2026100301');
- assert.equal(b.kind,'income');assert.equal(b.amount,5000);assert.equal(b.category,'Receita');
+ assert.equal(b.kind,'income');assert.equal(b.amount,5000);assert.equal(b.category,'Salário','0.3.209: categoria do app (antes "Receita", que nao existe no app)');
  assert.equal(c.kind,'card_payment');
 });
 test('CSV da conta (Nubank): separador vírgula, data BR, negativo = despesa; CSV do cartão: positivo = compra, negativo = pagamento (fica de fora)',t=>{

@@ -12,6 +12,15 @@ function num(v){const s=String(v==null?'':v).trim().replace(/^R\$\s*/i,'').repla
 function dateISO(v){const s=String(v||'').trim();let m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s);if(m)return m[1]+'-'+m[2]+'-'+m[3];m=/^(\d{4})(\d{2})(\d{2})/.exec(s);if(m)return m[1]+'-'+m[2]+'-'+m[3];m=/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/.exec(s);if(m){const y=m[3].length===2?'20'+m[3]:m[3];return y+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');}return '';}
 function importId(date,amount,desc,fitid){return fitid?'fitid:'+String(fitid).trim().slice(0,80):'h:'+crypto.createHash('sha1').update(date+'|'+Math.round(amount*100)+'|'+fold(desc)).digest('hex').slice(0,24);}
 function clean(desc){return String(desc||'').replace(/\s+/g,' ').trim().slice(0,120);}
+/** 0.3.209: descricao legivel - 'Pix enviado: "Cp :10573521-PIX Marketplace"' vira "Pix · PIX Marketplace". */
+function niceDesc(desc){
+ let d=clean(desc),head='';
+ const m=/^(pix enviado devolvido|pix recebido devolvido|pix enviado|pix recebido|pix|ted enviada|ted recebida|transferencia enviada|transferencia recebida|pagamento de boleto|pagamento)\s*[:\-–]\s*/i.exec(d);
+ if(m){const k=fold(m[1]);head=/devolvido/.test(k)?'Pix devolvido':/^pix/.test(k)?'Pix':/^ted/.test(k)?'TED':/^transferencia/.test(k)?'Transferência':'Pagamento';d=d.slice(m[0].length);}
+ d=d.replace(/^["'“”]+|["'“”]+$/g,'').replace(/\bcp\s*:\s*\d+\s*-\s*/i,'').replace(/^\d{6,}\s*-\s*/,'').replace(/\s+/g,' ').trim();
+ d=d.replace(/\b(instituicao de pagamento|instituição de pagamento|ltda|s\.?a\.?|me|eireli)\b\.?/gi,'').replace(/\s+/g,' ').trim();
+ return (head&&d?head+' · '+d:head||d||clean(desc)).slice(0,120);
+}
 
 // Categoria sugerida pela descrição (a pessoa pode trocar depois).
 const CATEGORY=[
@@ -68,16 +77,26 @@ function preview(workspace,{text,target='account',target_id=''}){
  if(!rows.length)throw new AppError('IMPORT_FORMAT',isOFX?'O OFX não tem lançamentos.':'Não achei lançamentos no CSV (data e valor por linha).',400);
  const card=target==='card';
  // Cartão: todo valor positivo é compra; negativo é pagamento/estorno (não entra). Conta: negativo = despesa, positivo = receita.
- const existing=new Set();for(let offset=0;offset<20000;offset+=500){const page=workspace.list({kind:'fin_tx',limit:500,offset});for(const e of page)if(e.data?.import_id)existing.add(e.data.import_id);if(page.length<500)break;}
+ const existing=new Set(),manual=[];for(let offset=0;offset<20000;offset+=500){const page=workspace.list({kind:'fin_tx',limit:500,offset});for(const e of page){if(e.data?.import_id)existing.add(e.data.import_id);if(e.state!=='archived'&&!String(e.data?.import_id||'').startsWith('ofx')&&(!target_id||e.data?.account_id===target_id||e.data?.card_id===target_id))manual.push(e);}if(page.length<500)break;}
+ // 0.3.209: ponto de partida - o que e de antes ja esta dentro do saldo (acertado com o banco ou na criacao da conta)
+ let start='';try{const acc=target_id?workspace.get(target_id):null;start=String(acc?.data?.balance_set_at||String(acc?.created_at||'').slice(0,10)||'');}catch{start='';}
+ const used=new Set();
+ const findManual=(kind,amount,date)=>{const t=Date.parse(date+'T12:00:00Z');return manual.filter(e=>!used.has(e.id)&&String(e.data?.kind||'expense')===kind&&Math.abs(Number(e.data?.amount)-amount)<=1.0001&&Math.abs(Date.parse(String(e.data?.date)+'T12:00:00Z')-t)<=3*864e5)
+  // o mais parecido primeiro: valor igual antes de valor quase igual, depois a data mais proxima
+  .sort((a,b)=>Math.abs(Number(a.data.amount)-amount)-Math.abs(Number(b.data.amount)-amount)||Math.abs(Date.parse(a.data.date+'T12:00:00Z')-t)-Math.abs(Date.parse(b.data.date+'T12:00:00Z')-t))[0];};
+ let bridge=null;try{bridge=require('../core/app-bridge');}catch{bridge=null;}
  const items=rows.map(r=>{
   let kind,amount=Math.abs(r.amount),skip='';
   if(card){kind='expense';if(r.amount<0){skip='pagamento/estorno do cartão';}}
   else kind=r.amount<0?'expense':'income';
   if(!card&&/pagamento de fatura|pagamento fatura|fatura cartao/.test(fold(r.desc)))kind='card_payment';
-  const import_id=importId(r.date,r.amount,r.desc,r.fitid);
-  return {import_id,date:r.date,desc:r.desc||'(sem descrição)',amount:Math.round(amount*100)/100,kind,category:r.category||guessCategory(r.desc,kind),duplicate:existing.has(import_id),skip};
+  const import_id=importId(r.date,r.amount,r.desc,r.fitid),amt=Math.round(amount*100)/100,desc=niceDesc(r.desc||'')||'(sem descrição)';
+  const dup=existing.has(import_id),m=!dup&&!skip?findManual(kind,amt,r.date):null;if(m)used.add(m.id);
+  const before=!!start&&r.date<start&&!dup;
+  let category=r.category||'';if(!category&&bridge&&bridge.financeCategory&&(kind==='expense'||kind==='income')){const c=bridge.financeCategory(workspace,kind,desc,'',r.desc||'');category=c&&c!=='Outros'?c:'';}if(!category)category=guessCategory(r.desc,kind)||'Outros';
+  return {import_id,date:r.date,desc,original:r.desc||'',amount:amt,kind,category,duplicate:dup,skip,match:m?{id:m.id,title:m.title,amount:Number(m.data?.amount)}:null,before,checked:!dup&&!skip&&!m&&!before};
  });
- return {format:isOFX?'ofx':'csv',items,total:items.filter(i=>!i.skip).length,duplicates:items.filter(i=>i.duplicate).length};
+ return {format:isOFX?'ofx':'csv',items,total:items.filter(i=>!i.skip).length,duplicates:items.filter(i=>i.duplicate).length,matched:items.filter(i=>i.match).length,before:items.filter(i=>i.before).length,start};
 }
 
 /** Grava os itens escolhidos como fin_tx (pagos), sem duplicar. */

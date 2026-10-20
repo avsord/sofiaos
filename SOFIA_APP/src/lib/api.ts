@@ -52,7 +52,7 @@ const apiFailures:Array<{at:string;path:string;method:string;status:number;code:
 function noteApiFailure(path:string,method:string,e:ApiError,ms:number){apiFailures.push({at:new Date().toISOString(),path:path.split('?')[0].slice(0,80),method,status:Number(e?.status)||0,code:String(e?.code||'?'),ms});if(apiFailures.length>40)apiFailures.shift();}
 export function apiDiagnostics(){return {recentFailures:apiFailures.slice(-25)};}
 export function startupSnapshotFor(scope:string){return new StartupSnapshot(encryptedStorage,SITE+'|'+scope.trim().toLowerCase()+'|startup-v1');}
-export type ImportItem = {import_id: string; date: string; desc: string; amount: number; kind: string; category: string; duplicate: boolean; skip: string};
+export type ImportItem = {import_id: string; date: string; desc: string; amount: number; kind: string; category: string; duplicate: boolean; skip: string; checked?: boolean; before?: boolean; match?: {id: string; title: string; amount?: number} | null; original?: string};
 export class SofiaApi {
   private readonly md:LegacyMdAdapter;
   private readonly startupReads=new StartupReads();

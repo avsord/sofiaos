@@ -334,7 +334,7 @@ function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi
       // 0.3.186: ao refazer, o saldo inicial da conta so muda se a pessoa mexeu no campo
       const initialTouched = !acc || money0(balance) !== acc.initial;
       const account = await saveEntity(api, 'fin_account', name.trim() || 'Conta principal',
-        {account_type: acc?.type || 'corrente', initial_balance: String(initialTouched ? money0(balance) : acc!.initial), color: acc?.color || FIN_COLORS[0], include_total: true, cycle_day: Math.min(31, Math.max(0, Number(cycleDay) || 0))}, acc?.entity);
+        {account_type: acc?.type || 'corrente', initial_balance: String(initialTouched ? money0(balance) : acc!.initial), ...(initialTouched ? {balance_set_at: todayISO()} : {}), color: acc?.color || FIN_COLORS[0], include_total: true, cycle_day: Math.min(31, Math.max(0, Number(cycleDay) || 0))}, acc?.entity);
       // 0.3.196: salario fixo do mes (valor cheio), a receber todo mes no dia informado
       if (money0(salary) > 0) {
         const today = todayISO(), payDay = Math.min(31, Math.max(1, Number(cycleDay) || Number(salaryTx?.date.slice(8, 10)) || 5));
@@ -1712,7 +1712,7 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountI
     setAdjBusy(true); setAdjError('');
     try {
       const diff = Math.round((v - current) * 100) / 100;
-      await api.saveEntity({...target.entity, data: {...target.entity.data, initial_balance: String(Math.round((target.initial + diff) * 100) / 100)}});
+      await api.saveEntity({...target.entity, data: {...target.entity.data, initial_balance: String(Math.round((target.initial + diff) * 100) / 100), balance_set_at: todayISO()}});
       setAdjusting(false); await reload?.(); onClose();
     } catch (e) { setAdjError(errorText(e)); } finally { setAdjBusy(false); }
   }
@@ -1963,7 +1963,7 @@ function ImportSheet({api, d, onClose, onDone}: {api: SofiaApi; d: Data; onClose
   async function analyze() {
     if (!file || !target) return;
     setBusy(true); setError('');
-    try { const r = await api.financeImportPreview(file.text, target.type, target.id); setPreview(r.items); setChosen(new Set(r.items.filter(i => !i.duplicate && !i.skip).map(i => i.import_id))); }
+    try { const r = await api.financeImportPreview(file.text, target.type, target.id); setPreview(r.items); setChosen(new Set(r.items.filter(i => i.checked !== false && !i.duplicate && !i.skip).map(i => i.import_id))); }
     catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
   async function confirm() {
@@ -2001,7 +2001,7 @@ function ImportSheet({api, d, onClose, onDone}: {api: SofiaApi; d: Data; onClose
                 <View><ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
                   {preview.map(i => <Pressable key={i.import_id} disabled={!!i.skip} onPress={() => toggle(i.import_id)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderColor: c.line, opacity: i.skip ? 0.45 : 1}}>
                     <View style={{width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: chosen.has(i.import_id) ? c.accent : c.line, backgroundColor: chosen.has(i.import_id) ? c.accent : 'transparent', alignItems: 'center', justifyContent: 'center'}}>{chosen.has(i.import_id) ? <Text style={{color: c.onAccent, fontSize: 13, fontWeight: '800'}}>✓</Text> : null}</View>
-                    <View style={{flex: 1}}><Text style={{color: c.text}} numberOfLines={1}>{i.desc}</Text><Text style={{fontSize: 11, color: c.muted}}>{i.date.split('-').reverse().join('/')}{i.category ? ' · ' + i.category : ''}{i.duplicate ? ' · já importado' : ''}{i.skip ? ' · ' + i.skip : ''}</Text></View>
+                    <View style={{flex: 1}}><Text style={{color: c.text}} numberOfLines={1}>{i.desc}</Text><Text style={{fontSize: 11, color: c.muted}}>{i.date.split('-').reverse().join('/')}{i.category ? ' · ' + i.category : ''}{i.duplicate ? ' · já importado' : ''}{i.match ? ' · já está no app: “' + i.match.title + '”' + (typeof i.match.amount === 'number' && Math.abs(i.match.amount - i.amount) > 0.004 ? ' (lá com ' + money(i.match.amount) + ')' : '') : ''}{i.before ? ' · antes do seu ponto de partida (já está no Saldo)' : ''}{i.skip ? ' · ' + i.skip : ''}</Text></View>
                     <Text style={{fontWeight: '700', color: i.kind === 'income' ? '#2fc58b' : c.text}}>{i.kind === 'income' ? '+' : '-'}{money(i.amount)}</Text>
                   </Pressable>)}
                 </ScrollView></View>

@@ -335,4 +335,4 @@ function query(workspace,store,target,action={}){
  return null;
 }
 
-module.exports={installmentPlan,APPS,APP_KINDS,appsContext,buildEntity,describeCreated,resolveRef,coerce,query,today,dateOf,money,timeOf,weekdays};
+module.exports={financeCategory,installmentPlan,APPS,APP_KINDS,appsContext,buildEntity,describeCreated,resolveRef,coerce,query,today,dateOf,money,timeOf,weekdays};

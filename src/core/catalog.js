@@ -1581,6 +1581,12 @@ const CATALOG={
     ],
     "fields": [
       {
+        "key": "balance_set_at",
+        "label": "Saldo acertado com o banco em",
+        "type": "date",
+        "developerOnly": true
+      },
+      {
         "key": "report_start",
         "label": "Relatórios a partir de",
         "type": "date"
