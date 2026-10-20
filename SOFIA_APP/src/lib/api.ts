@@ -258,6 +258,8 @@ export class SofiaApi {
   entityAction(id: string, input: object) { return this.request<any>('/workspace/entities/' + encodeURIComponent(id) + '/action', input); }
   async libraryOrganization(){const items:Entity[]=[];for(let offset=0;;offset+=100){const page=await this.request<{items:Entity[]}>('/workspace/entities?group=library&limit=100&offset='+offset);items.push(...page.items);if(page.items.length<100)return {items};}}
   financeImportPreview(text: string, target: 'account' | 'card', targetId: string) { return this.request<{format: string; items: ImportItem[]; total: number; duplicates: number}>('/md/finance/import', {text, target, target_id: targetId}, 'POST', 60000); }
+  /** 0.3.213: guarda o extrato a parte (nao vira lancamento) e devolve a conciliacao. */
+  financeStatement(text: string, targetId: string) { return this.request<{statement: Entity; items: ImportItem[]; matched: number; before: number; start: string; closing_balance: number | null; closing_at: string}>('/md/finance/statement', {text, target_id: targetId}, 'POST', 120000); }
   /** 0.3.212: zera Financas (apaga tudo do modulo) para comecar do zero. */
   financeReset() { return this.request<{ok: boolean; removed: number}>('/md/finance/reset', {confirm: 'ZERAR'}, 'POST', 60000); }
   /** 0.3.211: desfaz a importacao - tira tudo o que veio de extratos da conta/cartao (o lancado a mao fica). */

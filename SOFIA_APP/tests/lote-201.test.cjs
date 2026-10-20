@@ -129,7 +129,7 @@ test('0.3.210: importar extrato - lista com altura maxima (rola por dentro) e bo
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes("<View style={{maxHeight: Math.round(Dimensions.get('window').height * 0.42)"),'a lista nao empurra o botao para fora da tela');
   assert.ok(s.includes('>Marcar todos</Text>')&&s.includes('>Desmarcar todos</Text>'));
-  const i=s.indexOf("maxHeight: Math.round(Dimensions.get('window').height * 0.42)"),b=s.indexOf("<Button title={'Importar ' + chosenItems.length",i);assert.ok(b>i,'botao logo depois da lista');
+  const i=s.indexOf("maxHeight: Math.round(Dimensions.get('window').height * 0.42)"),b=s.indexOf("<Button title={chosenItems.length ? 'Lançar ' + chosenItems.length",i);assert.ok(b>i,'botao logo depois da lista');
 });
 
 test('0.3.211: desfazer importacao na engrenagem e conferencia do Saldo item por item',()=>{
@@ -137,4 +137,14 @@ test('0.3.211: desfazer importacao na engrenagem e conferencia do Saldo item por
   assert.ok(a.includes("financeImportUndo(targetId: string)"));
   assert.ok(s.includes('Desfazer importação de extrato</Text>')&&s.includes("api.financeImportUndo(acc ? acc.id : '')"));
   assert.ok(s.includes("'Extrato do saldo'")&&s.includes("run = Math.round((run + r.delta) * 100) / 100"),'saldo depois de cada item');
+});
+
+test('0.3.213: Financas reestruturadas - abas, Lancamentos com Extrato do banco (conciliacao), "+" com cinco entradas',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("[{value: 'home' as Tab, label: 'Resumo'}, {value: 'bills' as Tab, label: 'Contas'}, {value: 'txs' as Tab, label: 'Lançamentos'}, {value: 'cards' as Tab, label: 'Cartões'}, {value: 'reports' as Tab, label: 'Relatórios'}]"));
+  assert.ok(s.includes("tab === 'txs' ? <TxTab"),'Lancamentos e aba propria');
+  assert.ok(s.includes('function BankStatements(')&&s.includes("'falta no app'")&&s.includes('Acertar Saldo</Text>')&&s.includes("'lançado pelo extrato'"),'conciliacao');
+  assert.ok(s.includes("api.financeStatement(file.text, target.id)"),'importar guarda o extrato a parte');
+  assert.ok(s.includes("[['expense', '⏰ Conta a pagar', c.text], ['income', '⏰ Conta a receber', c.text]]"),'+ com conta a pagar e a receber');
+  assert.ok(s.includes("statements: g('fin_statement')"));
 });

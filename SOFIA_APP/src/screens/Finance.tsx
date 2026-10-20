@@ -35,9 +35,14 @@ import {appAlert} from '../lib/app-alert';
 import {useFormDraft} from '../lib/form-draft';
 
 const GOOD = '#2fc58b', BAD = '#ff6b7a', WARN = '#ffb547', GUARD = '#1f9d63';
-type Data = {accounts: Account[]; cards: Card[]; txs: Tx[]; budgets: Budget[]; goals: Goal[]; moves: ReserveMove[]};
+type Data = {accounts: Account[]; cards: Card[]; txs: Tx[]; budgets: Budget[]; goals: Goal[]; moves: ReserveMove[]; statements: Statement[]};
+// 0.3.213: extrato do banco guardado a parte - serve para conferir (conciliacao) e acertar o saldo; nao e lancamento
+type StatementLine = {import_id: string; date: string; desc: string; original?: string; amount: number; kind: string};
+type Statement = {id: string; accountId: string; from: string; to: string; closing: number | null; lines: StatementLine[]; entity: Entity};
+function toStatement(e: Entity): Statement { let lines: StatementLine[] = []; try { const a = JSON.parse(String(e.data?.lines_json || '[]')); if (Array.isArray(a)) lines = a; } catch { lines = []; }
+  const cb = e.data?.closing_balance; return {id: e.id, accountId: String(e.data?.account_id || ''), from: String(e.data?.from || ''), to: String(e.data?.to || ''), closing: cb === '' || cb === null || cb === undefined ? null : Number(cb), lines, entity: e}; }
 type Tab = 'home' | 'txs' | 'bills' | 'cards' | 'plan' | 'reports';
-const KINDS = ['fin_account', 'fin_card', 'fin_tx', 'fin_budget', 'fin_goal', 'fin_reserve_move'] as const;
+const KINDS = ['fin_account', 'fin_card', 'fin_tx', 'fin_budget', 'fin_goal', 'fin_reserve_move', 'fin_statement'] as const;
 const dateBR = (d: string) => d ? d.slice(8, 10) + '/' + d.slice(5, 7) : '';
 const weekday = (d: string) => new Date(d + 'T12:00:00Z').toLocaleDateString('pt-BR', {weekday: 'long', day: '2-digit', month: 'long', timeZone: 'UTC'});
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -49,7 +54,7 @@ type Bundle = {items: Record<string, Entity[]>; carry?: Record<string, number>; 
 function toData(all: Record<string, Entity[]>, carry: Record<string, number> = {}): Data {
   const g = (k: string) => all[k] || [];
   return {accounts: g('fin_account').map(toAccount).map(a => ({...a, initial: a.initial + (carry[a.id] || 0)})), cards: g('fin_card').map(toCard), txs: g('fin_tx').filter(e => e.state !== 'archived').map(toTx),
-    budgets: g('fin_budget').filter(e => e.state !== 'archived').map(toBudget), goals: g('fin_goal').filter(e => e.state !== 'archived').map(toGoal), moves: g('fin_reserve_move').filter(e => e.state !== 'archived').map(toReserveMove)};
+    budgets: g('fin_budget').filter(e => e.state !== 'archived').map(toBudget), goals: g('fin_goal').filter(e => e.state !== 'archived').map(toGoal), moves: g('fin_reserve_move').filter(e => e.state !== 'archived').map(toReserveMove), statements: g('fin_statement').filter(e => e.state !== 'archived').map(toStatement).sort((a, b) => b.to.localeCompare(a.to))};
 }
 /** Janela de meses que cada aba precisa: Resumo/Lançamentos/Cartões/Planejamento = mês anterior
  * ao próximo (previsto, fatura, "a pagar"); Relatórios = 6 meses (tendência). */
@@ -209,7 +214,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
           <Pressable accessibilityLabel="Próximo mês" onPress={() => setMonth(m => addMonths(m, 1))} style={{width: 32, height: 32, alignItems: 'center', justifyContent: 'center', transform: [{rotate: '180deg'}]}}><Icon name="back" size={18} color={c.text} /></Pressable>
         </View>
         <View style={{paddingHorizontal: 20, paddingBottom: 14}}>
-          <Chips scroll value={tab} onChange={navigateFinance} options={[{value: 'home' as Tab, label: 'Resumo'}, {value: 'bills' as Tab, label: 'Vencimentos'}, {value: 'cards' as Tab, label: 'Cartões'}, {value: 'reports' as Tab, label: 'Relatórios'}]} />
+          <Chips scroll value={tab} onChange={navigateFinance} options={[{value: 'home' as Tab, label: 'Resumo'}, {value: 'bills' as Tab, label: 'Contas'}, {value: 'txs' as Tab, label: 'Lançamentos'}, {value: 'cards' as Tab, label: 'Cartões'}, {value: 'reports' as Tab, label: 'Relatórios'}]} />
         </View>
 
         {!d ? <View style={{flex: 1, padding: 16, gap: 14}}>{error ? <View style={{padding: 20, gap: 12}}><Text style={{color: c.danger}}>{error}</Text><Button title="Tentar de novo" secondary onPress={() => void reload()} /></View> : <View style={{gap: 6}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Spinner size={16} stroke={1.8} /><Text style={{color: c.muted, fontSize: 13}}>Carregando suas finanças</Text></View><LoadingLines rows={5} /></View>}</View> : !d.accounts.length ? (
@@ -224,6 +229,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
               </Pressable>; })() : null}
             {tab === 'home' ? <HomeTab d={scoped || d} month={month} api={api} reload={reload} onTx={setEditing} onTab={navigateFinance} accountId={accountId} isPrimary={isPrimary} onBill={t => { setBillScope('series'); setBillEditor(t || 'new'); }} aporteKey={aporteKey} />
               : tab === 'bills' ? <PendingTab d={scoped || d} api={api} month={month} accountId={accountId} isPrimary={isPrimary} onAporte={() => { navigateFinance('home'); setAporteKey(k => k + 1); }} warning={notificationWarning} onBill={(t, scope) => { setBillScope(scope || 'series'); setBillFlow('expense'); setBillEditor(t); }} onNew={flow => { setBillScope('series'); setBillFlow(flow); setBillEditor('new'); }} onMonth={setMonth} side={pendingSide} onSide={setPendingSide} reload={reload} />
+              : tab === 'txs' ? <TxTab d={scoped || d} month={month} accountFilter={accountFilter} setAccountFilter={setAccountFilter} onTx={setEditing} api={api} reload={reload} />
               : tab === 'cards' ? <CardsTab d={scoped || d} api={api} reload={reload} onTx={setEditing} onManage={() => setManage(true)} />
               : <ReportsTab d={scoped || d} month={month} reserve={reserveFor((scoped || d).goals, accountId, isPrimary)} api={api} reload={reload} />}
           </ScrollView>
@@ -241,7 +247,9 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
               {([['expense', '↓ Despesa', BAD], ['income', '↑ Receita', GOOD], ['transfer', '⇄ Transferência entre contas', c.accent]] as const).map(([k, label, color]) =>
                 <Pressable key={k} accessibilityRole="button" onPress={() => { setNewMenu(false); afterSheet(() => newTx(k as TxKind)); }} style={{paddingVertical: 15, borderBottomWidth: 1, borderColor: c.line}}><Text style={{color, fontSize: 16, fontWeight: '700'}}>{label}</Text></Pressable>)}
               <Pressable accessibilityRole="button" onPress={() => { setNewMenu(false); navigateFinance('home'); afterSheet(() => setAporteKey(k => k + 1)); }} style={{paddingVertical: 15, borderBottomWidth: 1, borderColor: c.line}}><Text style={{color: GUARD, fontSize: 16, fontWeight: '700'}}>🔒 Aporte (guardar dinheiro)</Text></Pressable>
-              <Pressable accessibilityRole="button" onPress={() => { setNewMenu(false); afterSheet(() => setBillEditor('new')); }} style={{paddingVertical: 15}}><Text style={{color: c.text, fontSize: 16, fontWeight: '700'}}>⏰ Conta a pagar ou receber</Text></Pressable>
+              {/* 0.3.213: um "+" com as cinco entradas do modulo */}
+              {([['expense', '⏰ Conta a pagar', c.text], ['income', '⏰ Conta a receber', c.text]] as const).map(([flow, label, color]) =>
+                <Pressable key={flow} accessibilityRole="button" onPress={() => { setNewMenu(false); setBillScope('series'); setBillFlow(flow); afterSheet(() => setBillEditor('new')); }} style={{paddingVertical: 15, borderTopWidth: 1, borderColor: c.line}}><Text style={{color, fontSize: 16, fontWeight: '700'}}>{label}</Text></Pressable>)}
             </View>
           </Sheet>
         </> : null}
@@ -1100,9 +1108,11 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
         <Text style={{color: c.text, fontWeight: '700', fontSize: 13}}>{show(dues.reduce((sum, x) => sum + x.amount, 0))}</Text><Text style={{color: c.muted}}>›</Text>
       </Pressable> : null}
 
-      <View style={{gap: 12, paddingTop: 6}}>
-        <TxTab d={d} month={month} accountFilter="" setAccountFilter={() => undefined} onTx={onTx} api={api} reload={reload} />
-      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Ver os lançamentos do mês" onPress={() => onTab('txs')}
+        style={{flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.surface, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: c.line}}>
+        <Text style={{flex: 1, color: c.text, fontWeight: '700', fontSize: 13}}>Lançamentos de {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
+        <Text style={{color: c.muted, fontSize: 12}}>{d.txs.filter(t => !t.virtual && t.paid && t.date.startsWith(month) && (t.kind === 'income' || t.kind === 'expense')).length} ›</Text>
+      </Pressable>
 
     </>
   );
@@ -1208,6 +1218,57 @@ function BudgetRow({p}: {p: ReturnType<typeof budgetProgress>[number]}) {
 }
 
 // ============================ LANÇAMENTOS ============================
+/** 0.3.213: extratos do banco guardados a parte. Cada linha e conferida ao vivo com os lancamentos do app:
+ * bate / falta no app (Lancar) / ja estava no Saldo. O saldo do banco no fim do extrato pode acertar o Saldo. */
+function BankStatements({d, api, reload, onImport}: {d: Data; api: SofiaApi; reload: () => Promise<void>; onImport: () => void}) {
+  const c = useTheme(), [open, setOpen] = useState<string>(''), [busy, setBusy] = useState('');
+  const account = (id: string) => d.accounts.find(a => a.id === id);
+  const matchOf = (line: StatementLine, acc: Account | undefined) => {
+    const t = Date.parse(line.date + 'T12:00:00Z');
+    const byId = d.txs.find(x => !x.virtual && String(x.entity?.data?.import_id || '') === line.import_id); if (byId) return {tx: byId, how: 'extrato' as const};
+    const found = d.txs.filter(x => !x.virtual && x.paid && (!acc || x.accountId === acc.id) && x.kind === line.kind && Math.abs(x.amount - line.amount) <= 1.0001 && Math.abs(Date.parse(x.date + 'T12:00:00Z') - t) <= 3 * 864e5)
+      .sort((a, b) => Math.abs(a.amount - line.amount) - Math.abs(b.amount - line.amount))[0];
+    return found ? {tx: found, how: 'app' as const} : null;
+  };
+  async function launch(line: StatementLine, acc: Account) {
+    setBusy(line.import_id);
+    try { await api.financeImportCommit([{import_id: line.import_id, date: line.date, desc: line.desc, amount: line.amount, kind: line.kind, category: '', duplicate: false, skip: ''}], 'account', acc.id); await reload(); }
+    catch (e) { appAlert('Finanças', errorText(e)); } finally { setBusy(''); }
+  }
+  async function settle(st: Statement, acc: Account) {
+    if (st.closing === null) return;
+    const now = accountBalance(acc, d.txs), diff = Math.round((st.closing - now) * 100) / 100;
+    if (Math.abs(diff) < 0.005) { appAlert('Saldo', 'O Saldo do app já é igual ao do banco.'); return; }
+    appAlert('Acertar o Saldo com o banco?', 'O Saldo do app passa de ' + money(now) + ' para ' + money(st.closing) + ', o valor do banco no fim do extrato. Só o ponto de partida muda; nenhum lançamento é apagado.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Acertar', onPress: () => { setBusy('saldo'); void api.saveEntity({...acc.entity, data: {...acc.entity.data, initial_balance: String(Math.round((acc.initial + diff) * 100) / 100), balance_set_at: st.to || todayISO()}}).then(() => reload()).catch(e => appAlert('Finanças', errorText(e))).finally(() => setBusy('')); }}]);
+  }
+  if (!d.statements.length) return <View style={{backgroundColor: c.surface, borderRadius: 18, padding: 16, gap: 8, borderWidth: 1, borderColor: c.line}}>
+    <Text style={{color: c.text, fontWeight: '700'}}>Nenhum extrato ainda</Text>
+    <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>O extrato do banco não vira lançamento: ele fica aqui para conferir o app com o banco, lançar só o que faltar e acertar o Saldo.</Text>
+    <Button title="Importar extrato (OFX ou CSV)" secondary onPress={onImport} />
+  </View>;
+  return <View style={{gap: 12}}>
+    {d.statements.map(st => { const acc = account(st.accountId), start = String(acc?.entity?.data?.balance_set_at || ''); const rows = st.lines.map(l => ({l, m: matchOf(l, acc), before: !!start && l.date < start})); const missing = rows.filter(r => !r.m && !r.before).length;
+      return <View key={st.id} style={{backgroundColor: c.surface, borderRadius: 18, borderWidth: 1, borderColor: c.line, overflow: 'hidden'}}>
+        <Pressable accessibilityRole="button" onPress={() => setOpen(o => o === st.id ? '' : st.id)} style={{padding: 14, gap: 4}}>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}><Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 14}}>{st.from.split('-').reverse().slice(0, 2).join('/')} a {st.to.split('-').reverse().slice(0, 2).join('/')}{acc ? ' · ' + acc.name : ''}</Text><Text style={{color: c.muted}}>{open === st.id ? '▾' : '▸'}</Text></View>
+          <Text style={{color: c.muted, fontSize: 12}}>{st.lines.length} linhas · {missing ? missing + (missing === 1 ? ' falta no app' : ' faltam no app') : 'tudo confere'}{st.closing !== null ? ' · saldo no banco ' + money(st.closing) : ''}</Text>
+        </Pressable>
+        {open === st.id ? <View style={{paddingHorizontal: 14, paddingBottom: 14, gap: 6}}>
+          {acc && st.closing !== null ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.input, borderRadius: 12, padding: 10}}>
+            <Text style={{flex: 1, color: c.text, fontSize: 12}}>Banco no fim do extrato: <Text style={{fontWeight: '800'}}>{money(st.closing)}</Text> · app agora: <Text style={{fontWeight: '800'}}>{money(accountBalance(acc, d.txs))}</Text></Text>
+            <Pressable accessibilityRole="button" disabled={busy === 'saldo'} onPress={() => void settle(st, acc)} style={{paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: c.accentSoft}}><Text style={{color: c.accent, fontWeight: '700', fontSize: 12}}>Acertar Saldo</Text></Pressable>
+          </View> : null}
+          {rows.map(({l, m, before}) => <View key={l.import_id} style={{flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7, borderTopWidth: 1, borderColor: c.line}}>
+            <View style={{flex: 1}}><Text numberOfLines={1} style={{color: c.text, fontSize: 13}}>{l.desc}</Text><Text style={{color: m ? GOOD : before ? c.muted : WARN, fontSize: 11}}>{l.date.split('-').reverse().slice(0, 2).join('/')} · {m ? (m.how === 'app' ? 'bate com “' + m.tx.desc + '”' : 'lançado pelo extrato') : before ? 'antes do ponto de partida (já no Saldo)' : 'falta no app'}</Text></View>
+            <Text style={{color: l.kind === 'income' ? GOOD : c.text, fontWeight: '700', fontSize: 13}}>{l.kind === 'income' ? '+' : '−'}{money(l.amount)}</Text>
+            {!m && !before && acc ? <Pressable accessibilityRole="button" disabled={!!busy} onPress={() => void launch(l, acc)} style={{paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: c.accentSoft}}>{busy === l.import_id ? <ActivityIndicator color={c.accent} /> : <Text style={{color: c.accent, fontWeight: '700', fontSize: 12}}>Lançar</Text>}</Pressable> : null}
+          </View>)}
+          <Pressable accessibilityRole="button" onPress={() => appAlert('Apagar este extrato?', 'Só o extrato guardado sai. Os lançamentos continuam.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Apagar', style: 'destructive', onPress: () => void api.deleteEntity(st.id).then(() => reload()).catch(e => appAlert('Finanças', errorText(e)))}])} style={{paddingVertical: 10}}><Text style={{color: c.muted, fontSize: 12}}>Apagar este extrato</Text></Pressable>
+        </View> : null}
+      </View>; })}
+    <Button title="Importar outro extrato" secondary onPress={onImport} />
+  </View>;
+}
 function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {d: Data; month: string; accountFilter: string; setAccountFilter: (v: string) => void; onTx: (t: Partial<Tx>) => void; api: SofiaApi; reload: () => Promise<void>}) {
   const c = useTheme(), [kind, setKind] = useState<'all' | TxKind>('all'), [cat, setCat] = useState(''), [status, setStatus] = useState<'all' | 'pending'>('all');
   // 0.3.153: o que voce registrou na Sofia e o extrato importado do banco ficam separados, com troca.
@@ -1232,9 +1293,10 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
         {hasAnyTx ? <IconButton name="filter" label={tools ? 'Esconder filtros' : 'Filtrar'} onPress={() => setTools(v => !v)} /> : null}
         <IconButton name="plus" label="Importar extrato (OFX ou CSV)" onPress={() => setImporting(true)} />
       </View>
-      <Chips value={source} onChange={setSource} options={[{value: 'app' as const, label: 'Lançamentos'}, {value: 'import' as const, label: 'Extrato importado'}]} />
+      <Chips value={source} onChange={setSource} options={[{value: 'app' as const, label: 'Lançamentos'}, {value: 'import' as const, label: 'Extrato do banco'}]} />
+      {source === 'import' ? <BankStatements d={d} api={api} reload={reload} onImport={() => setImporting(true)} /> : null}
       {importing ? <ImportSheet api={api} d={d} onClose={() => setImporting(false)} onDone={async () => { setImporting(false); await reload(); }} /> : null}
-      {hasAnyTx && (tools || activeCat || kind !== 'all' || status !== 'all') ? <View style={{gap: 10}}>
+      {source === 'import' ? null : hasAnyTx && (tools || activeCat || kind !== 'all' || status !== 'all') ? <View style={{gap: 10}}>
       {catPresets.length ? <Chips scroll value={activeCat} onChange={setCat} options={[{value: '', label: 'Todas as categorias'}, ...catPresets.map(name => ({value: name, label: name}))]} /> : null}
       <Chips scroll value={kind} onChange={setKind} options={[{value: 'all' as const, label: 'Todos'}, {value: 'expense' as const, label: 'Despesas'}, {value: 'income' as const, label: 'Receitas'}, {value: 'transfer' as const, label: 'Transferências'}, {value: 'card_payment' as const, label: 'Faturas'}]} />
       <View style={{flexDirection: 'row', gap: 8, flexWrap: 'wrap', alignItems: 'center'}}>
@@ -1242,13 +1304,15 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
         {filterName ? <Pressable onPress={() => setAccountFilter('')} style={{paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99, backgroundColor: c.accentSoft}}><Text style={{color: c.accent, fontWeight: '600', fontSize: 12}}>{filterName} ✕</Text></Pressable> : null}
       </View>
       </View> : null}
+      {source === 'import' ? null : <>
       {list.length ? <Text style={{color: c.muted, fontSize: 12}}>{list.length} movimentações no mês · resultado {money(sum)}</Text> : null}
-      {!days.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>{activeCat || kind !== 'all' || status !== 'all' ? 'Nenhum lançamento com esses filtros.' : (source === 'import' ? 'Nenhum extrato importado neste mês. Toque em ＋ ao lado de Histórico para importar (OFX ou CSV).' : 'Nenhum lançamento neste mês. Toque em ＋ para registrar.')}</Text> : days.map(([date, items]) => (
+      {!days.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>{activeCat || kind !== 'all' || status !== 'all' ? 'Nenhum lançamento com esses filtros.' : 'Nenhum lançamento neste mês. Toque em ＋ para registrar.'}</Text> : days.map(([date, items]) => (
         <View key={date} style={{gap: 8}}>
           <Text style={{color: c.muted, fontSize: 12, fontWeight: '700', paddingLeft: 4}}>{weekday(date)}</Text>
           <Card_ style={{padding: 10, gap: 0}}>{items.map((t, i) => <TxRow key={t.id} t={t} d={d} first={i === 0} onPress={() => onTx(t)} api={api} reload={reload} />)}</Card_>
         </View>
       ))}
+      </>}
     </>
   );
 }
@@ -1944,7 +2008,7 @@ function ImportSheet({api, d, onClose, onDone}: {api: SofiaApi; d: Data; onClose
   async function analyze() {
     if (!file || !target) return;
     setBusy(true); setError('');
-    try { const r = await api.financeImportPreview(file.text, target.type, target.id); setPreview(r.items); setChosen(new Set(r.items.filter(i => i.checked !== false && !i.duplicate && !i.skip).map(i => i.import_id))); }
+    try { const r = target.type === 'account' ? await api.financeStatement(file.text, target.id) : await api.financeImportPreview(file.text, target.type, target.id); setPreview(r.items); setChosen(new Set(r.items.filter(i => i.checked !== false && !i.duplicate && !i.skip).map(i => i.import_id))); }
     catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
   async function confirm() {
@@ -1975,7 +2039,7 @@ function ImportSheet({api, d, onClose, onDone}: {api: SofiaApi; d: Data; onClose
             </View>
             <Text style={{fontSize: 12, color: c.muted, fontWeight: '700'}}>2. Arquivo</Text>
             <Button title={file ? file.name : 'Escolher arquivo (OFX ou CSV)'} secondary onPress={() => void pick()} />
-            {file && target && !preview ? <Button title="Analisar extrato" loading={busy} onPress={() => void analyze()} /> : null}
+            {file && target && !preview ? <Button title="Conferir com o app" loading={busy} onPress={() => void analyze()} /> : null}
             {preview ? (
               <View style={{gap: 6}}>
                 <Text style={{fontSize: 12, color: c.muted, fontWeight: '700'}}>3. Confira ({chosenItems.length} de {preview.length} marcados · {money(Math.abs(sum))} {sum >= 0 ? 'de entrada' : 'de saída'})</Text>
@@ -1991,7 +2055,8 @@ function ImportSheet({api, d, onClose, onDone}: {api: SofiaApi; d: Data; onClose
                     <Text style={{fontWeight: '700', color: i.kind === 'income' ? '#2fc58b' : c.text}}>{i.kind === 'income' ? '+' : '-'}{money(i.amount)}</Text>
                   </Pressable>)}
                 </ScrollView></View>
-                <Button title={'Importar ' + chosenItems.length + (chosenItems.length === 1 ? ' lançamento' : ' lançamentos')} loading={busy} disabled={!chosenItems.length} onPress={() => void confirm()} />
+                <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>O extrato já ficou guardado em Lançamentos → Extrato do banco, para conferir e acertar o Saldo. Só o que está marcado vira lançamento.</Text>
+                <Button title={chosenItems.length ? 'Lançar ' + chosenItems.length + (chosenItems.length === 1 ? ' que falta' : ' que faltam') : 'Nada a lançar: tudo já está no app'} loading={busy} disabled={!chosenItems.length} onPress={() => void confirm()} />
               </View>
             ) : null}
             {error ? <Text style={{color: c.danger}}>{error}</Text> : null}

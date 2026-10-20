@@ -171,7 +171,7 @@ function makeMobileApi(runtime, deps) {
     if (p === '/api/mobile/md/finance' && m === 'GET') {
       try { workspace.repairFinanceDuplicates(); } catch { /* reparo e best-effort */ }
       const out = {};
-      for (const kind of ['fin_account', 'fin_card', 'fin_tx', 'fin_budget', 'fin_goal', 'fin_reserve_move']) {
+      for (const kind of ['fin_account', 'fin_card', 'fin_tx', 'fin_budget', 'fin_goal', 'fin_reserve_move', 'fin_statement']) {
         const list = [];
         for (let offset = 0; offset < 50000; offset += 500) { const page = workspace.list({ kind, limit: 500, offset }); list.push(...page); if (page.length < 500) break; }
         out[kind] = list;
@@ -203,9 +203,14 @@ function makeMobileApi(runtime, deps) {
     // 0.3.212: zerar Financas - apaga TUDO do modulo (contas, cartoes, lancamentos, reserva, metas) para comecar do zero
     if (p === '/api/mobile/md/finance/reset' && m === 'POST') {
       const b = await bodyJson(req, 4096); if (String(b.confirm || '') !== 'ZERAR') fail('CONFIRM', 'Confirme com a palavra ZERAR.', 400);
-      let removed = 0; const kinds = ['fin_tx', 'fin_reserve_move', 'fin_budget', 'fin_goal', 'fin_card', 'fin_account'];
+      let removed = 0; const kinds = ['fin_tx', 'fin_reserve_move', 'fin_budget', 'fin_goal', 'fin_statement', 'fin_card', 'fin_account'];
       for (const kind of kinds) for (let round = 0; round < 50; round++) { const page = workspace.list({ kind, limit: 500, offset: 0 }); if (!page.length) break; for (const e of page) { try { workspace.deleteEntity(e.id); removed++; } catch { /* segue */ } } }
       return send({ ok: true, removed });
+    }
+    // 0.3.213: conciliacao - o extrato fica guardado a parte (fin_statement) e NAO vira lancamento
+    if (p === '/api/mobile/md/finance/statement' && m === 'POST') {
+      const b = await bodyJson(req, 5 * 1024 * 1024);
+      return send(require('../services/bank-import').saveStatement(workspace, { text: String(b.text || ''), target_id: String(b.target_id || '') }));
     }
     if (p === '/api/mobile/md/finance/import/undo' && m === 'POST') {
       const b = await bodyJson(req, 65536);

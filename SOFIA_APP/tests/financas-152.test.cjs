@@ -5,7 +5,7 @@ const s=fs.readFileSync(path.join(__dirname,'..','src/screens/Finance.tsx'),'utf
 test('Resumo: historico vem logo depois dos cartoes; cartoes de credito e vencimentos completos saem do Resumo',()=>{
   const home=s.slice(s.indexOf('function HomeTab('),s.indexOf('function DueRow('));
   assert.ok(!home.includes('<Title text="Próximos vencimentos"'));assert.ok(!home.includes('<Title text="Cartões"'));
-  assert.ok(home.includes('<TxTab d={d}'));
+  assert.ok(home.includes("onPress={() => onTab('txs')}"),'0.3.213: Lancamentos virou aba propria; o Resumo so aponta para ela');
   assert.ok(s.includes('>Histórico</Text>'));assert.ok(s.includes("(tools || activeCat || kind !== 'all' || status !== 'all') ?"),'filtros recolhidos');
 });
 test('topo compacto e um botao + com as opcoes de lancamento',()=>{

@@ -359,7 +359,7 @@ test('0.3.208: Relatorios com secoes que abrem e fecham (lembra a escolha), guar
   assert.ok(!r.slice(0,r.indexOf('\nfunction ',10)).includes('Recomeçar de hoje</Text>'),'fora dos Relatorios');
   assert.ok(!s.includes('Recomeçar de hoje</Text>')&&!s.includes('Recuperar itens apagados</Text>'),'0.3.212: recomecar e recuperar sairam');assert.ok(s.includes('>Zerar Finanças</Text>'),'zerar Financas na engrenagem');
   assert.ok(s.includes("manualDues(d.txs, accountId, today, 3)")&&s.includes('nos próximos 3 dias'),'vencimentos com 3 dias');
-  assert.ok(s.includes("label: 'Vencimentos'"),'aba Vencimentos');
+  assert.ok(s.includes("label: 'Contas'")&&s.includes("label: 'Lançamentos'"),'0.3.213: abas Resumo, Contas, Lancamentos, Cartoes, Relatorios');
   assert.ok(s.includes('async function saveFresh(')&&s.includes("await saveFresh(api, t.desc, {paid: true}, t.entity)"),'Paguei sobre a versao atual');
   assert.ok(s.includes('aparece {g.items.length} vezes'),'aviso de repetido');
 });

@@ -48,3 +48,14 @@ test('0.3.212: zerar Financas apaga tudo do modulo (inclusive arquivados) e exig
  assert.equal(r.ok,true);assert.equal(r.removed,4);
  for(const kind of ['fin_account','fin_tx','fin_goal'])assert.equal(w.list({kind,limit:50}).length,0,kind+' vazio');
 });
+
+test('0.3.213: o extrato fica guardado a parte (fin_statement) com saldo do banco; nada vira lancamento',t=>{
+ const {core}=fixture(t);const w=core.workspace;
+ const conta=w.save({kind:'fin_account',title:'Conta principal',area:'Pessoal',data:{account_type:'corrente',initial_balance:'1000',include_total:true}});
+ const text=ofx([['2026-10-19',-70,'Pix enviado: "Cp :99999999-Estacionamento Modelo Ltda"'],['2026-10-20',-469.26,'Pagamento Simples Nacional']]).replace('</BANKTRANLIST>','</BANKTRANLIST><LEDGERBAL><BALAMT>471.87<DTASOF>20261020120000</LEDGERBAL>');
+ const r=bank.saveStatement(w,{text,target_id:conta.id});
+ assert.equal(r.closing_balance,471.87);assert.equal(r.closing_at,'2026-10-20');assert.equal(r.items.length,2);
+ const st=w.list({kind:'fin_statement',limit:5})[0];assert.ok(st);assert.equal(st.data.account_id,conta.id);assert.equal(st.data.from,'2026-10-19');assert.equal(st.data.to,'2026-10-20');assert.equal(Number(st.data.closing_balance),471.87);
+ assert.equal(JSON.parse(st.data.lines_json).length,2);
+ assert.equal(w.list({kind:'fin_tx',limit:50}).length,0,'nenhum lancamento criado');
+});

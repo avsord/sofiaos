@@ -1883,6 +1883,19 @@ const CATALOG={
     ],
     "description": "Meta de economia com acompanhamento do quanto falta. Com papel 'reserve', é o Dinheiro guardado (valor separado para preservar)."
   },
+  "fin_statement": {
+    "label": "Extrato do banco",
+    "group": "finance",
+    "defaultPrivacy": "private",
+    "states": ["active", "archived"],
+    "fields": [
+      {"key": "account_id", "label": "Conta", "type": "text", "max": 80},
+      {"key": "from", "label": "De", "type": "date"},
+      {"key": "to", "label": "Até", "type": "date"},
+      {"key": "closing_balance", "label": "Saldo no banco no fim do extrato", "type": "number"},
+      {"key": "lines_json", "label": "Linhas do extrato", "type": "textarea", "max": 250000}
+    ]
+  },
   "fin_reserve_move": {
     "label": "Movimento da reserva",
     "group": "finance",
