@@ -94,3 +94,11 @@ test('Notas reestruturadas: pastas em cartoes, previa e data da nota, busca, aco
   assert.ok(s.includes("Array.isArray(data.notebooks)?data.notebooks:(data.rows||[])"),'le o formato antigo');
   assert.ok(s.includes("(p as Dated).updated_at=new Date().toISOString()"),'registra a ultima edicao');
 });
+
+test('0.3.202: foto do chat abre baixando pelo caminho do "Salvar" (autorizacao garantida) e mostra o motivo se falhar',()=>{
+  const s=read('src/screens/Chat.tsx');
+  assert.ok(s.includes("temp=await File.downloadFileAsync(source.uri,target,{headers:source.headers,idempotent:true});"));
+  assert.ok(s.includes("Não consegui abrir a foto: {error}"),'motivo exato');
+  assert.ok(s.includes("return()=>{alive=false;if(temp){try{temp.delete();}"),'ao fechar, a copia sai do celular');
+  assert.ok(!/<Image source=\{api\.attachmentSource\(id\)\}/.test(s),'nao depende mais do cabecalho de autorizacao na Image');
+});

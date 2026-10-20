@@ -39,14 +39,27 @@ function PhotoThumb({api,id}:{api:SofiaApi;id:string}){
  </View>;
 }
 function PhotoViewer({api,id,name,onSave,onClose}:{api:SofiaApi;id:string;name:string;onSave:()=>void;onClose:()=>void}){
- const c=useTheme(),[loading,setLoading]=useState(true),[error,setError]=useState(false);
+ // 0.3.202: baixa a foto pelo mesmo caminho do "Salvar no celular" (com a autorizacao garantida) e mostra a
+ // copia temporaria; ao fechar, ela e apagada. Se falhar, mostra o motivo que o servidor devolveu.
+ const c=useTheme(),[uri,setUri]=useState(''),[error,setError]=useState('');
+ useEffect(()=>{let alive=true,temp:File|null=null;
+  (async()=>{try{const source=api.attachmentSource(id),safe=name.replace(/[^\p{L}\p{N}._-]/gu,'_');
+   const target=new File(Paths.cache,'ver-'+id+'-'+safe);try{if(target.exists)target.delete();}catch{/* segue */}
+   temp=await File.downloadFileAsync(source.uri,target,{headers:source.headers,idempotent:true});
+   if(!alive){try{temp.delete();}catch{/* cache */}return;}
+   setUri(temp.uri);
+  }catch(e){if(!alive)return;
+   let why=errorText(e);try{const r=await fetch(api.attachmentSource(id).uri,{headers:api.attachmentSource(id).headers});if(!r.ok){const b=await r.json().catch(()=>null);why=(b&&b.error)||('Erro '+r.status);}}catch{/* sem rede */}
+   setError(why);}})();
+  return()=>{alive=false;if(temp){try{temp.delete();}catch{/* o sistema limpa o cache */}}};
+ },[api,id,name]);
  return <Sheet visible onClose={onClose} label="Fechar foto">
   <View style={{gap:12}}>
    <Text numberOfLines={1} style={{color:c.text,fontWeight:'800',fontSize:16}}>{name}</Text>
    <View style={{height:420,borderRadius:14,overflow:'hidden',backgroundColor:c.input,alignItems:'center',justifyContent:'center'}}>
-    {error?<Text style={{color:c.muted,textAlign:'center',padding:20}}>Não consegui abrir a foto. Ela fica no seu Google Drive (Sofia OS/Comprovantes); confira a conexão com o Google em Perfil.</Text>
-     :<Image source={api.attachmentSource(id)} resizeMode="contain" onLoadEnd={()=>setLoading(false)} onError={()=>{setLoading(false);setError(true);}} style={{width:'100%',height:'100%'}}/>}
-    {loading&&!error?<ActivityIndicator style={{position:'absolute'}} color={c.accent}/>:null}
+    {error?<Text style={{color:c.muted,textAlign:'center',padding:20,lineHeight:20}}>Não consegui abrir a foto: {error}</Text>
+     :uri?<Image source={{uri}} resizeMode="contain" onError={()=>setError('o arquivo baixado não é uma imagem válida.')} style={{width:'100%',height:'100%'}}/>
+     :<ActivityIndicator color={c.accent}/>}
    </View>
    <Text style={{color:c.muted,fontSize:11,lineHeight:16}}>A foto original fica guardada no seu Google Drive, em Sofia OS/Comprovantes. Aqui ela só é mostrada; ao fechar, nada fica no celular.</Text>
    <View style={{flexDirection:'row',gap:10}}>
