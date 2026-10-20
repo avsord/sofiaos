@@ -57,3 +57,14 @@ test('0.3.204: categoria pela natureza do que foi comprado (remedio vai para Sau
  const core=require('node:fs').readFileSync(require('node:path').join(__dirname,'..','src/core/sofia-core.js'),'utf8');
  assert.ok(core.includes('Se for FOTO DE COMPRA (cupom, nota fiscal, comprovante, pedido, Pix, recibo)'),'a regra vai junto com a foto');
 });
+
+test('0.3.205: compra pela foto entra paga (sai do Saldo), mesmo com "aguardando pagamento"; conta a pagar de verdade continua a pagar',t=>{
+ const w=setup(t);
+ const b=(title,changes,fallback='')=>bridge.buildEntity(w,'fin_tx',{title,content:'2 Tadalafila 5mg Eurofarma 30 Comprimidos',changes:[{field:'data.kind',value:'expense'},{field:'data.amount',value:'34,97'},...changes]},fallback).data;
+ assert.equal(b('Bifarma – Tadalafila',[{field:'data.paid',value:false}],'Veja a imagem que enviei.').paid,true,'a IA marcou a pagar lendo o Pix: entra pago');
+ assert.equal(b('Bifarma – Tadalafila',[]).paid,true,'padrao: pago');
+ assert.equal(b('Bifarma – Tadalafila',[{field:'data.paid',value:false}],'registra, vou pagar depois').paid,false,'a pessoa disse que paga depois');
+ const amanha=new Date(Date.now()+2*864e5).toISOString().slice(0,10);
+ assert.equal(b('DAS',[{field:'data.paid',value:false},{field:'data.date',value:amanha}],'DAS de novembro').paid,false,'conta com data futura continua a pagar');
+ assert.match(bridge.appsContext({list:()=>[]},null).content,/Compra pela foto entra PAGA/);
+});
