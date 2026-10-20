@@ -115,6 +115,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
   const [selectedAccount, setSelectedAccount] = useState(''), [accountPicker, setAccountPicker] = useState(false);
   const [billScope, setBillScope] = useState<'month' | 'series'>('series'), [billFlow, setBillFlow] = useState<'expense' | 'income'>('expense');
   const [billEditor, setBillEditor] = useState<Tx | 'new' | null>(null), [notificationWarning, setNotificationWarning] = useState('');
+  const [pendingSide, setPendingSide] = useState<'pagar' | 'receber'>('pagar'), [savedNotice, setSavedNotice] = useState<{id: string; text: string; checked: boolean} | null>(null);
   const [tabHistory, setTabHistory] = useState<Tab[]>([]);
   const navigateFinance = useCallback((next: Tab) => {
     if (next === tab) return;
@@ -213,8 +214,13 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
         ) : (
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingHorizontal: 20, paddingTop: 2, paddingBottom: insets.bottom + 110, gap: 16}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>
             {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
+            {savedNotice ? (() => { const found = !!d?.txs.some(t => t.id === savedNotice.id || t.entity?.id === savedNotice.id);
+              return <Pressable accessibilityRole="button" onPress={() => setSavedNotice(null)} style={{borderRadius: 14, padding: 12, backgroundColor: found || loading ? GOOD + '1f' : WARN + '22', borderWidth: 1, borderColor: found || loading ? GOOD : WARN}}>
+                <Text style={{color: c.text, fontSize: 13, fontWeight: '600'}}>{found || loading ? '✓ ' + savedNotice.text : 'Salvei “' + savedNotice.text.split('”')[0].replace('“', '') + '”, mas o servidor ainda não devolveu a conta. Puxe a tela para baixo para atualizar; se não aparecer, me avise com um print.'}</Text>
+                <Text style={{color: c.muted, fontSize: 11, marginTop: 2}}>Toque para fechar</Text>
+              </Pressable>; })() : null}
             {tab === 'home' ? <HomeTab d={scoped || d} month={month} api={api} reload={reload} onTx={setEditing} onTab={navigateFinance} accountId={accountId} isPrimary={isPrimary} onBill={t => { setBillScope('series'); setBillEditor(t || 'new'); }} aporteKey={aporteKey} />
-              : tab === 'bills' ? <PendingTab d={scoped || d} api={api} month={month} accountId={accountId} isPrimary={isPrimary} onAporte={() => { navigateFinance('home'); setAporteKey(k => k + 1); }} warning={notificationWarning} onBill={(t, scope) => { setBillScope(scope || 'series'); setBillFlow('expense'); setBillEditor(t); }} onNew={flow => { setBillScope('series'); setBillFlow(flow); setBillEditor('new'); }} onMonth={setMonth} reload={reload} />
+              : tab === 'bills' ? <PendingTab d={scoped || d} api={api} month={month} accountId={accountId} isPrimary={isPrimary} onAporte={() => { navigateFinance('home'); setAporteKey(k => k + 1); }} warning={notificationWarning} onBill={(t, scope) => { setBillScope(scope || 'series'); setBillFlow('expense'); setBillEditor(t); }} onNew={flow => { setBillScope('series'); setBillFlow(flow); setBillEditor('new'); }} onMonth={setMonth} side={pendingSide} onSide={setPendingSide} reload={reload} />
               : tab === 'cards' ? <CardsTab d={scoped || d} api={api} reload={reload} onTx={setEditing} onManage={() => setManage(true)} />
               : <ReportsTab d={scoped || d} month={month} reserve={reserveFor((scoped || d).goals, accountId, isPrimary)} api={api} reload={reload} />}
           </ScrollView>
@@ -238,7 +244,11 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
         </> : null}
 
         {editing && d ? <TxEditor api={api} d={d} tx={editing} defaultAccountId={accountId} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} /> : null}
-        {billEditor && d ? <BillEditor api={api} scope={billScope} initialFlow={billFlow} tx={billEditor === 'new' ? null : billEditor} accountId={accountId} onClose={() => setBillEditor(null)} onSaved={() => {setBillEditor(null);void reload();}} /> : null}
+        {billEditor && d ? <BillEditor api={api} scope={billScope} initialFlow={billFlow} tx={billEditor === 'new' ? null : billEditor} accountId={accountId} onClose={() => setBillEditor(null)} onSaved={saved => {setBillEditor(null);
+          // 0.3.207: depois de salvar, vai para o mes e para o lado (A pagar / A receber) da conta e confirma onde ficou
+          if(saved){setMonth(monthOf(saved.date));setPendingSide(saved.kind==='income'?'receber':'pagar');navigateFinance('bills');
+            setSavedNotice({id:saved.id,text:'“'+saved.title+'” salvo em '+(saved.kind==='income'?'A receber':'A pagar')+' · '+saved.date.split('-').reverse().slice(0,2).join('/'),checked:false});}
+          void reload();}} /> : null}
         {manage && d ? <ManageSheet api={api} d={d} onClose={() => setManage(false)} onFinished={goHome} reload={reload} /> : null}
         <Sheet visible={accountPicker} onClose={() => setAccountPicker(false)} label="Fechar seletor de contas">
           <View style={{gap:14,paddingBottom:12}}>
@@ -662,12 +672,12 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
 }
 
 // ============================ PENDENTES MANUAIS ============================
-function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,onAporte,onNew,onMonth}: {onMonth?:(m:string)=>void;onNew:(flow:'expense'|'income')=>void;d:Data;api:SofiaApi;month:string;accountId:string;warning:string;onBill:(t:Tx|'new',scope?:'month'|'series')=>void;reload:()=>Promise<void>;isPrimary?:boolean;onAporte?:()=>void}) {
+function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,onAporte,onNew,onMonth,side:sideProp,onSide}: {side?:'pagar'|'receber';onSide?:(v:'pagar'|'receber')=>void;onMonth?:(m:string)=>void;onNew:(flow:'expense'|'income')=>void;d:Data;api:SofiaApi;month:string;accountId:string;warning:string;onBill:(t:Tx|'new',scope?:'month'|'series')=>void;reload:()=>Promise<void>;isPrimary?:boolean;onAporte?:()=>void}) {
   // A aba segue o mes escolhido no topo; cada mes mostra so as suas contas (0.3.180)
   const c=useTheme(),today=todayISO(),list=useMemo(()=>monthDues(d.txs,accountId,month,today),[d,accountId,month,today]);
   const open=list.filter(row=>!row.paid),total=open.reduce((sum,row)=>sum+row.amount,0),paidCount=list.length-open.length;
   const toPay=open.filter(r=>r.kind!=='receber'),toGet=open.filter(r=>r.kind==='receber');
-  const [side,setSide]=useState<'pagar'|'receber'>('pagar');
+  const [sideLocal,setSideLocal]=useState<'pagar'|'receber'>('pagar');const side=sideProp??sideLocal,setSide=(v:'pagar'|'receber')=>{setSideLocal(v);onSide?.(v);};
   const sideOpen=side==='pagar'?toPay:toGet;
   const payList=list.filter(r=>r.kind!=='receber'),getList=list.filter(r=>r.kind==='receber');
   // contas do mes seguinte (ex.: o que entra no periodo do salario, mas ja em novembro) - para nada parecer oculto
@@ -748,7 +758,7 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
     </Card_>
   </>;
 }
-function BillEditor({api,tx,accountId,onClose,onSaved,scope='series',initialFlow='expense'}:{api:SofiaApi;tx:Tx|null;accountId:string;onClose:()=>void;onSaved:()=>void;scope?:'month'|'series';initialFlow?:'expense'|'income'}) {
+function BillEditor({api,tx,accountId,onClose,onSaved,scope='series',initialFlow='expense'}:{api:SofiaApi;tx:Tx|null;accountId:string;onClose:()=>void;onSaved:(saved?:{id:string;kind:string;date:string;title:string})=>void;scope?:'month'|'series';initialFlow?:'expense'|'income'}) {
   const c=useTheme(),existing=!!tx?.entity&&!tx?.virtual;
   // 0.3.193: aberta por "A vencer e atrasadas", a edicao de uma conta que se repete vale SO para aquele mes;
   // por "Contas fixas", vale para todos os meses.
@@ -816,16 +826,16 @@ function BillEditor({api,tx,accountId,onClose,onSaved,scope='series',initialFlow
         series_id:tx?.seriesId||'',
         import_id:existing?String(tx?.entity?.data?.import_id||''): 'sofia-pendencia:'+uid(),
       };
-      await saveEntity(api,'fin_tx',name.trim(),data,existing?tx?.entity:undefined);
+      const saved=await saveEntity(api,'fin_tx',name.trim(),data,existing?tx?.entity:undefined);
       await clearDraft();
-      onSaved();
+      onSaved({id:saved.id,kind:flow,date:finalDate,title:name.trim()});
     }catch(e){setError(errorText(e));}finally{setBusy(false);}
   }
   function erase() {
     if(!tx?.entity||tx.virtual)return;
     appAlert('Excluir vencimento?', 'Esse cadastro será apagado. Lançamentos já pagos de meses anteriores não serão excluídos.', [
       {text:'Cancelar',style:'cancel'},
-      {text:'Excluir',style:'destructive',onPress:()=>{setBusy(true);void api.deleteEntity(tx.entity!.id).then(onSaved).catch(e=>setError(errorText(e))).finally(()=>setBusy(false));}}
+      {text:'Excluir',style:'destructive',onPress:()=>{setBusy(true);void api.deleteEntity(tx.entity!.id).then(()=>onSaved()).catch(e=>setError(errorText(e))).finally(()=>setBusy(false));}}
     ]);
   }
   return <Sheet visible onClose={onClose} label="Fechar cadastro de vencimento">

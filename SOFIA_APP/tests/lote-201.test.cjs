@@ -102,3 +102,12 @@ test('0.3.202: foto do chat abre baixando pelo caminho do "Salvar" (autorizacao 
   assert.ok(s.includes("return()=>{alive=false;if(temp){try{temp.delete();}"),'ao fechar, a copia sai do celular');
   assert.ok(!/<Image source=\{api\.attachmentSource\(id\)\}/.test(s),'nao depende mais do cabecalho de autorizacao na Image');
 });
+
+test('0.3.207: depois de salvar uma conta, vai ao mes e ao lado (A pagar/A receber) dela, confirma onde ficou e avisa se o servidor nao devolveu',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("onSaved({id:saved.id,kind:flow,date:finalDate,title:name.trim()});"));
+  assert.ok(s.includes("setMonth(monthOf(saved.date));setPendingSide(saved.kind==='income'?'receber':'pagar');navigateFinance('bills');"));
+  assert.ok(s.includes("salvo em '+(saved.kind==='income'?'A receber':'A pagar')"));
+  assert.ok(s.includes('mas o servidor ainda não devolveu a conta'),'diagnostico se nao voltar');
+  assert.ok(s.includes("side={pendingSide} onSide={setPendingSide}"),'o lado escolhido nao volta sozinho para A pagar');
+});
