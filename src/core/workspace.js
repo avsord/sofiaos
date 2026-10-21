@@ -255,6 +255,9 @@ class Workspace {
  deleteEntity(entityId){
    const e=this.get(entityId);
    // 0.3.215: receita que mandou uma parte para o guardado - apagar a receita apaga o aporte ligado a ela
+   // 0.3.235: apagar uma regra de e-mail solta os e-mails que ela encontrou (eles continuam na lista, sem o vinculo) -
+   // antes o servidor recusava ("ainda e usado por...") e o app ficava parado sem avisar
+   if(e.kind==='mail_rule'){for(let offset=0;offset<20000;offset+=500){const page=this.list({kind:'mail_hit',limit:500,offset});for(const h of page)if(h.data&&h.data.rule_id===entityId){try{this.save({revision:h.revision,data:{...h.data,rule_id:''}},h.id);}catch{/* segue */}}if(page.length<500)break;}}
    if(e.kind==='fin_tx'&&Number(e.data&&e.data.reserve_part)>0){for(const m of this.list({kind:'fin_reserve_move',limit:500}))if(m.data&&m.data.income_id===entityId){try{this.deleteEntity(m.id);}catch{/* ja saiu */}}}
    if(e.kind==='user_page'){
      const pages=this.list({kind:'user_page',limit:500}),byParent=new Map();for(const p of pages){const parent=p.data?.parent_id||'';if(!byParent.has(parent))byParent.set(parent,[]);byParent.get(parent).push(p);}

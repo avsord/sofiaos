@@ -81,8 +81,10 @@ async function readCache(api: SofiaApi): Promise<Bundle | null> {
 }
 function writeCache(api: SofiaApi, bundle: Bundle) { void encryptedStorage.write(cacheScope(api), JSON.stringify(bundle)).catch(() => undefined); }
 function saveEntity(api: SofiaApi, kind: string, title: string, data: Record<string, any>, existing?: Entity, state?: string) {
-  return existing ? api.saveEntity({...existing, title, ...(state ? {state} : {}), data: {...existing.data, ...data}})
-    : api.saveEntity({kind, title, content: '', area: 'Pessoal', state: state || 'active', privacy: 'private', tags: [], data});
+  // 0.3.234: "__content" e a descricao breve do item (fica no conteudo do registro, fora dos campos)
+  const {__content, ...rest} = data, content = typeof __content === 'string' ? __content : undefined;
+  return existing ? api.saveEntity({...existing, title, ...(content !== undefined ? {content} : {}), ...(state ? {state} : {}), data: {...existing.data, ...rest}})
+    : api.saveEntity({kind, title, content: content ?? '', area: 'Pessoal', state: state || 'active', privacy: 'private', tags: [], data: rest});
 }
 
 function Chips<T extends string | number>({value, options, onChange, scroll = false}: {value: T; options: Array<{value: T; label: string}>; onChange: (v: T) => void; scroll?: boolean}) {
@@ -783,6 +785,7 @@ function BillEditor({api,tx,accountId,onClose,onSaved,scope='series',initialFlow
   // 0.3.216: receita que se repete (salario, aluguel) pode mandar uma parte para o guardado todo mes
   const [toReserve,setToReserve]=useState(tx?.reservePart?finishMoneyInput(String(tx.reservePart).replace('.',',')):'');
   const [time,setTime]=useState(tx?.time||'');
+  const [note,setNote]=useState(String(tx?.entity?.content||''));
   // 0.3.223: pagar com a conta ou com um cartao (a do cartao entra na fatura e nao sai do saldo direto)
   const cardsList=(finance?.cards||[]).filter(k=>!k.archived),[payCard,setPayCard]=useState(tx?.cardId||initialCard||'');
   // 0.3.151: tambem contas a receber, e aviso alguns dias antes (alem do aviso no dia)
@@ -850,6 +853,7 @@ function BillEditor({api,tx,accountId,onClose,onSaved,scope='series',initialFlow
         series_id:tx?.seriesId||'',
         reserve_part:reserveAmt>0?reserveAmt:'',
         time:time||'',
+        __content:note.trim(),
         import_id:existing?String(tx?.entity?.data?.import_id||''): 'sofia-pendencia:'+uid(),
       };
       const saved=await saveEntity(api,'fin_tx',name.trim(),data,existing?tx?.entity:undefined);
@@ -872,6 +876,7 @@ function BillEditor({api,tx,accountId,onClose,onSaved,scope='series',initialFlow
       <Text style={{fontSize:13,lineHeight:19,color:c.muted}}>Este registro só afeta o saldo depois que você confirmar o pagamento. Não vem automaticamente do extrato bancário.</Text>
       <Chips value={flow} onChange={setFlow} options={[{value:'expense',label:'A pagar'},{value:'income',label:'A receber'}]}/>
       <Field label={flow==='income'?'Conta a receber':'Conta a pagar'} value={name} onChange={setName} placeholder={flow==='income'?'Ex.: Freela, aluguel recebido, reembolso':'Ex.: Boleto de energia, dívida, aluguel'} />
+      <View style={{gap: 6}}><Text style={{fontSize: 12, color: c.muted}}>Descrição (opcional)</Text><TextInput accessibilityLabel="Descrição" value={note} onChangeText={setNote} placeholder="Uma observação breve" placeholderTextColor={c.muted} multiline maxLength={280} style={{minHeight: 44, maxHeight: 88, color: c.text, backgroundColor: c.input, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, textAlignVertical: 'top'}} /></View>
       <Field label="Valor (R$)" value={amount} onChange={setAmount} numeric placeholder="0,00" />
       <DateTimeField label={tx&&!tx.virtual&&tx.recurrence==='monthly'&&!tx.seriesId?'Vencimento (o dia vale para todos os meses)':'Vencimento'} value={date} onChange={v=>v&&setDate(v)} dateOnly allowClear={false} />
       <DateTimeField label="Horário (opcional)" value={time} onChange={v=>setTime(v?String(v).slice(0,5):'')} timeOnly emptyLabel="Sem horário" />
@@ -962,7 +967,8 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
     const ref = month === monthOf(today) ? today : dayIn(month, 1), cur = cycleRange(cycleDay, ref), nextPay = addDays(cur.end, 1);
     const daysLeft = Math.round((Date.parse(nextPay + 'T12:00:00Z') - Date.parse(ref + 'T12:00:00Z')) / 864e5), upcoming = daysLeft <= 5;
     const r = {start: cur.start, end: upcoming ? cycleRange(cycleDay, nextPay).end : cur.end};
-    return {...moneyLeft(d.txs, d.cards, r, accountId, total, aportePendingIn(r), today), upcoming, shownStart: r.start};
+    // 0.3.234: so os aportes de hoje em diante (o de um ciclo que ja passou nao entra na previsao)
+    return {...moneyLeft(d.txs, d.cards, r, accountId, total, aportePendingIn({start: today > r.start ? today : r.start, end: r.end}), today), upcoming, shownStart: r.start};
   }, [d, month, cycleDay, accountId, total, aportePendingIn, today]);
   const forecastEnd = forecastP.end.slice(8, 10) + '/' + forecastP.end.slice(5, 7), paydayKnown = cycleDay > 1;
   // 0.3.225: mes que ainda nao chegou fica zerado no Resumo - so passa a contar quando o mes chegar
@@ -1486,6 +1492,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved}: {api: SofiaA
   const [source, setSource] = useState(tx.cardId || tx.accountId || firstAccount), [to, setTo] = useState(tx.toAccountId || d.accounts.find(a => !a.archived && a.id !== firstAccount)?.id || '');
   const [paid, setPaid] = useState(tx.paid ?? true), [repeat, setRepeat] = useState<'none' | 'monthly' | 'installments'>(tx.recurrence && tx.recurrence !== 'none' ? 'monthly' : 'none');
   const [time, setTime] = useState(tx.time || '');
+  const [note, setNote] = useState(String(tx.entity?.content || ''));
   const [parts, setParts] = useState(3), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const isCard = d.cards.some(x => x.id === source);
   // 0.3.215: receita avulsa pode mandar uma parte para o guardado (a parte do saldo soma ao valor inicial do Controle)
@@ -1505,7 +1512,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved}: {api: SofiaA
     try {
       const card = d.cards.find(x => x.id === source);
       const base: Record<string, any> = {kind, amount: value, date, category: kind === 'transfer' ? 'Transferência' : category, account_id: card ? '' : source, to_account_id: kind === 'transfer' ? to : '',
-        card_id: card ? card.id : '', invoice_month: card ? invoiceMonth(card, date) : '', paid: card ? false : paid, recurrence: repeat === 'monthly' ? 'monthly' : 'none', time: time || ''};
+        card_id: card ? card.id : '', invoice_month: card ? invoiceMonth(card, date) : '', paid: card ? false : paid, recurrence: repeat === 'monthly' ? 'monthly' : 'none', time: time || '', __content: note.trim()};
       const title = desc.trim() || (kind === 'transfer' ? 'Transferência' : category);
       const splitOk = kind === 'income' && !isCard && !!goalForSplit && (repeat === 'monthly' || paid);
       const editSplit = splitOk && reserveValue > 0 && value ? Math.min(reserveValue, value) : 0;
@@ -1577,7 +1584,8 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved}: {api: SofiaA
           </View>
         </View>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 18, gap: 16, paddingBottom: 40}}>
-          <Field label="Descrição" value={desc} onChange={setDesc} placeholder={kind === 'income' ? 'Ex.: Salário' : 'Ex.: Mercado do mês'} />
+          <Field label="Nome" value={desc} onChange={setDesc} placeholder={kind === 'income' ? 'Ex.: Salário' : 'Ex.: Mercado do mês'} />
+          <View style={{gap: 6}}><Text style={{fontSize: 12, color: c.muted}}>Descrição (opcional)</Text><TextInput accessibilityLabel="Descrição" value={note} onChangeText={setNote} placeholder="Uma observação breve" placeholderTextColor={c.muted} multiline maxLength={280} style={{minHeight: 44, maxHeight: 88, color: c.text, backgroundColor: c.input, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, textAlignVertical: 'top'}} /></View>
           {kind !== 'transfer' ? (
             <View style={{gap: 8}}>
               <Text style={{fontSize: 12, color: c.muted}}>Categoria</Text>

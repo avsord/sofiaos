@@ -16,7 +16,9 @@ export function AppGrid<T extends {id:string;title:string}>({items,renderCard,on
  const p=(id:string)=>{let v=pos.get(id);if(!v){const k=Math.max(0,idsRef.current.indexOf(id));v=new Animated.ValueXY(slot(k));pos.set(id,v);}return v;};
  useEffect(()=>{if(!drag.current)setIds(items.map(i=>i.id));},[key]);
  useEffect(()=>{if(!w)return;const first=!placed.current;placed.current=true;
-  ids.forEach((id,k)=>{if(drag.current?.live&&drag.current.id===id)return;const s=slot(k);if(first)p(id).setValue(s);else Animated.spring(p(id),{toValue:s,useNativeDriver:true,speed:16,bounciness:6}).start();});},[ids,w]);
+  // 0.3.236: so anima enquanto a pessoa arrasta; ordem que chega de fora (ao abrir) aparece direto no lugar
+  const live=!!drag.current?.live;
+  ids.forEach((id,k)=>{if(live&&drag.current?.id===id)return;const s=slot(k);if(first||!live)p(id).setValue(s);else Animated.spring(p(id),{toValue:s,useNativeDriver:true,speed:16,bounciness:6}).start();});},[ids,w]);
  function end(terminated:boolean){const d=drag.current;drag.current=null;setPressed(null);if(!d)return;if(d.timer)clearTimeout(d.timer);
   if(!d.live){if(!d.moved&&!terminated)cb.current.onOpen(d.id);return;}
   const k=idsRef.current.indexOf(d.id);

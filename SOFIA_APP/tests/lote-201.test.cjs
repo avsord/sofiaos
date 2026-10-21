@@ -425,3 +425,28 @@ test('0.3.232: Contas so com programadas, avulsas so no extrato; copias identica
   const txs=[mk('a','Quinto andar (aluguel)',1853.94,'2026-10-20T10:00'),mk('b','Quinto andar (aluguel)',1853.94,'2026-10-20T11:00'),mk('c','Quinto andar (aluguel)',1853.94,'2026-10-21T00:10'),mk('d','Quinto Andar(aluguel)',1853.54,'2026-10-20T09:00',{installments:'',installment:''})];
   assert.equal(f.exactTwinExtras(txs).map(t=>t.id).join(','),'b,c','as duas copias iguais saem; fica a mais antiga');
 });
+
+test('0.3.234: o previsto conta so os aportes de hoje em diante (nao o do ciclo que ja passou)',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes('aportePendingIn({start: today > r.start ? today : r.start, end: r.end})'));
+});
+
+test('0.3.234: previsto conta so os aportes de hoje em diante; itens de Financas com descricao breve',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes('aportePendingIn({start: today > r.start ? today : r.start, end: r.end})'),'aporte do ciclo que ja passou nao entra');
+  assert.ok(s.includes("const {__content, ...rest} = data, content = typeof __content === 'string' ? __content : undefined;"),'descricao vai no conteudo do registro');
+  assert.ok(s.includes("time: time || '', __content: note.trim()};")&&s.includes("__content:note.trim(),"),'lancamento e conta');
+  assert.ok((s.match(/Descrição \(opcional\)<\/Text>/g)||[]).length===2&&s.includes('maxLength={280}'),'caixa pequena nos dois formularios');
+  assert.ok(s.includes('<Field label="Nome" value={desc} onChange={setDesc}'),'o nome do lancamento virou Nome');
+});
+
+test('0.3.233-0.3.236: aporte do previsto so de hoje em diante; descricao nos itens; Biblioteca sem fotos da conversa; apagar regra; apps sem animacao ao abrir',()=>{
+  const s=read('src/screens/Finance.tsx'),w=read('src/screens/Workspace.tsx'),m=read('src/screens/Mail.tsx'),g=read('src/components/AppGrid.tsx');
+  assert.ok(s.includes('aportePendingIn({start: today > r.start ? today : r.start, end: r.end})'),'aporte que ja passou nao entra no previsto');
+  assert.ok(s.includes('const {__content, ...rest} = data')&&s.includes("__content: note.trim()}")&&s.includes('__content:note.trim(),'),'descricao no lancamento e na conta');
+  assert.ok((s.match(/Descrição \(opcional\)/g)||[]).length>=2&&s.includes('maxLength={280}'),'caixa pequena');
+  assert.ok(w.includes("(e.tags||[]).includes('chat-attachment')")&&w.includes('!isChatAttachment(item)'),'Biblioteca sem anexos da conversa');
+  assert.ok(m.includes("{deleting ? 'Apagando…' : 'Apagar regra'}")&&m.includes('catch (e) { setError(errorText(e)); }'),'apagar regra mostra o andamento e o erro');
+  assert.ok(w.includes('{orderReady?<AppGrid items={orderedModules}')&&w.includes('let cachedAppOrder:string[]|null=null;'),'apps abrem na ordem salva');
+  assert.ok(g.includes('if(first||!live)p(id).setValue(s);'),'so anima ao arrastar');
+});

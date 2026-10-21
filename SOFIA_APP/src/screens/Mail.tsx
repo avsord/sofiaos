@@ -281,6 +281,7 @@ function AccountSheet({api, account, onClose, onDone, groups = []}: {api: SofiaA
 
 function RuleSheet({api, rule, accounts, onClose, onDone}: {api: SofiaApi; rule: Entity | Partial<Entity>; accounts: Entity[]; onClose: () => void; onDone: () => void}) {
   const c = useTheme(), existing = (rule as Entity).id ? rule as Entity : null, d = rule.data || {};
+  const [deleting, setDeleting] = useState(false);
   const [title, setTitle] = useState(rule.title || ''), [field, setField] = useState(String(d.field || 'from')), [contains, setContains] = useState(String(d.contains || ''));
   const [accountId, setAccountId] = useState(String(d.account_id || '')), [notify, setNotify] = useState(d.notify !== false), [important, setImportant] = useState(!!d.important);
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
@@ -309,7 +310,8 @@ function RuleSheet({api, rule, accounts, onClose, onDone}: {api: SofiaApi; rule:
         {existing ? (
           <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
             <Pressable onPress={async () => { await api.saveEntity({...existing, state: existing.state === 'paused' ? 'active' : 'paused'}).catch(() => {}); onDone(); }} style={{padding: 10}}><Text style={{color: c.text}}>{existing.state === 'paused' ? 'Reativar' : 'Pausar'}</Text></Pressable>
-            <Pressable onPress={async () => { await api.deleteEntity(existing.id).catch(() => {}); onDone(); }} style={{padding: 10}}><Text style={{color: c.danger}}>Apagar regra</Text></Pressable>
+            {/* 0.3.235: mostra que esta apagando e, se falhar, o motivo (antes o erro era engolido e parecia carregar para sempre) */}
+            <Pressable disabled={deleting} onPress={async () => { setDeleting(true); setError(''); try { await api.deleteEntity(existing.id); onDone(); } catch (e) { setError(errorText(e)); } finally { setDeleting(false); } }} style={{padding: 10}}><Text style={{color: c.danger}}>{deleting ? 'Apagando…' : 'Apagar regra'}</Text></Pressable>
           </View>
         ) : null}
       </ScrollView>
