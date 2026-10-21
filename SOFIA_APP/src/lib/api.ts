@@ -260,6 +260,8 @@ export class SofiaApi {
   financeImportPreview(text: string, target: 'account' | 'card', targetId: string) { return this.request<{format: string; items: ImportItem[]; total: number; duplicates: number}>('/md/finance/import', {text, target, target_id: targetId}, 'POST', 60000); }
   /** 0.3.213: guarda o extrato a parte (nao vira lancamento) e devolve a conciliacao. */
   financeStatement(text: string, targetId: string) { return this.request<{statement: Entity; items: ImportItem[]; matched: number; before: number; start: string; closing_balance: number | null; closing_at: string}>('/md/finance/statement', {text, target_id: targetId}, 'POST', 120000); }
+  /** 0.3.219: apaga o extrato e o que tenha sido lancado a partir dele. */
+  financeStatementDelete(id: string) { return this.request<{ok: boolean; removed: number}>('/md/finance/statement/delete', {id}, 'POST', 60000); }
   /** 0.3.212: zera Financas (apaga tudo do modulo) para comecar do zero. */
   financeReset() { return this.request<{ok: boolean; removed: number}>('/md/finance/reset', {confirm: 'ZERAR'}, 'POST', 60000); }
   /** 0.3.211: desfaz a importacao - tira tudo o que veio de extratos da conta/cartao (o lancado a mao fica). */

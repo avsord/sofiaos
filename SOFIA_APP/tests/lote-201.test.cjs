@@ -68,7 +68,7 @@ test('apps mudam de posicao: ordem guardada, apps novos no fim, setas nos limite
   assert.equal(o.orderApps(apps,[]).map(a=>a.id).join(','),'capsules,tasks,finance,mail','sem ordem: a padrao');
   assert.equal(o.orderApps(apps,['finance','capsules']).map(a=>a.id).join(','),'finance,capsules,tasks,mail','escolhidos primeiro, novos no fim');
   assert.equal(o.moveApp(['a','b','c'],'b',-1).join(','),'b,a,c');assert.equal(o.moveApp(['a','b','c'],'c',1).join(','),'a,b,c','no limite nao muda');
-  const w=read('src/screens/Workspace.tsx');assert.ok(w.includes("onLongPress={()=>setOrganizing(true)}"));assert.ok(w.includes("AsyncStorage.setItem(APP_ORDER_KEY"));assert.ok(w.includes("{organizing?'Concluir':'Organizar'}"));
+  const w=read('src/screens/Workspace.tsx');assert.ok(w.includes('<AppGrid items={orderedModules}'),'0.3.221: segurar e arrastar (as setas sairam)');assert.ok(w.includes("AsyncStorage.setItem(APP_ORDER_KEY"));
 });
 
 test('lembrete com alarme: tipo de aviso, canal de alarme, repeticao ate desligar, Desligar e Adiar',()=>{
@@ -107,8 +107,8 @@ test('0.3.207: depois de salvar uma conta, vai ao mes e ao lado (A pagar/A receb
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes("onSaved({id:saved.id,kind:flow,date:finalDate,title:name.trim()});"));
   assert.ok(s.includes("setMonth(monthOf(saved.date));setPendingSide(saved.kind==='income'?'receber':'pagar');navigateFinance('bills');"));
-  assert.ok(s.includes("salvo em '+(saved.kind==='income'?'A receber':'A pagar')"));
-  assert.ok(s.includes('mas o servidor ainda não devolveu a conta'),'diagnostico se nao voltar');
+  assert.ok(!s.includes('setSavedNotice'),'0.3.225: sem o aviso verde depois de salvar (continua indo ao mes e ao lado certos)');
+  assert.ok(!s.includes('mas o servidor ainda não devolveu a conta'));
   assert.ok(s.includes("side={pendingSide} onSide={setPendingSide}"),'o lado escolhido nao volta sozinho para A pagar');
 });
 
@@ -121,8 +121,8 @@ test('0.3.208: meta com progresso de 0 ate a meta, marcos e projecao (Relatorios
   assert.match(g.goalStats({name:'',saved:40000,target:40000,monthly:0,deadline:'',today:'2026-10-20'}).message,/Meta batida/);
   const atras=g.goalStats({name:'',saved:1000,target:40000,monthly:500,deadline:'2027-06-30',today:'2026-10-20'});assert.ok(atras.diff<0&&atras.needed>4000,'atrasado: mostra quanto por mes precisa');
   const f=read('src/screens/Finance.tsx'),h=read('src/screens/Home.tsx');
-  assert.ok(f.includes('{goal ? <GoalProgressCard g={goal} /> : null}'),'Relatorios');
-  assert.ok(h.includes("<FinanceGoalHome api={api} onOpen={()=>onOpenModule?onOpenModule('finance'):navigate('apps')}/>"),'Inicio');
+  assert.ok(f.includes('{goal ? <Fold id="meta" title="Dinheiro guardado"><GoalProgressCard g={goal} flat /></Fold> : null}'),'Relatorios (secao Dinheiro guardado)');
+  assert.ok(h.includes('const goal=useFinanceGoal(api);')&&h.includes("<GoalProgressCard g={goal} compact onPress={()=>onOpenModule?onOpenModule('finance'):navigate('apps')}/>"),'Inicio');
 });
 
 test('0.3.210: importar extrato - lista com altura maxima (rola por dentro) e botao Importar sempre visivel',()=>{
@@ -135,14 +135,14 @@ test('0.3.210: importar extrato - lista com altura maxima (rola por dentro) e bo
 test('0.3.211: desfazer importacao na engrenagem e conferencia do Saldo item por item',()=>{
   const s=read('src/screens/Finance.tsx'),a=read('src/lib/api.ts');
   assert.ok(a.includes("financeImportUndo(targetId: string)"));
-  assert.ok(s.includes('Desfazer importação de extrato</Text>')&&s.includes("api.financeImportUndo(acc ? acc.id : '')"));
+  assert.ok(!s.includes('Desfazer importação de extrato</Text>'),'0.3.219: saiu da engrenagem (apagar o extrato faz isso)');
   assert.ok(s.includes("'Extrato do saldo'")&&s.includes("run = Math.round((run + r.delta) * 100) / 100"),'saldo depois de cada item');
 });
 
 test('0.3.213: Financas reestruturadas - abas, Lancamentos com Extrato do banco (conciliacao), "+" com cinco entradas',()=>{
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes("[{value: 'home' as Tab, label: 'Resumo'}, {value: 'bills' as Tab, label: 'Contas'}, {value: 'cards' as Tab, label: 'Cartões'}, {value: 'reports' as Tab, label: 'Relatórios'}]"),'abas; historico de volta no Resumo');
-  assert.ok(s.includes('function BankStatements(')&&s.includes("'falta no app'")&&s.includes('Acertar Saldo</Text>')&&s.includes("'lançado pelo extrato'"),'conciliacao');
+  assert.ok(s.includes('function BankStatements(')&&s.includes("'falta no app'")&&s.includes("'lançado pelo extrato'"),'conciliacao (so leitura desde 0.3.219)');
   assert.ok(s.includes("api.financeStatement(file.text, target.id)"),'importar guarda o extrato a parte');
   assert.ok(s.includes("[['expense', '⏰ Conta a pagar', c.text], ['income', '⏰ Conta a receber', c.text]]"),'+ com conta a pagar e a receber');
   assert.ok(s.includes("statements: g('fin_statement')"));
@@ -246,4 +246,139 @@ test('0.3.217: apagar ou desfazer uma receita que mandou parte para o guardado a
   assert.ok(s.includes("' que foi para o guardado também é apagada do guardado (só esse aporte; os seus outros aportes não mudam).'"),'apagar lancamento');
   assert.ok(s.includes("' que foi para o guardado também sai de lá até você receber de novo.'"),'desfazer recebimento');
   assert.ok(s.includes("' que foi para o guardado neste recebimento também é apagado.'"),'apagar conta a receber ja recebida');
+});
+
+test('0.3.218: despesas e receitas com horario opcional (lancamento, conta, historico, aviso)',()=>{
+  const f=require('./load-ts.cjs')('src/lib/finance.ts');
+  const t=f.toTx({id:'x',kind:'fin_tx',title:'iFood',state:'active',data:{kind:'expense',amount:45,date:'2026-10-20',account_id:'a1',paid:true,category:'Alimentação',recurrence:'none',time:'20:15'}});
+  assert.equal(t.time,'20:15');
+  assert.equal(f.toTx({id:'y',kind:'fin_tx',title:'x',state:'active',data:{kind:'expense',amount:1,date:'2026-10-20',time:'abc'}}).time,'','horario invalido vira vazio');
+  const v=f.expandRecurring([f.toTx({id:'s',kind:'fin_tx',title:'Academia',state:'active',data:{kind:'expense',amount:129,date:'2026-09-11',account_id:'a1',paid:true,category:'Contas',recurrence:'monthly',time:'07:00'}})],'2026-10')[0];
+  assert.equal(v.time,'07:00','a ocorrencia do mes herda o horario');
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes('label="Horário (opcional)" value={time} onChange={v => setTime(v ? String(v).slice(0, 5)'),'lancamento');
+  assert.ok(s.includes('label="Horário (opcional)" value={time} onChange={v=>setTime(v?String(v).slice(0,5)'),'conta a pagar/receber');
+  assert.ok(s.includes("{t.time ? t.time + ' · ' : ''}{cat.name}"),'historico mostra o horario');
+  assert.ok(s.includes("(b.time || '').localeCompare(a.time || '')"),'ordem dentro do dia');
+  assert.ok(s.includes("time: t.time || '',"),'confirmar mantem o horario');
+  assert.ok(read('src/lib/finance-notifications.ts').includes("const date = new Date(year,month-1,day-offset,hh,mm,0);"),'aviso no horario da conta');
+});
+
+test('0.3.219: Receitas/Despesas - titulo e valor fixos no topo, fundo solido, lista rolando por baixo',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes('stickyHeaderIndices={parts ? undefined : [0]}'),'cabecalho fixo');
+  const i=s.indexOf('stickyHeaderIndices={parts ? undefined : [0]}'),h=s.indexOf('<View style={{backgroundColor: c.surface, paddingBottom: 10, gap: 2, borderBottomWidth: 1, borderColor: c.line}}>',i);
+  assert.ok(h>i,'titulo e valor num bloco com fundo solido (sem transparencia)');
+  assert.ok(s.indexOf("{parts ? null : <View>",h)>h,'a lista vem depois, como item separado que rola por baixo');
+});
+
+test('0.3.219: extrato do banco so fica guardado (nao mexe na conta); arrastar para apagar; setinha unica; sem opcao na engrenagem',()=>{
+  const s=read('src/screens/Finance.tsx'),a=read('src/lib/api.ts');
+  assert.ok(s.includes("if (target.type === 'account') { await api.financeStatement(file.text, target.id); await onDone(); return; }"),'importar so guarda');
+  const b=s.slice(s.indexOf('function BankStatements('),s.indexOf('\nfunction ',s.indexOf('function BankStatements(')+20));
+  assert.ok(!b.includes('Lançar</Text>')&&!b.includes('Acertar Saldo</Text>'),'o extrato nao lanca nem acerta o saldo');
+  assert.ok(b.includes('<SwipeToDelete key={st.id}')&&s.includes('function SwipeToDelete(')&&a.includes('financeStatementDelete(id: string)'),'arrastar para apagar');
+  assert.ok(s.includes('function Chevron(')&&b.includes('<Chevron open={open === st.id} />')&&s.includes('<Chevron open={open} />'),'mesma setinha no extrato e nos Relatorios');
+  assert.ok(!s.includes('Desfazer importação de extrato</Text>'),'saiu da engrenagem');
+});
+
+test('0.3.220: seletores compactos (do tamanho do texto) - Lancamentos | Extrato do banco e A pagar | A receber',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("function Segmented<T extends string>")&&s.includes("alignSelf: 'flex-start'"),'nao estica na largura toda');
+  assert.ok(s.includes("<Segmented value={source} onChange={setSource} options={[{value: 'app' as const, label: 'Lançamentos'}, {value: 'import' as const, label: 'Extrato do banco'}]} />"));
+  assert.ok(s.includes("<Segmented value={side} onChange={setSide} options={[{value: 'pagar' as const, label: 'A pagar'}, {value: 'receber' as const, label: 'A receber'}]} />"));
+  assert.ok(!s.includes("borderRadius:14,padding:4}}>"),'o seletor esticado saiu');
+});
+
+test('0.3.221: Apps arrastaveis como no iPhone; Inicio: segurar um widget abre o seletor com puxador',()=>{
+  const g=read('src/components/AppGrid.tsx'),l=read('src/components/ReorderList.tsx'),sw=read('src/components/SortableWidgets.tsx'),w=read('src/screens/Workspace.tsx'),h=read('src/screens/Home.tsx');
+  assert.ok(g.includes('const GAP=12,H=148,COLS=2,HOLD=320;')&&g.includes('onShouldBlockNativeResponder:()=>false')&&g.includes("Animated.spring(scale,{toValue:1.06"),'segura, cresce e segue o dedo; rolagem livre antes de segurar');
+  assert.ok(g.includes('if(target!==cur){const next=[...idsRef.current];next.splice(cur,1);next.splice(target,0,id)'),'os outros abrem espaco');
+  assert.ok(w.includes('<AppGrid items={orderedModules} onDragging={setDraggingApp} onReorder={saveAppOrder}')&&w.includes('scrollEnabled={!draggingApp}'),'apps usam a grade; a tela nao rola durante o arrasto');
+  assert.ok(!w.includes('Use as setas para mudar os apps de lugar.'),'saiu o modo das setas');
+  assert.ok(l.includes('onPanResponderTerminationRequest:()=>false')&&l.includes('useLayoutEffect(()=>{if(reset.current)'),'lista com puxador sem pulo ao soltar');
+  assert.ok(sw.includes('const HOLD=450;')&&sw.includes('Organizar Início</Text>')&&sw.includes('<ReorderList '),'segurar abre o seletor');
+  assert.ok(sw.includes("if(noHold.includes(id))return <View key={id}>{item.content}</View>;"),'widget que usa o segurar para outra coisa nao abre o seletor');
+  assert.ok(h.includes("{id:'goal',title:'Meta',content:<GoalProgressCard"),'meta e widget ordenavel');
+  assert.ok(h.includes('export function withFixedWidgets(order:string[]):string[]')&&h.includes('order={withFixedWidgets(widgets)}'),'listas antigas recebem agenda e meta no topo');
+});
+
+test('0.3.222: Previsto no fim do proximo mes; agenda fixa; meta sem espaco extra; busca de tarefas dentro da caixa',()=>{
+  const f=require('./load-ts.cjs')('src/lib/finance.ts');
+  const tx=(id,kind,amount,date,extra={})=>f.toTx({id,kind:'fin_tx',title:id,state:'active',data:{kind,amount,date,account_id:'a1',paid:false,category:'X',recurrence:'none',import_id:'sofia-pendencia:'+id,...extra}});
+  const txs=[tx('salario','income',7821,'2026-09-25',{recurrence:'monthly',paid:true,reserve_part:4000}),tx('aluguel','income',1853.94,'2026-10-25',{recurrence:'monthly'}),tx('contas','expense',4793.43,'2026-10-25',{recurrence:'monthly'})];
+  const r=f.moneyLeft(txs,[],{start:'2026-10-01',end:'2026-11-30'},'a1',353.13,8000,'2026-10-20');
+  assert.equal(r.toReceive,11349.88,'salario e aluguel de outubro e novembro, sem a parte do guardado');assert.equal(r.toGuard,8000);
+  assert.equal(r.toPay,9586.86);assert.equal(r.aporte,0,'a parte do guardado do salario ja e o aporte');assert.equal(r.left,2116.15);
+  const sem=f.moneyLeft([tx('c','expense',100,'2026-10-25')],[],{start:'2026-10-01',end:'2026-11-30'},'a1',1000,4000,'2026-10-20');assert.equal(sem.aporte,4000,'sem parte do guardado, o aporte planejado conta inteiro');
+  const s=read('src/screens/Finance.tsx'),h=read('src/screens/Home.tsx');
+  assert.ok(s.includes('const r = {start: cur.start, end: upcoming ? cycleRange(cycleDay, nextPay).end : cur.end};'),'0.3.224: previsto ate a vespera do proximo salario');
+  const ai=h.indexOf('<MiniAgenda '),si=h.indexOf('<SortableWidgets fixed={HOME_FIXED_WIDGETS}');assert.ok(ai>0&&ai<si,'agenda fixa antes da lista');
+  assert.ok(!h.includes("{id:'agenda'"),'agenda fora do organizador');
+  assert.ok(!s.includes('<View style={{marginBottom: 18}}><GoalProgressCard'),'meta sem margem extra');
+  assert.ok(h.includes("...(goal?[{id:'goal'"),'sem meta, sem espaco vazio');
+  const box=h.indexOf("todo.length||(tasks.length>2||taskQuery)?<View style={{backgroundColor:c.surface,borderRadius:18"),inp=h.indexOf('accessibilityLabel="Buscar tarefa no Início"');
+  assert.ok(box>0&&inp>box,'busca dentro da caixa');assert.ok(h.includes('marginTop:14,marginBottom:6}}'),'com respiro');
+  assert.ok(h.includes("marginTop:0,marginBottom:12}}><Text style={{fontSize:20,fontWeight:'600',color:c.text}}>Tarefas</Text>"),'titulo e filtro logo acima da caixa');
+});
+
+test('0.3.223: Redefinir Financas; Relatorios na ordem pedida e todas as secoes abrem/fecham; contas no cartao',()=>{
+  const s=read('src/screens/Finance.tsx'),g=read('src/components/GoalProgress.tsx');
+  assert.ok(s.includes('>Redefinir Finanças</Text>')&&!s.includes('Zerar Finanças')&&s.includes("resetWord.trim().toUpperCase() === 'REDEFINIR'"),'nome profissional');
+  const r=s.slice(s.indexOf('function ReportsTab('));
+  const pos=['<Fold id="categorias" title="Por categoria">','<Fold id="guardado"','<Fold id="meta" title="Dinheiro guardado">','<Fold id="saldo"','<Fold id="semana"','<Fold id="comparado"','<Fold id="seis"'].map(x=>r.indexOf(x));
+  assert.ok(pos.every(p=>p>0),'todas as secoes existem e abrem/fecham: '+pos);
+  assert.deepEqual([...pos].sort((a,b)=>a-b),pos,'ordem: categoria, evolucao do guardado, dinheiro guardado, evolucao do saldo, semana, comparado, 6 meses');
+  assert.ok(!r.slice(0,r.indexOf('\nfunction ',10)).includes('para mudar, use a engrenagem'),'sem frase velha');
+  assert.ok(g.includes('flat?{gap:10}:'),'meta sem caixa dentro de caixa');
+  const f=require('./load-ts.cjs')('src/lib/finance.ts');
+  const card={id:'c1',name:'Nubank',limit:5000,closing:3,due:10,color:'#000',accountId:'a1',archived:false,entity:null};
+  const adobe=f.toTx({id:'adobe',kind:'fin_tx',title:'Adobe',state:'active',data:{kind:'expense',amount:47,date:'2026-09-11',account_id:'a1',card_id:'c1',paid:false,category:'Contas',recurrence:'monthly',import_id:'sofia-pendencia:adobe'}});
+  const inv=f.cardInvoices(card,[adobe],'2026-10-20');
+  assert.equal(JSON.stringify(inv.slice(0,3).map(i=>[i.month,i.total])),JSON.stringify([['2026-10',47],['2026-11',47],['2026-12',47]]),'conta fixa no cartao cai na fatura todo mes');
+  assert.equal(f.cardUsed(card,[adobe],'2026-10-20'),94,'usado so com o que ja foi cobrado');
+  const due=f.monthDues([adobe],'a1','2026-10','2026-10-20');assert.equal(due.length,1);assert.equal(due[0].late,false,'conta do cartao nao fica atrasada');
+  assert.equal(f.effect(adobe,'a1'),0,'nao sai do saldo direto');
+  const fx=f.fixedSummary([adobe],'a1',{start:'2026-10-01',end:'2026-10-31'});assert.equal(fx.card,47);assert.equal(fx.open,0,'no cartao nao conta em faltam');
+  assert.ok(s.includes('<Title text="Contas no cartão" />')&&s.includes('>Usar uma de Contas</Text>')&&s.includes('>Nova conta</Text>'),'aba Cartoes');
+  assert.ok(s.includes("options={[{value:'',label:'Não'},...cardsList.map(k=>({value:k.id,label:'💳 '+k.name}))]}")&&s.includes('>Feita no cartão</Text>'),'0.3.224: marcar no editar que foi feita no cartao');
+  assert.ok(s.includes('async function startSeriesNextMonth(')&&s.includes("o cartão vale a partir do mês que vem"),'conta ja paga este mes passa ao cartao no mes seguinte');
+  assert.ok(s.includes("💳 {due.title}")&&s.includes("const open=list.filter(row=>!row.paid&&!row.tx?.cardId)"),'simbolo em Contas e fora dos totais');
+});
+
+test('0.3.224: rascunho velho nao volta; fechar o cadastro descarta; Redefinir apaga; menu sem linha dupla; cartao e identificacao; previsto pelo ciclo do salario',()=>{
+  const fd=read('src/lib/form-draft.ts'),s=read('src/screens/Finance.tsx');
+  assert.ok(fd.includes('const MAX_AGE = 6 * 60 * 60 * 1000;')&&fd.includes("JSON.stringify({v: value, at: Date.now()})")&&fd.includes("typeof box.at !== 'number'"),'rascunho com hora e validade (o formato antigo nao volta)');
+  assert.ok(fd.includes('export async function clearAllFormDrafts('),'apagar todos');
+  assert.ok(s.includes('<Sheet visible onClose={() => { void clearDraft(); onClose(); }} label="Fechar cadastro de vencimento">'),'fechar descarta o rascunho');
+  assert.ok(s.includes('await clearAllFormDrafts(); setResetBusy(false);'),'Redefinir apaga os rascunhos');
+  assert.ok(s.includes("borderBottomWidth: flow === 'expense' ? 1 : 0, borderColor: c.line}}>")&&!s.includes("afterSheet(() => setBillEditor('new')); }} style={{paddingVertical: 15, borderTopWidth: 1"),'menu sem linha dupla');
+  assert.ok(!s.includes('>Pagar com</Text>'),'sem "pagar com"');
+  const f=require('./load-ts.cjs')('src/lib/finance.ts');
+  const addDays=(d,n)=>{const x=new Date(d+'T12:00:00Z');x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10);};
+  const end=(day,ref)=>{const cur=f.cycleRange(day,ref),next=addDays(cur.end,1),left=Math.round((Date.parse(next+'T12:00:00Z')-Date.parse(ref+'T12:00:00Z'))/864e5);return left<=5?f.cycleRange(day,next).end:cur.end;};
+  assert.equal(end(25,'2026-10-10'),'2026-10-24','recebe dia 25: vespera do salario');
+  assert.equal(end(25,'2026-10-21'),'2026-11-24','a 4 dias do salario: ja mostra o ciclo seguinte');
+  assert.equal(end(5,'2026-10-10'),'2026-11-04','recebe dia 5');
+  assert.equal(end(0,'2026-10-21'),'2026-10-31','sem dia de salario: fim do mes');
+});
+
+test('0.3.225: sem aviso verde ao salvar; mes que ainda nao chegou fica zerado no Resumo',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(!s.includes('salvo em ')&&!s.includes('savedNotice'),'sem o aviso');
+  assert.ok(s.includes("setMonth(monthOf(saved.date));setPendingSide(saved.kind==='income'?'receber':'pagar');navigateFinance('bills');"),'continua indo ao mes e ao lado certos');
+  assert.ok(s.includes('const future = month > monthOf(today);'));
+  for(const t of ['{show(future ? 0 : total)}','{show(future ? 0 : forecastP.left)}','{show(future ? 0 : s.income)}','{show(future ? 0 : s.expense)}',"const b = future ? {...spend, start: 0, available: 0, left: 0, extra: 0, spent: 0, pct: 0} : spend"])assert.ok(s.includes(t),t);
+  assert.ok(s.includes('ainda não começou. Os números passam a contar quando o mês chegar.'),'explica');
+});
+
+test('0.3.226: aporte fora de "A vencer e atrasadas"; receita programada no Historico desde o comeco do mes',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(!s.includes("{aporte&&aporte.monthTarget>0?(aporte.missing>0"),'sem o aporte na lista');
+  assert.ok(s.includes("(pendingIncome(t) || !t.manualDue || t.paid)"),'receita a receber aparece o mes todo');
+  const f=require('./load-ts.cjs')('src/lib/finance.ts');
+  const sal=f.toTx({id:'sal',kind:'fin_tx',title:'Salário',state:'active',data:{kind:'income',amount:7821,date:'2026-09-25',account_id:'a1',paid:true,category:'Salário',recurrence:'monthly',import_id:'sofia-pendencia:sal'}});
+  const conta=f.toTx({id:'c',kind:'fin_tx',title:'Internet',state:'active',data:{kind:'expense',amount:100,date:'2026-10-15',account_id:'a1',paid:false,category:'Contas',recurrence:'none',import_id:'sofia-pendencia:c'}});
+  const shown=f.monthTxs([sal,conta],'2026-10').filter(t=>(t.kind==='income'&&!t.paid)||!t.manualDue||t.paid);
+  assert.equal(shown.length,1,'o salario de outubro aparece desde o dia 1; a conta a pagar fica so em Contas');assert.equal(shown[0].desc,'Salário');
 });

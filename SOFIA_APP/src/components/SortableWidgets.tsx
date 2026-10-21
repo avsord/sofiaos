@@ -1,17 +1,44 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {Animated,Pressable,Text,View} from 'react-native';
+import {Pressable,Text,Vibration,View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {Sheet} from './Sheet';
-import {IconButton} from './UI';
+import {ReorderList} from './ReorderList';
+
+/** 0.3.221: segurar qualquer widget do Inicio abre o seletor "Organizar Inicio": lista com puxador (≡) para
+ * arrastar, tirar e adicionar widgets. Na tela inicial nada se arrasta - a rolagem fica livre. */
 type Item={id:string;title:string;content:React.ReactNode};
-export function SortableWidgets({items,order,onSave,onLock}:{items:Item[];order:string[];onSave:(order:string[])=>Promise<void>;onLock:(locked:boolean)=>void}){
- const c=useTheme(),[preview,setPreview]=useState(order),[held,setHeld]=useState<string|null>(null),[menu,setMenu]=useState<string|null>(null),[add,setAdd]=useState(false);
- const nodes=useRef(new Map<string,View>()),rects=useRef(new Map<string,{y:number;height:number}>()),timer=useRef<ReturnType<typeof setTimeout>|null>(null),point=useRef({x:0,y:0}),drag=useRef<{id:string;original:string[];order:string[];moved:boolean}|null>(null),dy=useRef(new Animated.Value(0)).current;
- useEffect(()=>{if(!drag.current)setPreview(order);},[order]);
- const cancelTimer=()=>{if(timer.current)clearTimeout(timer.current);timer.current=null;};
- useEffect(()=>()=>{cancelTimer();onLock(false);},[]);
- function begin(id:string,x:number,y:number){cancelTimer();point.current={x,y};for(const [key,node] of nodes.current)node.measureInWindow((_x,y,_w,height)=>rects.current.set(key,{y,height}));timer.current=setTimeout(()=>{drag.current={id,original:order,order,moved:false};dy.setValue(0);setHeld(id);onLock(true);},350);}
- function move(x:number,y:number){const d=drag.current;if(!d){if(Math.abs(x-point.current.x)+Math.abs(y-point.current.y)>8)cancelTimer();return;}const delta=y-point.current.y;d.moved=d.moved||Math.abs(delta)>7;if(!d.moved){dy.setValue(delta);return;}const target=order.find(key=>{const r=rects.current.get(key);return r&&y>=r.y&&y<r.y+r.height;});if(target&&target!==d.id){const next=order.filter(key=>key!==d.id);next.splice(order.indexOf(target),0,d.id);d.order=next;setPreview(next);}const start=rects.current.get(d.id);if(start){let projected=rects.current.get(d.original[0])?.y||0;for(const key of d.order){if(key===d.id)break;projected+=(rects.current.get(key)?.height||0)+18;}dy.setValue(delta-(projected-start.y));}}
- function end(cancel=false){cancelTimer();const d=drag.current;drag.current=null;setHeld(null);dy.setValue(0);onLock(false);if(!d)return;if(cancel){setPreview(order);return;}if(!d.moved){setMenu(d.id);return;}void onSave(d.order).catch(()=>setPreview(order));}
- return <View style={{gap:18}}>{preview.map(id=>{const item=items.find(i=>i.id===id);if(!item)return null;return <View key={id} ref={n=>{if(n)nodes.current.set(id,n);else nodes.current.delete(id);}} collapsable={false} onTouchStart={e=>begin(id,e.nativeEvent.pageX,e.nativeEvent.pageY)} onTouchMove={e=>move(e.nativeEvent.pageX,e.nativeEvent.pageY)} onTouchEnd={()=>end()} onTouchCancel={()=>end(true)} onMoveShouldSetResponderCapture={()=>!!drag.current} onResponderMove={e=>move(e.nativeEvent.pageX,e.nativeEvent.pageY)} onResponderRelease={()=>end()} onResponderTerminationRequest={()=>!drag.current} onResponderTerminate={()=>end(true)} style={{borderRadius:18,borderWidth:2,borderColor:held===id?c.accent:'transparent',borderStyle:'dashed'}}><Animated.View style={{opacity:held===id?.55:1,transform:held===id?[{translateY:dy}]:[],zIndex:held===id?10:0}}>{item.content}</Animated.View></View>;})}<Pressable accessibilityLabel="Adicionar widget" onPress={()=>setAdd(true)} style={{alignSelf:'center',padding:10}}><Text style={{color:c.muted}}>＋ Adicionar widget</Text></Pressable><Sheet visible={!!menu} onClose={()=>setMenu(null)}><Text style={{fontSize:20,fontWeight:'700',color:c.text}}>{items.find(i=>i.id===menu)?.title}</Text><Pressable onPress={()=>{const id=menu;setMenu(null);void onSave(order.filter(key=>key!==id)).catch(()=>{});}} style={{paddingVertical:20}}><Text style={{color:c.danger}}>Remover da tela inicial</Text></Pressable></Sheet><Sheet visible={add} onClose={()=>setAdd(false)}><View style={{flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,color:c.text,fontSize:20,fontWeight:'700'}}>Adicionar widget</Text><IconButton name="close" label="Fechar widgets" onPress={()=>setAdd(false)}/></View>{items.filter(i=>!order.includes(i.id)).map(item=><Pressable key={item.id} onPress={()=>{setAdd(false);void onSave([...order,item.id]).catch(()=>{});}} style={{paddingVertical:20}}><Text style={{color:c.text}}>{item.title}</Text></Pressable>)}{items.every(i=>order.includes(i.id))?<Text style={{paddingVertical:20,color:c.muted}}>Todos os widgets disponíveis estão na tela inicial.</Text>:null}</Sheet></View>;
+const HOLD=450;
+export function SortableWidgets({items,order,onSave,onLock,fixed=[],noHold=[]}:{items:Item[];order:string[];onSave:(order:string[])=>Promise<void>;onLock:(locked:boolean)=>void;fixed?:string[];noHold?:string[]}){
+ const c=useTheme(),[open,setOpen]=useState(false),[draft,setDraft]=useState(order);
+ const timer=useRef<ReturnType<typeof setTimeout>|null>(null),start=useRef({x:0,y:0});
+ useEffect(()=>{if(!open)setDraft(order);},[order,open]);
+ const cancel=()=>{if(timer.current)clearTimeout(timer.current);timer.current=null;};
+ useEffect(()=>()=>{cancel();onLock(false);},[]);
+ function hold(x:number,y:number){cancel();start.current={x,y};timer.current=setTimeout(()=>{timer.current=null;try{Vibration.vibrate(12);}catch{/* sem vibracao */}setDraft(order);setOpen(true);},HOLD);}
+ function moved(x:number,y:number){if(timer.current&&Math.abs(x-start.current.x)+Math.abs(y-start.current.y)>8)cancel();}
+ const save=(next:string[])=>{setDraft(next);void onSave(next).catch(()=>setDraft(order));};
+ const visible=draft.filter(id=>items.some(i=>i.id===id)),hidden=items.filter(i=>!visible.includes(i.id));
+ return <View style={{gap:18}}>
+  {order.map(id=>{const item=items.find(i=>i.id===id);if(!item)return null;
+   // widget que ja usa o segurar para outra coisa (agenda: segurar um dia cria compromisso) nao abre o seletor
+   if(noHold.includes(id))return <View key={id}>{item.content}</View>;
+   return <View key={id} collapsable={false} onTouchStart={e=>hold(e.nativeEvent.pageX,e.nativeEvent.pageY)} onTouchMove={e=>moved(e.nativeEvent.pageX,e.nativeEvent.pageY)} onTouchEnd={cancel} onTouchCancel={cancel}>{item.content}</View>;})}
+  <Sheet visible={open} onClose={()=>setOpen(false)} label="Fechar organizar a tela inicial">
+   <View style={{gap:14,paddingBottom:12}}>
+    <View style={{flexDirection:'row',alignItems:'center'}}>
+     <Text style={{flex:1,fontSize:20,fontWeight:'800',color:c.text}}>Organizar Início</Text>
+     <Pressable accessibilityRole="button" onPress={()=>setOpen(false)} style={{paddingHorizontal:14,paddingVertical:8,borderRadius:99,backgroundColor:c.accent}}><Text style={{color:c.onAccent,fontWeight:'700',fontSize:13}}>Pronto</Text></Pressable>
+    </View>
+    <Text style={{color:c.muted,fontSize:12}}>Arraste pelo ≡ para mudar a ordem.</Text>
+    <ReorderList rows={visible.map(id=>({id,title:items.find(i=>i.id===id)!.title,removable:!fixed.includes(id)}))} onChange={save} onRemove={id=>save(visible.filter(x=>x!==id))}/>
+    {hidden.length?<View style={{gap:6}}>
+     <Text style={{color:c.muted,fontSize:12,fontWeight:'700'}}>Adicionar</Text>
+     {hidden.map(item=><Pressable key={item.id} accessibilityRole="button" accessibilityLabel={'Adicionar '+item.title} onPress={()=>save([...visible,item.id])} style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:12,paddingHorizontal:14,borderRadius:14,borderWidth:1,borderColor:c.line,backgroundColor:c.surface}}>
+      <View style={{width:22,height:22,borderRadius:11,backgroundColor:c.accent,alignItems:'center',justifyContent:'center'}}><Text style={{color:c.onAccent,fontWeight:'800',fontSize:15,lineHeight:17}}>+</Text></View>
+      <Text style={{color:c.text,fontSize:15,fontWeight:'600'}}>{item.title}</Text>
+     </Pressable>)}
+    </View>:null}
+   </View>
+  </Sheet>
+ </View>;
 }

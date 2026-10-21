@@ -59,3 +59,16 @@ test('0.3.213: o extrato fica guardado a parte (fin_statement) com saldo do banc
  assert.equal(JSON.parse(st.data.lines_json).length,2);
  assert.equal(w.list({kind:'fin_tx',limit:50}).length,0,'nenhum lancamento criado');
 });
+
+test('0.3.219: apagar o extrato tira tambem o que foi lancado a partir dele; o lancado a mao fica',t=>{
+ const {core}=fixture(t);const w=core.workspace;
+ const conta=w.save({kind:'fin_account',title:'Conta principal',area:'Pessoal',data:{account_type:'corrente',initial_balance:'1000',include_total:true}});
+ const manual=w.save({kind:'fin_tx',title:'Mercado',area:'Pessoal',data:{kind:'expense',amount:206.68,date:'2026-10-19',account_id:conta.id,paid:true,category:'Mercado',recurrence:'none'}});
+ const r=bank.saveStatement(w,{text:ofx([['2026-10-19',-70,'Pix enviado: "Cp :99999999-Estacionamento Modelo Ltda"'],['2026-10-19',-206.68,'Pix enviado: "Cp :12345678-Mercado Oficial"']]),target_id:conta.id});
+ bank.commit(w,{items:r.items,target:'account',target_id:conta.id});
+ assert.equal(w.list({kind:'fin_tx',limit:50}).length,3,'o extrato tinha lancado 2');
+ const out=bank.deleteStatement(w,{id:r.statement.id});
+ assert.equal(out.removed,2);
+ const left=w.list({kind:'fin_tx',limit:50});assert.equal(left.length,1);assert.equal(left[0].id,manual.id,'o lancado a mao fica');
+ assert.equal(w.list({kind:'fin_statement',limit:5}).length,0,'o extrato saiu');
+});

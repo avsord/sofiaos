@@ -68,3 +68,11 @@ test('0.3.205: compra pela foto entra paga (sai do Saldo), mesmo com "aguardando
  assert.equal(b('DAS',[{field:'data.paid',value:false},{field:'data.date',value:amanha}],'DAS de novembro').paid,false,'conta com data futura continua a pagar');
  assert.match(bridge.appsContext({list:()=>[]},null).content,/Compra pela foto entra PAGA/);
 });
+
+test('0.3.218: horario opcional - "as 20h", "8h30" viram HH:MM; sem horario fica vazio',t=>{
+ const w=setup(t);
+ const b=(time)=>bridge.buildEntity(w,'fin_tx',{title:'iFood',changes:[{field:'data.kind',value:'expense'},{field:'data.amount',value:'45'},...(time===undefined?[]:[{field:'data.time',value:time}])]},'iFood').data.time;
+ assert.equal(b('20h'),'20:00');assert.equal(b('8h30'),'08:30');assert.equal(b('20:5'),'20:05');assert.equal(b('14:45'),'14:45');
+ assert.equal(b(undefined),'','sem horario');assert.equal(b('25h'),'','horario invalido fica vazio');
+ assert.match(bridge.appsContext({list:()=>[]},null).content,/data\.time = horário HH:MM, opcional/);
+});

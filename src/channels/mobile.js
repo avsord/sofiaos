@@ -208,6 +208,10 @@ function makeMobileApi(runtime, deps) {
       return send({ ok: true, removed });
     }
     // 0.3.213: conciliacao - o extrato fica guardado a parte (fin_statement) e NAO vira lancamento
+    if (p === '/api/mobile/md/finance/statement/delete' && m === 'POST') {
+      const b = await bodyJson(req, 4096);
+      return send(require('../services/bank-import').deleteStatement(workspace, { id: String(b.id || '') }));
+    }
     if (p === '/api/mobile/md/finance/statement' && m === 'POST') {
       const b = await bodyJson(req, 5 * 1024 * 1024);
       return send(require('../services/bank-import').saveStatement(workspace, { text: String(b.text || ''), target_id: String(b.target_id || '') }));
@@ -221,7 +225,7 @@ function makeMobileApi(runtime, deps) {
       return send(require('../services/bank-import').commit(workspace, { items: b.items, target: b.target === 'card' ? 'card' : 'account', target_id: String(b.target_id || ''), privacy: 'private', source_id: null }));
     }
     if (p === '/api/mobile/md/dashboard') {
-      const allowedWidgets = ['monitoring', 'tasks', 'capsules', 'reminders', 'packages'];
+      const allowedWidgets = ['goal', 'monitoring', 'tasks', 'capsules', 'reminders', 'packages'];
       if (m === 'GET') { const saved = runtime.google.kvGet('dashboard_widgets'); return send({ widgets: Array.isArray(saved) ? saved : ['monitoring', 'tasks'], saved: Array.isArray(saved) }); }
       // O app salva a ordem com PATCH; antes so POST existia e o PATCH caia em "Esta rota do aplicativo nao existe" (widget de Capsulas sumia).
       if (m === 'POST' || m === 'PATCH') { const b = await bodyJson(req, 4096); const widgets = Array.isArray(b.widgets) ? [...new Set(b.widgets.filter(w => allowedWidgets.includes(w)))] : null; if (!widgets) fail('BAD_WIDGETS', 'Lista de widgets inválida.'); runtime.google.kvSet('dashboard_widgets', widgets); return send({ widgets }); }

@@ -1684,6 +1684,12 @@ const CATALOG={
     ],
     "fields": [
       {
+        "key": "time",
+        "label": "Horário",
+        "type": "text",
+        "max": 5
+      },
+      {
         "key": "reserve_part",
         "label": "Parte desta receita que foi para o guardado",
         "type": "number",

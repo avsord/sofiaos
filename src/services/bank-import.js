@@ -79,6 +79,18 @@ function undo(workspace,{target_id=''}={}){
  for(const e of ids){try{workspace.deleteEntity(e.id);removed++;amount+=Number(e.data?.amount)||0;}catch{/* ja saiu */}}
  return {removed,amount:Math.round(amount*100)/100};
 }
+/** 0.3.219: apaga o extrato guardado e tudo o que tenha sido lancado a partir das linhas dele - a conta volta a como era.
+ * O que foi lancado a mao ou pela Sofia (outro import_id) nao e tocado. */
+function deleteStatement(workspace,{id}){
+ const st=workspace.get(String(id||''));if(st.kind!=='fin_statement')throw new AppError('NOT_FOUND','Extrato não encontrado.',404);
+ let lines=[];try{lines=JSON.parse(String(st.data?.lines_json||'[]'));}catch{lines=[];}
+ const ids=new Set((Array.isArray(lines)?lines:[]).map(l=>String(l&&l.import_id||'')).filter(x=>/^(fitid:|h:)/.test(x)));
+ const acc=String(st.data?.account_id||''),hit=[];
+ if(ids.size)for(let offset=0;offset<20000;offset+=500){const page=workspace.list({kind:'fin_tx',limit:500,offset});for(const e of page)if(ids.has(String(e.data?.import_id||''))&&(!acc||e.data?.account_id===acc||e.data?.card_id===acc))hit.push(e.id);if(page.length<500)break;}
+ let removed=0;for(const tid of hit){try{workspace.deleteEntity(tid);removed++;}catch{/* ja saiu */}}
+ workspace.deleteEntity(st.id);
+ return {ok:true,removed};
+}
 /** 0.3.213: saldo informado pelo banco no fim do extrato (OFX <LEDGERBAL>), quando existe. */
 function ledgerBalance(text){const m=/<LEDGERBAL>[\s\S]*?<BALAMT>([^<\n]+)[\s\S]*?(?:<DTASOF>([^<\n]+))?/i.exec(String(text||''));if(!m)return null;const v=num(m[1]);return Number.isFinite(v)?{amount:Math.round(v*100)/100,at:m[2]?dateISO(m[2]):''}:null;}
 /** 0.3.213: guarda o extrato A PARTE (fin_statement) e devolve a conciliacao - nada vira lancamento aqui. */
@@ -147,4 +159,4 @@ function commit(workspace,{items,target='account',target_id='',privacy='private'
  return {created,skipped,items:saved};
 }
 
-module.exports={saveStatement,ledgerBalance,undo,preview,commit,parseOFX,parseCSV,guessCategory,num,dateISO};
+module.exports={deleteStatement,saveStatement,ledgerBalance,undo,preview,commit,parseOFX,parseCSV,guessCategory,num,dateISO};

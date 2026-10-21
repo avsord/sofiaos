@@ -52,7 +52,9 @@ export async function syncFinanceDueNotifications(txs: Tx[], owner: string, now 
     // 0.3.151: aviso no dia (9h) e, se escolhido, alguns dias antes; tambem para contas a receber.
     const before = Math.max(0, Math.min(15, Number(due.tx?.remindDays) || 0));
     for (const offset of before ? [before, 0] : [0]) {
-      const date = new Date(year,month-1,day-offset,9,0,0);
+      // 0.3.218: conta com horario avisa naquele horario; sem horario, as 9h
+      const [hh, mm] = /^\d{2}:\d{2}$/.test(String(due.tx?.time || '')) ? String(due.tx?.time).split(':').map(Number) : [9, 0];
+      const date = new Date(year,month-1,day-offset,hh,mm,0);
       if (date.getTime() <= now.getTime()) continue;
       const when = offset ? (offset === 1 ? 'amanhã' : 'em '+offset+' dias') : 'hoje';
       const first = String(due.tx?.entity?.data?.date || due.date);

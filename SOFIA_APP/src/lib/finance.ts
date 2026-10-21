@@ -7,7 +7,7 @@ export type TxKind = 'expense' | 'income' | 'transfer' | 'card_payment';
 export type Recurrence = 'none' | 'monthly' | 'weekly' | 'yearly';
 export type Account = {id: string; name: string; type: string; initial: number; color: string; include: boolean; archived: boolean; cycleDay: number; reportStart: string; monthStarts: Record<string, number>; entity: Entity};
 export type Card = {id: string; name: string; limit: number; closing: number; due: number; color: string; accountId: string; archived: boolean; entity: Entity};
-export type Tx = {reservePart: number; 
+export type Tx = {reservePart: number; time: string; 
   id: string; kind: TxKind; desc: string; amount: number; date: string; category: string; accountId: string; toAccountId: string; cardId: string;
   invoice: string; paid: boolean; seriesId: string; installment: number; installments: number; recurrence: Recurrence; recurrenceEnd: string;
   virtual?: boolean; manualDue?: boolean; remindDays?: number; entity?: Entity;
@@ -74,7 +74,7 @@ export function toTx(e: Entity): Tx {
   return {id: e.id, kind: (d.kind || 'expense') as TxKind, desc: e.title, amount: num(d.amount), date: String(d.date || ''), category: String(d.category || ''),
     accountId: String(d.account_id || ''), toAccountId: String(d.to_account_id || ''), cardId: String(d.card_id || ''), invoice: String(d.invoice_month || ''),
     paid: !!d.paid, seriesId: String(d.series_id || ''), installment: num(d.installment), installments: num(d.installments), recurrence: (d.recurrence || 'none') as Recurrence,
-    recurrenceEnd: String(d.recurrence_end || ''), manualDue: String(d.import_id || '').startsWith('sofia-pendencia:'), reservePart: Number(d.reserve_part) > 0 ? Number(d.reserve_part) : 0, remindDays: Math.max(0, Math.min(15, Number(d.remind_days) || 0)), entity: e};
+    recurrenceEnd: String(d.recurrence_end || ''), manualDue: String(d.import_id || '').startsWith('sofia-pendencia:'), reservePart: Number(d.reserve_part) > 0 ? Number(d.reserve_part) : 0, time: /^\d{2}:\d{2}$/.test(String(d.time || '')) ? String(d.time) : '', remindDays: Math.max(0, Math.min(15, Number(d.remind_days) || 0)), entity: e};
 }
 export function toBudget(e: Entity): Budget { return {id: e.id, category: String(e.data?.category || e.title), limit: num(e.data?.limit), entity: e}; }
 export function toGoal(e: Entity): Goal {
@@ -93,9 +93,18 @@ export function invoiceDue(card: Pick<Card, 'closing' | 'due'>, month: string): 
 }
 export function invoiceClose(card: Pick<Card, 'closing'>, month: string): string { return dayIn(month, card.closing); }
 export type Invoice = {card: Card; month: string; total: number; paid: number; due: string; close: string; items: Tx[]; status: 'aberta' | 'fechada' | 'paga' | 'vencida' | 'futura'};
+/** 0.3.223: conta fixa no cartao (todo mes) cai na fatura de cada mes sozinha - gera as cobrancas ate 2 meses a frente. */
+export function recurringCardCharges(card: Card, txs: Tx[], today = todayISO()): Tx[] {
+  const templates = txs.filter(t => !t.virtual && t.cardId === card.id && t.kind === 'expense' && t.recurrence !== 'none');
+  if (!templates.length) return [];
+  const until = addMonths(monthOf(today), 2), seen = new Set<string>(), out: Tx[] = [];
+  let from = templates.reduce((m, t) => monthOf(t.date) < m ? monthOf(t.date) : m, until);
+  for (let m = from; m <= until; m = addMonths(m, 1)) for (const v of expandRecurring(txs, m)) if (v.cardId === card.id && !seen.has(v.id)) { seen.add(v.id); out.push(v); }
+  return out;
+}
 export function cardInvoices(card: Card, txs: Tx[], today = todayISO()): Invoice[] {
   const months = new Map<string, Tx[]>();
-  for (const t of txs) if (t.kind === 'expense' && t.cardId === card.id) {
+  for (const t of [...txs, ...recurringCardCharges(card, txs, today)]) if (t.kind === 'expense' && t.cardId === card.id) {
     const m = t.invoice || invoiceMonth(card, t.date);
     if (!months.has(m)) months.set(m, []);
     months.get(m)!.push(t);
@@ -110,8 +119,9 @@ export function cardInvoices(card: Card, txs: Tx[], today = todayISO()): Invoice
     return {card, month, total, paid, due, close, items: items.sort((a, b) => b.date.localeCompare(a.date)), status};
   });
 }
-export function cardUsed(card: Card, txs: Tx[]): number {
-  return round2(cardInvoices(card, txs).reduce((s, i) => s + Math.max(0, i.total - i.paid), 0));
+export function cardUsed(card: Card, txs: Tx[], today = todayISO()): number {
+  // 0.3.223: so o que ja foi cobrado (as cobrancas futuras das contas fixas nao ocupam o limite antes da hora)
+  return round2(cardInvoices(card, txs, today).reduce((s, i) => s + Math.max(0, i.items.filter(t => t.date <= today).reduce((x, t) => x + t.amount, 0) - i.paid), 0));
 }
 
 // ---------- Parcelas e recorrência ----------
@@ -284,10 +294,11 @@ export function monthDues(txs: Tx[], accountId: string, month: string, today = t
   const seen = new Set<string>();
   return [...txs, ...expandRecurring(txs, month)]
     // 0.3.177: as pagas daquele mes continuam na lista (verdes), em vez de sumirem ao pagar
-    .filter(t => t.manualDue && (t.kind === 'expense' || t.kind === 'income') && !t.cardId && (!accountId || t.accountId === accountId))
+    // 0.3.223: as contas no cartao tambem aparecem (com o simbolo do cartao); elas se pagam pela fatura
+    .filter(t => t.manualDue && (t.kind === 'expense' || t.kind === 'income') && (!accountId || t.accountId === accountId))
     .filter(t => t.date >= start && t.date <= end)
     .filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; })
-    .map(t => ({id: t.id, title: t.desc, amount: t.amount, date: t.date, kind: (t.kind === 'income' ? 'receber' : 'pagar') as Due['kind'], late: !t.paid && t.date < today, paid: t.paid, tx: t}))
+    .map(t => ({id: t.id, title: t.desc, amount: t.amount, date: t.date, kind: (t.kind === 'income' ? 'receber' : 'pagar') as Due['kind'], late: !t.paid && !t.cardId && t.date < today, paid: t.paid, tx: t}))
     .sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
 }
 /** 0.3.185: lancamentos pagos que parecem repetidos - mesmo tipo, mesma descricao, mesmo valor e mesmo
@@ -499,13 +510,14 @@ export function fixedBills(txs: Tx[], accountId: string, range: {start: string; 
         installments: total, index, left: total ? Math.max(0, total - index + (t.paid ? 0 : 1)) : 0, last: !!total && index >= total, tx: t};
     });
 }
-export type FixedSummary = {bills: FixedBill[]; total: number; paid: number; open: number; income: number; share: number | null};
+export type FixedSummary = {card: number; bills: FixedBill[]; total: number; paid: number; open: number; income: number; share: number | null};
 export function fixedSummary(txs: Tx[], accountId: string, range: {start: string; end: string}, kind: 'expense' | 'income' = 'expense'): FixedSummary {
   const bills = fixedBills(txs, accountId, range, kind);
   const total = round2(bills.reduce((s, b) => s + b.amount, 0));
   const paid = round2(bills.filter(b => b.paid).reduce((s, b) => s + b.amount, 0));
+  const card = round2(bills.filter(b => !b.paid && b.cardId).reduce((s, b) => s + b.amount, 0));
   const income = round2(txs.filter(t => t.kind === 'income' && (!accountId || t.accountId === accountId) && t.date >= range.start && t.date <= range.end).reduce((s, t) => s + t.amount, 0));
-  return {bills, total, paid, open: round2(total - paid), income, share: income > 0 ? total / income : null};
+  return {bills, total, paid, card, open: round2(total - paid - card), income, share: income > 0 ? total / income : null};
 }
 /** Folga do ciclo: o que entrou menos as fixas (pagas ou nao), menos o aporte do ciclo, menos os gastos variaveis. */
 export type CycleRoom = {start: string; end: string; label: string; income: number; fixed: number; plan: number; ceiling: number; spent: number; left: number; pct: number; over: number};
@@ -703,7 +715,7 @@ export function categoryAlerts(txs: Tx[], accountId: string, month: string): Cat
 }
 
 // ---------- 0.3.208: sobra = saldo + o que vai entrar - o que falta pagar (contas, fatura, aporte) ----------
-export type MoneyLeft = {start: string; end: string; saldo: number; toReceive: number; toPay: number; card: number; aporte: number; left: number; spent: number; available: number; incomeItems: Tx[]; expenseItems: Tx[]};
+export type MoneyLeft = {start: string; end: string; saldo: number; toReceive: number; toGuard: number; toPay: number; card: number; aporte: number; left: number; spent: number; available: number; incomeItems: Tx[]; expenseItems: Tx[]};
 /** Pagar uma conta prevista nao muda a sobra (o saldo cai e a conta sai do "a pagar" juntos). So gasto fora do
  * previsto diminui; receita a mais aumenta. A fatura cadastrada como conta nao e contada duas vezes. */
 export function moneyLeft(txs: Tx[], cards: Card[], range: {start: string; end: string}, accountId: string, saldo: number, aportePending: number, today = todayISO()): MoneyLeft {
@@ -714,10 +726,12 @@ export function moneyLeft(txs: Tx[], cards: Card[], range: {start: string; end: 
   const incomeItems = list.filter(t => t.kind === 'income' && !t.paid).sort((a, b) => a.date.localeCompare(b.date));
   const expenseItems = list.filter(t => t.kind === 'expense' && !t.paid && !isInvoiceBill(t)).sort((a, b) => a.date.localeCompare(b.date));
   const sum = (xs: Tx[]) => round2(xs.reduce((s, t) => s + t.amount, 0));
-  const toReceive = sum(incomeItems), toPay = sum(expenseItems), aporte = round2(Math.max(0, aportePending));
+  // 0.3.222: a receita entra pelo que fica no saldo; a parte dela que vai para o guardado ja e o aporte (nao desconta duas vezes)
+  const toGuard = round2(incomeItems.reduce((s, t) => s + Math.min(t.amount, t.reservePart || 0), 0));
+  const toReceive = round2(sum(incomeItems) - toGuard), toPay = sum(expenseItems), aporte = round2(Math.max(0, aportePending - toGuard));
   const spent = sum(list.filter(t => t.kind === 'expense' && t.paid && !t.manualDue && !recurring(t)));
   const left = round2(saldo + toReceive - toPay - card - aporte);
-  return {start: range.start, end: range.end, saldo: round2(saldo), toReceive, toPay, card, aporte, left, spent, available: round2(Math.max(left, 0) + spent), incomeItems, expenseItems};
+  return {start: range.start, end: range.end, saldo: round2(saldo), toReceive, toGuard, toPay, card, aporte, left, spent, available: round2(Math.max(left, 0) + spent), incomeItems, expenseItems};
 }
 
 // ---------- 0.3.214: Controle de gastos = quanto tinha no inicio do mes x quanto tem agora (o Saldo) ----------

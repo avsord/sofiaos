@@ -19,9 +19,10 @@ export function goalStats(g:GoalNumbers){
  const message=pct>=1?'Meta batida! 🎉 Hora de comemorar e, quem sabe, sonhar a próxima.':pct>=0.75?'Reta final: falta pouco para chegar lá.':pct>=0.5?'Mais da metade do caminho. Continue no ritmo!':pct>=0.25?'Um quarto do caminho já foi. Cada aporte conta.':'Começo firme: o mais difícil é começar, e você já começou.';
  return {pct,missing,next,nextValue,nextMissing:Math.max(0,nextValue-g.saved),reach,deadlineYm,monthsLeft,needed,diff,message};
 }
-export function GoalProgressCard({g,compact=false,onPress}:{g:GoalNumbers;compact?:boolean;onPress?:()=>void}){
+export function GoalProgressCard({g,compact=false,onPress,flat=false}:{g:GoalNumbers;compact?:boolean;onPress?:()=>void;flat?:boolean}){
  const c=useTheme(),st=goalStats(g),GOOD='#2FB37E',GUARD='#2FB37E';
- const body=<View style={{backgroundColor:c.surface,borderRadius:20,padding:16,gap:10,borderWidth:1,borderColor:c.line}}>
+ // flat: dentro de uma secao dos Relatorios (sem a moldura de cartao, para nao ficar caixa dentro de caixa)
+ const body=<View style={flat?{gap:10}:{backgroundColor:c.surface,borderRadius:20,padding:16,gap:10,borderWidth:1,borderColor:c.line}}>
   <View style={{flexDirection:'row',alignItems:'baseline',gap:8}}>
    <Text numberOfLines={1} style={{flex:1,color:c.text,fontWeight:'800',fontSize:15}}>🎯 {g.name||'Sua meta'}</Text>
    {st.deadlineYm?<Text style={{color:c.muted,fontSize:11}}>até {monthName(st.deadlineYm)}</Text>:null}

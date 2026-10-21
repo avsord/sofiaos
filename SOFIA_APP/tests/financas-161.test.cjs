@@ -41,7 +41,7 @@ test('meta: projecao no ritmo atual e quanto por mes fecharia no prazo',()=>{
 test('telas: cartao Saldo, secao de contas fixas, meta e passo a passo com 7 etapas',()=>{
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes('>Controle de gastos</Text>')&&s.includes('moneyLeft(d.txs, d.cards, monthRange, accountId, total, aportePendingIn(monthRange), today)'),'cartao do ciclo');
-  assert.ok(s.includes('const b = spend, over = b.left < 0, pct = Math.min(1, b.pct);'),'controle de gastos e o Saldo');
+  assert.ok(s.includes(': spend, over = b.left < 0, pct = Math.min(1, b.pct);'),'controle de gastos e o Saldo');
   assert.ok(s.includes("<Title text={side==='pagar'?'Contas fixas':'Receitas fixas'} />")&&s.includes('Total do mês'));
   assert.ok(s.includes('Meta: {show(outlook.target)}')&&s.includes('Para fechar no prazo:'));
   assert.ok(s.includes("{title: 'Quando e quanto você recebe'")&&s.includes("{title: 'Tudo pronto'"));
@@ -178,7 +178,7 @@ test('0.3.188: aporte como conta a fazer (valor sugerido e editavel), no + e em 
   assert.ok(s.includes("kind === 'in' ? 'Aportar' :"));
   assert.ok(s.includes("toque para aportar este ou outro valor"),'sugestao no Resumo');
   assert.ok(s.includes("🔒 Aporte (guardar dinheiro)"),'opcao no +');
-  assert.ok(s.includes("🔒 Aporte do mês")&&s.includes("✓ Aportado"),'em Pendentes, amarelo/verde');
+  assert.ok(!s.includes("{aporte&&aporte.monthTarget>0?(aporte.missing>0"),'0.3.226: o aporte saiu de A vencer e atrasadas (fica no guardado e no +)');
   assert.ok(s.includes('<ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 14, paddingBottom: 28}}>'),'Sua reserva rola e tem respiro no fim');
   assert.ok(!s.includes('não entra no saldo geral'),'sem "saldo geral"');
 });
@@ -222,7 +222,7 @@ test('0.3.193: pela lista do mes a edicao vale so para aquele mes; conta paga co
   assert.ok(s.includes("const monthOnly=scope==='month'&&recurring;"));
   assert.ok(s.includes("if(monthOnly&&isTemplate&&tx?.entity){"),'original da conta fixa: vira o mes e a serie continua no mes seguinte com o valor de antes');
   assert.ok(s.includes("recurrence:tx?.virtual||monthOnly?'none':repeat,"),'so o mes nunca muda a repeticao');
-  assert.ok(s.includes("paid:existing?!!tx?.paid:false,"),'editar conta paga nao desmarca');
+  assert.ok(s.includes("paid:cardFor?false:existing?!!tx?.paid:false,"),'editar conta paga nao desmarca (a do cartao se paga pela fatura)');
   assert.ok(s.includes('Para mudar todos os meses, edite a conta em Contas fixas.'));
   assert.ok(!/<ScrollView(?![^>]*keyboardShouldPersistTaps)[^>]*contentContainerStyle=\{\{gap: 12, paddingBottom: 18\}\}>/.test(s),'tela do saldo: toque em Salvar funciona com o teclado aberto');
   // a conta fixa lista tambem os meses ja registrados da serie
@@ -249,7 +249,7 @@ test('0.3.195: previsao do salario (periodo do proximo salario) e ciclo de cada 
   assert.equal(f.effectiveCycleDay([acc],sal5,'a1'),5,'sem dia informado: o dia do salario fixo');
   assert.equal(f.effectiveCycleDay([acc],[],'a1'),0,'sem salario: mes do calendario');
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes("{'Previsto no fim de ' + monthLabel(month).split(' ')[0].toLowerCase()}"));
+  assert.ok(s.includes("'Previsto até ' + forecastEnd}"),'0.3.224: ate a vespera do proximo salario');
   assert.ok(s.includes("Você começou {monthLabel(month).split(' ')[0].toLowerCase()} com {show(b.start)}")&&s.includes("e agora tem {show(b.left)}."),'o cartao nunca some');
 });
 
@@ -293,12 +293,12 @@ test('0.3.196: modelo simples - previsto = receitas - despesas e pendentes - fat
   const ctl=f.spendControl(txs,[],'',f.cycleRange(25,'2026-10-19'),'a1',1779.53);
   assert.equal(ctl.left,1779.53,'controle de gastos e o Saldo');assert.equal(ctl.out,803.18);assert.equal(ctl.available,2582.71);assert.equal(Math.round(ctl.pct*100),69);
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes("['Aporte que falta', forecastP.aporte, GUARD, '−', [] as Tx[]]"),'aporte aparece na conta do previsto');
+  assert.ok(s.includes("['Aporte', forecastP.aporte, GUARD, '−', [] as Tx[]]"),'aporte aparece na conta do previsto');
 });
 
 test('0.3.197: Pendentes com seletor A pagar | A receber, mesmo esquema nos dois lados',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('accessibilityRole="tablist"')&&s.includes("[['pagar','A pagar'],['receber','A receber']]"),'seletor de duas metades iguais, sem contagem');
+  assert.ok(s.includes("<Segmented value={side} onChange={setSide} options={[{value: 'pagar' as const, label: 'A pagar'}, {value: 'receber' as const, label: 'A receber'}]} />"),'seletor de duas metades iguais, sem contagem');
   assert.ok(s.includes("onPress={()=>onNew(side==='pagar'?'expense':'income')}"),'+ Nova abre no tipo do lado escolhido');
   assert.ok(s.includes("const fx=side==='pagar'?fixed:fixedIn;"),'contas fixas ou receitas fixas');
   assert.ok(s.includes("tx?tx.kind==='income'?'income':'expense':initialFlow"),'o cadastro comeca no tipo escolhido');
@@ -357,7 +357,7 @@ test('0.3.208: Relatorios com secoes que abrem e fecham (lembra a escolha), guar
   assert.ok(s.includes("const FOLD_KEY = 'sofia_fin_folds_v1';")&&s.includes('SecureStore.setItemAsync(FOLD_KEY'),'lembra aberta/fechada');
   const r=s.slice(s.indexOf('function ReportsTab('));assert.ok(r.indexOf('<Fold id="guardado"')<r.indexOf('<Fold id="saldo"'),'guardado em cima, saldo embaixo');
   assert.ok(!r.slice(0,r.indexOf('\nfunction ',10)).includes('Recomeçar de hoje</Text>'),'fora dos Relatorios');
-  assert.ok(!s.includes('Recomeçar de hoje</Text>')&&!s.includes('Recuperar itens apagados</Text>'),'0.3.212: recomecar e recuperar sairam');assert.ok(s.includes('>Zerar Finanças</Text>'),'zerar Financas na engrenagem');
+  assert.ok(!s.includes('Recomeçar de hoje</Text>')&&!s.includes('Recuperar itens apagados</Text>'),'0.3.212: recomecar e recuperar sairam');assert.ok(s.includes('>Redefinir Finanças</Text>'),'0.3.223: Redefinir Financas na engrenagem');
   assert.ok(s.includes("manualDues(d.txs, accountId, today, 3)")&&s.includes('nos próximos 3 dias'),'vencimentos com 3 dias');
   assert.ok(s.includes("label: 'Contas'")&&s.includes("label: 'Lançamentos'"),'0.3.213: abas Resumo, Contas, Lancamentos, Cartoes, Relatorios');
   assert.ok(s.includes('async function saveFresh(')&&s.includes("return saveFresh(api, t.desc, {paid: true, ...extra}, t.entity)"),'Paguei sobre a versao atual');
