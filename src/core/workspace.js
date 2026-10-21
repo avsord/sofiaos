@@ -159,6 +159,15 @@ class Workspace {
   * o original da serie. Os outros sao apagados. Nada de fora de series e tocado. */
  repairFinanceDuplicates(){
   const rows=this.db.prepare("SELECT id FROM entities WHERE kind='fin_tx' AND state!='archived'").all().map(r=>this.get(r.id));
+  // 0.3.230: conta/receita fixa cadastrada mais de uma vez IGUALZINHA (mesmo nome, tipo, conta, valor, data e parcelas),
+  // ainda sem nenhum pagamento ligado a ela: fica a mais antiga, as copias saem (sobra do rascunho que voltava sozinho).
+  {const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+   const children=new Set(rows.map(e=>e.data&&e.data.series_id).filter(Boolean));
+   const twins=new Map();
+   for(const e of rows){const d=e.data||{};if(!String(d.import_id||'').startsWith('sofia-pendencia:')||d.recurrence!=='monthly'||d.series_id||d.paid||children.has(e.id))continue;
+    const key=[d.kind,d.account_id,norm(e.title),Number(d.amount).toFixed(2),d.date,Number(d.installments)||0,Number(d.installment)||0,d.card_id||''].join('|');twins.set(key,[...(twins.get(key)||[]),e]);}
+   for(const list of twins.values()){if(list.length<2)continue;const keep=[...list].sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)))[0];
+    for(const e of list){if(e.id===keep.id)continue;try{this.deleteEntity(e.id);}catch{/* segue */}}}}
   const groups=new Map();
   for(const e of rows){const d=e.data||{};const series=d.series_id||(d.recurrence&&d.recurrence!=='none'?e.id:'');if(!series||!d.date)continue;const key=series+'|'+String(d.date).slice(0,7);groups.set(key,[...(groups.get(key)||[]),e]);}
   let removed=0;

@@ -779,3 +779,33 @@ export function fixedDuplicateGroups(txs: Tx[]): FixedDupGroup[] {
   }
   return [...groups.entries()].filter(([, v]) => v.length > 1).map(([key, items]) => ({key, title: items[0].desc, kind: items[0].kind, day: Number(items[0].date.slice(8, 10)), items}));
 }
+
+/** 0.3.228: fixas (todo mes) ja cadastradas que so comecam DEPOIS do periodo - aparecem na lista de Contas (como "comeca em"),
+ * fora dos totais do mes. Antes, uma receita cadastrada para comecar no mes seguinte sumia da lista do mes atual. */
+export function fixedUpcoming(txs: Tx[], accountId: string, range: {start: string; end: string}, kind: 'expense' | 'income' = 'expense'): Tx[] {
+  return txs.filter(t => !t.virtual && t.entity && t.recurrence === 'monthly' && !t.seriesId && t.kind === kind && (!accountId || t.accountId === accountId) && t.date > range.end)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.desc.localeCompare(b.desc));
+}
+
+/** 0.3.232: conta com programacao (todo mes ou parcelada) fica em Contas; avulsa fica so no extrato (Historico). */
+export function isScheduled(t?: Tx | null): boolean { return !!t && (t.recurrence === 'monthly' || !!t.seriesId || (t.installments || 0) > 1); }
+
+/** 0.3.232: copias IDENTICAS de uma conta/receita programada (mesmo nome, tipo, conta, valor, data e parcelas), ainda sem
+ * pagamento ligado: devolve as que sobram (fica a mais antiga). O app apaga sozinho - nao depende do servidor. */
+export function exactTwinExtras(txs: Tx[]): Tx[] {
+  const norm = (v: string) => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const children = new Set(txs.map(t => t.seriesId).filter(Boolean)), groups = new Map<string, Tx[]>();
+  for (const t of txs) {
+    if (t.virtual || !t.entity || !t.manualDue || t.recurrence !== 'monthly' || t.seriesId || t.paid || children.has(t.id)) continue;
+    const d = t.entity.data || {};
+    const key = [t.kind, t.accountId, norm(t.desc), t.amount.toFixed(2), t.date, Number(d.installments) || 0, Number(d.installment) || 0, t.cardId || ''].join('|');
+    groups.set(key, [...(groups.get(key) || []), t]);
+  }
+  const extras: Tx[] = [];
+  for (const list of groups.values()) if (list.length > 1) {
+    const created = (t: Tx) => String((t.entity as {created_at?: string} | undefined)?.created_at || '');
+    const keep = [...list].sort((a, b) => created(a).localeCompare(created(b)) || a.id.localeCompare(b.id))[0];
+    extras.push(...list.filter(t => t.id !== keep.id));
+  }
+  return extras;
+}

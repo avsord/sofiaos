@@ -304,7 +304,7 @@ test('0.3.197: Pendentes com seletor A pagar | A receber, mesmo esquema nos dois
   assert.ok(s.includes("tx?tx.kind==='income'?'income':'expense':initialFlow"),'o cadastro comeca no tipo escolhido');
   assert.ok(s.includes("const draftKey='bill:'+(tx?.id||'novo:'+initialFlow);"),'rascunho separado por tipo');
   assert.ok(!s.includes("if(draft.flow)setFlow("),'rascunho antigo nao troca mais o tipo');
-  assert.ok(s.includes('{nextHint(side)}'),'aviso das contas do mes seguinte');
+  assert.ok(s.includes('{nextHint(side)}'),'aviso das contas programadas do mes seguinte');
   // receitas fixas (salario) aparecem do lado A receber
   const sal=f.toTx({id:'sal',kind:'fin_tx',title:'Salário',state:'active',data:{kind:'income',amount:7821,date:'2026-09-25',account_id:'a1',paid:false,category:'Salário',recurrence:'monthly',import_id:'sofia-pendencia:s'}});
   const inc=f.fixedSummary([sal],'a1',{start:'2026-10-01',end:'2026-10-31'},'income');

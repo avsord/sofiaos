@@ -29,7 +29,7 @@ import {
   trend, balanceSeries, upcoming, manualDues, transactionsForAccount, goalProgress, parseMoney, formatMoneyInput, finishMoneyInput, addDays,
   dayIn, daysIn} from '../lib/finance';
 import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove} from '../lib/finance';
-import {sinceReportStart, cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, monthDues, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove, effectiveCycleDay, periodBudget, salaryForecast, currentPlan, nextPlan, simpleForecast, spendControl, categoryAlerts, lastWeekByCategory, duplicateGroups, moneyLeft, monthControl, balanceAsOf, isOneOffIncome, fixedDuplicateGroups} from '../lib/finance';
+import {sinceReportStart, cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, monthDues, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove, effectiveCycleDay, periodBudget, salaryForecast, currentPlan, nextPlan, simpleForecast, spendControl, categoryAlerts, lastWeekByCategory, duplicateGroups, moneyLeft, monthControl, balanceAsOf, isOneOffIncome, fixedDuplicateGroups, fixedUpcoming, isScheduled, exactTwinExtras} from '../lib/finance';
 import {syncFinanceDueNotifications} from '../lib/finance-notifications';
 import {appAlert} from '../lib/app-alert';
 import {useFormDraft, clearAllFormDrafts} from '../lib/form-draft';
@@ -151,12 +151,17 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
     return () => sub.remove();
   },[active,backFinance]);
   const window = financeWindow(month, tab), windowKey = window.from + '..' + window.to, loaded = useRef<string>('');
+  const twinsTried = useRef(new Set<string>());
   const reload = useCallback(async () => {
     setLoading(true);
     try { const bundle = await loadAll(api, window); setData(toData(bundle.items, bundle.carry)); setError(''); loaded.current = windowKey; if (window.from <= monthOf(todayISO()) && window.to >= monthOf(todayISO())) writeCache(api, bundle); }
     catch (e) { setError(errorText(e)); }
     finally { setLoading(false); }
   }, [api, windowKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 0.3.232: copias identicas de uma conta/receita programada (sobra do rascunho que voltava) somem sozinhas ao abrir
+  useEffect(() => { if (!data) return; const extras = exactTwinExtras(data.txs).filter(t => !twinsTried.current.has(t.id)); if (!extras.length) return;
+    extras.forEach(t => twinsTried.current.add(t.id));
+    void (async () => { for (const t of extras) { try { await api.deleteEntity(t.entity!.id); } catch { /* segue */ } } await reload(); })(); }, [data]);
   // Abre na hora com a última versão guardada (mês atual); a atualização chega por trás.
   // Mudou o mês ou foi para Relatórios: busca a janela nova, mantendo o que está na tela até chegar.
   useEffect(() => {
@@ -679,14 +684,14 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
 // ============================ PENDENTES MANUAIS ============================
 function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,onAporte,onNew,onMonth,side:sideProp,onSide}: {side?:'pagar'|'receber';onSide?:(v:'pagar'|'receber')=>void;onMonth?:(m:string)=>void;onNew:(flow:'expense'|'income')=>void;d:Data;api:SofiaApi;month:string;accountId:string;warning:string;onBill:(t:Tx|'new',scope?:'month'|'series')=>void;reload:()=>Promise<void>;isPrimary?:boolean;onAporte?:()=>void}) {
   // A aba segue o mes escolhido no topo; cada mes mostra so as suas contas (0.3.180)
-  const c=useTheme(),today=todayISO(),list=useMemo(()=>monthDues(d.txs,accountId,month,today),[d,accountId,month,today]);
+  const c=useTheme(),today=todayISO(),list=useMemo(()=>monthDues(d.txs,accountId,month,today).filter(r=>isScheduled(r.tx)),[d,accountId,month,today]);
   const open=list.filter(row=>!row.paid&&!row.tx?.cardId),total=open.reduce((sum,row)=>sum+row.amount,0),paidCount=list.length-open.length;
   const toPay=open.filter(r=>r.kind!=='receber'),toGet=open.filter(r=>r.kind==='receber');
   const [sideLocal,setSideLocal]=useState<'pagar'|'receber'>('pagar');const side=sideProp??sideLocal,setSide=(v:'pagar'|'receber')=>{setSideLocal(v);onSide?.(v);};
   const sideOpen=side==='pagar'?toPay:toGet;
   const payList=list.filter(r=>r.kind!=='receber'),getList=list.filter(r=>r.kind==='receber');
   // contas do mes seguinte (ex.: o que entra no periodo do salario, mas ja em novembro) - para nada parecer oculto
-  const nextMonth=addMonths(month,1),nextList=useMemo(()=>monthDues(d.txs,accountId,nextMonth,today).filter(r=>!r.paid),[d,accountId,nextMonth,today]);
+  const nextMonth=addMonths(month,1),nextList=useMemo(()=>monthDues(d.txs,accountId,nextMonth,today).filter(r=>!r.paid&&isScheduled(r.tx)),[d,accountId,nextMonth,today]);
   const sideList=side==='pagar'?list.filter(r=>r.kind!=='receber'):list.filter(r=>r.kind==='receber');
   const sideNext=nextList.some(r=>side==='receber'?r.kind==='receber':r.kind!=='receber');
   const nextHint=(kind:'pagar'|'receber')=>{const rows=nextList.filter(r=>kind==='receber'?r.kind==='receber':r.kind!=='receber');if(!rows.length||!onMonth)return null;
@@ -701,6 +706,9 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
   const range=useMemo(()=>({start:dayIn(month,1),end:dayIn(month,daysIn(month)),label:monthLabel(month).split(' ')[0].toLowerCase()}),[month]);
   const fixed=useMemo(()=>fixedSummary(d.txs,accountId,range),[d,accountId,range]);
   const fixedIn=useMemo(()=>fixedSummary(d.txs,accountId,range,'income'),[d,accountId,range]);
+  // 0.3.228: fixas que so comecam depois deste mes tambem aparecem na lista ("comeca em"), fora dos totais
+  const upcomingFx=useMemo(()=>fixedUpcoming(d.txs,accountId,range,side==='pagar'?'expense':'income'),[d,accountId,range,side]);
+
   const prevShare=useMemo(()=>{const out:number[]=[];for(let i=1;i<=3;i++){const m=addMonths(month,-i);const f=fixedSummary(d.txs,accountId,{start:dayIn(m,1),end:dayIn(m,daysIn(m))});if(f.share!==null)out.push(f.share);}return out.length?out.reduce((a,b)=>a+b,0)/out.length:null;},[d,accountId,month]);
   const fx=side==='pagar'?fixed:fixedIn;
   return <>
@@ -719,7 +727,7 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
       </View>
       {warning ? <Text style={{fontSize:12,color:WARN}}>{warning}</Text> : null}
     </Card_>
-    {fx.bills.length ? <Card_>
+    {fx.bills.length||upcomingFx.length ? <Card_>
       <Title text={side==='pagar'?'Contas fixas':'Receitas fixas'} />
       <Text style={{fontSize:12,color:c.muted,lineHeight:18}}>{side==='pagar'?'As contas marcadas como “Todo mês”':'As receitas marcadas como “Todo mês” (ex.: salário)'}, em {range.label}.</Text>
       {/* 0.3.192: tocar numa conta fixa abre a edicao dela (nome, valor, dia, parcelas, avisos) - vale para todos os meses */}
@@ -731,6 +739,16 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
         </View>
         <Text style={{color:b.paid?c.muted:c.text,fontWeight:'700',fontSize:14,textDecorationLine:b.paid?'line-through':'none'}}>{money(b.amount)}</Text>
         {original?<Text style={{color:c.muted,fontSize:16}}>›</Text>:null}
+      </Pressable>;})}
+      {/* 0.3.230: a fixa que comeca depois aparece igual as outras (sem botao); so diz de quando e */}
+      {upcomingFx.map(t=>{const n=Math.round(Number(t.entity?.data?.installments)||0),from=monthLabel(monthOf(t.date)).split(' ')[0].toLowerCase(),to=n>1?monthLabel(addMonths(monthOf(t.date),n-Math.max(1,Math.round(Number(t.entity?.data?.installment)||1)))).split(' ')[0].toLowerCase():'';
+        return <Pressable key={'u'+t.id} accessibilityRole="button" accessibilityLabel={'Editar '+t.desc} onPress={()=>onBill(t,'series')} style={({pressed})=>({flexDirection:'row',alignItems:'center',gap:10,paddingVertical:12,borderTopWidth:1,borderColor:c.line,opacity:pressed?0.7:1})}>
+        <View style={{flex:1,gap:2}}>
+          <Text style={{color:c.text,fontSize:14,fontWeight:'600'}}>{t.desc}</Text>
+          <Text style={{color:c.muted,fontSize:11}}>dia {Number(t.date.slice(8,10))} · {side==='pagar'?'a pagar':'a receber'} · {to?'de '+from+' a '+to:'a partir de '+from}</Text>
+        </View>
+        <Text style={{color:c.text,fontWeight:'700',fontSize:14}}>{money(t.amount)}</Text>
+        <Text style={{color:c.muted,fontSize:16}}>›</Text>
       </Pressable>;})}
       <Text style={{color:c.muted,fontSize:11}}>Toque numa conta para mudar nome, valor, dia, parcelas ou avisos. Vale para todos os meses.</Text>
       <View style={{borderTopWidth:1,borderColor:c.line,paddingTop:12,gap:6}}>
@@ -1400,7 +1418,8 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
   // 0.3.226: salario e qualquer receita programada (inclusive as de Contas) aparecem no Historico desde o comeco do mes,
   // como "a receber", ate serem confirmadas; conta a pagar segue so em Contas
   const pendingIncome = (t: Tx) => t.kind === 'income' && !t.paid;
-  const list = monthTxs(d.txs, month).filter(t => (pendingIncome(t) || !t.manualDue || t.paid) && (source === 'import' ? imported(t) : !imported(t)) && (kind === 'all' || t.kind === kind) && (!accountFilter || t.accountId === accountFilter || t.toAccountId === accountFilter || t.cardId === accountFilter)
+  // 0.3.232: conta avulsa aparece so aqui no extrato; as programadas ficam em Contas
+  const list = monthTxs(d.txs, month).filter(t => (pendingIncome(t) || !t.manualDue || t.paid || !isScheduled(t)) && (source === 'import' ? imported(t) : !imported(t)) && (kind === 'all' || t.kind === kind) && (!accountFilter || t.accountId === accountFilter || t.toAccountId === accountFilter || t.cardId === accountFilter)
     && (status === 'all' || (!t.paid && !t.cardId)) && (!activeCat || t.category === activeCat));
   const days = useMemo(() => { const m = new Map<string, Tx[]>(); for (const t of list) { if (!m.has(t.date)) m.set(t.date, []); m.get(t.date)!.push(t); } return [...m.entries()].map(([k, v]) => [k, [...v].sort((a, b) => (b.time || '').localeCompare(a.time || ''))] as [string, Tx[]]); }, [list]);
   const sum = list.reduce((s, t) => s + (t.kind === 'income' ? t.amount : t.kind === 'expense' ? -t.amount : 0), 0);

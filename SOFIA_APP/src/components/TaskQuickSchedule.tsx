@@ -16,7 +16,7 @@ const REMINDERS=[{value:-1,label:'Sem lembrete'},{value:0,label:'No horário'},{
 
 /** 0.3.201: tocar numa tarefa e programar em segundos - dia, hora, lembrete e importancia. Com data, ela
  * aparece na Agenda e o lembrete avisa no celular. */
-export function TaskQuickSchedule({api,task,onClose,onSaved,onDetails}:{api:SofiaApi;task:Task;onClose:()=>void;onSaved:(t:Task)=>void;onDetails?:()=>void}){
+export function TaskQuickSchedule({api,task,onClose,onSaved,onDetails,detailsLabel}:{api:SofiaApi;task:Task;onClose:()=>void;onSaved:(t:Task)=>void;onDetails?:()=>void;detailsLabel?:string}){
  const c=useTheme();
  const due=task.due_at?new Date(task.due_at):null;
  const [date,setDate]=useState(due?dayKey(due):''),[time,setTime]=useState(due&&!(due.getHours()===9&&due.getMinutes()===0&&!task.notifications?.length)?pad(due.getHours())+':'+pad(due.getMinutes()):'');
@@ -57,7 +57,7 @@ export function TaskQuickSchedule({api,task,onClose,onSaved,onDetails}:{api:Sofi
    {error?<Text style={{color:c.danger,fontSize:13}}>{error}</Text>:null}
    <Button title={date?'Programar':'Salvar'} loading={saving} onPress={()=>void save()}/>
    <View style={{flexDirection:'row',justifyContent:'space-between'}}>
-    {onDetails?<Pressable accessibilityRole="button" onPress={onDetails} style={{paddingVertical:10}}><Text style={{color:c.accent,fontWeight:'700'}}>Ver detalhes</Text></Pressable>:<View/>}
+    {onDetails?<Pressable accessibilityRole="button" onPress={onDetails} style={{paddingVertical:10}}><Text style={{color:c.accent,fontWeight:'700'}}>{detailsLabel||'Ver detalhes'}</Text></Pressable>:<View/>}
     {task.due_at?<Pressable accessibilityRole="button" onPress={()=>void save(true)} style={{paddingVertical:10}}><Text style={{color:c.muted}}>Tirar a data</Text></Pressable>:null}
    </View>
   </ScrollView>

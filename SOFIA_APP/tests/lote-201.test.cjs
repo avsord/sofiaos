@@ -56,8 +56,11 @@ test('tocar na tarefa programa dia, hora, lembrete e importancia (Inicio, app de
   const q=read('src/components/TaskQuickSchedule.tsx');
   for(const s of ['Hoje','Amanhã','Sem data','Escolher o dia','Sem horário','Lembrete','Importância','Ver detalhes','Tirar a data'])assert.ok(q.includes(s),s);
   assert.ok(q.includes("notifications:at&&reminder>=0?[String(reminder)]:[]"));
-  assert.ok(read('src/screens/Home.tsx').includes('onPress={()=>setQuick(task)}'));
-  assert.ok(read('src/screens/Workspace.tsx').includes("onPress={()=>{setError('');setQuick(t);}}"));
+  // 0.3.231: tocar abre os detalhes (como antes); a tela rapida abre pelo Editar
+  const h=read('src/screens/Home.tsx'),w=read('src/screens/Workspace.tsx'),td=read('src/components/HomeTaskDetails.tsx');
+  assert.ok(h.includes('onPress={()=>openTask(task)}')&&h.includes('onEdit:(t:Task)=>setQuick(t)')&&td.includes('if(onEdit){close();onEdit(task);}'),'Inicio: tocar abre detalhes; Editar tarefa abre a tela rapida');
+  assert.ok(h.includes('detailsLabel="Editar título e descrição"')&&td.includes('[editing,setEditing]=useState(startEditing)'),'da tela rapida volta para editar titulo e descricao');
+  assert.ok(w.includes("onPress={()=>{setError('');setEditing({...t});}}")&&w.includes("{text:'Editar data e lembrete',onPress:()=>{setError('');setQuick(t);}}"),'Tarefas: tocar abre o editor; segurar > Editar data e lembrete');
   const ag=read('src/screens/Agenda.tsx');assert.ok(ag.includes("if(item.kind==='task')"));assert.ok(ag.includes("item.kind==='task'?'Tarefa'"));
   assert.ok(read('src/components/HomeCommitmentEditor.tsx').includes('[google,setGoogle]=useState(true)'),'compromisso novo ja vai para o Google');
 });
@@ -375,7 +378,7 @@ test('0.3.225: sem aviso verde ao salvar; mes que ainda nao chegou fica zerado n
 test('0.3.226: aporte fora de "A vencer e atrasadas"; receita programada no Historico desde o comeco do mes',()=>{
   const s=read('src/screens/Finance.tsx');
   assert.ok(!s.includes("{aporte&&aporte.monthTarget>0?(aporte.missing>0"),'sem o aporte na lista');
-  assert.ok(s.includes("(pendingIncome(t) || !t.manualDue || t.paid)"),'receita a receber aparece o mes todo');
+  assert.ok(s.includes("(pendingIncome(t) || !t.manualDue || t.paid || !isScheduled(t))"),'receita a receber aparece o mes todo');
   const f=require('./load-ts.cjs')('src/lib/finance.ts');
   const sal=f.toTx({id:'sal',kind:'fin_tx',title:'Salário',state:'active',data:{kind:'income',amount:7821,date:'2026-09-25',account_id:'a1',paid:true,category:'Salário',recurrence:'monthly',import_id:'sofia-pendencia:sal'}});
   const conta=f.toTx({id:'c',kind:'fin_tx',title:'Internet',state:'active',data:{kind:'expense',amount:100,date:'2026-10-15',account_id:'a1',paid:false,category:'Contas',recurrence:'none',import_id:'sofia-pendencia:c'}});
@@ -398,4 +401,27 @@ test('0.3.227: segurar widget nao abre a tela; meta removivel; arrastar app trav
   const g=f.fixedDuplicateGroups([mk('a','Quinto andar (aluguel)',1853.94),mk('b','Quinto andar (aluguel)',1853.94),mk('c','Quinto Andar(aluguel)',1853.54),mk('x','Outra',10)]);
   assert.equal(g.length,1);assert.equal(g[0].items.length,3,'mesmo nome (sem diferenca de maiuscula/espaco) e dia');
   assert.ok(s.includes('<FixedDupCard d={d} api={api} reload={reload} />'),'aviso em Contas e no Resumo');
+});
+
+test('0.3.228: fixa que comeca no mes seguinte aparece em Contas ("comeca em"), fora dos totais, com "Contar em <mes>"',()=>{
+  const f=require('./load-ts.cjs')('src/lib/finance.ts');
+  const mk=(id,title,amount,date,extra={})=>f.toTx({id,kind:'fin_tx',title,state:'active',data:{kind:'income',amount,date,account_id:'a1',paid:false,category:'Contas',recurrence:'monthly',import_id:'sofia-pendencia:'+id,...extra}});
+  const txs=[mk('q','Quinto andar (aluguel)',1853.94,'2026-11-12'),mk('s','Salário',7821,'2026-09-25',{paid:true})];
+  const out={start:'2026-10-01',end:'2026-10-31'};
+  assert.equal(f.fixedUpcoming(txs,'a1',out,'income').map(t=>t.desc).join(),'Quinto andar (aluguel)','aparece em outubro');
+  assert.equal(f.fixedSummary(txs,'a1',out,'income').total,7821,'fora do total de outubro');
+  assert.equal(f.fixedUpcoming(txs,'a1',{start:'2026-11-01',end:'2026-11-30'},'income').length,0,'em novembro ja esta na lista normal');
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("{to?'de '+from+' a '+to:'a partir de '+from}")&&!s.includes('Contar em {range.label}')&&s.includes('{fx.bills.length||upcomingFx.length ? <Card_>'),'0.3.230: igual as outras, sem botao');
+});
+
+
+test('0.3.232: Contas so com programadas, avulsas so no extrato; copias identicas do aluguel somem sozinhas',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes('monthDues(d.txs,accountId,month,today).filter(r=>isScheduled(r.tx))')&&s.includes('(pendingIncome(t) || !t.manualDue || t.paid || !isScheduled(t))'));
+  assert.ok(s.includes('const extras = exactTwinExtras(data.txs).filter(t => !twinsTried.current.has(t.id));'));
+  const f=require('./load-ts.cjs')('src/lib/finance.ts');
+  const mk=(id,title,amount,created,extra={})=>{const t=f.toTx({id,kind:'fin_tx',title,state:'active',data:{kind:'income',amount,date:'2026-11-12',account_id:'a1',paid:false,category:'Contas',recurrence:'monthly',installments:5,installment:1,import_id:'sofia-pendencia:'+id,...extra}});t.entity.created_at=created;return t;};
+  const txs=[mk('a','Quinto andar (aluguel)',1853.94,'2026-10-20T10:00'),mk('b','Quinto andar (aluguel)',1853.94,'2026-10-20T11:00'),mk('c','Quinto andar (aluguel)',1853.94,'2026-10-21T00:10'),mk('d','Quinto Andar(aluguel)',1853.54,'2026-10-20T09:00',{installments:'',installment:''})];
+  assert.equal(f.exactTwinExtras(txs).map(t=>t.id).join(','),'b,c','as duas copias iguais saem; fica a mais antiga');
 });
