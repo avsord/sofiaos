@@ -261,7 +261,7 @@ class Workspace {
    // que veio da regra sai, os e-mails ficam. Emoji escolhido pela pessoa (que nao seja a estrela) continua.
    if(e.kind==='mail_rule'){const at=now(),rows=this.db.prepare("SELECT id,data FROM entities WHERE owner=? AND kind='mail_hit' AND data LIKE ?").all(OWNER,'%'+entityId+'%');
     for(const r of rows){let d={};try{d=JSON.parse(r.data)||{};}catch{d={};}if(d.rule_id===entityId)d.rule_id='';for(const k of Object.keys(d))if(typeof d[k]==='string'&&d[k].includes(entityId))d[k]=d[k].split(entityId).join('');
-     d.important=false;if(d.emoji==='⭐')d.emoji='';d.rule_names=String(d.rule_names||'').split(', ').filter(n=>n&&n!==e.title).join(', ');
+     d.important=false;if(d.emoji==='⭐'||(e.data&&e.data.emoji&&d.emoji===e.data.emoji))d.emoji='';d.rule_names=String(d.rule_names||'').split(', ').filter(n=>n&&n!==e.title).join(', ');
      this.db.prepare('UPDATE entities SET data=?,revision=revision+1,updated_at=? WHERE id=?').run(JSON.stringify(d),at,r.id);}}
    if(e.kind==='fin_tx'&&Number(e.data&&e.data.reserve_part)>0){for(const m of this.list({kind:'fin_reserve_move',limit:500}))if(m.data&&m.data.income_id===entityId){try{this.deleteEntity(m.id);}catch{/* ja saiu */}}}
    if(e.kind==='user_page'){

@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ShimmerBlock,ShimmerGroup} from './Loading';
 import {useTheme} from '../lib/theme';
-import {AccessibilityActionEvent,Animated,PanResponder,Vibration,View} from 'react-native';
+import {AccessibilityActionEvent,Animated,Easing,PanResponder,Vibration,View} from 'react-native';
 
 /** 0.3.221: grade de apps como no iPhone - segura o app, ele cresce e segue o dedo; os outros deslizam para abrir
  * espaco; ao soltar, ele assenta no lugar. Toque rapido abre. Rolagem vertical continua normal antes de segurar. */
@@ -15,19 +15,22 @@ export function AppGrid<T extends {id:string;title:string}>({items,renderCard,on
  const cb=useRef({onOpen,onReorder,onDragging,onMenu});cb.current={onOpen,onReorder,onDragging,onMenu};
  const drag=useRef<{id:string;startX:number;startY:number;moved:boolean;live:boolean;dragged?:boolean;timer:ReturnType<typeof setTimeout>|null}|null>(null);
  const pos=useRef(new Map<string,Animated.ValueXY>()).current,scale=useRef(new Animated.Value(1)).current,placed=useRef(false);
+ // 0.3.223: tudo suave como no iPhone - contorno e sombra aparecem e somem em transicao (antes trocavam de uma vez)
+ const lift=useRef(new Animated.Value(0)).current,theme=useTheme();
+ const ease=(v:Animated.Value|Animated.ValueXY,toValue:any,duration=220)=>Animated.timing(v as any,{toValue,duration,easing:Easing.bezier(0.25,0.1,0.25,1),useNativeDriver:true});
  const slot=(k:number)=>({x:(k%COLS)*(geo.current.cellW+GAP),y:Math.floor(k/COLS)*(H+GAP)});
  const p=(id:string)=>{let v=pos.get(id);if(!v){const k=Math.max(0,idsRef.current.indexOf(id));v=new Animated.ValueXY(slot(k));pos.set(id,v);}return v;};
  useEffect(()=>{if(!drag.current)setIds(items.map(i=>i.id));},[key]);
  useEffect(()=>{if(!w)return;const first=!placed.current;placed.current=true;
   // 0.3.236: so anima enquanto a pessoa arrasta; ordem que chega de fora (ao abrir) aparece direto no lugar
   const live=!!drag.current?.live;
-  ids.forEach((id,k)=>{if(live&&drag.current?.id===id)return;const s=slot(k);if(first||!live)p(id).setValue(s);else Animated.spring(p(id),{toValue:s,useNativeDriver:true,speed:16,bounciness:6}).start();});},[ids,w]);
+  ids.forEach((id,k)=>{if(live&&drag.current?.id===id)return;const s=slot(k);if(first||!live)p(id).setValue(s);else ease(p(id),s,200).start();});},[ids,w]);
  function end(terminated:boolean){const d=drag.current;drag.current=null;setPressed(null);if(!d)return;if(d.timer)clearTimeout(d.timer);
   if(!d.live){if(!d.moved&&!terminated)cb.current.onOpen(d.id);return;}
   const k=idsRef.current.indexOf(d.id);
-  // 0.3.221: soltou, ficou - o app vai direto para o lugar e o contorno/selecao sai no mesmo quadro (antes esperava a mola assentar)
-  p(d.id).stopAnimation();scale.stopAnimation();p(d.id).setValue(slot(k));scale.setValue(1);setActive(null);
-  idsRef.current.forEach((id,i)=>{if(id!==d.id){p(id).stopAnimation();p(id).setValue(slot(i));}});
+  // 0.3.223: soltou - desliza ate o lugar numa animacao curta e suave; contorno e sombra somem no mesmo movimento
+  idsRef.current.forEach((id,i)=>{if(id!==d.id)ease(p(id),slot(i),200).start();});
+  Animated.parallel([ease(p(d.id),slot(k),240),ease(scale,1,240),ease(lift,0,240)]).start(()=>setActive(a=>a===d.id?null:a));
   cb.current.onDragging?.(false);cb.current.onReorder([...idsRef.current]);
   // 0.3.222: segurou e soltou sem arrastar - abre as opcoes do app (destacar com uma bolinha de cor)
   if(!d.dragged&&!terminated)cb.current.onMenu?.(d.id);}
@@ -37,7 +40,7 @@ export function AppGrid<T extends {id:string;title:string}>({items,renderCard,on
   // antes de segurar, a rolagem da tela pode assumir; durante o arrasto, nao
   onShouldBlockNativeResponder:()=>false,onPanResponderTerminationRequest:()=>!drag.current?.live,
   onPanResponderGrant:()=>{const k=idsRef.current.indexOf(id),s=slot(k);const d={id,startX:s.x,startY:s.y,moved:false,live:false,timer:null as ReturnType<typeof setTimeout>|null};setPressed(id);
-   d.timer=setTimeout(()=>{if(drag.current!==d)return;d.live=true;setActive(id);setPressed(null);cb.current.onDragging?.(true);try{Vibration.vibrate(12);}catch{/* sem vibracao */}Animated.spring(scale,{toValue:1.06,useNativeDriver:true,speed:18,bounciness:6}).start();},HOLD);drag.current=d;},
+   d.timer=setTimeout(()=>{if(drag.current!==d)return;d.live=true;setActive(id);setPressed(null);cb.current.onDragging?.(true);try{Vibration.vibrate(12);}catch{/* sem vibracao */}Animated.parallel([ease(scale,1.06,180),ease(lift,1,180)]).start();},HOLD);drag.current=d;},
   onPanResponderMove:(_e,g)=>{const d=drag.current;if(!d||d.id!==id)return;
    if(!d.live){if(Math.abs(g.dx)+Math.abs(g.dy)>10){d.moved=true;if(d.timer)clearTimeout(d.timer);setPressed(null);}return;}
    if(Math.abs(g.dx)+Math.abs(g.dy)>8)d.dragged=true;
@@ -55,9 +58,11 @@ export function AppGrid<T extends {id:string;title:string}>({items,renderCard,on
    return <Animated.View key={id} {...responder(id).panHandlers} accessible accessibilityRole="button" accessibilityLabel={'Abrir '+item.title+'. Segure e arraste para mudar de lugar.'}
     accessibilityActions={[{name:'activate'},{name:'moveBefore',label:'Mover para antes'},{name:'moveAfter',label:'Mover para depois'}]}
     onAccessibilityAction={(e:AccessibilityActionEvent)=>{const n=e.nativeEvent.actionName;if(n==='activate')cb.current.onOpen(id);else if(n==='moveBefore')move(id,-1);else if(n==='moveAfter')move(id,1);}}
-    style={{position:'absolute',left:0,top:0,width:cellW,height:H,zIndex:lifted?20:1,elevation:lifted?10:0,shadowColor:'#000',shadowOpacity:lifted?0.22:0,shadowRadius:14,shadowOffset:{width:0,height:6},opacity:pressed===id?0.85:1,
+    style={{position:'absolute',left:0,top:0,width:cellW,height:H,zIndex:lifted?20:1,opacity:pressed===id?0.85:1,
      transform:[...p(id).getTranslateTransform(),{scale:lifted?scale:1}]}}>
-    {renderCard(item,lifted)}
+    {lifted?<Animated.View pointerEvents="none" style={{position:'absolute',left:2,right:2,top:6,bottom:-4,borderRadius:24,backgroundColor:'#000',opacity:lift.interpolate({inputRange:[0,1],outputRange:[0,0.14]}),transform:[{translateY:4}]}}/>:null}
+    {renderCard(item,false)}
+    {lifted?<Animated.View pointerEvents="none" style={{position:'absolute',left:0,right:0,top:0,bottom:0,borderRadius:22,borderWidth:2,borderColor:theme.accent,opacity:lift}}/>:null}
    </Animated.View>;}):null}
  </View>;
 }

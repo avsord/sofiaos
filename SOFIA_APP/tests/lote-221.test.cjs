@@ -16,7 +16,7 @@ test('fatura: a de outubro paga, a compra depois do fechamento vai para novembro
   assert.equal(inv('2026-11').status,'aberta','0.3.222: depois do fechamento (dia 20) a compra de hoje entra na de novembro, que e a aberta');
   assert.equal(f.invoiceMonth(card,'2026-10-21'),'2026-11','a compra continua indo para a fatura certa pelo fechamento');
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('invoices.findIndex(i => i.month === monthOf(todayISO()))'),'Cartoes abre na fatura do mes');
+  assert.ok(s.includes('invoiceForMonth(card, d.txs, month)'),'0.3.223: Cartoes mostra a fatura do mes do topo');
 });
 
 test('pagar a fatura paga todas as contas marcadas com o cartao; desfazer volta a abrir',()=>{
@@ -86,6 +86,7 @@ test('voltar de Financas para Apps: grade ja montada, Financas nao desmonta, esq
 
 test('soltar um app: fica no lugar e o contorno sai na hora',()=>{
   const g=read('src/components/AppGrid.tsx');
-  assert.ok(g.includes('p(d.id).setValue(slot(k));scale.setValue(1);setActive(null);'));
-  assert.ok(!g.includes('.start(()=>setActive(a=>a===d.id?null:a))'),'nao espera a mola assentar');
+  // 0.3.223: assenta deslizando, curto e suave (sem mola demorada); contorno e sombra somem no mesmo movimento
+  assert.ok(g.includes('Animated.parallel([ease(p(d.id),slot(k),240),ease(scale,1,240),ease(lift,0,240)])'));
+  assert.ok(!g.includes('bounciness'),'sem mola');
 });

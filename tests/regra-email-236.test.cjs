@@ -19,3 +19,13 @@ test('apagar regra solta os e-mails direto no banco e tira a estrela',t=>{
  const saved=w.save({...w.get(hit.id),data:{...clean,emoji:'🔥'}},hit.id);
  assert.equal(saved.data.emoji,'🔥','emoji proprio do e-mail');
 });
+
+test('0.3.223: regra com emoji proprio - o e-mail encontrado vem com ele; apagar a regra tira esse emoji',t=>{
+ const {core}=fixture(t);const w=core.workspace;
+ const acc=w.save({kind:'mail_account',title:'Gmail',area:'Pessoal',data:{address:'eu@example.com',provider:'gmail'}});
+ const rule=w.save({kind:'mail_rule',title:'Impostos',area:'Pessoal',data:{field:'any',contains:'imposto',important:true,emoji:'🧾'}});
+ assert.equal(w.get(rule.id).data.emoji,'🧾');
+ const hit=w.save({kind:'mail_hit',title:'DAS',area:'Pessoal',state:'new',data:{from_name:'Receita',from_addr:'x@example.com',snippet:'',received_at:'',account_id:acc.id,rule_id:rule.id,rule_names:'Impostos',message_key:'k2',important:true,emoji:'🧾'}});
+ w.deleteEntity(rule.id);
+ const h=w.get(hit.id);assert.equal(h.data.emoji,'');assert.equal(h.data.important,false);assert.equal(h.title,'DAS');
+});

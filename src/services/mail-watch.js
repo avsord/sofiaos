@@ -217,7 +217,7 @@ class MailWatcher {
     const snippet = safeText(clean(mail.text, SNIPPET), rejectSecrets), subject = safeText(mail.subject, rejectSecrets);
     const important = rules.some(r => r.data.important);
     const hit = this.w.save({kind: 'mail_hit', title: subject.slice(0, 240), area: 'Pessoal', privacy: 'private', state: 'new',
-      data: {from_name: mail.fromName, from_addr: mail.fromAddr, snippet, received_at: mail.date, account_id: account.id, rule_id: rules[0].id, rule_names: rules.map(r => r.title).join(', ').slice(0, 300), message_key: mail.key, important}});
+      data: {from_name: mail.fromName, from_addr: mail.fromAddr, snippet, received_at: mail.date, account_id: account.id, rule_id: rules[0].id, rule_names: rules.map(r => r.title).join(', ').slice(0, 300), message_key: mail.key, important, ...(rules.find(r => r.data.important && r.data.emoji) ? {emoji: rules.find(r => r.data.important && r.data.emoji).data.emoji} : {})}});
     if (rules.some(r => r.data.notify !== false)) {
       const who = mail.fromName || mail.fromAddr || 'Remetente desconhecido';
       this.w.notify('email', (important ? '⭐ ' : '') + who + ' — ' + subject.slice(0, 120), 'Regra: ' + rules.map(r => r.title).join(', ') + (snippet ? '. ' + snippet.slice(0, 140) : ''), hit.id, important ? 'opportunity' : 'info', 'mail:' + mail.key);

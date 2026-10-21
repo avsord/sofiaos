@@ -293,7 +293,7 @@ test('0.3.196: modelo simples - previsto = receitas - despesas e pendentes - fat
   const ctl=f.spendControl(txs,[],'',f.cycleRange(25,'2026-10-19'),'a1',1779.53);
   assert.equal(ctl.left,1779.53,'controle de gastos e o Saldo');assert.equal(ctl.out,803.18);assert.equal(ctl.available,2582.71);assert.equal(Math.round(ctl.pct*100),69);
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes("['Aporte', forecastP.aporte, GUARD, '−', [] as Tx[]]"),'aporte aparece na conta do previsto');
+  assert.ok(s.includes("['Aporte', forecastP.aporte, BAD, '−', [] as Tx[]]"),'aporte aparece na conta do previsto (0.3.223: em vermelho, e um valor que sai)');
 });
 
 test('0.3.197: Pendentes com seletor A pagar | A receber, mesmo esquema nos dois lados',()=>{

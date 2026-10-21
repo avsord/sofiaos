@@ -83,6 +83,12 @@ export function toGoal(e: Entity): Goal {
 
 // ---------- Cartão de crédito ----------
 /** Compra depois do dia de fechamento cai na fatura do mês seguinte. */
+/** 0.3.223: em qual fatura o lancamento entra. Conta do mes marcada no cartao (vencimento) entra na fatura do mes dela -
+ * a conta de outubro fica na fatura de outubro. So compra avulsa segue o dia de fechamento (feita depois dele, vai para o
+ * mes seguinte). Mes gravado no lancamento sempre vale. */
+export function txInvoiceMonth(card: Pick<Card, 'closing'>, t: Pick<Tx, 'invoice' | 'date' | 'manualDue'>): string {
+  return t.invoice || (t.manualDue ? monthOf(t.date) : invoiceMonth(card, t.date));
+}
 export function invoiceMonth(card: Pick<Card, 'closing'>, date: string): string {
   const day = Number(date.slice(8, 10)), month = monthOf(date);
   return day > card.closing ? addMonths(month, 1) : month;
@@ -105,7 +111,7 @@ export function recurringCardCharges(card: Card, txs: Tx[], today = todayISO()):
 export function cardInvoices(card: Card, txs: Tx[], today = todayISO()): Invoice[] {
   const months = new Map<string, Tx[]>();
   for (const t of [...txs, ...recurringCardCharges(card, txs, today)]) if (t.kind === 'expense' && t.cardId === card.id) {
-    const m = t.invoice || invoiceMonth(card, t.date);
+    const m = txInvoiceMonth(card, t);
     if (!months.has(m)) months.set(m, []);
     months.get(m)!.push(t);
   }
@@ -117,9 +123,17 @@ export function cardInvoices(card: Card, txs: Tx[], today = todayISO()): Invoice
     const total = round2(items.reduce((s, t) => s + t.amount, 0));
     const paid = round2(txs.filter(t => t.kind === 'card_payment' && t.cardId === card.id && t.invoice === month && t.paid).reduce((s, t) => s + t.amount, 0));
     const due = invoiceDue(card, month), close = invoiceClose(card, month);
-    const status: Invoice['status'] = total > 0 && paid >= total ? 'paga' : month > current ? 'futura' : month === current ? 'aberta' : today > due && paid < total ? 'vencida' : 'fechada';
+    // 0.3.223: depois do fechamento a fatura aparece FECHADA ate ser paga (o vencimento passado aparece ao lado da data)
+    const status: Invoice['status'] = total > 0 && paid >= total ? 'paga' : month > current ? 'futura' : month === current ? 'aberta' : 'fechada';
     return {card, month, total, paid, due, close, items: items.sort((a, b) => b.date.localeCompare(a.date)), status};
   });
+}
+/** 0.3.223: a fatura de um mes escolhido no topo (com as compras e contas daquele mes; mes sem nada vem vazio). */
+export function invoiceForMonth(card: Card, txs: Tx[], month: string, today = todayISO()): Invoice {
+  const found = cardInvoices(card, txs, today).find(i => i.month === month);
+  if (found) return found;
+  const current = invoiceMonth(card, today);
+  return {card, month, total: 0, paid: 0, due: invoiceDue(card, month), close: invoiceClose(card, month), items: [], status: month > current ? 'futura' : month === current ? 'aberta' : 'fechada'};
 }
 /** 0.3.221: conta marcada com o cartao fica paga quando a fatura dela e paga (pagar a fatura paga todas de uma vez).
  * Se o pagamento da fatura for desfeito, elas voltam a ficar em aberto. */
@@ -131,7 +145,7 @@ export function cardBillSettled(cards: Card[], txs: Tx[], today = todayISO()): (
     if (!card) return false;
     let list = cache.get(card.id);
     if (!list) { list = cardInvoices(card, txs, today); cache.set(card.id, list); }
-    const inv = list.find(i => i.month === (t.invoice || invoiceMonth(card, t.date)));
+    const inv = list.find(i => i.month === txInvoiceMonth(card, t));
     return !!inv && inv.total > 0 && inv.paid >= inv.total - 0.005;
   };
 }
@@ -207,9 +221,14 @@ export type MonthSummary = {income: number; incomePending: number; expense: numb
 export function monthSummary(txs: Tx[], month: string): MonthSummary {
   const list = monthTxs(txs, month);
   let income = 0, incomePending = 0, expense = 0, expensePending = 0, cardSpend = 0;
+  // 0.3.223: compra no cartao cobrada na fatura de outro mes (feita depois do fechamento) conta nas Despesas do mes da
+  // fatura, nao no da compra - nao mexe no mes atual
+  const later = (t: Tx) => t.kind === 'expense' && !!t.cardId && !!t.invoice && t.invoice > monthOf(t.date);
+  for (const t of txs) if (!t.virtual && later(t) && t.invoice === month && monthOf(t.date) !== month) { cardSpend += t.amount; expense += t.amount; }
   for (const t of list) {
     if (t.kind === 'income') { if (t.paid && !t.virtual) income += t.amount; else incomePending += t.amount; }
     if (t.kind === 'expense') {
+      if (later(t)) continue;
       if (t.cardId) { cardSpend += t.amount; expense += t.amount; }
       else if (t.paid && !t.virtual) expense += t.amount; else expensePending += t.amount;
     }

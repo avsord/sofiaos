@@ -38,13 +38,13 @@ test('fatura pelo fechamento (fecha 9, vence 15): em 21/10 outubro esta fechada 
   const card=f.toCard(E('fin_card','Inter',{limit:5000,closing_day:9,due_day:15,account_id:'a1'}));
   const c1=tx('compra',{kind:'expense',amount:300,date:'2026-10-21',card_id:'Inter',paid:false}),c0=tx('antiga',{kind:'expense',amount:50,date:'2026-10-02',card_id:'Inter',paid:false});
   const inv=f.cardInvoices(card,[c0,c1],'2026-10-21'),by=m=>inv.find(i=>i.month===m);
-  assert.equal(by('2026-10').status,'vencida','outubro fechou dia 9 e venceu dia 15 sem pagamento');
+  assert.equal(by('2026-10').status,'fechada','0.3.223: outubro fechou dia 9 - aparece FECHADA ate ser paga');
   assert.equal(by('2026-11').status,'aberta');assert.equal(by('2026-11').total,300,'a compra de hoje ja consta em novembro');
   assert.equal(f.invoiceDue(card,'2026-11'),'2026-11-15');
   const paid=[c0,c1,tx('pg',{kind:'card_payment',amount:50,date:'2026-10-14',card_id:'Inter',invoice_month:'2026-10'})];
   assert.equal(f.cardInvoices(card,paid,'2026-10-21').find(i=>i.month==='2026-10').status,'paga');
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes("' · cobrado na fatura de ' + monthLabel(t.invoice || invoiceMonth(card, t.date))"),'historico avisa em qual fatura sera cobrado');
+  assert.ok(s.includes("' · cobrado na fatura de ' + monthLabel(txInvoiceMonth(card, t))"),'historico avisa em qual fatura sera cobrado');
   assert.ok(s.includes('function askPayInvoice(card: Card, t: Tx)')&&s.includes('onPress={() => askPayInvoice(cardOf, due.tx!)}'),'Paguei na conta do cartao paga a fatura toda');
   assert.ok(s.includes('>Usar conta existente</Text>')&&!s.includes('Usar uma de Contas'));
 });
@@ -64,5 +64,5 @@ test('apps: segurar seleciona quase na hora; segurar e soltar sem arrastar abre 
 
 test('e-mail: emoji por e-mail (estrela ou outro)',()=>{
   const m=read('src/screens/Mail.tsx');
-  assert.ok(m.includes("const HIT_EMOJIS = ['⭐'")&&m.includes('{hitEmoji(h) ? <Text>{hitEmoji(h)}</Text> : null}')&&m.includes('Emoji deste e-mail'));
+  assert.ok(m.includes("const HIT_EMOJIS = ['⭐'")&&m.includes('{hitEmoji(h, rules) ? <Text>{hitEmoji(h, rules)}</Text> : null}')&&m.includes('Emoji deste e-mail'));
 });

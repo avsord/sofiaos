@@ -295,7 +295,7 @@ test('0.3.220: seletores compactos (do tamanho do texto) - Lancamentos | Extrato
 
 test('0.3.221: Apps arrastaveis como no iPhone; Inicio: segurar um widget abre o seletor com puxador',()=>{
   const g=read('src/components/AppGrid.tsx'),l=read('src/components/ReorderList.tsx'),sw=read('src/components/SortableWidgets.tsx'),w=read('src/screens/Workspace.tsx'),h=read('src/screens/Home.tsx');
-  assert.ok(g.includes('const GAP=12,H=148,COLS=2,HOLD=170;')&&g.includes('onShouldBlockNativeResponder:()=>false')&&g.includes("Animated.spring(scale,{toValue:1.06"),'segura, cresce e segue o dedo; rolagem livre antes de segurar');
+  assert.ok(g.includes('const GAP=12,H=148,COLS=2,HOLD=170;')&&g.includes('onShouldBlockNativeResponder:()=>false')&&g.includes("Animated.parallel([ease(scale,1.06,180),ease(lift,1,180)])"),'segura, cresce e segue o dedo; rolagem livre antes de segurar');
   assert.ok(g.includes('if(target!==cur){const next=[...idsRef.current];next.splice(cur,1);next.splice(target,0,id)'),'os outros abrem espaco');
   assert.ok(w.includes('<AppGrid items={orderedModules} onMenu={setHighlightFor} onDragging={on=>{setDraggingApp(on);onGestureLock?.(on);}} onReorder={saveAppOrder}')&&w.includes('scrollEnabled={!draggingApp}'),'apps usam a grade; a tela nao rola durante o arrasto');
   assert.ok(!w.includes('Use as setas para mudar os apps de lugar.'),'saiu o modo das setas');
@@ -338,12 +338,12 @@ test('0.3.223: Redefinir Financas; Relatorios na ordem pedida e todas as secoes 
   const card={id:'c1',name:'Nubank',limit:5000,closing:3,due:10,color:'#000',accountId:'a1',archived:false,entity:null};
   const adobe=f.toTx({id:'adobe',kind:'fin_tx',title:'Adobe',state:'active',data:{kind:'expense',amount:47,date:'2026-09-11',account_id:'a1',card_id:'c1',paid:false,category:'Contas',recurrence:'monthly',import_id:'sofia-pendencia:adobe'}});
   const inv=f.cardInvoices(card,[adobe],'2026-10-20');
-  assert.equal(JSON.stringify(inv.slice(0,3).map(i=>[i.month,i.total])),JSON.stringify([['2026-10',47],['2026-11',47],['2026-12',47]]),'conta fixa no cartao cai na fatura todo mes');
+  assert.equal(JSON.stringify(inv.slice(0,3).map(i=>[i.month,i.total])),JSON.stringify([['2026-09',47],['2026-10',47],['2026-11',47]]),'conta fixa no cartao cai na fatura todo mes (0.3.223: na fatura do mes da propria conta)');
   assert.equal(f.cardUsed(card,[adobe],'2026-10-20'),94,'usado so com o que ja foi cobrado');
   const due=f.monthDues([adobe],'a1','2026-10','2026-10-20');assert.equal(due.length,1);assert.equal(due[0].late,false,'conta do cartao nao fica atrasada');
   assert.equal(f.effect(adobe,'a1'),0,'nao sai do saldo direto');
   const fx=f.fixedSummary([adobe],'a1',{start:'2026-10-01',end:'2026-10-31'});assert.equal(fx.card,47);assert.equal(fx.open,0,'no cartao nao conta em faltam');
-  assert.ok(s.includes('<Title text="Contas no cartão" />')&&s.includes('>Usar conta existente</Text>')&&s.includes('>Nova conta</Text>'),'aba Cartoes');
+  assert.ok(!s.includes('<Title text="Contas no cartão" />')&&s.includes('>Usar conta existente</Text>')&&s.includes('>Nova conta</Text>'),'aba Cartoes (0.3.223: sem o bloco repetido; botoes na fatura)');
   assert.ok(s.includes("options={[{value:'',label:'Não'},...cardsList.map(k=>({value:k.id,label:'💳 '+k.name}))]}")&&s.includes('>Feita no cartão</Text>'),'0.3.224: marcar no editar que foi feita no cartao');
   assert.ok(s.includes('async function startSeriesNextMonth(')&&s.includes("o cartão vale a partir do mês que vem"),'conta ja paga este mes passa ao cartao no mes seguinte');
   assert.ok(s.includes("💳 {due.title}")&&s.includes("const open=list.filter(row=>!row.paid&&!row.tx?.cardId)"),'simbolo em Contas e fora dos totais');

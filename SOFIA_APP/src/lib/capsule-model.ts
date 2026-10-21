@@ -29,3 +29,16 @@ export function capsuleDoseOfNotice(id:string):{planId:string;day:string;time:st
  const m=/^local:capsule:(.+):(\d{4}-\d{2}-\d{2}):([01]\d|2[0-3]):([0-5]\d)(?::early)?$/.exec(String(id||''));
  return m?{planId:m[1],day:m[2],time:m[3]+':'+m[4]}:null;
 }
+
+/** 0.3.223: dose nao tomada nao some na virada do dia - fica acumulando ate a pessoa marcar que tomou. Devolve as doses dos
+ * dias anteriores (ate 30 dias, e nunca antes de `since`, o dia em que esta regra passou a valer no aparelho) sem registro. */
+export function capsuleMissed(plans:Entity[],history:Entity[],since:string,today=capsuleDay(new Date())):CapsuleDose[]{
+ const done=new Set(history.map(r=>capsuleKey(r.data.capsule_id,r.data.day,r.data.time))),out:CapsuleDose[]=[];
+ const t=new Date(today+'T12:00:00'),first=new Date(t.getFullYear(),t.getMonth(),t.getDate()-30),min=capsuleDay(first)>since?capsuleDay(first):since;
+ for(let d=new Date(min+'T12:00:00');capsuleDay(d)<today;d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1)){const day=capsuleDay(d);
+  for(const plan of plans){if(plan.state!=='active'||!capsuleOccurs(plan.data,day))continue;
+   for(const time of capsuleTimes(plan)){const key=capsuleKey(plan.id,day,time);if(done.has(key))continue;out.push({key,plan,day,time,date:new Date(day+'T'+time+':00'),due:true,missed:true});}}}
+ return out.sort((a,b)=>a.date.getTime()-b.date.getTime());
+}
+/** "ontem" ou dd/mm. */
+export function capsuleDayLabel(day:string,today=capsuleDay(new Date())):string{const t=new Date(today+'T12:00:00'),y=capsuleDay(new Date(t.getFullYear(),t.getMonth(),t.getDate()-1));return day===y?'ontem':day.slice(8,10)+'/'+day.slice(5,7);}

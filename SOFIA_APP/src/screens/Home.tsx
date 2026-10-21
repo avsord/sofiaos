@@ -43,7 +43,7 @@ export const HOME_WIDGET_IDS=['goal','monitoring','tasks','capsules','reminders'
 export const HOME_FIXED_WIDGETS:string[]=[];
 export const GOAL_HIDDEN_KEY='sofia.home.goal.hidden.v1';
 export function withFixedWidgets(order:string[],goalHidden=false):string[]{return goalHidden||order.includes('goal')?order:['goal',...order];}
-export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisible=true,onGestureLock,onOpenCapsules,onOpenMonitoring,onOpenTasks,onOpenModule,onDiscussTask}:{onOpenModule?:(id:string)=>void;onDiscussTask?:(task:Task)=>void;onOpenCapsules?:()=>void;onOpenMonitoring?:()=>void;onOpenTasks?:()=>void;onGestureLock?:(locked:boolean)=>void;api:SofiaApi;bootstrap:Bootstrap;navigate:(tab:Tab)=>void;onOpenAgenda?:(date:string,id?:string,create?:boolean)=>void;active?:boolean;launchVisible?:boolean}){useRenderCost('home');
+export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisible=true,onGestureLock,onOpenCapsules,onOpenMonitoring,onOpenTasks,onOpenModule,onDiscussTask,homeTopKey=0,homeTopSmooth=false}:{homeTopKey?:number;homeTopSmooth?:boolean;onOpenModule?:(id:string)=>void;onDiscussTask?:(task:Task)=>void;onOpenCapsules?:()=>void;onOpenMonitoring?:()=>void;onOpenTasks?:()=>void;onGestureLock?:(locked:boolean)=>void;api:SofiaApi;bootstrap:Bootstrap;navigate:(tab:Tab)=>void;onOpenAgenda?:(date:string,id?:string,create?:boolean)=>void;active?:boolean;launchVisible?:boolean}){useRenderCost('home');
  const [agendaDraft,setAgendaDraft]=useState<Partial<Entity>|null>(null),[agendaCatalog,setAgendaCatalog]=useState<Catalog|null>(()=>api.cached<Catalog>('/workspace/catalog')||null);
  // Catalog metadata is optional on launch. Keep cached areas synchronously,
  // then refresh after native Home is actually visible and the JS thread yields.
@@ -55,6 +55,8 @@ export function Home({api,bootstrap,navigate,onOpenAgenda,active=true,launchVisi
  },[api,active,launchVisible,agendaCatalog]);
  // 0.3.145: volta ao topo ainda escondido, depois de 10 s seguidos fora (ver return-to-top.ts).
  const homeScroll=useReturnToTop(active);
+ // 0.3.223: tocar em Inicio na barra leva ao topo (suave se ja estava no Inicio)
+ const topSeen=useRef(homeTopKey);useEffect(()=>{if(homeTopKey===topSeen.current)return;topSeen.current=homeTopKey;homeScroll.current?.scrollTo({y:0,animated:homeTopSmooth});},[homeTopKey,homeTopSmooth]);
  function createHomeCommitment(day:string){setAgendaDraft({kind:'commitment',title:'',data:{home_day:day}});}
  const [detail,setDetail]=useState<Task|null>(null),[detailOpen,setDetailOpen]=useState(false);
  const [detailEdit,setDetailEdit]=useState(false);

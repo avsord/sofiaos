@@ -2094,6 +2094,12 @@ const CATALOG={
         "key": "important",
         "label": "Marcar como importante",
         "type": "checkbox"
+      },
+      {
+        "key": "emoji",
+        "label": "Emoji",
+        "type": "text",
+        "max": 16
       }
     ],
     "description": "Quando um e-mail novo bate com a regra, a Sofia guarda e avisa."

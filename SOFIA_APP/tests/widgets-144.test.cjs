@@ -16,5 +16,5 @@ test('0.3.144: widgets abrem o app certo e so carregam quando o Inicio esta visi
   assert.ok(w.includes("useEffect(()=>{if(active)void records.load();},[active,api]);"));
   assert.ok(home.includes("onOpenModule?onOpenModule('reminders'):navigate('apps')"));
   assert.ok(home.includes("onOpenModule?onOpenModule('packages'):navigate('apps')"));
-  assert.ok(ws.includes("['reminders','packages'].includes(openModuleId)"));
+  assert.ok(ws.includes("['reminders','packages','finance','monitor','mail','capsules','routines','tasks'].includes(openModuleId)"),'0.3.223: todos os widgets abrem o app deles (inclusive a Meta)');
 });
