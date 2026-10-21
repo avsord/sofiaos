@@ -28,7 +28,8 @@ import {
   invoiceMonth, cardInvoices, cardUsed, installmentPlan, accountBalance, totalBalance, forecastBalance, monthTxs, monthSummary, byCategory, budgetProgress,
   trend, balanceSeries, upcoming, manualDues, transactionsForAccount, goalProgress, parseMoney, formatMoneyInput, finishMoneyInput, addDays,
   dayIn, daysIn} from '../lib/finance';
-import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove} from '../lib/finance';
+import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove, SaldoSnap, SaldoChange} from '../lib/finance';
+import {saldoSnapshot, reserveSnapshot, saldoDiff, cardBillSettled} from '../lib/finance';
 import {sinceReportStart, cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, monthDues, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove, effectiveCycleDay, periodBudget, salaryForecast, currentPlan, nextPlan, simpleForecast, spendControl, categoryAlerts, lastWeekByCategory, duplicateGroups, moneyLeft, monthControl, balanceAsOf, isOneOffIncome, fixedDuplicateGroups, fixedUpcoming, isScheduled, exactTwinExtras} from '../lib/finance';
 import {syncFinanceDueNotifications} from '../lib/finance-notifications';
 import {appAlert} from '../lib/app-alert';
@@ -53,7 +54,7 @@ type Bundle = {items: Record<string, Entity[]>; carry?: Record<string, number>; 
  * gráfico dia a dia) continuam exatos sem baixar o histórico inteiro. */
 function toData(all: Record<string, Entity[]>, carry: Record<string, number> = {}): Data {
   const g = (k: string) => all[k] || [];
-  return {accounts: g('fin_account').map(toAccount).map(a => ({...a, initial: a.initial + (carry[a.id] || 0)})), cards: g('fin_card').map(toCard), txs: g('fin_tx').filter(e => e.state !== 'archived').map(toTx),
+  return {accounts: g('fin_account').map(toAccount).map(a => ({...a, carry: carry[a.id] || 0, initial: a.initial + (carry[a.id] || 0)})), cards: g('fin_card').map(toCard), txs: g('fin_tx').filter(e => e.state !== 'archived').map(toTx),
     budgets: g('fin_budget').filter(e => e.state !== 'archived').map(toBudget), goals: g('fin_goal').filter(e => e.state !== 'archived').map(toGoal), moves: g('fin_reserve_move').filter(e => e.state !== 'archived').map(toReserveMove), statements: g('fin_statement').filter(e => e.state !== 'archived').map(toStatement).sort((a, b) => b.to.localeCompare(a.to))};
 }
 /** Janela de meses que cada aba precisa: Resumo/Lançamentos/Cartões/Planejamento = mês anterior
@@ -79,6 +80,32 @@ const cacheScope = (api: SofiaApi) => 'sofia-finance-v1|' + api.owner.trim().toL
 async function readCache(api: SofiaApi): Promise<Bundle | null> {
   try { const raw = await encryptedStorage.read(cacheScope(api)); const v = raw ? JSON.parse(raw) : null; return v && typeof v === 'object' && v.items ? v : null; } catch { return null; }
 }
+// 0.3.221: a cada atualizacao do mes atual, o app guarda (criptografado, no aparelho) um retrato do que forma o Saldo
+// de cada conta e da reserva. Se o Saldo mudar entre uma vez e outra, fica registrado o que mudou - inclusive o que
+// saiu do app sem a pessoa ver. O Extrato do saldo mostra essa lista.
+type SaldoStore = {snaps: Record<string, SaldoSnap>; log: Record<string, SaldoChange[]>};
+const saldoScope = (api: SofiaApi) => 'sofia-finance-saldo-v1|' + api.owner.trim().toLowerCase();
+async function readSaldoStore(api: SofiaApi): Promise<SaldoStore> {
+  try { const raw = await encryptedStorage.read(saldoScope(api)); const v = raw ? JSON.parse(raw) : null; if (v && typeof v === 'object' && v.snaps && v.log) return v; } catch { /* comeca do zero */ }
+  return {snaps: {}, log: {}};
+}
+let saldoQueue: Promise<void> = Promise.resolve();
+function recordSaldo(api: SofiaApi, data: Data) {
+  saldoQueue = saldoQueue.then(async () => {
+    const store = await readSaldoStore(api), at = new Date().toISOString(), present = new Set(data.txs.map(t => t.id));
+    const snaps: Record<string, SaldoSnap> = {};
+    for (const a of data.accounts) if (!a.archived) snaps[a.id] = saldoSnapshot(a, data.txs);
+    const r = reserveOf(data.goals);
+    if (r) snaps.reserve = reserveSnapshot(data.moves || [], r.id);
+    for (const [key, snap] of Object.entries(snaps)) {
+      const prev = store.snaps[key];
+      const change = prev ? saldoDiff(prev, snap, at, present) : null;
+      if (change && change.lines.length) store.log[key] = [change, ...(store.log[key] || [])].slice(0, 40);
+    }
+    store.snaps = snaps;
+    await encryptedStorage.write(saldoScope(api), JSON.stringify(store));
+  }).catch(() => undefined);
+}
 function writeCache(api: SofiaApi, bundle: Bundle) { void encryptedStorage.write(cacheScope(api), JSON.stringify(bundle)).catch(() => undefined); }
 function saveEntity(api: SofiaApi, kind: string, title: string, data: Record<string, any>, existing?: Entity, state?: string) {
   // 0.3.234: "__content" e a descricao breve do item (fica no conteudo do registro, fora dos campos)
@@ -87,13 +114,25 @@ function saveEntity(api: SofiaApi, kind: string, title: string, data: Record<str
     : api.saveEntity({kind, title, content: content ?? '', area: 'Pessoal', state: state || 'active', privacy: 'private', tags: [], data: rest});
 }
 
+/** 0.3.221: toque que nao se perde. No Android, o primeiro toque logo depois de rolar a folha as vezes so parava a rolagem
+ * e nao chegava ao botao (era preciso tocar duas vezes, ex.: marcar o cartao numa conta). Aqui o toque tambem e lido direto
+ * no proprio botao: dedo desceu e subiu no mesmo lugar = escolheu. Se o toque normal ja chegou, nao repete. */
+function SurePressable({onPress, ...rest}: React.ComponentProps<typeof Pressable> & {onPress: () => void}) {
+  const start = useRef<{x: number; y: number; t: number} | null>(null), fired = useRef(false);
+  return <Pressable {...rest} onPress={() => { fired.current = true; onPress(); }}
+    onTouchStart={e => { fired.current = false; start.current = {x: e.nativeEvent.pageX, y: e.nativeEvent.pageY, t: Date.now()}; }}
+    onTouchCancel={() => { start.current = null; }}
+    onTouchEnd={e => { const s0 = start.current; start.current = null;
+      if (!s0 || Math.abs(e.nativeEvent.pageX - s0.x) + Math.abs(e.nativeEvent.pageY - s0.y) > 12 || Date.now() - s0.t > 700) return;
+      setTimeout(() => { if (!fired.current) { fired.current = true; onPress(); } }, 0); }} />;
+}
 function Chips<T extends string | number>({value, options, onChange, scroll = false}: {value: T; options: Array<{value: T; label: string}>; onChange: (v: T) => void; scroll?: boolean}) {
   const c = useTheme();
   const inner = options.map(o => (
-    <Pressable key={String(o.value)} accessibilityRole="button" accessibilityState={{selected: o.value === value}} onPress={() => onChange(o.value)}
+    <SurePressable key={String(o.value)} accessibilityRole="button" accessibilityState={{selected: o.value === value}} onPress={() => onChange(o.value)}
       style={{paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99, backgroundColor: o.value === value ? c.surface : 'transparent'}}>
       <Text style={{fontSize: 13, fontWeight: '600', color: o.value === value ? c.text : c.muted}}>{o.label}</Text>
-    </Pressable>
+    </SurePressable>
   ));
   const box = {flexDirection: 'row' as const, backgroundColor: c.input, borderRadius: 99, padding: 3};
   return scroll ? <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false}><View style={box}>{inner}</View></ScrollView> : <View style={box}>{inner}</View>;
@@ -156,7 +195,9 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
   const twinsTried = useRef(new Set<string>());
   const reload = useCallback(async () => {
     setLoading(true);
-    try { const bundle = await loadAll(api, window); setData(toData(bundle.items, bundle.carry)); setError(''); loaded.current = windowKey; if (window.from <= monthOf(todayISO()) && window.to >= monthOf(todayISO())) writeCache(api, bundle); }
+    try { const bundle = await loadAll(api, window), fresh = toData(bundle.items, bundle.carry); setData(fresh); setError(''); loaded.current = windowKey; if (window.from <= monthOf(todayISO()) && window.to >= monthOf(todayISO())) writeCache(api, bundle);
+      // so a janela padrao do mes atual (o acumulado dos meses anteriores e sempre o mesmo corte) entra no registro do Saldo
+      if (window.from === addMonths(monthOf(todayISO()), -1) && window.to === addMonths(monthOf(todayISO()), 1)) recordSaldo(api, fresh); }
     catch (e) { setError(errorText(e)); }
     finally { setLoading(false); }
   }, [api, windowKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -164,6 +205,10 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
   useEffect(() => { if (!data) return; const extras = exactTwinExtras(data.txs).filter(t => !twinsTried.current.has(t.id)); if (!extras.length) return;
     extras.forEach(t => twinsTried.current.add(t.id));
     void (async () => { for (const t of extras) { try { await api.deleteEntity(t.entity!.id); } catch { /* segue */ } } await reload(); })(); }, [data]);
+  // 0.3.221: Financas continua montada depois de aberta (voltar aos Apps nao desmonta a tela). Ao sair, volta ao Resumo
+  // do mes atual, como abria antes, e a proxima abertura atualiza por tras mostrando o que ja esta na tela.
+  const wasActive = useRef(active);
+  useEffect(() => { if (wasActive.current && !active) { goHome(); setMonth(monthOf(todayISO())); setNewMenu(false); loaded.current = ''; } wasActive.current = active; }, [active, goHome]);
   // Abre na hora com a última versão guardada (mês atual); a atualização chega por trás.
   // Mudou o mês ou foi para Relatórios: busca a janela nova, mantendo o que está na tela até chegar.
   useEffect(() => {
@@ -287,7 +332,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
 function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi; onDone: () => Promise<void>; existing?: {account: Account | null; reserve: Goal | null; fixed?: Tx[]; salary?: Tx | null} | null; onClose?: () => void; onFinished?: () => void}) {
   const c = useTheme(), acc = existing?.account || null, reserve = existing?.reserve || null;
   const [step, setStep] = useState(0), [busy, setBusy] = useState(false), [error, setError] = useState('');
-  const [name, setName] = useState(acc?.name || 'Conta principal'), [balance, setBalance] = useState(acc ? finishMoneyInput(String(acc.initial).replace('.', ',')) : '');
+  const [name, setName] = useState(acc?.name || 'Conta principal'), [balance, setBalance] = useState(acc ? finishMoneyInput(String(acc.initial - (acc.carry || 0)).replace('.', ',')) : '');
   const [cycleDay, setCycleDay] = useState(acc?.cycleDay ? String(acc.cycleDay) : '');
   const salaryTx = existing?.salary || null;
   const [salary, setSalary] = useState(salaryTx ? finishMoneyInput(String(salaryTx.amount).replace('.', ',')) : '');
@@ -341,9 +386,12 @@ function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi
     setBusy(true); setError('');
     try {
       // 0.3.186: ao refazer, o saldo inicial da conta so muda se a pessoa mexeu no campo
-      const initialTouched = !acc || money0(balance) !== acc.initial;
+      // 0.3.221: compara e grava o saldo inicial guardado na conta. Antes entrava o acumulado dos meses anteriores junto,
+      // e ele passava a contar duas vezes (o Saldo subia sozinho).
+      const storedInitial = acc ? Math.round((acc.initial - (acc.carry || 0)) * 100) / 100 : 0;
+      const initialTouched = !acc || money0(balance) !== storedInitial;
       const account = await saveEntity(api, 'fin_account', name.trim() || 'Conta principal',
-        {account_type: acc?.type || 'corrente', initial_balance: String(initialTouched ? money0(balance) : acc!.initial), ...(initialTouched ? {balance_set_at: todayISO()} : {}), color: acc?.color || FIN_COLORS[0], include_total: true, cycle_day: Math.min(31, Math.max(0, Number(cycleDay) || 0))}, acc?.entity);
+        {account_type: acc?.type || 'corrente', initial_balance: String(initialTouched ? money0(balance) : storedInitial), ...(initialTouched ? {balance_set_at: todayISO()} : {}), color: acc?.color || FIN_COLORS[0], include_total: true, cycle_day: Math.min(31, Math.max(0, Number(cycleDay) || 0))}, acc?.entity);
       // 0.3.196: salario fixo do mes (valor cheio), a receber todo mes no dia informado
       if (money0(salary) > 0) {
         const today = todayISO(), payDay = Math.min(31, Math.max(1, Number(cycleDay) || Number(salaryTx?.date.slice(8, 10)) || 5));
@@ -686,14 +734,17 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
 // ============================ PENDENTES MANUAIS ============================
 function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,onAporte,onNew,onMonth,side:sideProp,onSide}: {side?:'pagar'|'receber';onSide?:(v:'pagar'|'receber')=>void;onMonth?:(m:string)=>void;onNew:(flow:'expense'|'income')=>void;d:Data;api:SofiaApi;month:string;accountId:string;warning:string;onBill:(t:Tx|'new',scope?:'month'|'series')=>void;reload:()=>Promise<void>;isPrimary?:boolean;onAporte?:()=>void}) {
   // A aba segue o mes escolhido no topo; cada mes mostra so as suas contas (0.3.180)
-  const c=useTheme(),today=todayISO(),list=useMemo(()=>monthDues(d.txs,accountId,month,today).filter(r=>isScheduled(r.tx)),[d,accountId,month,today]);
+  const c=useTheme(),today=todayISO();
+  // 0.3.221: pagar a fatura paga junto as contas marcadas com o cartao dela
+  const settled=useMemo(()=>cardBillSettled(d.cards,d.txs,today),[d,today]);
+  const list=useMemo(()=>monthDues(d.txs,accountId,month,today,settled).filter(r=>isScheduled(r.tx)),[d,accountId,month,today,settled]);
   const open=list.filter(row=>!row.paid&&!row.tx?.cardId),total=open.reduce((sum,row)=>sum+row.amount,0),paidCount=list.length-open.length;
   const toPay=open.filter(r=>r.kind!=='receber'),toGet=open.filter(r=>r.kind==='receber');
   const [sideLocal,setSideLocal]=useState<'pagar'|'receber'>('pagar');const side=sideProp??sideLocal,setSide=(v:'pagar'|'receber')=>{setSideLocal(v);onSide?.(v);};
   const sideOpen=side==='pagar'?toPay:toGet;
   const payList=list.filter(r=>r.kind!=='receber'),getList=list.filter(r=>r.kind==='receber');
   // contas do mes seguinte (ex.: o que entra no periodo do salario, mas ja em novembro) - para nada parecer oculto
-  const nextMonth=addMonths(month,1),nextList=useMemo(()=>monthDues(d.txs,accountId,nextMonth,today).filter(r=>!r.paid&&isScheduled(r.tx)),[d,accountId,nextMonth,today]);
+  const nextMonth=addMonths(month,1),nextList=useMemo(()=>monthDues(d.txs,accountId,nextMonth,today,settled).filter(r=>!r.paid&&isScheduled(r.tx)),[d,accountId,nextMonth,today,settled]);
   const sideList=side==='pagar'?list.filter(r=>r.kind!=='receber'):list.filter(r=>r.kind==='receber');
   const sideNext=nextList.some(r=>side==='receber'?r.kind==='receber':r.kind!=='receber');
   const nextHint=(kind:'pagar'|'receber')=>{const rows=nextList.filter(r=>kind==='receber'?r.kind==='receber':r.kind!=='receber');if(!rows.length||!onMonth)return null;
@@ -706,7 +757,7 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
   const cycleDay=d.accounts.find(a=>a.id===accountId)?.cycleDay||0;
   // 0.3.185: mesmo periodo da lista de cima (o mes escolhido no topo), para nenhuma conta sumir de uma das duas
   const range=useMemo(()=>({start:dayIn(month,1),end:dayIn(month,daysIn(month)),label:monthLabel(month).split(' ')[0].toLowerCase()}),[month]);
-  const fixed=useMemo(()=>fixedSummary(d.txs,accountId,range),[d,accountId,range]);
+  const fixed=useMemo(()=>fixedSummary(d.txs,accountId,range,'expense',settled),[d,accountId,range,settled]);
   const fixedIn=useMemo(()=>fixedSummary(d.txs,accountId,range,'income'),[d,accountId,range]);
   // 0.3.228: fixas que so comecam depois deste mes tambem aparecem na lista ("comeca em"), fora dos totais
   const upcomingFx=useMemo(()=>fixedUpcoming(d.txs,accountId,range,side==='pagar'?'expense':'income'),[d,accountId,range,side]);
@@ -737,7 +788,7 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
         return <Pressable key={b.id+b.date} accessibilityRole="button" accessibilityLabel={'Editar '+b.title} disabled={!original} onPress={()=>original&&onBill(original,'series')} style={({pressed})=>({flexDirection:'row',alignItems:'center',gap:10,paddingVertical:9,borderTopWidth:1,borderColor:c.line,opacity:pressed?0.6:1})}>
         <View style={{flex:1,gap:2}}>
           <Text style={{color:c.text,fontSize:14,fontWeight:'600'}}>{b.title}</Text>
-          <Text style={{color:c.muted,fontSize:11}}>dia {b.day}{b.cardId?' · 💳 '+(d.cards.find(x=>x.id===b.cardId)?.name||'cartão')+' · na fatura':' · '+(side==='pagar'?(b.paid?'paga':'a pagar'):(b.paid?'recebida':'a receber'))}{b.installments?' · parcela '+b.index+' de '+b.installments+(b.left?' · faltam '+b.left:' · última'):''}</Text>
+          <Text style={{color:c.muted,fontSize:11}}>dia {b.day}{b.cardId?' · 💳 '+(d.cards.find(x=>x.id===b.cardId)?.name||'cartão')+(b.paid?' · paga com a fatura':' · na fatura'):' · '+(side==='pagar'?(b.paid?'paga':'a pagar'):(b.paid?'recebida':'a receber'))}{b.installments?' · parcela '+b.index+' de '+b.installments+(b.left?' · faltam '+b.left:' · última'):''}</Text>
         </View>
         <Text style={{color:b.paid?c.muted:c.text,fontWeight:'700',fontSize:14,textDecorationLine:b.paid?'line-through':'none'}}>{money(b.amount)}</Text>
         {original?<Text style={{color:c.muted,fontSize:16}}>›</Text>:null}
@@ -1189,7 +1240,7 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
   const target = due.tx;
   const openEdit = () => { if (target) onTx(target); };
   // 0.3.223: conta no cartao - entra na fatura, sem "Paguei" (quem se paga e a fatura)
-  if (due.tx?.cardId) { const cardOf = d.cards.find(x => x.id === due.tx!.cardId); return (
+  if (due.tx?.cardId && !due.paid) { const cardOf = d.cards.find(x => x.id === due.tx!.cardId); return (
     <Pressable accessibilityRole="button" accessibilityLabel={'Editar ' + due.title} disabled={!target} onPress={openEdit}
       style={({pressed}) => ({flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 14, backgroundColor: c.input, opacity: pressed ? 0.7 : 1})}>
       <View style={{width: 4, height: 36, borderRadius: 2, backgroundColor: cardOf?.color || c.accent}} />
@@ -1205,7 +1256,7 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
       <View style={{width: 4, height: 36, borderRadius: 2, backgroundColor: GOOD}} />
       <View style={{flex: 1, gap: 2}}>
         <Text numberOfLines={1} style={{color: c.text, fontWeight: '600'}}>{due.title}</Text>
-        <Text style={{fontSize: 11, color: GOOD}}>{due.kind === 'receber' ? 'Recebido' : 'Pago'} · {dateBR(due.date)}{due.tx?.time ? ' · ' + due.tx.time : ''}</Text>
+        <Text style={{fontSize: 11, color: GOOD}}>{due.kind === 'receber' ? 'Recebido' : 'Pago'} · {dateBR(due.date)}{due.tx?.time ? ' · ' + due.tx.time : ''}{due.tx?.cardId ? ' · com a fatura do ' + (d.cards.find(x => x.id === due.tx!.cardId)?.name || 'cartão') : ''}</Text>
       </View>
       <Text style={{color: GOOD, fontWeight: '700'}}>{money(due.amount)}</Text>
       <Text style={{color: GOOD, fontWeight: '800', fontSize: 12}}>✓ {due.kind === 'receber' ? 'Recebido' : 'Pago'}</Text>
@@ -1602,7 +1653,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved}: {api: SofiaA
           <View style={{gap: 8}}>
             <Text style={{fontSize: 12, color: c.muted}}>{kind === 'transfer' ? 'Sai de' : kind === 'income' ? 'Entra em' : 'Pago com'}</Text>
             <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
-              {sources.map(s => <Pressable key={s.id} onPress={() => setSource(s.id)} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: source === s.id ? c.accent : c.input}}><Text style={{color: source === s.id ? '#fff' : c.text, fontSize: 13, fontWeight: '600'}}>{s.label}</Text></Pressable>)}
+              {sources.map(s => <SurePressable key={s.id} accessibilityRole="button" accessibilityState={{selected: source === s.id}} onPress={() => setSource(s.id)} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: source === s.id ? c.accent : c.input}}><Text style={{color: source === s.id ? '#fff' : c.text, fontSize: 13, fontWeight: '600'}}>{s.label}</Text></SurePressable>)}
             </View>
             {isCard ? <Text style={{fontSize: 11, color: c.muted}}>Entra na fatura de {monthLabel(invoiceMonth(d.cards.find(x => x.id === source)!, date)).toLowerCase()}.</Text> : null}
           </View>
@@ -1610,7 +1661,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved}: {api: SofiaA
             <View style={{gap: 8}}>
               <Text style={{fontSize: 12, color: c.muted}}>Vai para</Text>
               <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
-                {d.accounts.filter(a => !a.archived && a.id !== source).map(a => <Pressable key={a.id} onPress={() => setTo(a.id)} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: to === a.id ? c.accent : c.input}}><Text style={{color: to === a.id ? '#fff' : c.text, fontSize: 13, fontWeight: '600'}}>{a.name}</Text></Pressable>)}
+                {d.accounts.filter(a => !a.archived && a.id !== source).map(a => <SurePressable key={a.id} accessibilityRole="button" onPress={() => setTo(a.id)} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: to === a.id ? c.accent : c.input}}><Text style={{color: to === a.id ? '#fff' : c.text, fontSize: 13, fontWeight: '600'}}>{a.name}</Text></SurePressable>)}
               </View>
               {d.accounts.filter(a => !a.archived).length < 2 ? <Text style={{fontSize: 12, color: c.muted}}>Crie uma segunda conta em ⚙ para transferir.</Text> : null}
             </View>
@@ -1659,10 +1710,10 @@ function CardsTab({d, api, reload, onTx, onManage, onNewBill, onEditBill}: {d: D
   const c = useTheme(), cards = d.cards.filter(x => !x.archived);
   const [cardId, setCardId] = useState(cards[0]?.id || ''), card = cards.find(x => x.id === cardId) || cards[0];
   const invoices = card ? cardInvoices(card, d.txs) : [];
-  const currentIdx = card ? Math.max(0, invoices.findIndex(i => i.month === invoiceMonth(card, todayISO()))) : 0;
+  const currentIdx = card ? Math.max(0, invoices.findIndex(i => i.month === monthOf(todayISO()))) : 0;
   const [idx, setIdx] = useState<number | null>(null), i = invoices[idx ?? currentIdx];
   const [pick, setPick] = useState(false), [busy, setBusy] = useState(false);
-  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false), linking = useRef(false);
   useEffect(() => { setIdx(null); }, [cardId]);
   if (!card) return <Card_><Text style={{color: c.text, fontWeight: '700'}}>Nenhum cartão ainda</Text><Text style={{color: c.muted}}>Adicione seu cartão com limite, dia de fechamento e vencimento. A Sofia monta as faturas sozinha.</Text><Button title="Adicionar cartão" onPress={onManage} /></Card_>;
   const used = cardUsed(card, d.txs);
@@ -1704,7 +1755,7 @@ function CardsTab({d, api, reload, onTx, onManage, onNewBill, onEditBill}: {d: D
       {/* 0.3.223: contas que se pagam neste cartao - uma de Contas ou uma nova (que tambem aparece em Contas) */}
       {(() => { const linked = d.txs.filter(t => !t.virtual && t.manualDue && t.kind === 'expense' && t.cardId === card.id && (t.recurrence === 'monthly' ? !t.seriesId : true));
         const candidates = d.txs.filter(t => !t.virtual && t.manualDue && t.kind === 'expense' && !t.cardId && ((t.recurrence === 'monthly' && !t.seriesId) || (t.recurrence === 'none' && !t.paid)));
-        const link = async (t: Tx) => { setBusy(true); try { if (t.recurrence === 'monthly' && t.paid && t.entity) await startSeriesNextMonth(api, t, {card_id: card.id, invoice_month: ''}, t.desc); else if (t.entity) await saveEntity(api, 'fin_tx', t.desc, {card_id: card.id, invoice_month: '', paid: false}, t.entity); setLinkOpen(false); await reload(); } catch (e) { appAlert('Finanças', errorText(e)); } finally { setBusy(false); } };
+        const link = async (t: Tx) => { if (linking.current) return; linking.current = true; setBusy(true); try { if (t.recurrence === 'monthly' && t.paid && t.entity) await startSeriesNextMonth(api, t, {card_id: card.id, invoice_month: ''}, t.desc); else if (t.entity) await saveEntity(api, 'fin_tx', t.desc, {card_id: card.id, invoice_month: '', paid: false}, t.entity); setLinkOpen(false); await reload(); } catch (e) { appAlert('Finanças', errorText(e)); } finally { linking.current = false; setBusy(false); } };
         return <>
           <Card_>
             <Title text="Contas no cartão" />
@@ -1714,7 +1765,7 @@ function CardsTab({d, api, reload, onTx, onManage, onNewBill, onEditBill}: {d: D
               <Text style={{color: c.text, fontWeight: '700'}}>{money(t.amount)}</Text>
             </Pressable>) : <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Nenhuma conta neste cartão ainda. Assinaturas e contas fixas pagas no cartão entram na fatura sozinhas, todo mês.</Text>}
             <View style={{flexDirection: 'row', gap: 8, marginTop: 6}}>
-              <Pressable accessibilityRole="button" disabled={busy} onPress={() => setLinkOpen(true)} style={{flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: c.accentSoft, alignItems: 'center'}}><Text style={{color: c.accent, fontWeight: '700', fontSize: 13}}>Usar uma de Contas</Text></Pressable>
+              <SurePressable accessibilityRole="button" disabled={busy} onPress={() => { if (!busy) setLinkOpen(true); }} style={{flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: c.accentSoft, alignItems: 'center'}}><Text style={{color: c.accent, fontWeight: '700', fontSize: 13}}>Usar uma de Contas</Text></SurePressable>
               <Pressable accessibilityRole="button" disabled={busy} onPress={() => onNewBill?.(card.id)} style={{flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: c.accent, alignItems: 'center'}}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 13}}>Nova conta</Text></Pressable>
             </View>
           </Card_>
@@ -1722,10 +1773,10 @@ function CardsTab({d, api, reload, onTx, onManage, onNewBill, onEditBill}: {d: D
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 10, paddingBottom: 18}}>
               <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Pagar no {card.name}</Text>
               <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Escolha a conta que passa a ser paga neste cartão. Conta fixa já paga este mês continua paga pela conta; o cartão vale a partir do mês que vem.</Text>
-              {candidates.length ? candidates.map(t => <Pressable key={t.id} accessibilityRole="button" disabled={busy} onPress={() => void link(t)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 12, borderRadius: 14, backgroundColor: c.input}}>
+              {candidates.length ? candidates.map(t => <SurePressable key={t.id} accessibilityRole="button" disabled={busy} onPress={() => void link(t)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 12, borderRadius: 14, backgroundColor: c.input}}>
                 <View style={{flex: 1, gap: 2}}><Text numberOfLines={1} style={{color: c.text, fontWeight: '600'}}>{t.desc}</Text><Text style={{color: c.muted, fontSize: 11}}>{t.recurrence === 'monthly' ? 'todo mês, dia ' + Number(t.date.slice(8, 10)) : dateBR(t.date)}</Text></View>
                 <Text style={{color: c.text, fontWeight: '700'}}>{money(t.amount)}</Text>
-              </Pressable>) : <Text style={{color: c.muted}}>Nenhuma conta a pagar em Contas para trazer para o cartão.</Text>}
+              </SurePressable>) : <Text style={{color: c.muted}}>Nenhuma conta a pagar em Contas para trazer para o cartão.</Text>}
             </ScrollView>
           </Sheet> : null}
         </>; })()}
@@ -1962,6 +2013,7 @@ function ReportsTab({d: full, month, reserve, api, reload}: {d: Data; month: str
 
 // ============================ 0.3.182: DETALHES DO SALDO, RECEITAS E DESPESAS ============================
 /** Tocar no Saldo mostra de onde ele vem; tocar em Receitas ou Despesas lista as do mes. */
+const CHANGE_LABEL: Record<SaldoChange['lines'][number]['why'], string> = {novo: 'entrou', saiu: 'saiu do app', desmarcado: 'deixou de estar pago', mudou: 'valor mudou', inicial: 'saldo inicial mudou', anteriores: 'meses anteriores mudaram'};
 function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountId = '', reload}: {kind: 'saldo' | 'income' | 'expense'; d: Data; month: string; show: (v: number) => string; net: number; onTx: (t: Tx) => void; onClose: () => void; api?: SofiaApi; accountId?: string; reload?: () => Promise<void>}) {
   const c = useTheme();
   // 0.3.192: ajustar o Saldo para o valor real do banco. Muda o ponto de partida da conta (saldo inicial)
@@ -1978,13 +2030,21 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountI
     try {
       // 0.3.214: saldo atual -> o Saldo; saldo no inicio do mes -> o 100% do Controle de gastos deste mes
       const diff = Math.round((v - current) * 100) / 100, starts = {...target.monthStarts, [month]: Math.round(st * 100) / 100};
-      await api.saveEntity({...target.entity, data: {...target.entity.data, initial_balance: String(Math.round((target.initial + diff) * 100) / 100), balance_set_at: todayISO(), month_starts_json: JSON.stringify(starts)}});
+      await api.saveEntity({...target.entity, data: {...target.entity.data, initial_balance: String(Math.round((target.initial - (target.carry || 0) + diff) * 100) / 100), balance_set_at: todayISO(), month_starts_json: JSON.stringify(starts)}});
       setAdjusting(false); await reload?.(); onClose();
     } catch (e) { setAdjError(errorText(e)); } finally { setAdjBusy(false); }
   }
   const list = useMemo(() => monthTxs(d.txs, month).filter(t => t.paid && t.kind === kind).sort((a, b) => b.date.localeCompare(a.date)), [d, month, kind]);
   const total = list.reduce((s, t) => s + t.amount, 0);
   const [ledgerOpen, setLedgerOpen] = useState(false), reserve = reserveOf(d.goals);
+  const [changesOpen, setChangesOpen] = useState(false), [changes, setChanges] = useState<SaldoChange[]>([]);
+  useEffect(() => {
+    if (kind !== 'saldo' || !api) return;
+    let live = true;
+    const keys = [...(accountId ? [accountId] : d.accounts.filter(a => a.include && !a.archived).map(a => a.id)), ...(net ? ['reserve'] : [])];
+    void readSaldoStore(api).then(st => { if (live) setChanges(keys.flatMap(k => st.log[k] || []).sort((a, b) => b.at.localeCompare(a.at))); });
+    return () => { live = false; };
+  }, [kind, api, accountId, d, net]);
   const parts = useMemo(() => {
     if (kind !== 'saldo') return null;
     const accounts = d.accounts.filter(a => a.include && !a.archived);
@@ -1997,7 +2057,9 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountI
     const total = totalBalance(d.accounts, d.txs) - net;
     // o que sobra para fechar a conta sao as transferencias entre contas (com conta fora do total)
     const transfers = Math.round((total + net - (initial + income - expense - cards)) * 100) / 100;
-    return {initial, income, expense, cards, transfers, total};
+    const carry = Math.round(accounts.reduce((s, a) => s + (a.carry || 0), 0) * 100) / 100;
+    // so o que esta na tela (o resto ja vem somado no acumulado dos meses anteriores)
+    return {initial, income: income, expense, cards, transfers, total, carry};
   }, [kind, d, net]);
   const [startReal, setStartReal] = useState('');
   const monthStartGuess = useMemo(() => { if (!parts) return 0; const r = reserveOf(d.goals); return monthControl(d.txs, d.moves || [], r?.id || '', month, accountId, parts.total, null).start; }, [parts, d, month, accountId]);
@@ -2024,7 +2086,8 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountI
           : <Text style={{color: c.muted, fontSize: 12}}>Para ajustar o saldo, escolha uma conta no topo.</Text>}
         <Text style={{fontSize: 15, fontWeight: '800', color: c.text, marginTop: 6}}>Como o saldo é calculado</Text>
         <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 2}}>
-          {row('Ponto de partida (saldo inicial e ajustes)', show(parts.initial))}
+          {row('Ponto de partida (saldo inicial e ajustes)', show(parts.initial - parts.carry))}
+          {parts.carry ? row((parts.carry > 0 ? '+' : '−') + ' Lançamentos de meses anteriores', show(Math.abs(parts.carry)), false, parts.carry > 0 ? GOOD : BAD) : null}
           {parts.initial ? <Text style={{color: c.muted, fontSize: 11, lineHeight: 16, marginBottom: 4}}>Não é um lançamento: é o saldo inicial da conta, já com os ajustes ao valor do banco. Muda pelo botão acima ou em Contas e cartões → conta.</Text> : null}
           {row('+ Receitas recebidas', show(parts.income), false, GOOD)}
           {row('− Despesas pagas', show(parts.expense), false, BAD)}
@@ -2037,11 +2100,18 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountI
         {/* 0.3.211: conferencia item por item - cada valor que entrou e saiu desde o ponto de partida, com o saldo depois de cada um */}
         <Pressable accessibilityRole="button" onPress={() => setLedgerOpen(v => !v)} style={{paddingVertical: 8}}><Text style={{color: c.accent, fontWeight: '700'}}>{ledgerOpen ? 'Esconder o extrato do saldo' : 'Extrato do saldo'}</Text></Pressable>
         {ledgerOpen && parts ? <View style={{backgroundColor: c.input, borderRadius: 16, padding: 12, gap: 4}}>
-          <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '700', fontSize: 12}}>Ponto de partida</Text><Text style={{color: c.text, fontWeight: '800', fontSize: 12}}>{show(parts.initial)}</Text></View>
+          <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '700', fontSize: 12}}>Ponto de partida</Text><Text style={{color: c.text, fontWeight: '800', fontSize: 12}}>{show(parts.initial - parts.carry)}</Text></View>
+          {parts.carry ? <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Lançamentos de meses anteriores (somados)</Text><Text style={{color: parts.carry > 0 ? GOOD : BAD, fontWeight: '700', fontSize: 12}}>{parts.carry > 0 ? '+' : '−'}{show(Math.abs(parts.carry))}</Text></View> : null}
           {(() => { let run = parts.initial; const ids = new Set(d.accounts.filter(a => a.include && !a.archived).map(a => a.id));
             const rows = [...d.txs.filter(t => t.paid && !t.virtual && ids.has(t.accountId) && !t.cardId && (t.kind === 'income' || t.kind === 'expense' || t.kind === 'card_payment')).map(t => ({date: t.date, desc: t.desc, delta: t.kind === 'income' ? t.amount : -t.amount, tx: t as Tx | null, note: t.manualDue ? 'conta' : /^(fitid:|h:)/.test(String(t.entity?.data?.import_id || '')) ? 'do extrato' : ''})),
-              ...(reserve ? (d.moves || []).filter(m => m.goalId === reserve.id && m.entity?.state !== 'archived').map(m => ({date: m.date, desc: m.direction === 'in' ? 'Aporte no guardado' : 'Retirada do guardado', delta: m.direction === 'in' ? -m.amount : m.amount, tx: null as Tx | null, note: 'reserva'})) : [])]
+              // 0.3.221: transferencias tambem aparecem (antes so entravam na conta do total)
+              ...d.txs.filter(t => t.paid && !t.virtual && t.kind === 'transfer' && (ids.has(t.accountId) !== ids.has(t.toAccountId))).map(t => ({date: t.date, desc: t.desc || 'Transferência', delta: ids.has(t.toAccountId) ? t.amount : -t.amount, tx: t as Tx | null, note: 'transferência'})),
+              ...(reserve && net ? (d.moves || []).filter(m => m.goalId === reserve.id && m.entity?.state !== 'archived').map(m => ({date: m.date, desc: m.direction === 'in' ? 'Aporte no guardado' : 'Retirada do guardado', delta: m.direction === 'in' ? -m.amount : m.amount, tx: null as Tx | null, note: 'reserva'})) : [])]
               .sort((a, b) => a.date.localeCompare(b.date));
+            run = Math.round((parts.initial) * 100) / 100;
+            const finalRun = Math.round(rows.reduce((s, r) => s + r.delta, run) * 100) / 100, gap = Math.round((parts.total - finalRun) * 100) / 100;
+            // 0.3.221: se a soma da lista nao bater com o Saldo, a diferenca aparece na ultima linha (nada fica escondido)
+            if (gap) rows.push({date: todayISO(), desc: 'Diferença sem lançamento na lista', delta: gap, tx: null, note: 'veja Mudanças no saldo'});
             return rows.map((r, i) => { run = Math.round((run + r.delta) * 100) / 100; return <Pressable key={i} accessibilityRole="button" disabled={!r.tx} onPress={() => { if (r.tx) onTx(r.tx); }} style={{flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5, borderTopWidth: 1, borderColor: c.line}}>
               <Text style={{color: c.muted, fontSize: 11, width: 38}}>{r.date.slice(8, 10)}/{r.date.slice(5, 7)}</Text>
               <Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 12}}>{r.desc}{r.note ? <Text style={{color: c.muted}}> · {r.note}</Text> : null}</Text>
@@ -2049,6 +2119,20 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountI
               <Text style={{color: run < 0 ? BAD : c.text, fontSize: 11, width: 76, textAlign: 'right'}}>{show(run)}</Text>
             </Pressable>; }); })()}
           <Text style={{color: c.muted, fontSize: 11, lineHeight: 16, marginTop: 6}}>Toque num item para corrigir ou apagar. A última coluna é o saldo depois daquele item.</Text>
+        </View> : null}
+        {/* 0.3.221: tudo o que mudou o Saldo entre uma abertura e outra, item por item - inclusive o que saiu do app */}
+        <Pressable accessibilityRole="button" onPress={() => setChangesOpen(v => !v)} style={{paddingVertical: 8}}><Text style={{color: c.accent, fontWeight: '700'}}>{changesOpen ? 'Esconder mudanças no saldo' : 'Mudanças no saldo' + (changes.length ? ' (' + changes.length + ')' : '')}</Text></Pressable>
+        {changesOpen ? <View style={{backgroundColor: c.input, borderRadius: 16, padding: 12, gap: 10}}>
+          {changes.length ? changes.slice(0, 20).map((ch, i) => <View key={ch.at + i} style={{gap: 3, borderTopWidth: i ? 1 : 0, borderColor: c.line, paddingTop: i ? 8 : 0}}>
+            <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+              <Text style={{color: c.text, fontWeight: '700', fontSize: 12}}>{new Date(ch.at).toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})} às {new Date(ch.at).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</Text>
+              <Text style={{color: ch.after >= ch.before ? GOOD : BAD, fontWeight: '800', fontSize: 12}}>{ch.after >= ch.before ? '+' : '−'}{show(Math.abs(ch.after - ch.before))}</Text>
+            </View>
+            {ch.lines.map((l, k) => <View key={k} style={{flexDirection: 'row', gap: 8}}>
+              <Text numberOfLines={2} style={{flex: 1, color: c.text, fontSize: 12}}>{l.title}<Text style={{color: l.why === 'saiu' || l.why === 'anteriores' || l.why === 'inicial' ? WARN : c.muted}}> · {CHANGE_LABEL[l.why]}{l.why === 'novo' || l.why === 'saiu' || l.why === 'desmarcado' || l.why === 'mudou' ? ' (' + l.date.slice(8, 10) + '/' + l.date.slice(5, 7) + ')' : ''}</Text></Text>
+              <Text style={{color: l.delta >= 0 ? GOOD : BAD, fontSize: 12, fontWeight: '700'}}>{l.delta >= 0 ? '+' : '−'}{show(Math.abs(l.delta))}</Text>
+            </View>)}
+          </View>) : <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Nenhuma mudança registrada ainda. A partir de agora, toda vez que o Saldo mudar, aparece aqui o que mudou.</Text>}
         </View> : null}
         <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Soma de tudo o que já foi pago ou recebido nas contas (não só deste mês). Se algum valor parecer errado, toque em Receitas ou Despesas para ver os lançamentos, ou confira o saldo inicial da conta em Contas e cartões.</Text>
       </> : <View style={{backgroundColor: c.surface, paddingBottom: 10, gap: 2, borderBottomWidth: 1, borderColor: c.line}}>

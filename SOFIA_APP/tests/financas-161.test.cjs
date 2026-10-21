@@ -118,7 +118,7 @@ test('0.3.180: pendencias seguem o mes do topo; cada mes fica com as suas, mesmo
   assert.equal(titles('2026-11'),'novembro,academia','outro mes: so o dele, com as fixas daquele mes');
   assert.equal(titles('2026-12'),'academia');
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('monthDues(d.txs,accountId,month,today)'));
+  assert.ok(s.includes('monthDues(d.txs,accountId,month,today,settled)'));
   assert.ok(s.includes("'Pendentes de '+monthLabel(month)"));
 });
 
@@ -168,7 +168,7 @@ test('0.3.186: sem aviso de repetido (o servidor nao deixa duplicar e corrige o 
   assert.ok(!s.includes('DuplicatesSheet')&&!s.includes('Lançamento repetido'),'nada de tela de repetidos');
   assert.ok(s.includes('receiveTx(api, d, due.tx)')&&s.includes('receiveTx(api, d, t)')&&s.includes('async function confirmTx('),'confirmar nao cria segundo registro');
   assert.ok(s.includes("const range=useMemo(()=>({start:dayIn(month,1),end:dayIn(month,daysIn(month))"),'contas fixas no mes da pagina');
-  assert.ok(s.includes("const initialTouched = !acc || money0(balance) !== acc.initial;"),'refazer nao reescreve o saldo inicial');
+  assert.ok(s.includes("const initialTouched = !acc || money0(balance) !== storedInitial;"),'refazer nao reescreve o saldo inicial');
   assert.ok(s.includes('Não é um lançamento: é o saldo inicial da conta'));
 });
 
@@ -213,7 +213,7 @@ test('0.3.192: ajustar o Saldo ao valor do banco muda so o ponto de partida; lan
   assert.equal(f.totalBalance([adjusted],[...txs,tx('mercado','expense',200,'2026-10-20')]),5800,'e continua contando a partir dele');
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes('<Button title="Ajustar saldo" secondary'),'0.3.214: botao Ajustar saldo');
-  assert.ok(s.includes("initial_balance: String(Math.round((target.initial + diff) * 100) / 100)"),'sem lancamento falso');
+  assert.ok(s.includes("initial_balance: String(Math.round((target.initial - (target.carry || 0) + diff) * 100) / 100)"),'sem lancamento falso (e sem gravar o acumulado dos meses anteriores)');
 });
 
 test('0.3.193: pela lista do mes a edicao vale so para aquele mes; conta paga continua paga; botoes funcionam com teclado aberto',()=>{

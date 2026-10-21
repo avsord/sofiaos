@@ -182,15 +182,19 @@ function makeMobileApi(runtime, deps) {
         const start = from + '-01', end = to + '-31';
         const all = out.fin_tx.filter(e => e.state !== 'archived');
         const effect = (t, accountId) => {
-          const d = t.data || {}; if (d.paid === false) return 0; const amount = Number(d.amount || 0);
+          // 0.3.221: mesma regra do app - so conta o que esta marcado como pago
+          const d = t.data || {}; if (!d.paid) return 0; const amount = Number(d.amount || 0);
           if (d.kind === 'income' && d.account_id === accountId) return amount;
           if (d.kind === 'expense' && !d.card_id && d.account_id === accountId) return -amount;
           if (d.kind === 'card_payment' && d.account_id === accountId) return -amount;
           if (d.kind === 'transfer') return (d.to_account_id === accountId ? amount : 0) - (d.account_id === accountId ? amount : 0);
           return 0;
         };
-        for (const a of out.fin_account) carry[a.id] = Math.round(all.filter(t => String(t.data?.date || '') < start).reduce((s, t) => s + effect(t, a.id), 0) * 100) / 100;
-        out.fin_tx = all.filter(t => { const d = t.data || {}; const date = String(d.date || ''); return (date >= start && date <= end) || (d.recurrence && d.recurrence !== 'none') || d.paid === false || (d.invoice_month && d.invoice_month >= from && d.invoice_month <= to); });
+        const sent = t => { const d = t.data || {}; const date = String(d.date || ''); return (date >= start && date <= end) || (d.recurrence && d.recurrence !== 'none') || !d.paid || (d.invoice_month && d.invoice_month >= from && d.invoice_month <= to); };
+        // 0.3.221: o acumulado leva so o que NAO vai na lista. Antes, um lancamento antigo que tambem ia na lista (fixa/salario
+        // que se repete, fatura) contava duas vezes - no acumulado e no app - e o Saldo mudava sozinho conforme o mes aberto.
+        for (const a of out.fin_account) carry[a.id] = Math.round(all.filter(t => String(t.data?.date || '') < start && !sent(t)).reduce((s, t) => s + effect(t, a.id), 0) * 100) / 100;
+        out.fin_tx = all.filter(sent);
         window = { from, to };
       }
       return send({ items: out, carry, window, at: new Date().toISOString() });

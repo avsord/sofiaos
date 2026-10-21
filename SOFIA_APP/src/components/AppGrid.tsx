@@ -1,4 +1,6 @@
 import React,{useEffect,useRef,useState} from 'react';
+import {ShimmerBlock,ShimmerGroup} from './Loading';
+import {useTheme} from '../lib/theme';
 import {AccessibilityActionEvent,Animated,PanResponder,Vibration,View} from 'react-native';
 
 /** 0.3.221: grade de apps como no iPhone - segura o app, ele cresce e segue o dedo; os outros deslizam para abrir
@@ -22,7 +24,9 @@ export function AppGrid<T extends {id:string;title:string}>({items,renderCard,on
  function end(terminated:boolean){const d=drag.current;drag.current=null;setPressed(null);if(!d)return;if(d.timer)clearTimeout(d.timer);
   if(!d.live){if(!d.moved&&!terminated)cb.current.onOpen(d.id);return;}
   const k=idsRef.current.indexOf(d.id);
-  Animated.parallel([Animated.spring(p(d.id),{toValue:slot(k),useNativeDriver:true,speed:14,bounciness:7}),Animated.spring(scale,{toValue:1,useNativeDriver:true,speed:14,bounciness:4})]).start(()=>setActive(a=>a===d.id?null:a));
+  // 0.3.221: soltou, ficou - o app vai direto para o lugar e o contorno/selecao sai no mesmo quadro (antes esperava a mola assentar)
+  p(d.id).stopAnimation();scale.stopAnimation();p(d.id).setValue(slot(k));scale.setValue(1);setActive(null);
+  idsRef.current.forEach((id,i)=>{if(id!==d.id){p(id).stopAnimation();p(id).setValue(slot(i));}});
   cb.current.onDragging?.(false);cb.current.onReorder([...idsRef.current]);}
  const responders=useRef(new Map<string,ReturnType<typeof PanResponder.create>>()).current;
  const responder=(id:string)=>{let r=responders.get(id);if(r)return r;r=PanResponder.create({
@@ -41,7 +45,8 @@ export function AppGrid<T extends {id:string;title:string}>({items,renderCard,on
   onPanResponderRelease:()=>end(false),onPanResponderTerminate:()=>end(true)});responders.set(id,r);return r;};
  const move=(id:string,delta:number)=>{const cur=idsRef.current.indexOf(id),to=cur+delta;if(cur<0||to<0||to>=idsRef.current.length)return;const next=[...idsRef.current];next.splice(cur,1);next.splice(to,0,id);setIds(next);cb.current.onReorder(next);};
  const rows=Math.ceil(ids.length/COLS);
- return <View onLayout={e=>setW(e.nativeEvent.layout.width)} style={{height:rows?rows*H+(rows-1)*GAP:0}}>
+ return <View onLayout={e=>{const width=e.nativeEvent.layout.width;if(width>0)setW(width);}} style={{height:rows?rows*H+(rows-1)*GAP:0}}>
+  {!w?<AppGridSkeleton count={ids.length} bare/>:null}
   {w?ids.map(id=>{const item=items.find(i=>i.id===id);if(!item)return null;const lifted=active===id;
    return <Animated.View key={id} {...responder(id).panHandlers} accessible accessibilityRole="button" accessibilityLabel={'Abrir '+item.title+'. Segure e arraste para mudar de lugar.'}
     accessibilityActions={[{name:'activate'},{name:'moveBefore',label:'Mover para antes'},{name:'moveAfter',label:'Mover para depois'}]}
@@ -51,4 +56,16 @@ export function AppGrid<T extends {id:string;title:string}>({items,renderCard,on
     {renderCard(item,lifted)}
    </Animated.View>;}):null}
  </View>;
+}
+
+/** 0.3.221: enquanto a grade mede a tela (ou le a ordem salva), esqueleto com brilho no lugar dos apps - nunca tela vazia. */
+export function AppGridSkeleton({count,bare=false}:{count:number;bare?:boolean}){
+ const c=useTheme(),rows=Math.ceil(Math.max(1,count)/COLS);
+ return <ShimmerGroup><View accessibilityRole="progressbar" accessibilityLabel="Carregando apps" style={bare?{position:'absolute',left:0,right:0,top:0,gap:GAP}:{gap:GAP}}>
+  {Array.from({length:rows},(_,r)=><View key={r} style={{flexDirection:'row',gap:GAP}}>
+   {Array.from({length:COLS},(_,k)=>r*COLS+k<count?<View key={k} style={{flex:1,height:H,padding:18,gap:12,borderRadius:22,borderWidth:1,borderColor:c.line,backgroundColor:c.surface}}>
+    <ShimmerBlock width={26} height={26} radius={8}/><ShimmerBlock width={'62%'} height={14}/><ShimmerBlock width={'88%'} height={10}/><ShimmerBlock width={'54%'} height={10}/>
+   </View>:<View key={k} style={{flex:1}}/>)}
+  </View>)}
+ </View></ShimmerGroup>;
 }

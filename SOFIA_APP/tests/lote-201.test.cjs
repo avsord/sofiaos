@@ -418,7 +418,7 @@ test('0.3.228: fixa que comeca no mes seguinte aparece em Contas ("comeca em"), 
 
 test('0.3.232: Contas so com programadas, avulsas so no extrato; copias identicas do aluguel somem sozinhas',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('monthDues(d.txs,accountId,month,today).filter(r=>isScheduled(r.tx))')&&s.includes('(pendingIncome(t) || !t.manualDue || t.paid || !isScheduled(t))'));
+  assert.ok(s.includes('monthDues(d.txs,accountId,month,today,settled).filter(r=>isScheduled(r.tx))')&&s.includes('(pendingIncome(t) || !t.manualDue || t.paid || !isScheduled(t))'));
   assert.ok(s.includes('const extras = exactTwinExtras(data.txs).filter(t => !twinsTried.current.has(t.id));'));
   const f=require('./load-ts.cjs')('src/lib/finance.ts');
   const mk=(id,title,amount,created,extra={})=>{const t=f.toTx({id,kind:'fin_tx',title,state:'active',data:{kind:'income',amount,date:'2026-11-12',account_id:'a1',paid:false,category:'Contas',recurrence:'monthly',installments:5,installment:1,import_id:'sofia-pendencia:'+id,...extra}});t.entity.created_at=created;return t;};
@@ -447,6 +447,6 @@ test('0.3.233-0.3.236: aporte do previsto so de hoje em diante; descricao nos it
   assert.ok((s.match(/Descrição \(opcional\)/g)||[]).length>=2&&s.includes('maxLength={280}'),'caixa pequena');
   assert.ok(w.includes("(e.tags||[]).includes('chat-attachment')")&&w.includes('!isChatAttachment(item)'),'Biblioteca sem anexos da conversa');
   assert.ok(m.includes("{deleting ? 'Apagando…' : 'Apagar regra'}")&&m.includes('catch (e) { setError(errorText(e)); }'),'apagar regra mostra o andamento e o erro');
-  assert.ok(w.includes('{orderReady?<AppGrid items={orderedModules}')&&w.includes('let cachedAppOrder:string[]|null=null;'),'apps abrem na ordem salva');
+  assert.ok(w.includes('{!orderReady?<AppGridSkeleton count={modules.length}/>:<AppGrid items={orderedModules}')&&w.includes('let cachedAppOrder:string[]|null=null;'),'apps abrem na ordem salva');
   assert.ok(g.includes('if(first||!live)p(id).setValue(s);'),'so anima ao arrastar');
 });

@@ -4,7 +4,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const fin=fs.readFileSync(path.join(__dirname,'../src/screens/Finance.tsx'),'utf8'),api=fs.readFileSync(path.join(__dirname,'../src/lib/api.ts'),'utf8');
 test('um pedido só ao servidor (com a janela do mês), com volta para o modo antigo se o servidor não tiver a rota',()=>{
- assert.ok(api.includes("financeBundle(window?: {from: string; to: string}) { return this.request<"));assert.ok(fin.includes('await loadAll(api, window);'));
+ assert.ok(api.includes("financeBundle(window?: {from: string; to: string}) { return this.request<"));assert.ok(fin.includes('const bundle = await loadAll(api, window), fresh = toData(bundle.items, bundle.carry);'));
  assert.ok(fin.includes("(e as any)?.status !== 404"),'só cai no modo antigo em 404, não esconde outros erros');
 });
 test('abre com o guardado (mês atual) e atualiza por trás; guarda só no armazenamento criptografado',()=>{

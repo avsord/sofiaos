@@ -5,7 +5,7 @@ import type {Entity} from './types';
 
 export type TxKind = 'expense' | 'income' | 'transfer' | 'card_payment';
 export type Recurrence = 'none' | 'monthly' | 'weekly' | 'yearly';
-export type Account = {id: string; name: string; type: string; initial: number; color: string; include: boolean; archived: boolean; cycleDay: number; reportStart: string; monthStarts: Record<string, number>; entity: Entity};
+export type Account = {carry?: number; id: string; name: string; type: string; initial: number; color: string; include: boolean; archived: boolean; cycleDay: number; reportStart: string; monthStarts: Record<string, number>; entity: Entity};
 export type Card = {id: string; name: string; limit: number; closing: number; due: number; color: string; accountId: string; archived: boolean; entity: Entity};
 export type Tx = {reservePart: number; time: string; 
   id: string; kind: TxKind; desc: string; amount: number; date: string; category: string; accountId: string; toAccountId: string; cardId: string;
@@ -109,7 +109,8 @@ export function cardInvoices(card: Card, txs: Tx[], today = todayISO()): Invoice
     if (!months.has(m)) months.set(m, []);
     months.get(m)!.push(t);
   }
-  const current = invoiceMonth(card, today);
+  // 0.3.221: a fatura em aberto e a do mes do calendario; a do mes seguinte so abre no dia 1 (antes abria no dia do fechamento)
+  const current = monthOf(today);
   if (!months.has(current)) months.set(current, []);
   return [...months.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([month, items]) => {
     const total = round2(items.reduce((s, t) => s + t.amount, 0));
@@ -118,6 +119,20 @@ export function cardInvoices(card: Card, txs: Tx[], today = todayISO()): Invoice
     const status: Invoice['status'] = total > 0 && paid >= total ? 'paga' : month > current ? 'futura' : month === current ? 'aberta' : today > due && paid < total ? 'vencida' : 'fechada';
     return {card, month, total, paid, due, close, items: items.sort((a, b) => b.date.localeCompare(a.date)), status};
   });
+}
+/** 0.3.221: conta marcada com o cartao fica paga quando a fatura dela e paga (pagar a fatura paga todas de uma vez).
+ * Se o pagamento da fatura for desfeito, elas voltam a ficar em aberto. */
+export function cardBillSettled(cards: Card[], txs: Tx[], today = todayISO()): (t: Tx) => boolean {
+  const cache = new Map<string, Invoice[]>();
+  return (t: Tx) => {
+    if (!t.cardId || t.kind !== 'expense') return false;
+    const card = cards.find(c => c.id === t.cardId);
+    if (!card) return false;
+    let list = cache.get(card.id);
+    if (!list) { list = cardInvoices(card, txs, today); cache.set(card.id, list); }
+    const inv = list.find(i => i.month === (t.invoice || invoiceMonth(card, t.date)));
+    return !!inv && inv.total > 0 && inv.paid >= inv.total - 0.005;
+  };
 }
 export function cardUsed(card: Card, txs: Tx[], today = todayISO()): number {
   // 0.3.223: so o que ja foi cobrado (as cobrancas futuras das contas fixas nao ocupam o limite antes da hora)
@@ -289,7 +304,7 @@ export function manualDues(txs: Tx[], accountId = '', today = todayISO(), days =
 }
 /** Pendencias do MES escolhido no topo. 0.3.180: cada mes fica com as suas contas, mesmo as
  * atrasadas - uma conta de setembro nao pagas continua em setembro (marcada como atrasada). */
-export function monthDues(txs: Tx[], accountId: string, month: string, today = todayISO()): Due[] {
+export function monthDues(txs: Tx[], accountId: string, month: string, today = todayISO(), settled?: (t: Tx) => boolean): Due[] {
   const start = dayIn(month, 1), end = dayIn(month, daysIn(month));
   const seen = new Set<string>();
   return [...txs, ...expandRecurring(txs, month)]
@@ -298,7 +313,7 @@ export function monthDues(txs: Tx[], accountId: string, month: string, today = t
     .filter(t => t.manualDue && (t.kind === 'expense' || t.kind === 'income') && (!accountId || t.accountId === accountId))
     .filter(t => t.date >= start && t.date <= end)
     .filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; })
-    .map(t => ({id: t.id, title: t.desc, amount: t.amount, date: t.date, kind: (t.kind === 'income' ? 'receber' : 'pagar') as Due['kind'], late: !t.paid && !t.cardId && t.date < today, paid: t.paid, tx: t}))
+    .map(t => ({id: t.id, title: t.desc, amount: t.amount, date: t.date, kind: (t.kind === 'income' ? 'receber' : 'pagar') as Due['kind'], late: !t.paid && !t.cardId && t.date < today, paid: t.paid || (!!t.cardId && !!settled?.(t)), tx: t}))
     .sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
 }
 /** 0.3.185: lancamentos pagos que parecem repetidos - mesmo tipo, mesma descricao, mesmo valor e mesmo
@@ -492,7 +507,7 @@ export function cycleRange(day: number, today = todayISO()): {start: string; end
 /** Contas fixas = pendencias marcadas como "todo mes". Previsto e o valor cadastrado; realizado, o confirmado. */
 export type FixedBill = {id: string; title: string; amount: number; paidAmount: number | null; day: number; date: string; paid: boolean; cardId: string;
   installments: number; index: number; left: number; last: boolean; tx: Tx};
-export function fixedBills(txs: Tx[], accountId: string, range: {start: string; end: string}, kind: 'expense' | 'income' = 'expense'): FixedBill[] {
+export function fixedBills(txs: Tx[], accountId: string, range: {start: string; end: string}, kind: 'expense' | 'income' = 'expense', settled?: (t: Tx) => boolean): FixedBill[] {
   const months = [...new Set([monthOf(range.start), monthOf(range.end)])];
   const all = [...txs, ...months.flatMap(m => expandRecurring(txs, m))];
   const seen = new Set<string>();
@@ -506,13 +521,14 @@ export function fixedBills(txs: Tx[], accountId: string, range: {start: string; 
       const first = String(t.entity?.data?.date || t.date);
       const base = Math.max(1, Math.round(Number(t.entity?.data?.installment) || 1));
       const index = total ? Math.min(total, monthsBetween(monthOf(first), monthOf(t.date)) + base) : 0;
-      return {id: t.id, title: t.desc, amount: t.amount, paidAmount: t.paid ? t.amount : null, day: Number(t.date.slice(8, 10)), date: t.date, paid: t.paid, cardId: t.cardId || '',
-        installments: total, index, left: total ? Math.max(0, total - index + (t.paid ? 0 : 1)) : 0, last: !!total && index >= total, tx: t};
+      const paid = t.paid || (!!t.cardId && !!settled?.(t));
+      return {id: t.id, title: t.desc, amount: t.amount, paidAmount: paid ? t.amount : null, day: Number(t.date.slice(8, 10)), date: t.date, paid, cardId: t.cardId || '',
+        installments: total, index, left: total ? Math.max(0, total - index + (paid ? 0 : 1)) : 0, last: !!total && index >= total, tx: t};
     });
 }
 export type FixedSummary = {card: number; bills: FixedBill[]; total: number; paid: number; open: number; income: number; share: number | null};
-export function fixedSummary(txs: Tx[], accountId: string, range: {start: string; end: string}, kind: 'expense' | 'income' = 'expense'): FixedSummary {
-  const bills = fixedBills(txs, accountId, range, kind);
+export function fixedSummary(txs: Tx[], accountId: string, range: {start: string; end: string}, kind: 'expense' | 'income' = 'expense', settled?: (t: Tx) => boolean): FixedSummary {
+  const bills = fixedBills(txs, accountId, range, kind, settled);
   const total = round2(bills.reduce((s, b) => s + b.amount, 0));
   const paid = round2(bills.filter(b => b.paid).reduce((s, b) => s + b.amount, 0));
   const card = round2(bills.filter(b => !b.paid && b.cardId).reduce((s, b) => s + b.amount, 0));
@@ -808,4 +824,52 @@ export function exactTwinExtras(txs: Tx[]): Tx[] {
     extras.push(...list.filter(t => t.id !== keep.id));
   }
   return extras;
+}
+
+// ---------- 0.3.221: mudancas no Saldo (o que mudou entre uma abertura e outra, item por item) ----------
+/** Retrato do que forma o Saldo de uma conta: ponto de partida (saldo inicial e ajustes), acumulado dos meses
+ * anteriores e cada lancamento que conta, com o valor que ele soma ou tira. */
+export type SaldoItem = {d: number; t: string; dt: string};
+export type SaldoSnap = {total: number; base: number; carry: number; items: Record<string, SaldoItem>};
+export type SaldoLine = {title: string; date: string; delta: number; why: 'novo' | 'saiu' | 'desmarcado' | 'mudou' | 'inicial' | 'anteriores'};
+export type SaldoChange = {at: string; before: number; after: number; lines: SaldoLine[]};
+export function saldoSnapshot(a: Account, txs: Tx[]): SaldoSnap {
+  const items: Record<string, SaldoItem> = {};
+  let sum = 0;
+  for (const t of txs) {
+    if (t.virtual || !t.entity || String(t.id).startsWith('local:')) continue;
+    const e = effect(t, a.id);
+    if (!e) continue;
+    items[t.id] = {d: round2(e), t: t.desc, dt: t.date};
+    sum += e;
+  }
+  const carry = round2(a.carry || 0), base = round2(a.initial - carry);
+  return {total: round2(base + carry + sum), base, carry, items};
+}
+/** Reserva (guardado): aporte tira do Saldo, retirada devolve. */
+export function reserveSnapshot(moves: ReserveMove[], goalId: string): SaldoSnap {
+  const items: Record<string, SaldoItem> = {};
+  let sum = 0;
+  for (const m of moves) {
+    if (m.goalId !== goalId || m.entity?.state === 'archived') continue;
+    const d = round2(m.direction === 'in' ? -m.amount : m.amount);
+    items['move:' + m.id] = {d, t: m.direction === 'in' ? 'Aporte no guardado' : 'Retirada do guardado', dt: m.date};
+    sum += d;
+  }
+  return {total: round2(sum), base: 0, carry: 0, items};
+}
+/** O que explica a diferenca entre dois retratos. null quando o Saldo nao mudou. `present` = ids que ainda existem no app
+ * (um pago que virou "a pagar" aparece como desmarcado, nao como apagado). */
+export function saldoDiff(prev: SaldoSnap, next: SaldoSnap, at: string, present: Set<string> = new Set()): SaldoChange | null {
+  if (round2(prev.total) === round2(next.total)) return null;
+  const lines: SaldoLine[] = [];
+  if (round2(next.base - prev.base)) lines.push({title: 'Saldo inicial / ajuste do saldo', date: at.slice(0, 10), delta: round2(next.base - prev.base), why: 'inicial'});
+  if (round2(next.carry - prev.carry)) lines.push({title: 'Lançamentos de meses anteriores', date: at.slice(0, 10), delta: round2(next.carry - prev.carry), why: 'anteriores'});
+  for (const [id, it] of Object.entries(next.items)) {
+    const old = prev.items[id];
+    if (!old) lines.push({title: it.t, date: it.dt, delta: it.d, why: 'novo'});
+    else if (round2(old.d - it.d)) lines.push({title: it.t, date: it.dt, delta: round2(it.d - old.d), why: 'mudou'});
+  }
+  for (const [id, it] of Object.entries(prev.items)) if (!next.items[id]) lines.push({title: it.t, date: it.dt, delta: round2(-it.d), why: present.has(id) ? 'desmarcado' : 'saiu'});
+  return {at, before: round2(prev.total), after: round2(next.total), lines};
 }
