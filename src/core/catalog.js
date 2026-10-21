@@ -2179,6 +2179,12 @@ const CATALOG={
         "key": "important",
         "label": "Importante",
         "type": "checkbox"
+      },
+      {
+        "key": "emoji",
+        "label": "Emoji",
+        "type": "text",
+        "max": 16
       }
     ],
     "description": "Mensagem que bateu com uma regra. Só cabeçalho e trecho curto; o e-mail continua no provedor."

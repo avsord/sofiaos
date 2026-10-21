@@ -5,14 +5,15 @@ import {AccessibilityActionEvent,Animated,PanResponder,Vibration,View} from 'rea
 
 /** 0.3.221: grade de apps como no iPhone - segura o app, ele cresce e segue o dedo; os outros deslizam para abrir
  * espaco; ao soltar, ele assenta no lugar. Toque rapido abre. Rolagem vertical continua normal antes de segurar. */
-const GAP=12,H=148,COLS=2,HOLD=320;
-export function AppGrid<T extends {id:string;title:string}>({items,renderCard,onOpen,onReorder,onDragging}:{items:T[];renderCard:(item:T,lifted:boolean)=>React.ReactNode;onOpen:(id:string)=>void;onReorder:(ids:string[])=>void;onDragging?:(on:boolean)=>void}){
+// 0.3.222: segurar seleciona quase na hora, como no iPhone (antes 320 ms)
+const GAP=12,H=148,COLS=2,HOLD=170;
+export function AppGrid<T extends {id:string;title:string}>({items,renderCard,onOpen,onReorder,onDragging,onMenu}:{items:T[];renderCard:(item:T,lifted:boolean)=>React.ReactNode;onOpen:(id:string)=>void;onReorder:(ids:string[])=>void;onDragging?:(on:boolean)=>void;onMenu?:(id:string)=>void}){
  const [w,setW]=useState(0),cellW=w?(w-GAP)/COLS:0,key=items.map(i=>i.id).join('|');
  const [ids,setIds]=useState(items.map(i=>i.id)),[active,setActive]=useState<string|null>(null),[pressed,setPressed]=useState<string|null>(null);
  const idsRef=useRef(ids);idsRef.current=ids;
  const geo=useRef({cellW:0});geo.current.cellW=cellW;
- const cb=useRef({onOpen,onReorder,onDragging});cb.current={onOpen,onReorder,onDragging};
- const drag=useRef<{id:string;startX:number;startY:number;moved:boolean;live:boolean;timer:ReturnType<typeof setTimeout>|null}|null>(null);
+ const cb=useRef({onOpen,onReorder,onDragging,onMenu});cb.current={onOpen,onReorder,onDragging,onMenu};
+ const drag=useRef<{id:string;startX:number;startY:number;moved:boolean;live:boolean;dragged?:boolean;timer:ReturnType<typeof setTimeout>|null}|null>(null);
  const pos=useRef(new Map<string,Animated.ValueXY>()).current,scale=useRef(new Animated.Value(1)).current,placed=useRef(false);
  const slot=(k:number)=>({x:(k%COLS)*(geo.current.cellW+GAP),y:Math.floor(k/COLS)*(H+GAP)});
  const p=(id:string)=>{let v=pos.get(id);if(!v){const k=Math.max(0,idsRef.current.indexOf(id));v=new Animated.ValueXY(slot(k));pos.set(id,v);}return v;};
@@ -27,7 +28,9 @@ export function AppGrid<T extends {id:string;title:string}>({items,renderCard,on
   // 0.3.221: soltou, ficou - o app vai direto para o lugar e o contorno/selecao sai no mesmo quadro (antes esperava a mola assentar)
   p(d.id).stopAnimation();scale.stopAnimation();p(d.id).setValue(slot(k));scale.setValue(1);setActive(null);
   idsRef.current.forEach((id,i)=>{if(id!==d.id){p(id).stopAnimation();p(id).setValue(slot(i));}});
-  cb.current.onDragging?.(false);cb.current.onReorder([...idsRef.current]);}
+  cb.current.onDragging?.(false);cb.current.onReorder([...idsRef.current]);
+  // 0.3.222: segurou e soltou sem arrastar - abre as opcoes do app (destacar com uma bolinha de cor)
+  if(!d.dragged&&!terminated)cb.current.onMenu?.(d.id);}
  const responders=useRef(new Map<string,ReturnType<typeof PanResponder.create>>()).current;
  const responder=(id:string)=>{let r=responders.get(id);if(r)return r;r=PanResponder.create({
   onStartShouldSetPanResponder:()=>true,
@@ -37,6 +40,7 @@ export function AppGrid<T extends {id:string;title:string}>({items,renderCard,on
    d.timer=setTimeout(()=>{if(drag.current!==d)return;d.live=true;setActive(id);setPressed(null);cb.current.onDragging?.(true);try{Vibration.vibrate(12);}catch{/* sem vibracao */}Animated.spring(scale,{toValue:1.06,useNativeDriver:true,speed:18,bounciness:6}).start();},HOLD);drag.current=d;},
   onPanResponderMove:(_e,g)=>{const d=drag.current;if(!d||d.id!==id)return;
    if(!d.live){if(Math.abs(g.dx)+Math.abs(g.dy)>10){d.moved=true;if(d.timer)clearTimeout(d.timer);setPressed(null);}return;}
+   if(Math.abs(g.dx)+Math.abs(g.dy)>8)d.dragged=true;
    p(id).setValue({x:d.startX+g.dx,y:d.startY+g.dy});
    const cw=geo.current.cellW,cx=d.startX+g.dx+cw/2,cy=d.startY+g.dy+H/2;
    const col=Math.max(0,Math.min(COLS-1,Math.floor(cx/(cw+GAP)))),row=Math.max(0,Math.floor(cy/(H+GAP)));

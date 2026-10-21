@@ -28,6 +28,9 @@ const PROVIDERS: Array<{value: string; label: string; help: string; link?: strin
   {value: 'imap', label: 'Outro (IMAP)', help: 'Informe o servidor IMAP do seu provedor (ex.: imap.seudominio.com) e a senha da caixa ou senha de app.'},
 ];
 const FIELDS = [{value: 'any', label: 'Em qualquer lugar'}, {value: 'from', label: 'Remetente'}, {value: 'subject', label: 'Assunto'}, {value: 'body', label: 'Texto'}];
+/** 0.3.222: emoji do e-mail - o escolhido pela pessoa vale; sem escolha, a estrela das regras "importante". */
+const HIT_EMOJIS = ['⭐', '🔥', '💰', '📌', '✅', '❗', '🧾', '📦'];
+function hitEmoji(h: {data: Record<string, any>}): string { const e = String(h.data?.emoji || ''); if (e === 'none') return ''; return e || (h.data?.important ? '⭐' : ''); }
 const TEMPLATES = [
   {title: 'Contas e faturas', field: 'any', contains: 'fatura, boleto, vencimento, pagamento', important: true},
   {title: 'Entregas', field: 'subject', contains: 'pedido, entrega, enviado, rastreio', important: false},
@@ -156,7 +159,7 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
                     style={{flexDirection: 'row', gap: 12, padding: 12, borderRadius: 16, backgroundColor: h.state === 'new' ? '#38b6ff14' : c.surface, borderWidth: 1, borderColor: c.line}}>
                     <View style={{width: 38, height: 38, borderRadius: 19, backgroundColor: '#38b6ff26', alignItems: 'center', justifyContent: 'center'}}><Text style={{fontWeight: '800', color: '#38b6ff'}}>{String(h.data.from_name || h.data.from_addr || '?').charAt(0).toUpperCase()}</Text></View>
                     <View style={{flex: 1, gap: 2}}>
-                      <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>{h.data.important ? <Text>⭐</Text> : null}<Text numberOfLines={1} style={{flex: 1, color: c.text, fontWeight: h.state === 'new' ? '700' : '500'}}>{h.data.from_name || h.data.from_addr}</Text><Text style={{color: c.muted, fontSize: 10}}>{relativeTime(String(h.data.received_at))}</Text></View>
+                      <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>{hitEmoji(h) ? <Text>{hitEmoji(h)}</Text> : null}<Text numberOfLines={1} style={{flex: 1, color: c.text, fontWeight: h.state === 'new' ? '700' : '500'}}>{h.data.from_name || h.data.from_addr}</Text><Text style={{color: c.muted, fontSize: 10}}>{relativeTime(String(h.data.received_at))}</Text></View>
                       <Text numberOfLines={1} style={{color: c.text, fontSize: 13}}>{h.title}</Text>
                       <Text numberOfLines={2} style={{color: c.muted, fontSize: 12}}>{h.data.snippet}</Text>
                       <Text style={{color: c.muted, fontSize: 10}}>Regra: {h.data.rule_names}</Text>
@@ -200,7 +203,18 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
               <Text style={{color: c.text}}>{open.data.from_name} <Text style={{color: c.muted}}>&lt;{open.data.from_addr}&gt;</Text></Text>
               <Text style={{color: c.muted, fontSize: 12}}>{new Date(String(open.data.received_at)).toLocaleString('pt-BR')} · {accountName(open.data.account_id)}</Text>
               <Text style={{color: c.text, lineHeight: 21}}>{open.data.snippet}</Text>
-              <Text style={{color: c.muted, fontSize: 12}}>Encontrado pela regra: {open.data.rule_names}.</Text>
+              <Text style={{color: c.muted, fontSize: 12}}>{open.data.rule_names ? 'Encontrado pela regra: ' + open.data.rule_names + '.' : 'A regra que encontrou este e-mail foi apagada; ele continua aqui.'}</Text>
+              {/* 0.3.222: cada e-mail pode ter o seu emoji (a estrela ou outro) */}
+              <View style={{gap: 6}}>
+                <Text style={{color: c.muted, fontSize: 12}}>Emoji deste e-mail</Text>
+                <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
+                  {['', ...HIT_EMOJIS].map(e => { const on = (hitEmoji(open) || '') === e; return <Pressable key={e || 'none'} accessibilityRole="button" accessibilityLabel={e ? 'Usar ' + e : 'Sem emoji'} accessibilityState={{selected: on}}
+                    onPress={() => { const next = {...open, data: {...open.data, emoji: e || 'none', important: e === '⭐' ? true : e ? open.data.important : false}}; setOpen(next); void api.saveEntity(next).then(saved => { setOpen(o => o && o.id === saved.id ? saved : o); void load(); }).catch(err => setError(errorText(err))); }}
+                    style={{minWidth: 40, height: 40, paddingHorizontal: 8, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? c.accent + '33' : c.input, borderWidth: on ? 2 : 0, borderColor: c.accent}}>
+                    <Text style={{fontSize: e ? 18 : 12, color: c.muted}}>{e || 'Nenhum'}</Text>
+                  </Pressable>; })}
+                </View>
+              </View>
               <Button title="Abrir no Gmail" onPress={() => { const addr = String((accounts || []).find(a => a.id === open.data.account_id)?.data?.address || ''); void openInGmail(open, addr).then(ok => { if (!ok) setInfo('Não foi possível abrir o Gmail neste celular.'); }); }} />
               <BillFromMail api={api} hit={open} onDone={() => setOpen(null)} />
               <Pressable onPress={() => { const id = open.id; setOpen(null); void api.deleteEntity(id).then(load).catch(() => {}); }} style={{paddingVertical: 12}}><Text style={{color: c.danger}}>Tirar da lista</Text></Pressable>

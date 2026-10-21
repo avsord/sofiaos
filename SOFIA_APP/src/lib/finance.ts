@@ -109,8 +109,9 @@ export function cardInvoices(card: Card, txs: Tx[], today = todayISO()): Invoice
     if (!months.has(m)) months.set(m, []);
     months.get(m)!.push(t);
   }
-  // 0.3.221: a fatura em aberto e a do mes do calendario; a do mes seguinte so abre no dia 1 (antes abria no dia do fechamento)
-  const current = monthOf(today);
+  // 0.3.222: a fatura aberta e a que ainda recebe compras (pelo dia de fechamento). Ex.: fecha dia 9 - em 21/10 a de
+  // outubro ja esta fechada (ou paga) e a compra de hoje entra na de novembro, que e a aberta.
+  const current = invoiceMonth(card, today);
   if (!months.has(current)) months.set(current, []);
   return [...months.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([month, items]) => {
     const total = round2(items.reduce((s, t) => s + t.amount, 0));
@@ -831,7 +832,7 @@ export function exactTwinExtras(txs: Tx[]): Tx[] {
  * anteriores e cada lancamento que conta, com o valor que ele soma ou tira. */
 export type SaldoItem = {d: number; t: string; dt: string};
 export type SaldoSnap = {total: number; base: number; carry: number; items: Record<string, SaldoItem>};
-export type SaldoLine = {title: string; date: string; delta: number; why: 'novo' | 'saiu' | 'desmarcado' | 'mudou' | 'inicial' | 'anteriores'};
+export type SaldoLine = {id?: string; title: string; date: string; delta: number; why: 'novo' | 'saiu' | 'desmarcado' | 'mudou' | 'inicial' | 'anteriores'};
 export type SaldoChange = {at: string; before: number; after: number; lines: SaldoLine[]};
 export function saldoSnapshot(a: Account, txs: Tx[]): SaldoSnap {
   const items: Record<string, SaldoItem> = {};
@@ -867,9 +868,45 @@ export function saldoDiff(prev: SaldoSnap, next: SaldoSnap, at: string, present:
   if (round2(next.carry - prev.carry)) lines.push({title: 'Lançamentos de meses anteriores', date: at.slice(0, 10), delta: round2(next.carry - prev.carry), why: 'anteriores'});
   for (const [id, it] of Object.entries(next.items)) {
     const old = prev.items[id];
-    if (!old) lines.push({title: it.t, date: it.dt, delta: it.d, why: 'novo'});
-    else if (round2(old.d - it.d)) lines.push({title: it.t, date: it.dt, delta: round2(it.d - old.d), why: 'mudou'});
+    if (!old) lines.push({id, title: it.t, date: it.dt, delta: it.d, why: 'novo'});
+    else if (round2(old.d - it.d)) lines.push({id, title: it.t, date: it.dt, delta: round2(it.d - old.d), why: 'mudou'});
   }
-  for (const [id, it] of Object.entries(prev.items)) if (!next.items[id]) lines.push({title: it.t, date: it.dt, delta: round2(-it.d), why: present.has(id) ? 'desmarcado' : 'saiu'});
+  for (const [id, it] of Object.entries(prev.items)) if (!next.items[id]) lines.push({id, title: it.t, date: it.dt, delta: round2(-it.d), why: present.has(id) ? 'desmarcado' : 'saiu'});
   return {at, before: round2(prev.total), after: round2(next.total), lines};
+}
+
+/** 0.3.222: Extrato do saldo como um extrato de banco - o que ja aconteceu nao muda. O ponto de partida fica como era;
+ * cada ajuste, item que saiu, deixou de estar pago ou mudou de valor entra como uma linha nova, na data e hora em que
+ * aconteceu, com o quanto mudou e quanto ficou. O item que saiu continua na data dele, como era. */
+export type LedgerItem = {id: string; date: string; desc: string; delta: number; note: string; tx: Tx | null};
+export type LedgerRow = LedgerItem & {at: string; run: number; change: boolean};
+export function saldoLedger(items: LedgerItem[], base: number, carry: number, changes: SaldoChange[], total: number): {start: number; carry: number; rows: LedgerRow[]} {
+  const rows: Array<LedgerItem & {at: string; change: boolean}> = items.map(i => ({...i, at: '', change: false}));
+  const byId = new Map(rows.map(r => [r.id, r]));
+  let start = base, prior = carry;
+  const hm = (at: string) => { const d = new Date(at); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+  const ordered = [...changes].sort((a, b) => b.at.localeCompare(a.at));   // do mais novo para o mais antigo: desfaz um por vez
+  for (const ch of ordered) {
+    const date = todayISO(new Date(ch.at));
+    for (const l of ch.lines) {
+      if (l.why === 'novo') continue;
+      const add = (desc: string, note: string) => rows.push({id: 'change:' + ch.at + ':' + (l.id || l.why), date, desc, delta: l.delta, note: note + ' às ' + hm(ch.at), tx: null, at: ch.at, change: true});
+      if (l.why === 'inicial') { start = round2(start - l.delta); add('Ajuste do saldo', 'ajuste'); }
+      else if (l.why === 'anteriores') { prior = round2(prior - l.delta); add('Ajuste nos meses anteriores', 'ajuste'); }
+      else if (l.why === 'saiu' || l.why === 'desmarcado') {
+        const original = {id: (l.id || l.title) + ':antes:' + ch.at, date: l.date, desc: l.title, delta: round2(-l.delta), note: l.why === 'saiu' ? 'saiu depois' : 'desmarcado depois', tx: null, at: '', change: false};
+        rows.push(original);
+        add(l.title, l.why === 'saiu' ? 'saiu do app' : 'deixou de estar pago');
+      } else if (l.why === 'mudou' && l.id && byId.has(l.id)) {
+        const cur = byId.get(l.id)!; cur.delta = round2(cur.delta - l.delta);
+        add(l.title, 'valor mudou');
+      }
+    }
+  }
+  rows.sort((a, b) => a.date.localeCompare(b.date) || Number(a.change) - Number(b.change) || a.at.localeCompare(b.at));
+  let run = round2(start + prior);
+  const out: LedgerRow[] = rows.map(r => { run = round2(run + r.delta); return {...r, run}; });
+  const gap = round2(total - run);
+  if (gap) { run = round2(run + gap); out.push({id: 'gap', date: todayISO(), desc: 'Diferença sem lançamento', delta: gap, note: 'não identificada', tx: null, at: '', change: true, run}); }
+  return {start, carry: prior, rows: out};
 }

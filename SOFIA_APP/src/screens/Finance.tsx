@@ -29,7 +29,8 @@ import {
   trend, balanceSeries, upcoming, manualDues, transactionsForAccount, goalProgress, parseMoney, formatMoneyInput, finishMoneyInput, addDays,
   dayIn, daysIn} from '../lib/finance';
 import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove, SaldoSnap, SaldoChange} from '../lib/finance';
-import {saldoSnapshot, reserveSnapshot, saldoDiff, cardBillSettled} from '../lib/finance';
+import {saldoSnapshot, reserveSnapshot, saldoDiff, cardBillSettled, saldoLedger} from '../lib/finance';
+import type {LedgerItem} from '../lib/finance';
 import {sinceReportStart, cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, monthDues, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove, effectiveCycleDay, periodBudget, salaryForecast, currentPlan, nextPlan, simpleForecast, spendControl, categoryAlerts, lastWeekByCategory, duplicateGroups, moneyLeft, monthControl, balanceAsOf, isOneOffIncome, fixedDuplicateGroups, fixedUpcoming, isScheduled, exactTwinExtras} from '../lib/finance';
 import {syncFinanceDueNotifications} from '../lib/finance-notifications';
 import {appAlert} from '../lib/app-alert';
@@ -125,6 +126,12 @@ function SurePressable({onPress, ...rest}: React.ComponentProps<typeof Pressable
     onTouchEnd={e => { const s0 = start.current; start.current = null;
       if (!s0 || Math.abs(e.nativeEvent.pageX - s0.x) + Math.abs(e.nativeEvent.pageY - s0.y) > 12 || Date.now() - s0.t > 700) return;
       setTimeout(() => { if (!fired.current) { fired.current = true; onPress(); } }, 0); }} />;
+}
+/** 0.3.222: compra/conta no cartao mostra em qual fatura vai ser cobrada (ex.: feita em outubro depois do fechamento -> novembro). */
+function cardWhen(t: Tx, cards: Card[]): string {
+  const card = cards.find(x => x.id === t.cardId);
+  if (!card || !t.date) return '';
+  return ' · cobrado na fatura de ' + monthLabel(t.invoice || invoiceMonth(card, t.date)).split(' ')[0].toLowerCase();
 }
 function Chips<T extends string | number>({value, options, onChange, scroll = false}: {value: T; options: Array<{value: T; label: string}>; onChange: (v: T) => void; scroll?: boolean}) {
   const c = useTheme();
@@ -847,7 +854,7 @@ function BillEditor({api,tx,accountId,onClose,onSaved,scope='series',initialFlow
   // 0.3.168: se o app for para o fundo (ou for encerrado) no meio do preenchimento, nada se perde.
   // 0.3.196: rascunho separado para A pagar e A receber; antes um rascunho antigo podia trocar o tipo escolhido
   const draftKey='bill:'+(tx?.id||'novo:'+initialFlow);
-  const form={name,amount,date,category,repeat,flow,before,parcels,parcelNow};
+  const form={name,amount,date,category,repeat,flow,before,parcels,parcelNow,payCard};
   const {draft,ready,clear:clearDraft}=useFormDraft(draftKey,form);
   const restored=useRef(false);
   useEffect(()=>{
@@ -861,6 +868,7 @@ function BillEditor({api,tx,accountId,onClose,onSaved,scope='series',initialFlow
     if(draft.before!==undefined)setBefore(String(draft.before));
     if(draft.parcels!==undefined)setParcels(String(draft.parcels));
     if(draft.parcelNow!==undefined)setParcelNow(String(draft.parcelNow));
+    if(typeof draft.payCard==='string'&&cardsList.some(k=>k.id===draft.payCard||draft.payCard===''))setPayCard(draft.payCard);
   },[ready,draft]);
   const [error,setError]=useState(''),[busy,setBusy]=useState(false);
   async function save() {
@@ -907,7 +915,10 @@ function BillEditor({api,tx,accountId,onClose,onSaved,scope='series',initialFlow
         __content:note.trim(),
         import_id:existing?String(tx?.entity?.data?.import_id||''): 'sofia-pendencia:'+uid(),
       };
-      const saved=await saveEntity(api,'fin_tx',name.trim(),data,existing?tx?.entity:undefined);
+      let saved=await saveEntity(api,'fin_tx',name.trim(),data,existing?tx?.entity:undefined);
+      // 0.3.222: confere que o cartao ficou gravado (antes, as vezes era preciso salvar duas vezes para o cartao pegar)
+      if(String(saved?.data?.card_id||'')!==String(cardFor||'')){saved=await api.saveEntity({...saved,data:{...saved.data,card_id:cardFor,invoice_month:'',paid:cardFor?false:saved.data?.paid}});
+        if(String(saved?.data?.card_id||'')!==String(cardFor||''))throw new Error('O cartão não foi gravado. Tente salvar de novo.');}
       // receita ja recebida: o aporte ligado a ela acompanha a nova parte do guardado
       if(flow==='income'&&finance){const g=reserveOf(finance.goals);if(g)await syncIncomeReserve(api,finance,saved.id,g.id,reserveAmt,!!data.paid,finalDate,name.trim());}
       await clearDraft();
@@ -952,7 +963,7 @@ function BillEditor({api,tx,accountId,onClose,onSaved,scope='series',initialFlow
       {flow==='expense'&&cardsList.length?<View style={{gap:6}}>
         <Text style={{fontSize:12,color:c.muted}}>Feita no cartão</Text>
         <Chips value={payCard} onChange={setPayCard} options={[{value:'',label:'Não'},...cardsList.map(k=>({value:k.id,label:'💳 '+k.name}))]}/>
-        {payCard?<Text style={{fontSize:11,color:c.muted,lineHeight:16}}>Fica marcada com 💳 em Contas e entra na fatura do {cardsList.find(k=>k.id===payCard)?.name||'cartão'}{repeat==='monthly'?' todo mês':''}.{tx&&!tx.cardId&&tx.paid&&tx.recurrence==='monthly'?' Este mês já está pago; a marcação vale a partir do mês que vem.':''}</Text>:null}
+        {payCard?<Text style={{fontSize:11,color:c.muted,lineHeight:16}}>Fica marcada com 💳 e entra na fatura do {cardsList.find(k=>k.id===payCard)?.name||'cartão'}{repeat==='monthly'?' todo mês':(()=>{const k=cardsList.find(x=>x.id===payCard);return k&&/^\d{4}-\d{2}-\d{2}$/.test(date)?' de '+monthLabel(invoiceMonth(k,date)).split(' ')[0].toLowerCase():'';})()}.{tx&&!tx.cardId&&tx.paid&&tx.recurrence==='monthly'?' Este mês já está pago; a marcação vale a partir do mês que vem.':''}</Text>:null}
       </View>:null}
       <Text style={{color:c.muted,fontSize:12}}>Avisar</Text>
       <Chips value={before} onChange={setBefore} options={[{value:'0',label:'No dia'},{value:'1',label:'1 dia antes'},{value:'3',label:'3 dias antes'},{value:'7',label:'7 dias antes'}]}/>
@@ -1235,6 +1246,22 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
       }
     } catch (e) { appAlert('Finanças', errorText(e)); } finally { setBusy(false); }
   }
+  // 0.3.222: pagar pela conta do cartao = pagar a fatura em que ela cai (o que falta dela)
+  function invoiceOf(card: Card, t: Tx) { const m = t.invoice || invoiceMonth(card, t.date); return cardInvoices(card, d.txs).find(i => i.month === m) || null; }
+  async function payInvoiceOf(card: Card, t: Tx, accountId: string) {
+    const inv = invoiceOf(card, t); if (!inv) return;
+    const left = Math.round((inv.total - inv.paid) * 100) / 100; if (left <= 0) return;
+    setBusy(true);
+    try { await saveEntity(api, 'fin_tx', 'Fatura ' + card.name + ' ' + inv.month.slice(5, 7) + '/' + inv.month.slice(0, 4), {kind: 'card_payment', amount: left, date: todayISO(), card_id: card.id, invoice_month: inv.month, account_id: accountId, paid: true, category: 'Fatura do cartão'}); await reload(); }
+    catch (e) { appAlert('Finanças', errorText(e)); } finally { setBusy(false); }
+  }
+  function askPayInvoice(card: Card, t: Tx) {
+    const inv = invoiceOf(card, t); if (!inv) return;
+    const left = Math.round((inv.total - inv.paid) * 100) / 100, n = inv.items.length, label = monthLabel(inv.month).split(' ')[0].toLowerCase();
+    const accounts = d.accounts.filter(a => !a.archived);
+    appAlert('Pagar a fatura de ' + label + '?', 'Esta conta está no ' + card.name + '. Pagar marca a fatura de ' + label + ' como paga (' + money(left) + ') e as ' + n + (n === 1 ? ' compra/conta dela fica paga.' : ' compras e contas dela ficam pagas.'),
+      [{text: 'Cancelar', style: 'cancel'}, {text: 'Pagar fatura', onPress: () => { if (accounts.length > 1 && !card.accountId) setPick(true); else void payInvoiceOf(card, t, card.accountId || accounts[0]?.id || ''); }}]);
+  }
   // 0.3.192: tocar em qualquer parte da linha abre a edicao; numa repeticao, abre a conta fixa original
   // 0.3.193: pela lista do mes, a edicao vale so para aquele mes (a conta fixa inteira muda em Contas fixas)
   const target = due.tx;
@@ -1246,9 +1273,17 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
       <View style={{width: 4, height: 36, borderRadius: 2, backgroundColor: cardOf?.color || c.accent}} />
       <View style={{flex: 1, gap: 2}}>
         <Text numberOfLines={1} style={{color: c.text, fontWeight: '600'}}>💳 {due.title}</Text>
-        <Text style={{fontSize: 11, color: c.muted}}>{dateBR(due.date)}{due.tx?.time ? ' · ' + due.tx.time : ''} · na fatura do {cardOf?.name || 'cartão'}</Text>
+        <Text style={{fontSize: 11, color: c.muted}}>{dateBR(due.date)}{due.tx?.time ? ' · ' + due.tx.time : ''} · na fatura do {cardOf?.name || 'cartão'}{cardOf && due.tx ? ' de ' + monthLabel(due.tx.invoice || invoiceMonth(cardOf, due.date)).split(' ')[0].toLowerCase() : ''}</Text>
       </View>
       <Text style={{color: c.text, fontWeight: '700'}}>{money(due.amount)}</Text>
+      {/* 0.3.222: Paguei numa conta do cartao paga a fatura dela inteira - todas as contas daquela fatura ficam pagas */}
+      {cardOf && due.tx ? <Pressable disabled={busy} onPress={() => askPayInvoice(cardOf, due.tx!)} style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: c.accent + '22'}}>
+        {busy ? <ActivityIndicator size="small" color={c.accent} /> : <Text style={{color: c.accent, fontWeight: '700', fontSize: 12}}>Paguei</Text>}
+      </Pressable> : null}
+      <Sheet visible={pick} onClose={() => setPick(false)} label="Fechar escolha de conta">
+        <Text style={{fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 8}}>Pagar a fatura com qual conta?</Text>
+        {d.accounts.filter(a => !a.archived).map(a => <Pressable key={a.id} onPress={() => { setPick(false); if (cardOf && due.tx) void payInvoiceOf(cardOf, due.tx, a.id); }} style={{paddingVertical: 14}}><Text style={{color: c.text, fontSize: 15}}>{a.name} · {money(accountBalance(a, d.txs))}</Text></Pressable>)}
+      </Sheet>
     </Pressable>); }
   if (due.paid) return (
     <Pressable accessibilityRole="button" accessibilityLabel={'Editar ' + due.title} disabled={!target} onPress={openEdit}
@@ -1515,7 +1550,7 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
 }
 function TxRow({t, d, first, onPress, api, reload}: {t: Tx; d: Data; first: boolean; onPress: () => void; api: SofiaApi; reload: () => Promise<void>}) {
   const c = useTheme(), cat = categoryOf(t.category, t.kind);
-  const source = t.cardId ? '💳 ' + (d.cards.find(x => x.id === t.cardId)?.name || 'Cartão') : t.kind === 'transfer' ? (d.accounts.find(a => a.id === t.accountId)?.name || '') + ' → ' + (d.accounts.find(a => a.id === t.toAccountId)?.name || '') : d.accounts.find(a => a.id === t.accountId)?.name || '';
+  const source = t.cardId ? '💳 ' + (d.cards.find(x => x.id === t.cardId)?.name || 'Cartão') + cardWhen(t, d.cards) : t.kind === 'transfer' ? (d.accounts.find(a => a.id === t.accountId)?.name || '') + ' → ' + (d.accounts.find(a => a.id === t.toAccountId)?.name || '') : d.accounts.find(a => a.id === t.accountId)?.name || '';
   const pending = !t.paid && !t.cardId;
   const color = t.kind === 'income' ? GOOD : t.kind === 'transfer' ? c.muted : c.text;
   return (
@@ -1765,7 +1800,7 @@ function CardsTab({d, api, reload, onTx, onManage, onNewBill, onEditBill}: {d: D
               <Text style={{color: c.text, fontWeight: '700'}}>{money(t.amount)}</Text>
             </Pressable>) : <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Nenhuma conta neste cartão ainda. Assinaturas e contas fixas pagas no cartão entram na fatura sozinhas, todo mês.</Text>}
             <View style={{flexDirection: 'row', gap: 8, marginTop: 6}}>
-              <SurePressable accessibilityRole="button" disabled={busy} onPress={() => { if (!busy) setLinkOpen(true); }} style={{flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: c.accentSoft, alignItems: 'center'}}><Text style={{color: c.accent, fontWeight: '700', fontSize: 13}}>Usar uma de Contas</Text></SurePressable>
+              <SurePressable accessibilityRole="button" disabled={busy} onPress={() => { if (!busy) setLinkOpen(true); }} style={{flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: c.accentSoft, alignItems: 'center'}}><Text style={{color: c.accent, fontWeight: '700', fontSize: 13}}>Usar conta existente</Text></SurePressable>
               <Pressable accessibilityRole="button" disabled={busy} onPress={() => onNewBill?.(card.id)} style={{flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: c.accent, alignItems: 'center'}}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 13}}>Nova conta</Text></Pressable>
             </View>
           </Card_>
@@ -2013,7 +2048,6 @@ function ReportsTab({d: full, month, reserve, api, reload}: {d: Data; month: str
 
 // ============================ 0.3.182: DETALHES DO SALDO, RECEITAS E DESPESAS ============================
 /** Tocar no Saldo mostra de onde ele vem; tocar em Receitas ou Despesas lista as do mes. */
-const CHANGE_LABEL: Record<SaldoChange['lines'][number]['why'], string> = {novo: 'entrou', saiu: 'saiu do app', desmarcado: 'deixou de estar pago', mudou: 'valor mudou', inicial: 'saldo inicial mudou', anteriores: 'meses anteriores mudaram'};
 function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountId = '', reload}: {kind: 'saldo' | 'income' | 'expense'; d: Data; month: string; show: (v: number) => string; net: number; onTx: (t: Tx) => void; onClose: () => void; api?: SofiaApi; accountId?: string; reload?: () => Promise<void>}) {
   const c = useTheme();
   // 0.3.192: ajustar o Saldo para o valor real do banco. Muda o ponto de partida da conta (saldo inicial)
@@ -2037,7 +2071,7 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountI
   const list = useMemo(() => monthTxs(d.txs, month).filter(t => t.paid && t.kind === kind).sort((a, b) => b.date.localeCompare(a.date)), [d, month, kind]);
   const total = list.reduce((s, t) => s + t.amount, 0);
   const [ledgerOpen, setLedgerOpen] = useState(false), reserve = reserveOf(d.goals);
-  const [changesOpen, setChangesOpen] = useState(false), [changes, setChanges] = useState<SaldoChange[]>([]);
+  const [changes, setChanges] = useState<SaldoChange[]>([]);
   useEffect(() => {
     if (kind !== 'saldo' || !api) return;
     let live = true;
@@ -2061,6 +2095,15 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountI
     // so o que esta na tela (o resto ja vem somado no acumulado dos meses anteriores)
     return {initial, income: income, expense, cards, transfers, total, carry};
   }, [kind, d, net]);
+  // 0.3.222: extrato do saldo com o historico de mudancas (ajustes e alteracoes viram linhas, o passado fica como era)
+  const ledger = useMemo(() => {
+    if (!parts) return null;
+    const ids = new Set(d.accounts.filter(a => a.include && !a.archived).map(a => a.id));
+    const items: LedgerItem[] = [...d.txs.filter(t => t.paid && !t.virtual && ids.has(t.accountId) && !t.cardId && (t.kind === 'income' || t.kind === 'expense' || t.kind === 'card_payment')).map(t => ({id: t.id, date: t.date, desc: t.desc, delta: t.kind === 'income' ? t.amount : -t.amount, tx: t as Tx | null, note: t.manualDue ? 'conta' : /^(fitid:|h:)/.test(String(t.entity?.data?.import_id || '')) ? 'do extrato' : t.kind === 'card_payment' ? 'fatura' : ''})),
+      ...d.txs.filter(t => t.paid && !t.virtual && t.kind === 'transfer' && (ids.has(t.accountId) !== ids.has(t.toAccountId))).map(t => ({id: t.id, date: t.date, desc: t.desc || 'Transferência', delta: ids.has(t.toAccountId) ? t.amount : -t.amount, tx: t as Tx | null, note: 'transferência'})),
+      ...(reserve && net ? (d.moves || []).filter(m => m.goalId === reserve.id && m.entity?.state !== 'archived').map(m => ({id: 'move:' + m.id, date: m.date, desc: m.direction === 'in' ? 'Aporte no guardado' : 'Retirada do guardado', delta: m.direction === 'in' ? -m.amount : m.amount, tx: null as Tx | null, note: 'reserva'})) : [])];
+    return saldoLedger(items, Math.round((parts.initial - parts.carry) * 100) / 100, parts.carry, changes, parts.total);
+  }, [parts, d, reserve, net, changes]);
   const [startReal, setStartReal] = useState('');
   const monthStartGuess = useMemo(() => { if (!parts) return 0; const r = reserveOf(d.goals); return monthControl(d.txs, d.moves || [], r?.id || '', month, accountId, parts.total, null).start; }, [parts, d, month, accountId]);
   const row = (label: string, value: string, strong = false, color?: string) => <View style={{flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4}}>
@@ -2099,40 +2142,16 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountI
         </View>
         {/* 0.3.211: conferencia item por item - cada valor que entrou e saiu desde o ponto de partida, com o saldo depois de cada um */}
         <Pressable accessibilityRole="button" onPress={() => setLedgerOpen(v => !v)} style={{paddingVertical: 8}}><Text style={{color: c.accent, fontWeight: '700'}}>{ledgerOpen ? 'Esconder o extrato do saldo' : 'Extrato do saldo'}</Text></Pressable>
-        {ledgerOpen && parts ? <View style={{backgroundColor: c.input, borderRadius: 16, padding: 12, gap: 4}}>
-          <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '700', fontSize: 12}}>Ponto de partida</Text><Text style={{color: c.text, fontWeight: '800', fontSize: 12}}>{show(parts.initial - parts.carry)}</Text></View>
-          {parts.carry ? <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Lançamentos de meses anteriores (somados)</Text><Text style={{color: parts.carry > 0 ? GOOD : BAD, fontWeight: '700', fontSize: 12}}>{parts.carry > 0 ? '+' : '−'}{show(Math.abs(parts.carry))}</Text></View> : null}
-          {(() => { let run = parts.initial; const ids = new Set(d.accounts.filter(a => a.include && !a.archived).map(a => a.id));
-            const rows = [...d.txs.filter(t => t.paid && !t.virtual && ids.has(t.accountId) && !t.cardId && (t.kind === 'income' || t.kind === 'expense' || t.kind === 'card_payment')).map(t => ({date: t.date, desc: t.desc, delta: t.kind === 'income' ? t.amount : -t.amount, tx: t as Tx | null, note: t.manualDue ? 'conta' : /^(fitid:|h:)/.test(String(t.entity?.data?.import_id || '')) ? 'do extrato' : ''})),
-              // 0.3.221: transferencias tambem aparecem (antes so entravam na conta do total)
-              ...d.txs.filter(t => t.paid && !t.virtual && t.kind === 'transfer' && (ids.has(t.accountId) !== ids.has(t.toAccountId))).map(t => ({date: t.date, desc: t.desc || 'Transferência', delta: ids.has(t.toAccountId) ? t.amount : -t.amount, tx: t as Tx | null, note: 'transferência'})),
-              ...(reserve && net ? (d.moves || []).filter(m => m.goalId === reserve.id && m.entity?.state !== 'archived').map(m => ({date: m.date, desc: m.direction === 'in' ? 'Aporte no guardado' : 'Retirada do guardado', delta: m.direction === 'in' ? -m.amount : m.amount, tx: null as Tx | null, note: 'reserva'})) : [])]
-              .sort((a, b) => a.date.localeCompare(b.date));
-            run = Math.round((parts.initial) * 100) / 100;
-            const finalRun = Math.round(rows.reduce((s, r) => s + r.delta, run) * 100) / 100, gap = Math.round((parts.total - finalRun) * 100) / 100;
-            // 0.3.221: se a soma da lista nao bater com o Saldo, a diferenca aparece na ultima linha (nada fica escondido)
-            if (gap) rows.push({date: todayISO(), desc: 'Diferença sem lançamento na lista', delta: gap, tx: null, note: 'veja Mudanças no saldo'});
-            return rows.map((r, i) => { run = Math.round((run + r.delta) * 100) / 100; return <Pressable key={i} accessibilityRole="button" disabled={!r.tx} onPress={() => { if (r.tx) onTx(r.tx); }} style={{flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5, borderTopWidth: 1, borderColor: c.line}}>
-              <Text style={{color: c.muted, fontSize: 11, width: 38}}>{r.date.slice(8, 10)}/{r.date.slice(5, 7)}</Text>
-              <Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 12}}>{r.desc}{r.note ? <Text style={{color: c.muted}}> · {r.note}</Text> : null}</Text>
-              <Text style={{color: r.delta >= 0 ? GOOD : BAD, fontSize: 12, fontWeight: '700'}}>{r.delta >= 0 ? '+' : '−'}{show(Math.abs(r.delta))}</Text>
-              <Text style={{color: run < 0 ? BAD : c.text, fontSize: 11, width: 76, textAlign: 'right'}}>{show(run)}</Text>
-            </Pressable>; }); })()}
-          <Text style={{color: c.muted, fontSize: 11, lineHeight: 16, marginTop: 6}}>Toque num item para corrigir ou apagar. A última coluna é o saldo depois daquele item.</Text>
-        </View> : null}
-        {/* 0.3.221: tudo o que mudou o Saldo entre uma abertura e outra, item por item - inclusive o que saiu do app */}
-        <Pressable accessibilityRole="button" onPress={() => setChangesOpen(v => !v)} style={{paddingVertical: 8}}><Text style={{color: c.accent, fontWeight: '700'}}>{changesOpen ? 'Esconder mudanças no saldo' : 'Mudanças no saldo' + (changes.length ? ' (' + changes.length + ')' : '')}</Text></Pressable>
-        {changesOpen ? <View style={{backgroundColor: c.input, borderRadius: 16, padding: 12, gap: 10}}>
-          {changes.length ? changes.slice(0, 20).map((ch, i) => <View key={ch.at + i} style={{gap: 3, borderTopWidth: i ? 1 : 0, borderColor: c.line, paddingTop: i ? 8 : 0}}>
-            <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
-              <Text style={{color: c.text, fontWeight: '700', fontSize: 12}}>{new Date(ch.at).toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})} às {new Date(ch.at).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</Text>
-              <Text style={{color: ch.after >= ch.before ? GOOD : BAD, fontWeight: '800', fontSize: 12}}>{ch.after >= ch.before ? '+' : '−'}{show(Math.abs(ch.after - ch.before))}</Text>
-            </View>
-            {ch.lines.map((l, k) => <View key={k} style={{flexDirection: 'row', gap: 8}}>
-              <Text numberOfLines={2} style={{flex: 1, color: c.text, fontSize: 12}}>{l.title}<Text style={{color: l.why === 'saiu' || l.why === 'anteriores' || l.why === 'inicial' ? WARN : c.muted}}> · {CHANGE_LABEL[l.why]}{l.why === 'novo' || l.why === 'saiu' || l.why === 'desmarcado' || l.why === 'mudou' ? ' (' + l.date.slice(8, 10) + '/' + l.date.slice(5, 7) + ')' : ''}</Text></Text>
-              <Text style={{color: l.delta >= 0 ? GOOD : BAD, fontSize: 12, fontWeight: '700'}}>{l.delta >= 0 ? '+' : '−'}{show(Math.abs(l.delta))}</Text>
-            </View>)}
-          </View>) : <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Nenhuma mudança registrada ainda. A partir de agora, toda vez que o Saldo mudar, aparece aqui o que mudou.</Text>}
+        {ledgerOpen && parts && ledger ? <View style={{backgroundColor: c.input, borderRadius: 16, padding: 12, gap: 4}}>
+          <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '700', fontSize: 12}}>Ponto de partida</Text><Text style={{color: c.text, fontWeight: '800', fontSize: 12}}>{show(ledger.start)}</Text></View>
+          {ledger.carry ? <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Lançamentos de meses anteriores (somados)</Text><Text style={{color: ledger.carry > 0 ? GOOD : BAD, fontWeight: '700', fontSize: 12}}>{ledger.carry > 0 ? '+' : '−'}{show(Math.abs(ledger.carry))}</Text></View> : null}
+          {ledger.rows.map(r => <Pressable key={r.id} accessibilityRole="button" disabled={!r.tx} onPress={() => { if (r.tx) onTx(r.tx); }} style={{flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5, borderTopWidth: 1, borderColor: c.line, backgroundColor: r.change ? WARN + '14' : 'transparent'}}>
+            <Text style={{color: c.muted, fontSize: 11, width: 38}}>{r.date.slice(8, 10)}/{r.date.slice(5, 7)}</Text>
+            <Text numberOfLines={2} style={{flex: 1, color: c.text, fontSize: 12}}>{r.desc}{r.note ? <Text style={{color: r.change ? WARN : c.muted}}> · {r.note}</Text> : null}</Text>
+            <Text style={{color: r.delta >= 0 ? GOOD : BAD, fontSize: 12, fontWeight: '700'}}>{r.delta >= 0 ? '+' : '−'}{show(Math.abs(r.delta))}</Text>
+            <Text style={{color: r.run < 0 ? BAD : c.text, fontSize: 11, width: 76, textAlign: 'right'}}>{show(r.run)}</Text>
+          </Pressable>)}
+          <Text style={{color: c.muted, fontSize: 11, lineHeight: 16, marginTop: 6}}>Funciona como o extrato do banco: o que já passou não muda. Ajustes e alterações entram como uma linha nova, na hora em que aconteceram, com quanto mudou e quanto ficou. A última coluna é o saldo depois de cada linha. Toque num item para corrigir ou apagar.</Text>
         </View> : null}
         <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Soma de tudo o que já foi pago ou recebido nas contas (não só deste mês). Se algum valor parecer errado, toque em Receitas ou Despesas para ver os lançamentos, ou confira o saldo inicial da conta em Contas e cartões.</Text>
       </> : <View style={{backgroundColor: c.surface, paddingBottom: 10, gap: 2, borderBottomWidth: 1, borderColor: c.line}}>

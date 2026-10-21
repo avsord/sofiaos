@@ -139,7 +139,7 @@ test('0.3.211: desfazer importacao na engrenagem e conferencia do Saldo item por
   const s=read('src/screens/Finance.tsx'),a=read('src/lib/api.ts');
   assert.ok(a.includes("financeImportUndo(targetId: string)"));
   assert.ok(!s.includes('Desfazer importação de extrato</Text>'),'0.3.219: saiu da engrenagem (apagar o extrato faz isso)');
-  assert.ok(s.includes("'Extrato do saldo'")&&s.includes("run = Math.round((run + r.delta) * 100) / 100"),'saldo depois de cada item');
+  assert.ok(s.includes("'Extrato do saldo'")&&s.includes("{show(r.run)}"),'saldo depois de cada item');
 });
 
 test('0.3.213: Financas reestruturadas - abas, Lancamentos com Extrato do banco (conciliacao), "+" com cinco entradas',()=>{
@@ -295,9 +295,9 @@ test('0.3.220: seletores compactos (do tamanho do texto) - Lancamentos | Extrato
 
 test('0.3.221: Apps arrastaveis como no iPhone; Inicio: segurar um widget abre o seletor com puxador',()=>{
   const g=read('src/components/AppGrid.tsx'),l=read('src/components/ReorderList.tsx'),sw=read('src/components/SortableWidgets.tsx'),w=read('src/screens/Workspace.tsx'),h=read('src/screens/Home.tsx');
-  assert.ok(g.includes('const GAP=12,H=148,COLS=2,HOLD=320;')&&g.includes('onShouldBlockNativeResponder:()=>false')&&g.includes("Animated.spring(scale,{toValue:1.06"),'segura, cresce e segue o dedo; rolagem livre antes de segurar');
+  assert.ok(g.includes('const GAP=12,H=148,COLS=2,HOLD=170;')&&g.includes('onShouldBlockNativeResponder:()=>false')&&g.includes("Animated.spring(scale,{toValue:1.06"),'segura, cresce e segue o dedo; rolagem livre antes de segurar');
   assert.ok(g.includes('if(target!==cur){const next=[...idsRef.current];next.splice(cur,1);next.splice(target,0,id)'),'os outros abrem espaco');
-  assert.ok(w.includes('<AppGrid items={orderedModules} onDragging={on=>{setDraggingApp(on);onGestureLock?.(on);}} onReorder={saveAppOrder}')&&w.includes('scrollEnabled={!draggingApp}'),'apps usam a grade; a tela nao rola durante o arrasto');
+  assert.ok(w.includes('<AppGrid items={orderedModules} onMenu={setHighlightFor} onDragging={on=>{setDraggingApp(on);onGestureLock?.(on);}} onReorder={saveAppOrder}')&&w.includes('scrollEnabled={!draggingApp}'),'apps usam a grade; a tela nao rola durante o arrasto');
   assert.ok(!w.includes('Use as setas para mudar os apps de lugar.'),'saiu o modo das setas');
   assert.ok(l.includes('onPanResponderTerminationRequest:()=>false')&&l.includes('useLayoutEffect(()=>{if(reset.current)'),'lista com puxador sem pulo ao soltar');
   assert.ok(sw.includes('const HOLD=450;')&&sw.includes('Organizar Início</Text>')&&sw.includes('<ReorderList '),'segurar abre o seletor');
@@ -343,7 +343,7 @@ test('0.3.223: Redefinir Financas; Relatorios na ordem pedida e todas as secoes 
   const due=f.monthDues([adobe],'a1','2026-10','2026-10-20');assert.equal(due.length,1);assert.equal(due[0].late,false,'conta do cartao nao fica atrasada');
   assert.equal(f.effect(adobe,'a1'),0,'nao sai do saldo direto');
   const fx=f.fixedSummary([adobe],'a1',{start:'2026-10-01',end:'2026-10-31'});assert.equal(fx.card,47);assert.equal(fx.open,0,'no cartao nao conta em faltam');
-  assert.ok(s.includes('<Title text="Contas no cartão" />')&&s.includes('>Usar uma de Contas</Text>')&&s.includes('>Nova conta</Text>'),'aba Cartoes');
+  assert.ok(s.includes('<Title text="Contas no cartão" />')&&s.includes('>Usar conta existente</Text>')&&s.includes('>Nova conta</Text>'),'aba Cartoes');
   assert.ok(s.includes("options={[{value:'',label:'Não'},...cardsList.map(k=>({value:k.id,label:'💳 '+k.name}))]}")&&s.includes('>Feita no cartão</Text>'),'0.3.224: marcar no editar que foi feita no cartao');
   assert.ok(s.includes('async function startSeriesNextMonth(')&&s.includes("o cartão vale a partir do mês que vem"),'conta ja paga este mes passa ao cartao no mes seguinte');
   assert.ok(s.includes("💳 {due.title}")&&s.includes("const open=list.filter(row=>!row.paid&&!row.tx?.cardId)"),'simbolo em Contas e fora dos totais');

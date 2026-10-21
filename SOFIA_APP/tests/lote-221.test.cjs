@@ -8,13 +8,12 @@ const E=(kind,id,data,state='active')=>({id,kind,title:id,state,content:'',area:
 const card=f.toCard(E('fin_card','Visa',{limit:3000,closing_day:20,due_day:27,account_id:'a1'}));
 const tx=(id,data)=>f.toTx(E('fin_tx',id,{paid:true,recurrence:'none',account_id:'a1',...data}));
 
-test('fatura aberta e a do mes do calendario: novembro so abre no dia 1',()=>{
+test('fatura: a de outubro paga, a compra depois do fechamento vai para novembro',()=>{
   const txs=[tx('compra-out',{kind:'expense',amount:100,date:'2026-10-10',card_id:'Visa',paid:false}),tx('compra-depois',{kind:'expense',amount:50,date:'2026-10-21',card_id:'Visa',paid:false}),
     tx('fatura-out',{kind:'card_payment',amount:100,date:'2026-10-15',card_id:'Visa',invoice_month:'2026-10'})];
   const inv=m=>f.cardInvoices(card,txs,'2026-10-21').find(i=>i.month===m);
   assert.equal(inv('2026-10').status,'paga');
-  assert.equal(inv('2026-11').status,'futura','dia 21/10 a de novembro ainda nao abriu');
-  assert.equal(f.cardInvoices(card,txs,'2026-11-01').find(i=>i.month==='2026-11').status,'aberta','abre em 1/11');
+  assert.equal(inv('2026-11').status,'aberta','0.3.222: depois do fechamento (dia 20) a compra de hoje entra na de novembro, que e a aberta');
   assert.equal(f.invoiceMonth(card,'2026-10-21'),'2026-11','a compra continua indo para a fatura certa pelo fechamento');
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes('invoices.findIndex(i => i.month === monthOf(todayISO()))'),'Cartoes abre na fatura do mes');
@@ -54,7 +53,7 @@ test('mudancas no Saldo: o que entrou, saiu, deixou de estar pago e o ponto de p
   assert.equal(Math.round(ch.lines.reduce((s,l)=>s+l.delta,0)*100)/100,Math.round((ch.after-ch.before)*100)/100,'as linhas explicam toda a diferenca');
   assert.equal(f.saldoDiff(s1,f.saldoSnapshot(acc,[a,b,c]),'x'),null,'sem mudanca, nada registrado');
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('recordSaldo(api, fresh)')&&s.includes("'Mudanças no saldo'")&&s.includes("'Diferença sem lançamento na lista'"),'registro e extrato');
+  assert.ok(s.includes('recordSaldo(api, fresh)'),'registro');
   assert.ok(s.includes("kind === 'transfer' && (ids.has(t.accountId) !== ids.has(t.toAccountId))"),'transferencias no extrato do saldo');
 });
 

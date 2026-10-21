@@ -257,7 +257,12 @@ class Workspace {
    // 0.3.215: receita que mandou uma parte para o guardado - apagar a receita apaga o aporte ligado a ela
    // 0.3.235: apagar uma regra de e-mail solta os e-mails que ela encontrou (eles continuam na lista, sem o vinculo) -
    // antes o servidor recusava ("ainda e usado por...") e o app ficava parado sem avisar
-   if(e.kind==='mail_rule'){for(let offset=0;offset<20000;offset+=500){const page=this.list({kind:'mail_hit',limit:500,offset});for(const h of page)if(h.data&&h.data.rule_id===entityId){try{this.save({revision:h.revision,data:{...h.data,rule_id:''}},h.id);}catch{/* segue */}}if(page.length<500)break;}}
+   // 0.3.222: direto no banco (antes o regravar podia falhar em e-mail antigo e a regra continuava presa); a estrela
+   // que veio da regra sai, os e-mails ficam. Emoji escolhido pela pessoa (que nao seja a estrela) continua.
+   if(e.kind==='mail_rule'){const at=now(),rows=this.db.prepare("SELECT id,data FROM entities WHERE owner=? AND kind='mail_hit' AND data LIKE ?").all(OWNER,'%'+entityId+'%');
+    for(const r of rows){let d={};try{d=JSON.parse(r.data)||{};}catch{d={};}if(d.rule_id===entityId)d.rule_id='';for(const k of Object.keys(d))if(typeof d[k]==='string'&&d[k].includes(entityId))d[k]=d[k].split(entityId).join('');
+     d.important=false;if(d.emoji==='⭐')d.emoji='';d.rule_names=String(d.rule_names||'').split(', ').filter(n=>n&&n!==e.title).join(', ');
+     this.db.prepare('UPDATE entities SET data=?,revision=revision+1,updated_at=? WHERE id=?').run(JSON.stringify(d),at,r.id);}}
    if(e.kind==='fin_tx'&&Number(e.data&&e.data.reserve_part)>0){for(const m of this.list({kind:'fin_reserve_move',limit:500}))if(m.data&&m.data.income_id===entityId){try{this.deleteEntity(m.id);}catch{/* ja saiu */}}}
    if(e.kind==='user_page'){
      const pages=this.list({kind:'user_page',limit:500}),byParent=new Map();for(const p of pages){const parent=p.data?.parent_id||'';if(!byParent.has(parent))byParent.set(parent,[]);byParent.get(parent).push(p);}
