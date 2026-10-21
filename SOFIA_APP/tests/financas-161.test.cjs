@@ -41,7 +41,7 @@ test('meta: projecao no ritmo atual e quanto por mes fecharia no prazo',()=>{
 test('telas: cartao Saldo, secao de contas fixas, meta e passo a passo com 7 etapas',()=>{
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes('>Controle de gastos</Text>')&&s.includes('moneyLeft(d.txs, d.cards, monthRange, accountId, total, aportePendingIn(monthRange), today)'),'cartao do ciclo');
-  assert.ok(s.includes("'estourou ' + show(-b.left)"),'mostra quando estoura');
+  assert.ok(s.includes('const b = spend, over = b.left < 0, pct = Math.min(1, b.pct);'),'controle de gastos e o Saldo');
   assert.ok(s.includes("<Title text={side==='pagar'?'Contas fixas':'Receitas fixas'} />")&&s.includes('Total do mês'));
   assert.ok(s.includes('Meta: {show(outlook.target)}')&&s.includes('Para fechar no prazo:'));
   assert.ok(s.includes("{title: 'Quando e quanto você recebe'")&&s.includes("{title: 'Tudo pronto'"));
@@ -166,7 +166,7 @@ test('0.3.182: Saldo, detalhes do saldo, listas de receitas e despesas, cartao n
 test('0.3.186: sem aviso de repetido (o servidor nao deixa duplicar e corrige o antigo); contas fixas no mes da pagina',()=>{
   const s=read('src/screens/Finance.tsx');
   assert.ok(!s.includes('DuplicatesSheet')&&!s.includes('Lançamento repetido'),'nada de tela de repetidos');
-  assert.ok(s.includes('confirmTx(api, due.tx, d.txs)')&&s.includes('confirmTx(api, t, d.txs)'),'confirmar nao cria segundo registro');
+  assert.ok(s.includes('receiveTx(api, d, due.tx)')&&s.includes('receiveTx(api, d, t)')&&s.includes('async function confirmTx('),'confirmar nao cria segundo registro');
   assert.ok(s.includes("const range=useMemo(()=>({start:dayIn(month,1),end:dayIn(month,daysIn(month))"),'contas fixas no mes da pagina');
   assert.ok(s.includes("const initialTouched = !acc || money0(balance) !== acc.initial;"),'refazer nao reescreve o saldo inicial');
   assert.ok(s.includes('Não é um lançamento: é o saldo inicial da conta'));
@@ -212,7 +212,7 @@ test('0.3.192: ajustar o Saldo ao valor do banco muda so o ponto de partida; lan
   assert.equal(f.totalBalance([adjusted],txs),6000,'Saldo vira o valor do banco');
   assert.equal(f.totalBalance([adjusted],[...txs,tx('mercado','expense',200,'2026-10-20')]),5800,'e continua contando a partir dele');
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('Ajustar saldo ao valor do banco'));
+  assert.ok(s.includes('<Button title="Ajustar saldo" secondary'),'0.3.214: botao Ajustar saldo');
   assert.ok(s.includes("initial_balance: String(Math.round((target.initial + diff) * 100) / 100)"),'sem lancamento falso');
 });
 
@@ -250,7 +250,7 @@ test('0.3.195: previsao do salario (periodo do proximo salario) e ciclo de cada 
   assert.equal(f.effectiveCycleDay([acc],[],'a1'),0,'sem salario: mes do calendario');
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes("{'Previsto no fim de ' + monthLabel(month).split(' ')[0].toLowerCase()}"));
-  assert.ok(s.includes('Começa em {show(b.available)} e desce com cada gasto'),'o cartao nunca some');
+  assert.ok(s.includes("Você começou {monthLabel(month).split(' ')[0].toLowerCase()} com {show(b.start)}")&&s.includes("e agora tem {show(b.left)}."),'o cartao nunca some');
 });
 
 test('0.3.196: Controle de gastos; passo a passo pede o valor cheio do salario e cria a receita fixa no dia',()=>{
@@ -360,14 +360,14 @@ test('0.3.208: Relatorios com secoes que abrem e fecham (lembra a escolha), guar
   assert.ok(!s.includes('Recomeçar de hoje</Text>')&&!s.includes('Recuperar itens apagados</Text>'),'0.3.212: recomecar e recuperar sairam');assert.ok(s.includes('>Zerar Finanças</Text>'),'zerar Financas na engrenagem');
   assert.ok(s.includes("manualDues(d.txs, accountId, today, 3)")&&s.includes('nos próximos 3 dias'),'vencimentos com 3 dias');
   assert.ok(s.includes("label: 'Contas'")&&s.includes("label: 'Lançamentos'"),'0.3.213: abas Resumo, Contas, Lancamentos, Cartoes, Relatorios');
-  assert.ok(s.includes('async function saveFresh(')&&s.includes("await saveFresh(api, t.desc, {paid: true}, t.entity)"),'Paguei sobre a versao atual');
+  assert.ok(s.includes('async function saveFresh(')&&s.includes("return saveFresh(api, t.desc, {paid: true, ...extra}, t.entity)"),'Paguei sobre a versao atual');
   assert.ok(s.includes('aparece {g.items.length} vezes'),'aviso de repetido');
 });
 
 test('0.3.212: previsto e controle pelo mes da tela; extrato do saldo; pular o passo a passo',()=>{
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes("const monthRange = useMemo(() => ({start: dayIn(month, 1), end: dayIn(month, daysIn(month))}), [month]);"));
-  assert.ok(s.includes("'estourou ' + show(-b.left)")&&!s.includes('além do que sobra'));
+  assert.ok(!s.includes('além do que sobra'));
   assert.ok(s.includes("'Extrato do saldo'")&&!s.includes('Conferir item por item'));
   assert.ok(s.includes('Pular: só a conta. O resto a Sofia cadastra pelos seus prints'));
   assert.ok(s.includes("api.financeReset()"));

@@ -238,6 +238,8 @@ class Workspace {
  changeState(entityId,state,revision,extra={}){const old=this.get(entityId);return this.save({...old,...extra,state,revision},entityId);}
  deleteEntity(entityId){
    const e=this.get(entityId);
+   // 0.3.215: receita que mandou uma parte para o guardado - apagar a receita apaga o aporte ligado a ela
+   if(e.kind==='fin_tx'&&Number(e.data&&e.data.reserve_part)>0){for(const m of this.list({kind:'fin_reserve_move',limit:500}))if(m.data&&m.data.income_id===entityId){try{this.deleteEntity(m.id);}catch{/* ja saiu */}}}
    if(e.kind==='user_page'){
      const pages=this.list({kind:'user_page',limit:500}),byParent=new Map();for(const p of pages){const parent=p.data?.parent_id||'';if(!byParent.has(parent))byParent.set(parent,[]);byParent.get(parent).push(p);}
      const ordered=[],seen=new Set();const walk=id=>{for(const child of byParent.get(id)||[]){if(seen.has(child.id))continue;seen.add(child.id);walk(child.id);ordered.push(child);}};walk(entityId);ordered.push(e);

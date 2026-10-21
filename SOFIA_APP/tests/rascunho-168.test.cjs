@@ -75,7 +75,7 @@ test('0.3.174: concluir os passos leva ao Resumo de Financas',()=>{
 test('0.3.175: "Paguei" fica pago na hora e o fim dos passos grava em paralelo',()=>{
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes('local?.markPaid(due.tx);'),'marca na tela antes de esperar o servidor');
-  assert.ok(s.includes("void confirmTx(api, due.tx, d.txs).then(() => reload()).catch(e => { appAlert('Finanças', errorText(e)); void reload(); });"),'se falhar, volta ao estado real');
+  assert.ok(s.includes("void receiveTx(api, d, due.tx).then(() => reload()).catch(e => { appAlert('Finanças', errorText(e)); void reload(); });"),'se falhar, volta ao estado real');
   assert.ok(s.includes('<FinanceLocal.Provider value={local}>'));
   assert.ok(s.includes('await Promise.all(jobs);'),'gravacoes em paralelo');
   assert.ok(s.includes('if (existing) { if (onFinished) onFinished(); else onClose?.(); void onDone(); }'),'ao refazer, vai para o Resumo sem esperar');

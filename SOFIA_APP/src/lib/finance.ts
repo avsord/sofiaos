@@ -5,9 +5,9 @@ import type {Entity} from './types';
 
 export type TxKind = 'expense' | 'income' | 'transfer' | 'card_payment';
 export type Recurrence = 'none' | 'monthly' | 'weekly' | 'yearly';
-export type Account = {id: string; name: string; type: string; initial: number; color: string; include: boolean; archived: boolean; cycleDay: number; reportStart: string; entity: Entity};
+export type Account = {id: string; name: string; type: string; initial: number; color: string; include: boolean; archived: boolean; cycleDay: number; reportStart: string; monthStarts: Record<string, number>; entity: Entity};
 export type Card = {id: string; name: string; limit: number; closing: number; due: number; color: string; accountId: string; archived: boolean; entity: Entity};
-export type Tx = {
+export type Tx = {reservePart: number; 
   id: string; kind: TxKind; desc: string; amount: number; date: string; category: string; accountId: string; toAccountId: string; cardId: string;
   invoice: string; paid: boolean; seriesId: string; installment: number; installments: number; recurrence: Recurrence; recurrenceEnd: string;
   virtual?: boolean; manualDue?: boolean; remindDays?: number; entity?: Entity;
@@ -63,7 +63,7 @@ export function addDays(date: string, n: number): string { const d = new Date(da
 // ---------- Leitura das entidades ----------
 export function toAccount(e: Entity): Account {
   return {id: e.id, name: e.title, type: String(e.data?.account_type || 'corrente'), initial: num(e.data?.initial_balance), color: String(e.data?.color || FIN_COLORS[0]),
-    include: e.data?.include_total !== false, archived: e.state === 'archived', cycleDay: Math.min(31, Math.max(0, num(e.data?.cycle_day))), reportStart: /^\d{4}-\d{2}-\d{2}$/.test(String(e.data?.report_start || '')) ? String(e.data.report_start) : '', entity: e};
+    include: e.data?.include_total !== false, archived: e.state === 'archived', cycleDay: Math.min(31, Math.max(0, num(e.data?.cycle_day))), reportStart: /^\d{4}-\d{2}-\d{2}$/.test(String(e.data?.report_start || '')) ? String(e.data.report_start) : '', monthStarts: parseMonthStarts(e.data?.month_starts_json), entity: e};
 }
 export function toCard(e: Entity): Card {
   return {id: e.id, name: e.title, limit: num(e.data?.limit), closing: num(e.data?.closing_day) || 1, due: num(e.data?.due_day) || 10, color: String(e.data?.color || FIN_COLORS[2]),
@@ -74,7 +74,7 @@ export function toTx(e: Entity): Tx {
   return {id: e.id, kind: (d.kind || 'expense') as TxKind, desc: e.title, amount: num(d.amount), date: String(d.date || ''), category: String(d.category || ''),
     accountId: String(d.account_id || ''), toAccountId: String(d.to_account_id || ''), cardId: String(d.card_id || ''), invoice: String(d.invoice_month || ''),
     paid: !!d.paid, seriesId: String(d.series_id || ''), installment: num(d.installment), installments: num(d.installments), recurrence: (d.recurrence || 'none') as Recurrence,
-    recurrenceEnd: String(d.recurrence_end || ''), manualDue: String(d.import_id || '').startsWith('sofia-pendencia:'), remindDays: Math.max(0, Math.min(15, Number(d.remind_days) || 0)), entity: e};
+    recurrenceEnd: String(d.recurrence_end || ''), manualDue: String(d.import_id || '').startsWith('sofia-pendencia:'), reservePart: Number(d.reserve_part) > 0 ? Number(d.reserve_part) : 0, remindDays: Math.max(0, Math.min(15, Number(d.remind_days) || 0)), entity: e};
 }
 export function toBudget(e: Entity): Budget { return {id: e.id, category: String(e.data?.category || e.title), limit: num(e.data?.limit), entity: e}; }
 export function toGoal(e: Entity): Goal {
@@ -718,4 +718,34 @@ export function moneyLeft(txs: Tx[], cards: Card[], range: {start: string; end: 
   const spent = sum(list.filter(t => t.kind === 'expense' && t.paid && !t.manualDue && !recurring(t)));
   const left = round2(saldo + toReceive - toPay - card - aporte);
   return {start: range.start, end: range.end, saldo: round2(saldo), toReceive, toPay, card, aporte, left, spent, available: round2(Math.max(left, 0) + spent), incomeItems, expenseItems};
+}
+
+// ---------- 0.3.214: Controle de gastos = quanto tinha no inicio do mes x quanto tem agora (o Saldo) ----------
+export function parseMonthStarts(v: unknown): Record<string, number> {
+  try { const o = JSON.parse(String(v || '{}')); const out: Record<string, number> = {}; if (o && typeof o === 'object') for (const [k, n] of Object.entries(o)) if (/^\d{4}-\d{2}$/.test(k) && Number.isFinite(Number(n))) out[k] = Number(n); return out; } catch { return {}; }
+}
+/** start = saldo no inicio do mes (o informado em "Ajustar saldo"; sem ele, o calculado pelos lancamentos).
+ * O 100% e o start (parado); o atual e o Saldo (receitas do mes entram so nele). Gasto = start - atual. */
+export type MonthControl = {start: number; manual: boolean; income: number; extra: number; available: number; left: number; spent: number; pct: number};
+/** Receita AVULSA (freela, venda...) e a que nao e programada: sem repeticao e sem serie. A parte dela que foi para o
+ * guardado nao entra no Controle; o que ficou no saldo soma ao valor inicial. Salario e aluguel (programadas) vao para o
+ * Saldo e so entram na base na virada do mes. */
+export function isOneOffIncome(t: Tx): boolean { return t.kind === 'income' && t.recurrence !== 'monthly' && !t.seriesId && !t.virtual; }
+export function monthControl(txs: Tx[], moves: ReserveMove[], reserveId: string, month: string, accountId: string, saldo: number, manualStart: number | null): MonthControl {
+  const first = dayIn(month, 1), last = dayIn(month, daysIn(month));
+  const mine = (t: Tx) => (!accountId || t.accountId === accountId) && t.paid && !t.virtual && !t.cardId && t.date >= first && t.date <= last;
+  const income = round2(txs.filter(t => mine(t) && t.kind === 'income').reduce((s, t) => s + t.amount, 0));
+  const extra = round2(txs.filter(t => mine(t) && isOneOffIncome(t)).reduce((s, t) => s + Math.max(0, t.amount - (t.reservePart || 0)), 0));
+  const out = round2(txs.filter(t => mine(t) && (t.kind === 'expense' || t.kind === 'card_payment')).reduce((s, t) => s + t.amount, 0)
+    + (reserveId ? moves.filter(m => m.goalId === reserveId && m.entity?.state !== 'archived' && m.date >= first && m.date <= last).reduce((s, m) => s + (m.direction === 'in' ? m.amount : -m.amount), 0) : 0));
+  const start = manualStart !== null ? round2(manualStart) : round2(saldo - income + out);
+  const available = round2(start + extra), left = round2(saldo);
+  return {start, manual: manualStart !== null, income, extra, available, left, spent: round2(available - left), pct: available > 0 ? Math.max(0, left / available) : 0};
+}
+
+/** 0.3.214: Saldo (o que voce tem para usar) como estava no fim de uma data: contas ate a data menos o guardado ate a data.
+ * Serve ao Controle de gastos de um mes que ja passou - assim ele nao compara o saldo de HOJE com o comeco daquele mes. */
+export function balanceAsOf(accounts: Account[], txs: Tx[], moves: ReserveMove[], reserveId: string, date: string): number {
+  const net = reserveId ? moves.filter(m => m.goalId === reserveId && m.entity?.state !== 'archived' && m.date <= date).reduce((s, m) => s + (m.direction === 'in' ? m.amount : -m.amount), 0) : 0;
+  return round2(totalBalance(accounts, txs, date) - net);
 }

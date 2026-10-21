@@ -141,10 +141,109 @@ test('0.3.211: desfazer importacao na engrenagem e conferencia do Saldo item por
 
 test('0.3.213: Financas reestruturadas - abas, Lancamentos com Extrato do banco (conciliacao), "+" com cinco entradas',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes("[{value: 'home' as Tab, label: 'Resumo'}, {value: 'bills' as Tab, label: 'Contas'}, {value: 'txs' as Tab, label: 'Lançamentos'}, {value: 'cards' as Tab, label: 'Cartões'}, {value: 'reports' as Tab, label: 'Relatórios'}]"));
-  assert.ok(s.includes("tab === 'txs' ? <TxTab"),'Lancamentos e aba propria');
+  assert.ok(s.includes("[{value: 'home' as Tab, label: 'Resumo'}, {value: 'bills' as Tab, label: 'Contas'}, {value: 'cards' as Tab, label: 'Cartões'}, {value: 'reports' as Tab, label: 'Relatórios'}]"),'abas; historico de volta no Resumo');
   assert.ok(s.includes('function BankStatements(')&&s.includes("'falta no app'")&&s.includes('Acertar Saldo</Text>')&&s.includes("'lançado pelo extrato'"),'conciliacao');
   assert.ok(s.includes("api.financeStatement(file.text, target.id)"),'importar guarda o extrato a parte');
   assert.ok(s.includes("[['expense', '⏰ Conta a pagar', c.text], ['income', '⏰ Conta a receber', c.text]]"),'+ com conta a pagar e a receber');
   assert.ok(s.includes("statements: g('fin_statement')"));
+});
+
+test('0.3.214: Controle de gastos e o Saldo; 100% e o que havia no mes antes de comecar a gastar; historico no Resumo',()=>{
+  const f=require('./load-ts.cjs')('src/lib/finance.ts');
+  const tx=(id,amount,date)=>f.toTx({id,kind:'fin_tx',title:id,state:'active',data:{kind:'expense',amount,date,account_id:'a1',paid:true,category:'X',recurrence:'none'}});
+  const r=f.spendControl([tx('a',2529.58,'2026-10-11')],[],'',{start:'2026-10-01',end:'2026-10-31'},'a1',353.13);
+  assert.equal(r.left,353.13,'o valor e o Saldo');assert.equal(r.available,2882.71,'saldo + tudo o que saiu no mes');assert.equal(Math.round(r.pct*100),12);
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("monthControl(d.txs, d.moves || [], reserve?.id || '', month, accountId, controlSaldo, manualStart)"));
+  assert.ok(s.includes('<TxTab d={d} month={month} accountFilter="" setAccountFilter={() => undefined} onTx={onTx} api={api} reload={reload} />'),'historico de volta no Resumo');
+  assert.ok(!s.includes("label: 'Lançamentos'}, {value: 'cards'"),'sem aba Lancamentos repetida');
+});
+
+
+test('0.3.214: Ajustar saldo com inicio do mes e atual; Controle compara so os dois (receita do mes fica so no atual)',()=>{
+  const f=require('./load-ts.cjs')('src/lib/finance.ts');
+  const tx=(id,kind,amount,date,extra={})=>f.toTx({id,kind:'fin_tx',title:id,state:'active',data:{kind,amount,date,account_id:'a1',paid:true,category:'X',recurrence:'none',...extra}});
+  const r=f.monthControl([tx('g','expense',1596.02,'2026-10-11')],[],'','2026-10','a1',353.13,1949.15);
+  assert.equal(r.available,1949.15,'100% = inicio do mes informado');assert.equal(r.left,353.13,'atual = Saldo');assert.equal(Math.round(r.pct*100),18);assert.equal(r.spent,1596.02);
+  const sal=f.monthControl([tx('s','income',7821,'2026-10-25',{recurrence:'monthly'})],[],'','2026-10','a1',8174.13,1949.15);
+  assert.equal(sal.available,1949.15,'salario (programada) NAO entra no inicio do mes');assert.equal(sal.left,8174.13,'entra so no atual');assert.ok(sal.pct>1,'passa de 100%');
+  assert.equal(f.parseMonthStarts('{"2026-10":1949.15,"x":1}')['2026-10'],1949.15);
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes('<Button title="Ajustar saldo" secondary')&&!s.includes('Ajustar saldo ao valor do banco'),'nome do botao');
+  assert.ok(s.includes('accessibilityLabel="Saldo no início do mês"')&&s.includes('accessibilityLabel="Saldo atual"'),'dois valores');
+  assert.ok(s.includes('month_starts_json: JSON.stringify(starts)'),'guarda o inicio do mes');
+  assert.ok(s.includes('monthControl(d.txs, d.moves || [], reserve?.id || \'\', month, accountId, controlSaldo, manualStart)'),'controle usa o inicio do mes');
+});
+
+test('0.3.214: virada do mes - salario nao mexe no inicio; novembro comeca no saldo daquele momento; mes passado usa o saldo do ultimo dia dele',()=>{
+  const f=require('./load-ts.cjs')('src/lib/finance.ts');
+  const mk=(id,kind,amount,date)=>f.toTx({id,kind:'fin_tx',title:id,state:'active',data:{kind,amount,date,account_id:'a1',paid:true,category:'X',recurrence:'none'}});
+  const acc=f.toAccount({id:'a1',kind:'fin_account',title:'Conta',state:'active',data:{account_type:'corrente',initial_balance:'1949.15',include_total:true}});
+  const saldo=(t,upTo)=>f.totalBalance([acc],t,upTo),ctl=(t,m,s,man=null)=>f.monthControl(t,[],'',m,'a1',s,man);
+  let t=[mk('a','expense',200,'2026-10-05'),mk('b','expense',500,'2026-10-12'),mk('sal','income',7821,'2026-10-25'),mk('c','expense',300,'2026-10-28')];
+  assert.equal(ctl(t,'2026-10',saldo(t)).start,1949.15,'salario nao mexe no inicio do mes');
+  const nov=ctl(t,'2026-11',saldo(t));assert.equal(nov.start,saldo(t),'novembro comeca no saldo daquele momento');assert.equal(Math.round(nov.pct*100),100);
+  const t2=[...t,mk('d','expense',150,'2026-11-03')];
+  assert.equal(ctl(t2,'2026-11',saldo(t2)).start,saldo(t),'gastar em novembro nao muda o inicio');
+  const fim=f.balanceAsOf([acc],t2,[],'','2026-10-31');assert.equal(fim,saldo(t),'saldo no ultimo dia de outubro');
+  const out=ctl(t2,'2026-10',fim);assert.equal(out.start,1949.15,'outubro visto depois: inicio certo');assert.equal(out.left,8770.15,'e o agora e o saldo de 31/10, nao o de hoje');
+  assert.ok(read('src/screens/Finance.tsx').includes("month < monthOf(today) ? balanceAsOf("));
+});
+
+test('0.3.215: receita avulsa divide entre saldo e guardado; programada (salario) nao; a parte do saldo soma ao inicio do Controle',()=>{
+  const f=require('./load-ts.cjs')('src/lib/finance.ts');
+  const mk=(id,kind,amount,date,extra={})=>f.toTx({id,kind:'fin_tx',title:id,state:'active',data:{kind,amount,date,account_id:'a1',paid:true,category:'X',recurrence:'none',...extra}});
+  const acc=f.toAccount({id:'a1',kind:'fin_account',title:'Conta',state:'active',data:{account_type:'corrente',initial_balance:'1949.15',include_total:true}});
+  const mv=(amount,date)=>({id:'m'+amount,goalId:'g1',direction:'in',amount,date,entity:{state:'active'}});
+  const usable=(t,m)=>f.totalBalance([acc],t)-m.reduce((s,x)=>s+x.amount,0);
+  const ctl=(t,m)=>f.monthControl(t,m,'g1','2026-10','a1',usable(t,m),null);
+  let txs=[mk('g','expense',1000,'2026-10-11')],moves=[];
+  const base=ctl(txs,moves);assert.equal(base.available,1949.15);assert.equal(base.spent,1000);
+  txs=[...txs,mk('freela','income',1000,'2026-10-21',{reserve_part:300})];moves=[mv(300,'2026-10-21')];
+  const fr=ctl(txs,moves);assert.equal(fr.extra,700,'so o que ficou no saldo');assert.equal(fr.available,2649.15,'soma ao valor inicial');assert.equal(fr.left,1649.15);assert.equal(fr.spent,1000,'o gasto nao muda');
+  txs=[...txs,mk('salario','income',7821,'2026-10-25',{recurrence:'monthly'})];
+  const sal=ctl(txs,moves);assert.equal(sal.available,2649.15,'salario (programada) NAO soma na base do mes');assert.equal(sal.left,9470.15,'entra no saldo');
+  const venda=ctl([...txs,mk('venda','income',500,'2026-10-26')],moves);assert.equal(venda.extra,1200,'venda sem guardado: tudo no saldo');
+  assert.equal(f.isOneOffIncome(mk('x','income',1,'2026-10-01')),true);assert.equal(f.isOneOffIncome(mk('x','income',1,'2026-10-01',{recurrence:'monthly'})),false);assert.equal(f.isOneOffIncome(mk('x','income',1,'2026-10-01',{series_id:'s'})),false);
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes('Desta receita, quanto vai para o guardado? (R$)')&&s.includes('syncIncomeReserve(api, d, saved.id, goalForSplit.id, split, true, date, title)'),'lancamento de receita');
+  assert.ok(s.includes("somou ' + show(b.extra) + ' de receita avulsa'"),'texto do Controle');
+  assert.ok(f.balanceAsOf,'balanceAsOf continua existindo');
+});
+
+test('0.3.216: salario e aluguel (programadas) tambem dividem entre saldo e guardado, com o padrao do cadastro e a pergunta no Recebi',()=>{
+  const f=require('./load-ts.cjs')('src/lib/finance.ts');
+  const mk=(id,kind,amount,date,extra={})=>f.toTx({id,kind:'fin_tx',title:id,state:'active',data:{kind,amount,date,account_id:'a1',paid:true,category:'X',recurrence:'none',...extra}});
+  const acc=f.toAccount({id:'a1',kind:'fin_account',title:'Conta',state:'active',data:{account_type:'corrente',initial_balance:'1949.15',include_total:true}});
+  const mv=(amount,date)=>({id:'m'+amount,goalId:'g1',direction:'in',amount,date,entity:{state:'active'}});
+  const usable=(t,m)=>f.totalBalance([acc],t)-m.reduce((s,x)=>s+x.amount,0);
+  const txs=[mk('gasto','expense',1000,'2026-10-11'),mk('salario','income',7821,'2026-10-25',{recurrence:'monthly',reserve_part:4000})],moves=[mv(4000,'2026-10-25')];
+  const r=f.monthControl(txs,moves,'g1','2026-10','a1',usable(txs,moves),null);
+  assert.equal(r.left,4770.15,'o saldo recebe so o que nao foi para o guardado (7821 - 4000)');
+  assert.equal(r.available,1949.15,'a base do mes continua parada (programada so entra na virada)');
+  assert.equal(r.extra,0);assert.equal(mk('s','income',100,'2026-10-01',{recurrence:'monthly',reserve_part:40}).reservePart,40,'o padrao fica na receita');
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes('Desta receita, quanto vai para o guardado todo mês? (R$)')&&s.includes('Quanto vai para o guardado todo mês'),'cadastro todo mes');
+  assert.ok(s.includes('reserve_part:reserveAmt>0?reserveAmt:\'\''),'padrao gravado na receita programada');
+});
+
+test('0.3.217: Recebi manda sozinho a parte do guardado (sem pergunta); editar o item atualiza o aporte; vale para avulsa e programada',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(!s.includes('Quanto desse valor vai para o guardado?')&&!s.includes('setSplitOpen'),'sem pergunta no Recebi');
+  assert.ok(s.includes('async function receiveTx(')&&s.includes('void receiveTx(api, d, due.tx)')&&s.includes('void receiveTx(api, d, t)'),'Recebi (Contas e Historico) usa a parte ja cadastrada');
+  assert.ok(s.includes('async function syncIncomeReserve(')&&s.includes('await api.deleteEntity(linked.entity.id)'),'aporte ligado acompanha: cria, ajusta, apaga');
+  assert.ok(s.includes("syncIncomeReserve(api, d, savedTx.id, goalForSplit.id, editSplit, paid && !isCard, date, title)"),'editar a receita atualiza o aporte');
+  assert.ok(s.includes("syncIncomeReserve(api,finance,saved.id,g.id,reserveAmt,!!data.paid,finalDate,name.trim())"),'editar a conta a receber atualiza o aporte');
+  assert.ok(s.includes("syncIncomeReserve(api, d, tx.entity!.id, g.id, 0, false, tx.date || '', tx.desc || '')"),'desfazer o recebimento tira o aporte');
+  assert.ok(s.includes("Desta receita, quanto vai para o guardado{repeat==='monthly'?' todo mês':''}? (R$)"),'campo para qualquer receita');
+  const f=require('./load-ts.cjs')('src/lib/finance.ts');
+  const t=f.toTx({id:'t',kind:'fin_tx',title:'Salário',state:'active',data:{kind:'income',amount:7821,date:'2026-09-25',account_id:'a1',paid:true,category:'Salário',recurrence:'monthly',reserve_part:4000}});
+  const v=f.expandRecurring([t],'2026-10')[0];assert.equal(v.reservePart,4000,'a ocorrencia do mes herda a parte do guardado');
+});
+
+test('0.3.217: apagar ou desfazer uma receita que mandou parte para o guardado avisa o que acontece com o aporte',()=>{
+  const s=read('src/screens/Finance.tsx');
+  assert.ok(s.includes("' que foi para o guardado também é apagada do guardado (só esse aporte; os seus outros aportes não mudam).'"),'apagar lancamento');
+  assert.ok(s.includes("' que foi para o guardado também sai de lá até você receber de novo.'"),'desfazer recebimento');
+  assert.ok(s.includes("' que foi para o guardado neste recebimento também é apagado.'"),'apagar conta a receber ja recebida');
 });

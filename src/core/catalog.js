@@ -1581,6 +1581,13 @@ const CATALOG={
     ],
     "fields": [
       {
+        "key": "month_starts_json",
+        "label": "Saldo no início de cada mês",
+        "type": "textarea",
+        "max": 6000,
+        "developerOnly": true
+      },
+      {
         "key": "balance_set_at",
         "label": "Saldo acertado com o banco em",
         "type": "date",
@@ -1676,6 +1683,12 @@ const CATALOG={
       "archived"
     ],
     "fields": [
+      {
+        "key": "reserve_part",
+        "label": "Parte desta receita que foi para o guardado",
+        "type": "number",
+        "developerOnly": true
+      },
       {
         "key": "remind_days",
         "label": "Avisar dias antes",
@@ -1905,6 +1918,13 @@ const CATALOG={
       "archived"
     ],
     "fields": [
+      {
+        "key": "income_id",
+        "label": "Receita de onde veio",
+        "type": "text",
+        "max": 80,
+        "developerOnly": true
+      },
       {
         "key": "goal_id",
         "label": "Reserva",
