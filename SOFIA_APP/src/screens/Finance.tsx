@@ -161,7 +161,7 @@ function Dot({color, icon, size = 36}: {color: string; icon: string; size?: numb
 }
 
 // ============================ TELA ============================
-export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; onBack: () => void}) {
+export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler: (() => boolean) | null) => void; api: SofiaApi; active: boolean; onBack: () => void}) {
   useRenderCost('apps:finance');
   const c = useTheme(), insets = useSafeAreaInsets();
   const [data, setData] = useState<Data | null>(null), [error, setError] = useState(''), [loading, setLoading] = useState(false);
@@ -200,6 +200,16 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
   },[active,backFinance]);
   const window = financeWindow(month, tab), windowKey = window.from + '..' + window.to, loaded = useRef<string>('');
   const twinsTried = useRef(new Set<string>());
+  // 0.3.224: tocar em Apps na barra dentro de Financas - fora do Resumo (ou com algo aberto por cima) volta ao Resumo;
+  // no Resumo rolado para baixo, sobe ao topo; no Resumo ja no topo, sai para a grade de apps
+  const mainScroll = useRef<ScrollView>(null), scrollY = useRef(0);
+  const appsTap = useRef<() => boolean>(() => false);
+  appsTap.current = () => {
+    if (tab !== 'home' || editing || billEditor || manage || accountPicker || newMenu) { goHome(); setNewMenu(false); scrollY.current = 0; mainScroll.current?.scrollTo({y: 0, animated: false}); return true; }
+    if (scrollY.current > 4) { mainScroll.current?.scrollTo({y: 0, animated: true}); scrollY.current = 0; return true; }
+    return false;
+  };
+  useEffect(() => { if (!onAppsTap) return; onAppsTap(active ? () => appsTap.current() : null); return () => onAppsTap(null); }, [active, onAppsTap]);
   // 0.3.223: qual periodo ja chegou atualizado do servidor (o Controle de gastos so mostra numero e cor com ele)
   const [liveKey, setLiveKey] = useState('');
   const reload = useCallback(async () => {
@@ -283,7 +293,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
         {!d ? <View style={{flex: 1, padding: 16, gap: 14}}>{error ? <View style={{padding: 20, gap: 12}}><Text style={{color: c.danger}}>{error}</Text><Button title="Tentar de novo" secondary onPress={() => void reload()} /></View> : <View style={{gap: 6}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Spinner size={16} stroke={1.8} /><Text style={{color: c.muted, fontSize: 13}}>Carregando suas finanças</Text></View><LoadingLines rows={5} /></View>}</View> : !d.accounts.length ? (
           <Onboarding api={api} onDone={reload} onFinished={goHome} />
         ) : (
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingHorizontal: 20, paddingTop: 2, paddingBottom: 84, gap: 16}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>
+          <ScrollView ref={mainScroll} onScroll={e => { scrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={64} keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingHorizontal: 20, paddingTop: 2, paddingBottom: 84, gap: 16}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>
             {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
             {tab === 'home' ? <HomeTab fresh={liveKey === windowKey} d={scoped || d} month={month} api={api} reload={reload} onTx={setEditing} onTab={navigateFinance} accountId={accountId} isPrimary={isPrimary} onBill={t => { setBillScope('series'); setBillEditor(t || 'new'); }} aporteKey={aporteKey} />
               : tab === 'bills' ? <PendingTab d={scoped || d} api={api} month={month} accountId={accountId} isPrimary={isPrimary} onAporte={() => { navigateFinance('home'); setAporteKey(k => k + 1); }} warning={notificationWarning} onBill={(t, scope) => { setBillScope(scope || 'series'); setBillFlow('expense'); setBillEditor(t); }} onNew={flow => { setBillScope('series'); setBillFlow(flow); setBillEditor('new'); }} onMonth={setMonth} side={pendingSide} onSide={setPendingSide} reload={reload} />
@@ -1785,7 +1795,7 @@ function CardsTab({d, month, api, reload, onTx, onManage, onNewBill}: {month: st
       {cards.length > 1 ? <Chips scroll value={card.id} onChange={setCardId} options={cards.map(x => ({value: x.id, label: x.name}))} /> : null}
       <View style={{backgroundColor: card.color, borderRadius: 22, padding: 18, gap: 10}}>
         <Text style={{color: '#fff', fontWeight: '800', fontSize: 18}}>💳 {card.name}</Text>
-        <Text style={{color: '#ffffffcc', fontSize: 12}}>Limite {money(card.limit)} · usado {money(used)} · disponível {money(Math.max(0, card.limit - used))}</Text>
+        <Text style={{color: '#ffffffcc', fontSize: 12}}>Limite {money(card.limit)} · usado {money(used)} · {card.limit && used > card.limit ? <Text style={{color: '#fff', fontWeight: '800', backgroundColor: BAD, borderRadius: 6}}> passou {money(used - card.limit)} do limite </Text> : 'disponível ' + money(Math.max(0, card.limit - used))}</Text>
         <View style={{height: 8, borderRadius: 4, backgroundColor: '#ffffff44', overflow: 'hidden'}}><View style={{width: `${Math.min(100, card.limit ? used / card.limit * 100 : 0)}%`, height: 8, backgroundColor: '#fff'}} /></View>
         <Text style={{color: '#ffffffcc', fontSize: 11}}>Fecha dia {card.closing} · vence dia {card.due}</Text>
       </View>
@@ -1797,7 +1807,7 @@ function CardsTab({d, month, api, reload, onTx, onManage, onNewBill}: {month: st
           </View>
           <Text style={{color: c.text, fontSize: 30, fontWeight: '800', textAlign: 'center'}}>{money(i.total)}</Text>
           <Text style={{color: c.muted, fontSize: 12, textAlign: 'center'}}>{i.status === 'fechada' || i.status === 'paga' ? 'Fechou' : 'Fecha'} {dateBR(i.close)} · {i.status !== 'paga' && todayISO() > i.due ? <Text style={{color: BAD, fontWeight: '700'}}>venceu {dateBR(i.due)}</Text> : 'vence ' + dateBR(i.due)}{i.paid ? ' · pago ' + money(i.paid) : ''}</Text>
-          {i.total > i.paid && i.status !== 'futura' ? <Button title={busy ? 'Pagando…' : 'Pagar fatura · ' + money(i.total - i.paid)} loading={busy} onPress={() => d.accounts.filter(a => !a.archived).length > 1 ? setPick(true) : void pay(card.accountId || d.accounts[0].id)} /> : null}
+          {i.total > i.paid && i.status !== 'futura' && i.status !== 'paga' ? <Button title={busy ? 'Pagando…' : 'Pagar fatura · ' + money(i.total - i.paid)} loading={busy} onPress={() => d.accounts.filter(a => !a.archived).length > 1 ? setPick(true) : void pay(card.accountId || d.accounts[0].id)} /> : null}
           {i.items.length ? i.items.map((t, k) => <TxRow key={t.id} t={t} d={d} first={k === 0} onPress={() => onTx(t)} api={api} reload={reload} inInvoice />) : <Text style={{color: c.muted, textAlign: 'center'}}>Nenhuma compra nesta fatura.</Text>}
           <View style={{flexDirection: 'row', gap: 8, marginTop: 4}}>
             <SurePressable accessibilityRole="button" disabled={busy} onPress={() => { if (!busy) setLinkOpen(true); }} style={{flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: c.accentSoft, alignItems: 'center'}}><Text style={{color: c.accent, fontWeight: '700', fontSize: 13}}>Usar conta existente</Text></SurePressable>

@@ -124,7 +124,10 @@ export function cardInvoices(card: Card, txs: Tx[], today = todayISO()): Invoice
     const paid = round2(txs.filter(t => t.kind === 'card_payment' && t.cardId === card.id && t.invoice === month && t.paid).reduce((s, t) => s + t.amount, 0));
     const due = invoiceDue(card, month), close = invoiceClose(card, month);
     // 0.3.223: depois do fechamento a fatura aparece FECHADA ate ser paga (o vencimento passado aparece ao lado da data)
-    const status: Invoice['status'] = total > 0 && paid >= total ? 'paga' : month > current ? 'futura' : month === current ? 'aberta' : 'fechada';
+    // 0.3.224: fatura que ja fechou e foi paga NAO reabre - conta esquecida que entra nela depois ja vem paga junto (o saldo
+    // da pessoa ja e o real, com tudo pago), sem botao de pagar e sem mexer no saldo
+    const closedPaid = month < current && paid > 0;
+    const status: Invoice['status'] = closedPaid || (total > 0 && paid >= total) ? 'paga' : month > current ? 'futura' : month === current ? 'aberta' : 'fechada';
     return {card, month, total, paid, due, close, items: items.sort((a, b) => b.date.localeCompare(a.date)), status};
   });
 }
@@ -146,12 +149,14 @@ export function cardBillSettled(cards: Card[], txs: Tx[], today = todayISO()): (
     let list = cache.get(card.id);
     if (!list) { list = cardInvoices(card, txs, today); cache.set(card.id, list); }
     const inv = list.find(i => i.month === txInvoiceMonth(card, t));
-    return !!inv && inv.total > 0 && inv.paid >= inv.total - 0.005;
+    return !!inv && inv.status === 'paga';
   };
 }
+/** 0.3.224: usado = tudo o que esta no cartao e ainda nao foi pago, em qualquer fatura (a compra parcelada ocupa o limite
+ * inteiro na hora; pagar a fatura devolve). Assinatura/conta fixa no cartao so ocupa quando e cobrada naquele mes. */
 export function cardUsed(card: Card, txs: Tx[], today = todayISO()): number {
-  // 0.3.223: so o que ja foi cobrado (as cobrancas futuras das contas fixas nao ocupam o limite antes da hora)
-  return round2(cardInvoices(card, txs, today).reduce((s, i) => s + Math.max(0, i.items.filter(t => t.date <= today).reduce((x, t) => x + t.amount, 0) - i.paid), 0));
+  return round2(cardInvoices(card, txs, today).filter(i => i.status !== 'paga')
+    .reduce((s, i) => s + Math.max(0, i.items.filter(t => !(t.virtual && t.date > today)).reduce((x, t) => x + t.amount, 0) - i.paid), 0));
 }
 
 // ---------- Parcelas e recorrência ----------
@@ -297,7 +302,7 @@ export function upcoming(txs: Tx[], cards: Card[], today = todayISO(), days = 7)
     list.push({id: t.id, title: t.desc, amount: t.amount, date: t.date, kind: t.kind === 'income' ? 'receber' : 'pagar', late: t.date < today, tx: t});
   }
   for (const c of cards) if (!c.archived) for (const i of cardInvoices(c, txs, today)) {
-    if (i.total <= i.paid || i.status === 'futura' || i.status === 'aberta' && i.due > until) continue;
+    if (i.total <= i.paid || i.status === 'paga' || i.status === 'futura' || i.status === 'aberta' && i.due > until) continue;
     if (i.due <= until) list.push({id: 'fatura:' + c.id + ':' + i.month, title: 'Fatura ' + c.name, amount: round2(i.total - i.paid), date: i.due, kind: 'fatura', late: i.due < today, invoice: i});
   }
   return list.sort((a, b) => a.date.localeCompare(b.date));
