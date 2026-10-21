@@ -29,7 +29,7 @@ import {
   trend, balanceSeries, upcoming, manualDues, transactionsForAccount, goalProgress, parseMoney, formatMoneyInput, finishMoneyInput, addDays,
   dayIn, daysIn} from '../lib/finance';
 import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove} from '../lib/finance';
-import {sinceReportStart, cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, monthDues, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove, effectiveCycleDay, periodBudget, salaryForecast, currentPlan, nextPlan, simpleForecast, spendControl, categoryAlerts, lastWeekByCategory, duplicateGroups, moneyLeft, monthControl, balanceAsOf, isOneOffIncome} from '../lib/finance';
+import {sinceReportStart, cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, monthDues, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove, effectiveCycleDay, periodBudget, salaryForecast, currentPlan, nextPlan, simpleForecast, spendControl, categoryAlerts, lastWeekByCategory, duplicateGroups, moneyLeft, monthControl, balanceAsOf, isOneOffIncome, fixedDuplicateGroups} from '../lib/finance';
 import {syncFinanceDueNotifications} from '../lib/finance-notifications';
 import {appAlert} from '../lib/app-alert';
 import {useFormDraft, clearAllFormDrafts} from '../lib/form-draft';
@@ -220,7 +220,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
         {!d ? <View style={{flex: 1, padding: 16, gap: 14}}>{error ? <View style={{padding: 20, gap: 12}}><Text style={{color: c.danger}}>{error}</Text><Button title="Tentar de novo" secondary onPress={() => void reload()} /></View> : <View style={{gap: 6}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Spinner size={16} stroke={1.8} /><Text style={{color: c.muted, fontSize: 13}}>Carregando suas finanças</Text></View><LoadingLines rows={5} /></View>}</View> : !d.accounts.length ? (
           <Onboarding api={api} onDone={reload} onFinished={goHome} />
         ) : (
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingHorizontal: 20, paddingTop: 2, paddingBottom: insets.bottom + 110, gap: 16}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingHorizontal: 20, paddingTop: 2, paddingBottom: 84, gap: 16}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>
             {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
             {tab === 'home' ? <HomeTab d={scoped || d} month={month} api={api} reload={reload} onTx={setEditing} onTab={navigateFinance} accountId={accountId} isPrimary={isPrimary} onBill={t => { setBillScope('series'); setBillEditor(t || 'new'); }} aporteKey={aporteKey} />
               : tab === 'bills' ? <PendingTab d={scoped || d} api={api} month={month} accountId={accountId} isPrimary={isPrimary} onAporte={() => { navigateFinance('home'); setAporteKey(k => k + 1); }} warning={notificationWarning} onBill={(t, scope) => { setBillScope(scope || 'series'); setBillFlow('expense'); setBillEditor(t); }} onNew={flow => { setBillScope('series'); setBillFlow(flow); setBillEditor('new'); }} onMonth={setMonth} side={pendingSide} onSide={setPendingSide} reload={reload} />
@@ -232,7 +232,7 @@ export function Finance({api, active, onBack}: {api: SofiaApi; active: boolean; 
         {d && d.accounts.length ? <>
           {/* 0.3.152: um unico botao + (antes eram dois botoes grandes sobre o extrato) */}
           <Pressable accessibilityRole="button" accessibilityLabel="Novo lançamento" onPress={() => setNewMenu(true)}
-            style={{position: 'absolute', right: 18, bottom: insets.bottom + 20, width: 56, height: 56, borderRadius: 28, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', elevation: 6}}>
+            style={{position: 'absolute', right: 18, bottom: 16, width: 56, height: 56, borderRadius: 28, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', elevation: 6}}>
             <Text style={{color: c.onAccent, fontSize: 28, fontWeight: '400', marginTop: -2}}>＋</Text>
           </Pressable>
           <Sheet visible={newMenu} onClose={() => setNewMenu(false)} label="Fechar novo lançamento">
@@ -704,6 +704,7 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
   const prevShare=useMemo(()=>{const out:number[]=[];for(let i=1;i<=3;i++){const m=addMonths(month,-i);const f=fixedSummary(d.txs,accountId,{start:dayIn(m,1),end:dayIn(m,daysIn(m))});if(f.share!==null)out.push(f.share);}return out.length?out.reduce((a,b)=>a+b,0)/out.length:null;},[d,accountId,month]);
   const fx=side==='pagar'?fixed:fixedIn;
   return <>
+    <FixedDupCard d={d} api={api} reload={reload} />
     <Card_>
       {/* 0.3.197: A pagar e A receber no mesmo esquema, separados por um seletor */}
       <Segmented value={side} onChange={setSide} options={[{value: 'pagar' as const, label: 'A pagar'}, {value: 'receber' as const, label: 'A receber'}]} />
@@ -1099,6 +1100,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
           <Text style={{color: c.muted, fontSize: 12}}>Pode ter sido lançado repetido e descontado {g.items.length} vezes. Toque para revisar.</Text>
         </View>
       </Pressable>)}
+      <FixedDupCard d={d} api={api} reload={reload} />
       {dupGroup ? <Sheet visible onClose={() => setDupOpen(null)} label="Fechar revisão de repetidos">
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 12, paddingBottom: 18}}>
           <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Lançamentos repetidos</Text>
@@ -1282,10 +1284,11 @@ function BudgetRow({p}: {p: ReturnType<typeof budgetProgress>[number]}) {
 /** 0.3.220: seletor compacto de duas opcoes (do tamanho do texto, alinhado a esquerda) - o mesmo em todo Financas. */
 function Segmented<T extends string>({value, onChange, options}: {value: T; onChange: (v: T) => void; options: {value: T; label: string}[]}) {
   const c = useTheme();
-  return <View accessibilityRole="tablist" style={{flexDirection: 'row', alignSelf: 'flex-start', backgroundColor: c.input, borderRadius: 12, padding: 3, gap: 2}}>
+  // 0.3.227: duas metades iguais na largura toda (como era em Contas), o mesmo em Contas e no Historico do Resumo
+  return <View accessibilityRole="tablist" style={{flexDirection: 'row', backgroundColor: c.input, borderRadius: 14, padding: 4}}>
     {options.map(o => { const on = o.value === value; return <Pressable key={o.value} accessibilityRole="tab" accessibilityState={{selected: on}} onPress={() => onChange(o.value)}
-      style={{paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9, backgroundColor: on ? c.surface : 'transparent', ...(on ? {shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: {width: 0, height: 1}, elevation: 1} : {})}}>
-      <Text style={{color: on ? c.text : c.muted, fontWeight: on ? '700' : '600', fontSize: 13}}>{o.label}</Text>
+      style={{flex: 1, paddingVertical: 9, borderRadius: 11, alignItems: 'center', backgroundColor: on ? c.surface : 'transparent', ...(on ? {shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: {width: 0, height: 1}, elevation: 1} : {})}}>
+      <Text style={{color: on ? c.text : c.muted, fontWeight: on ? '800' : '600', fontSize: 13}}>{o.label}</Text>
     </Pressable>; })}
   </View>;
 }
@@ -1312,6 +1315,37 @@ function SwipeToDelete({children, onDelete, label, busy = false}: {children: Rea
     </View>
     <Animated.View {...pan.panHandlers} style={{transform: [{translateX: x}]}}>{children}</Animated.View>
   </View>;
+}
+/** 0.3.227: conta/receita fixa cadastrada mais de uma vez - avisa e deixa apagar as copias (ou manter). */
+function FixedDupCard({d, api, reload}: {d: Data; api: SofiaApi; reload: () => Promise<void>}) {
+  const c = useTheme(), [ok, setOk] = useState<string[]>([]), [open, setOpen] = useState<string | null>(null), [busy, setBusy] = useState('');
+  const code = (key: string) => { let h = 2166136261; for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 16777619); } return 'f' + (h >>> 0).toString(36); };
+  useEffect(() => { SecureStore.getItemAsync('sofia_fin_dupok_v1').then(v => { try { const a = JSON.parse(v || '[]'); if (Array.isArray(a)) setOk(a.map(String)); } catch { /* nenhum */ } }).catch(() => {}); }, []);
+  const groups = useMemo(() => fixedDuplicateGroups(d.txs).filter(g => !ok.includes(code(g.key))), [d, ok]);
+  const g = groups.find(x => x.key === open) || null;
+  if (!groups.length) return null;
+  return <>
+    {groups.slice(0, 2).map(x => <Pressable key={x.key} accessibilityRole="button" onPress={() => setOpen(x.key)} style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: BAD + '14', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: BAD}}>
+      <Text style={{fontSize: 18}}>⚠️</Text>
+      <View style={{flex: 1, gap: 2}}>
+        <Text style={{color: c.text, fontWeight: '700', fontSize: 13}}>“{x.title}” está cadastrada {x.items.length} vezes</Text>
+        <Text style={{color: c.muted, fontSize: 12}}>{x.kind === 'income' ? 'Receita' : 'Conta'} do dia {x.day}. Toque para apagar as cópias.</Text>
+      </View>
+    </Pressable>)}
+    {g ? <Sheet visible onClose={() => setOpen(null)} label="Fechar cadastros repetidos">
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 12, paddingBottom: 18}}>
+        <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Cadastros repetidos</Text>
+        <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>“{g.title}” aparece {g.items.length} vezes, todas no dia {g.day}. Apague as que sobram e deixe só a certa.</Text>
+        {g.items.map((t, i) => <View key={t.id} style={{flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.input, borderRadius: 14, padding: 12}}>
+          <View style={{flex: 1, gap: 2}}><Text style={{color: c.text, fontWeight: '600'}}>{i + 1}. {t.desc} · {money(t.amount)}</Text><Text style={{color: c.muted, fontSize: 12}}>{t.recurrence === 'monthly' ? (t.installments > 1 ? 'parcela ' + t.installment + ' de ' + t.installments : 'todo mês, sem prazo') : 'só esta vez'} · desde {t.date.split('-').reverse().join('/')}</Text></View>
+          <Pressable accessibilityRole="button" disabled={!!busy || g.items.length < 2} onPress={() => { setBusy(t.id); void api.deleteEntity(t.entity!.id).then(() => reload()).catch(e => appAlert('Finanças', errorText(e))).finally(() => setBusy('')); }}
+            style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: BAD + '1f'}}>{busy === t.id ? <ActivityIndicator color={BAD} /> : <Text style={{color: BAD, fontWeight: '700'}}>Apagar</Text>}</Pressable>
+        </View>)}
+        <Pressable accessibilityRole="button" onPress={() => { const next = [...ok, code(g.key)].slice(-150); setOk(next); void SecureStore.setItemAsync('sofia_fin_dupok_v1', JSON.stringify(next)).catch(() => {}); setOpen(null); }} style={{paddingVertical: 12}}>
+          <Text style={{color: c.accent, fontWeight: '700'}}>São diferentes, pode manter</Text></Pressable>
+      </ScrollView>
+    </Sheet> : null}
+  </>;
 }
 function BankStatements({d, api, reload, onImport}: {d: Data; api: SofiaApi; reload: () => Promise<void>; onImport: () => void}) {
   const c = useTheme(), [open, setOpen] = useState<string>(''), [busy, setBusy] = useState('');
@@ -1825,7 +1859,8 @@ function ReportsTab({d: full, month, reserve, api, reload}: {d: Data; month: str
   // 0.3.208: meta do guardado com progresso, marcos e projecao
   const goal = useMemo(() => { if (!reserve || !(Number(reserve.target) > 0)) return null; const sp = moneySplit(reserve, full.moves || [], full.accounts, full.txs, full.cards, monthOf(todayISO()));
     return {name: reserve.name || 'Sua meta', saved: sp.saved, target: Number(reserve.target), monthly: sp.planned || 0, deadline: String(reserve.entity?.data?.deadline || ''), today: todayISO()}; }, [reserve, full]);
-  const week = useMemo(() => lastWeekByCategory(full.txs, ''), [full]);
+  // 0.3.227: so despesas avulsas (sem contas, fixas e parcelas)
+  const week = useMemo(() => lastWeekByCategory(full.txs.filter(t => !t.manualDue && t.recurrence === 'none' && !t.seriesId), ''), [full]);
   function setStart(date: string) {
     if (!api) return;
     const go = async () => {
@@ -1882,13 +1917,6 @@ function ReportsTab({d: full, month, reserve, api, reload}: {d: Data; month: str
           <Text style={{color: c.text, fontWeight: '700', fontSize: 13}}>{money(l.total)}</Text>
         </View>)}
       </Fold> : null}
-      <Fold id="comparado" title="Comparado ao mês anterior">
-        
-        {[['Receitas', s.income + s.incomePending, prev.income + prev.incomePending, true], ['Despesas', s.expense + s.expensePending, prev.expense + prev.expensePending, false]].map(([label, now, before, up]) => {
-          const n = now as number, b = before as number, diff = b ? (n - b) / b * 100 : null, good = diff === null ? null : (up ? diff >= 0 : diff <= 0);
-          return <View key={label as string} style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text}}>{label as string}</Text><Text style={{color: c.text, fontWeight: '700', marginRight: 8}}>{money(n)}</Text><Text style={{color: good === null ? c.muted : good ? GOOD : BAD, fontSize: 12, width: 70, textAlign: 'right'}}>{diff === null ? '—' : (diff > 0 ? '▲ ' : '▼ ') + Math.abs(Math.round(diff)) + '%'}</Text></View>;
-        })}
-      </Fold>
       <Fold id="seis" title="Receitas × despesas · 6 meses">
         
         <View onLayout={e => setW(e.nativeEvent.layout.width)} style={{height: 150}}>

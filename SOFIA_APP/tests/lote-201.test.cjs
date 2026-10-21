@@ -294,13 +294,13 @@ test('0.3.221: Apps arrastaveis como no iPhone; Inicio: segurar um widget abre o
   const g=read('src/components/AppGrid.tsx'),l=read('src/components/ReorderList.tsx'),sw=read('src/components/SortableWidgets.tsx'),w=read('src/screens/Workspace.tsx'),h=read('src/screens/Home.tsx');
   assert.ok(g.includes('const GAP=12,H=148,COLS=2,HOLD=320;')&&g.includes('onShouldBlockNativeResponder:()=>false')&&g.includes("Animated.spring(scale,{toValue:1.06"),'segura, cresce e segue o dedo; rolagem livre antes de segurar');
   assert.ok(g.includes('if(target!==cur){const next=[...idsRef.current];next.splice(cur,1);next.splice(target,0,id)'),'os outros abrem espaco');
-  assert.ok(w.includes('<AppGrid items={orderedModules} onDragging={setDraggingApp} onReorder={saveAppOrder}')&&w.includes('scrollEnabled={!draggingApp}'),'apps usam a grade; a tela nao rola durante o arrasto');
+  assert.ok(w.includes('<AppGrid items={orderedModules} onDragging={on=>{setDraggingApp(on);onGestureLock?.(on);}} onReorder={saveAppOrder}')&&w.includes('scrollEnabled={!draggingApp}'),'apps usam a grade; a tela nao rola durante o arrasto');
   assert.ok(!w.includes('Use as setas para mudar os apps de lugar.'),'saiu o modo das setas');
   assert.ok(l.includes('onPanResponderTerminationRequest:()=>false')&&l.includes('useLayoutEffect(()=>{if(reset.current)'),'lista com puxador sem pulo ao soltar');
   assert.ok(sw.includes('const HOLD=450;')&&sw.includes('Organizar Início</Text>')&&sw.includes('<ReorderList '),'segurar abre o seletor');
   assert.ok(sw.includes("if(noHold.includes(id))return <View key={id}>{item.content}</View>;"),'widget que usa o segurar para outra coisa nao abre o seletor');
   assert.ok(h.includes("{id:'goal',title:'Meta',content:<GoalProgressCard"),'meta e widget ordenavel');
-  assert.ok(h.includes('export function withFixedWidgets(order:string[]):string[]')&&h.includes('order={withFixedWidgets(widgets)}'),'listas antigas recebem agenda e meta no topo');
+  assert.ok(h.includes('export function withFixedWidgets(order:string[],goalHidden=false):string[]')&&h.includes('order={withFixedWidgets(widgets,goalHidden)}'),'listas antigas recebem agenda e meta no topo');
 });
 
 test('0.3.222: Previsto no fim do proximo mes; agenda fixa; meta sem espaco extra; busca de tarefas dentro da caixa',()=>{
@@ -326,7 +326,7 @@ test('0.3.223: Redefinir Financas; Relatorios na ordem pedida e todas as secoes 
   const s=read('src/screens/Finance.tsx'),g=read('src/components/GoalProgress.tsx');
   assert.ok(s.includes('>Redefinir Finanças</Text>')&&!s.includes('Zerar Finanças')&&s.includes("resetWord.trim().toUpperCase() === 'REDEFINIR'"),'nome profissional');
   const r=s.slice(s.indexOf('function ReportsTab('));
-  const pos=['<Fold id="categorias" title="Por categoria">','<Fold id="guardado"','<Fold id="meta" title="Dinheiro guardado">','<Fold id="saldo"','<Fold id="semana"','<Fold id="comparado"','<Fold id="seis"'].map(x=>r.indexOf(x));
+  const pos=['<Fold id="categorias" title="Por categoria">','<Fold id="guardado"','<Fold id="meta" title="Dinheiro guardado">','<Fold id="saldo"','<Fold id="semana"','<Fold id="seis"'].map(x=>r.indexOf(x));
   assert.ok(pos.every(p=>p>0),'todas as secoes existem e abrem/fecham: '+pos);
   assert.deepEqual([...pos].sort((a,b)=>a-b),pos,'ordem: categoria, evolucao do guardado, dinheiro guardado, evolucao do saldo, semana, comparado, 6 meses');
   assert.ok(!r.slice(0,r.indexOf('\nfunction ',10)).includes('para mudar, use a engrenagem'),'sem frase velha');
@@ -381,4 +381,21 @@ test('0.3.226: aporte fora de "A vencer e atrasadas"; receita programada no Hist
   const conta=f.toTx({id:'c',kind:'fin_tx',title:'Internet',state:'active',data:{kind:'expense',amount:100,date:'2026-10-15',account_id:'a1',paid:false,category:'Contas',recurrence:'none',import_id:'sofia-pendencia:c'}});
   const shown=f.monthTxs([sal,conta],'2026-10').filter(t=>(t.kind==='income'&&!t.paid)||!t.manualDue||t.paid);
   assert.equal(shown.length,1,'o salario de outubro aparece desde o dia 1; a conta a pagar fica so em Contas');assert.equal(shown[0].desc,'Salário');
+});
+
+test('0.3.227: segurar widget nao abre a tela; meta removivel; arrastar app trava as telas; seletor largo; menos espaco; relatorios; repetidos',()=>{
+  const sw=read('src/components/SortableWidgets.tsx'),h=read('src/screens/Home.tsx'),w=read('src/screens/Workspace.tsx'),s=read('src/screens/Finance.tsx'),a=read('src/lib/api.ts');
+  assert.ok(sw.includes("setNonce(n=>({...n,[id]:(n[id]||0)+1}))")&&sw.includes("key={id+':'+(nonce[id]||0)}"),'o toque do widget segurado e cancelado');
+  assert.ok(h.includes("export const HOME_FIXED_WIDGETS:string[]=[];")&&h.includes('order={withFixedWidgets(widgets,goalHidden)} onSave={saveHomeOrder}'),'meta pode sair');
+  assert.ok(w.includes('onDragging={on=>{setDraggingApp(on);onGestureLock?.(on);}}')&&read('App.tsx').includes('load={loadWorkspace} screenProps={{onGestureLock:setGestureLocked,'),'arrastar app nao troca de tela');
+  assert.ok(s.includes("style={{flex: 1, paddingVertical: 9, borderRadius: 11, alignItems: 'center'"),'seletor de duas metades');
+  assert.ok(s.includes('paddingBottom: 84')&&s.includes('bottom: 16, width: 56, height: 56,'),'menos espaco embaixo');
+  assert.ok(!s.includes('<Fold id="comparado"'),'sem comparado ao mes anterior');
+  assert.ok(s.includes("lastWeekByCategory(full.txs.filter(t => !t.manualDue && t.recurrence === 'none' && !t.seriesId), '')"),'semana passada so avulsas');
+  assert.ok(a.includes('/Campo não previsto: ([a-z_]+)/'),'servidor atrasado nao trava o salvar');
+  const f=require('./load-ts.cjs')('src/lib/finance.ts');
+  const mk=(id,title,amount,extra={})=>f.toTx({id,kind:'fin_tx',title,state:'active',data:{kind:'income',amount,date:'2026-11-12',account_id:'a1',paid:false,category:'Contas',recurrence:'monthly',import_id:'sofia-pendencia:'+id,...extra}});
+  const g=f.fixedDuplicateGroups([mk('a','Quinto andar (aluguel)',1853.94),mk('b','Quinto andar (aluguel)',1853.94),mk('c','Quinto Andar(aluguel)',1853.54),mk('x','Outra',10)]);
+  assert.equal(g.length,1);assert.equal(g[0].items.length,3,'mesmo nome (sem diferenca de maiuscula/espaco) e dia');
+  assert.ok(s.includes('<FixedDupCard d={d} api={api} reload={reload} />'),'aviso em Contas e no Resumo');
 });

@@ -763,3 +763,19 @@ export function balanceAsOf(accounts: Account[], txs: Tx[], moves: ReserveMove[]
   const net = reserveId ? moves.filter(m => m.goalId === reserveId && m.entity?.state !== 'archived' && m.date <= date).reduce((s, m) => s + (m.direction === 'in' ? m.amount : -m.amount), 0) : 0;
   return round2(totalBalance(accounts, txs, date) - net);
 }
+
+// ---------- 0.3.227: conta/receita fixa cadastrada mais de uma vez (mesmo nome, tipo, conta e dia) ----------
+export type FixedDupGroup = {key: string; title: string; kind: TxKind; day: number; items: Tx[]};
+const normTitle = (v: string) => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+export function fixedDuplicateGroups(txs: Tx[]): FixedDupGroup[] {
+  const groups = new Map<string, Tx[]>();
+  for (const t of txs) {
+    if (t.virtual || !t.entity || !t.manualDue || (t.kind !== 'income' && t.kind !== 'expense')) continue;
+    const fixed = t.recurrence === 'monthly' && !t.seriesId, single = t.recurrence === 'none' && !t.paid && !t.seriesId;
+    if (!fixed && !single) continue;
+    const key = [t.kind, t.accountId, normTitle(t.desc), Number(t.date.slice(8, 10)), fixed ? 'mensal' : t.date.slice(0, 7)].join('|');
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(t);
+  }
+  return [...groups.entries()].filter(([, v]) => v.length > 1).map(([key, items]) => ({key, title: items[0].desc, kind: items[0].kind, day: Number(items[0].date.slice(8, 10)), items}));
+}

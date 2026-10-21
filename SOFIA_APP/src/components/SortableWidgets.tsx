@@ -9,12 +9,13 @@ import {ReorderList} from './ReorderList';
 type Item={id:string;title:string;content:React.ReactNode};
 const HOLD=450;
 export function SortableWidgets({items,order,onSave,onLock,fixed=[],noHold=[]}:{items:Item[];order:string[];onSave:(order:string[])=>Promise<void>;onLock:(locked:boolean)=>void;fixed?:string[];noHold?:string[]}){
- const c=useTheme(),[open,setOpen]=useState(false),[draft,setDraft]=useState(order);
+ const c=useTheme(),[open,setOpen]=useState(false),[draft,setDraft]=useState(order),[nonce,setNonce]=useState<Record<string,number>>({});
  const timer=useRef<ReturnType<typeof setTimeout>|null>(null),start=useRef({x:0,y:0});
  useEffect(()=>{if(!open)setDraft(order);},[order,open]);
  const cancel=()=>{if(timer.current)clearTimeout(timer.current);timer.current=null;};
  useEffect(()=>()=>{cancel();onLock(false);},[]);
- function hold(x:number,y:number){cancel();start.current={x,y};timer.current=setTimeout(()=>{timer.current=null;try{Vibration.vibrate(12);}catch{/* sem vibracao */}setDraft(order);setOpen(true);},HOLD);}
+ // 0.3.227: ao abrir o seletor, o widget segurado e remontado - o toque dele e cancelado e ele nao abre a tela/app ao soltar
+ function hold(id:string,x:number,y:number){cancel();start.current={x,y};timer.current=setTimeout(()=>{timer.current=null;try{Vibration.vibrate(12);}catch{/* sem vibracao */}setNonce(n=>({...n,[id]:(n[id]||0)+1}));setDraft(order);setOpen(true);},HOLD);}
  function moved(x:number,y:number){if(timer.current&&Math.abs(x-start.current.x)+Math.abs(y-start.current.y)>8)cancel();}
  const save=(next:string[])=>{setDraft(next);void onSave(next).catch(()=>setDraft(order));};
  const visible=draft.filter(id=>items.some(i=>i.id===id)),hidden=items.filter(i=>!visible.includes(i.id));
@@ -22,7 +23,7 @@ export function SortableWidgets({items,order,onSave,onLock,fixed=[],noHold=[]}:{
   {order.map(id=>{const item=items.find(i=>i.id===id);if(!item)return null;
    // widget que ja usa o segurar para outra coisa (agenda: segurar um dia cria compromisso) nao abre o seletor
    if(noHold.includes(id))return <View key={id}>{item.content}</View>;
-   return <View key={id} collapsable={false} onTouchStart={e=>hold(e.nativeEvent.pageX,e.nativeEvent.pageY)} onTouchMove={e=>moved(e.nativeEvent.pageX,e.nativeEvent.pageY)} onTouchEnd={cancel} onTouchCancel={cancel}>{item.content}</View>;})}
+   return <View key={id+':'+(nonce[id]||0)} collapsable={false} onTouchStart={e=>hold(id,e.nativeEvent.pageX,e.nativeEvent.pageY)} onTouchMove={e=>moved(e.nativeEvent.pageX,e.nativeEvent.pageY)} onTouchEnd={cancel} onTouchCancel={cancel}>{item.content}</View>;})}
   <Sheet visible={open} onClose={()=>setOpen(false)} label="Fechar organizar a tela inicial">
    <View style={{gap:14,paddingBottom:12}}>
     <View style={{flexDirection:'row',alignItems:'center'}}>

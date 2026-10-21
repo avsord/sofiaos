@@ -353,7 +353,7 @@ test('0.3.208: sobra = saldo + o que entra - o que falta pagar; pagar conta prev
 
 test('0.3.208: Relatorios com secoes que abrem e fecham (lembra a escolha), guardado primeiro, Recomecar so na engrenagem',()=>{
   const s=read('src/screens/Finance.tsx');
-  for(const id of ['guardado','semana','comparado','seis','saldo'])assert.ok(s.includes('<Fold id="'+id+'"'),id);
+  for(const id of ['guardado','semana','seis','saldo'])assert.ok(s.includes('<Fold id="'+id+'"'),id);
   assert.ok(s.includes("const FOLD_KEY = 'sofia_fin_folds_v1';")&&s.includes('SecureStore.setItemAsync(FOLD_KEY'),'lembra aberta/fechada');
   const r=s.slice(s.indexOf('function ReportsTab('));assert.ok(r.indexOf('<Fold id="guardado"')<r.indexOf('<Fold id="saldo"'),'guardado em cima, saldo embaixo');
   assert.ok(!r.slice(0,r.indexOf('\nfunction ',10)).includes('Recomeçar de hoje</Text>'),'fora dos Relatorios');

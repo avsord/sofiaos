@@ -3,7 +3,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const s=fs.readFileSync(path.join(__dirname,'..','src/screens/Finance.tsx'),'utf8');
 test('margens e espaco entre blocos iguais no cabecalho, abas e lista',()=>{
-  assert.ok(s.includes("contentContainerStyle={{paddingHorizontal: 20, paddingTop: 2, paddingBottom: insets.bottom + 110, gap: 16}}"));
+  assert.ok(s.includes("contentContainerStyle={{paddingHorizontal: 20, paddingTop: 2, paddingBottom: 84, gap: 16}}"));
   assert.ok(s.includes("<View style={{paddingHorizontal: 20, paddingBottom: 14}}>"),'abas com a mesma margem e respiro antes do conteudo');
   assert.ok(s.includes("alignItems: 'center', paddingHorizontal: 20, paddingTop: 4, paddingBottom: 10, gap: 8}}"),'linha conta/mes alinhada com o resto');
 });

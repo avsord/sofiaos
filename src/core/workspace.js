@@ -218,6 +218,13 @@ class Workspace {
  saveCore(input,entityId){
   // 0.3.185: uma ocorrencia de conta fixa/salario so pode existir uma vez por mes. Se ja existe um
   // registro dessa serie no mesmo mes, o "novo" vira atualizacao dele (evita somar duas vezes).
+  // 0.3.227: conta/receita fixa (todo mes) igual a uma que ja existe (mesmo nome, tipo, conta, valor e dia) nao vira outra
+  if(!entityId&&input&&input.kind==='fin_tx'&&input.data&&String(input.data.import_id||'').startsWith('sofia-pendencia:')&&input.data.recurrence==='monthly'&&!input.data.series_id&&input.data.date){
+    const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+    const d=input.data,day=String(d.date).slice(8,10),title=norm(input.title);
+    for(let offset=0;offset<20000;offset+=500){const page=this.list({kind:'fin_tx',limit:500,offset});for(const e of page){if(e.state==='archived')continue;const x=e.data||{};
+      if(String(x.import_id||'').startsWith('sofia-pendencia:')&&x.recurrence==='monthly'&&!x.series_id&&x.kind===d.kind&&String(x.account_id||'')===String(d.account_id||'')&&Math.abs(Number(x.amount)-Number(d.amount))<0.005&&String(x.date||'').slice(8,10)===day&&norm(e.title)===title)return e;}if(page.length<500)break;}
+  }
   if(!entityId&&input&&input.kind==='fin_tx'&&input.data&&input.data.series_id&&input.data.date){
    const series=String(input.data.series_id),month=String(input.data.date).slice(0,7);
    const dup=this.db.prepare("SELECT id FROM entities WHERE kind='fin_tx' AND state!='archived' AND (id=? OR json_extract(data,'$.series_id')=?) AND id!=? AND substr(json_extract(data,'$.date'),1,7)=? LIMIT 1").all(series,series,series,month).map(r=>this.get(r.id)).find(e=>e.state!=='archived'&&(e.id===series||(e.data&&e.data.series_id===series))&&e.id!==series&&String(e.data&&e.data.date||'').slice(0,7)===month);
