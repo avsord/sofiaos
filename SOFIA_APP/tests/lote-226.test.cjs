@@ -12,7 +12,7 @@ test('0.3.226: editor completo apaga na hora; Contas grava por tras',()=>{
   assert.ok(s.includes('onOptimistic={patchTx} onOptimisticRemove={removeTx}'));
   assert.ok(s.includes("onOptimistic={(t, replaceId) => { setData(prev => prev ? {...prev, txs: replaceId ? prev.txs.map(x => x.id === replaceId ? t : x) : [...prev.txs, t]} : prev);"),'Contas na hora');
 });
-test('0.3.226: Valor guardado hoje dentro de Editar meta, sem mexer no Saldo',()=>{
+test('0.3.226/0.3.228: Valor guardado hoje (botao proprio no menu desde a 0.3.228), sem mexer no Saldo',()=>{
   assert.ok(s.includes("input('Valor guardado hoje', savedNow, setSavedNow, 'Ex.: 19.000')"));
   assert.ok(s.includes('if (Math.abs(want - split.saved) >= 0.005) savedBase = {saved: Math.round((want - net) * 100) / 100};'),'base nova = valor - movimentos');
   assert.ok(!s.includes('0.3.225: aporte do mes ja feito'),'sem o cartao duplicado fora');

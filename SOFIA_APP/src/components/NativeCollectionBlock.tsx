@@ -93,7 +93,7 @@ export function NativeCollectionBlock({block,onChange,onDelete,onInteractionChan
    <Pressable onPress={()=>addRow()} style={{padding:9}}><Text style={{color:c.muted,fontSize:12}}>＋ Nova página</Text></Pressable>
   </View></ScrollView>;
  };
- if(d.mode==='notebooks'||active?.type==='pages')return <NotebookBlock data={d} onChange={onChange} onDelete={onDelete}/>;
+ if(d.mode==='notebooks'||active?.type==='pages')return <NotebookBlock data={d} onChange={onChange} onDelete={onDelete} onInteractionChange={onInteractionChange}/>;
  return <View style={{marginVertical:5}}>
   {/* 0.3.201: o titulo do bloco que veio do template (Kanban, Formulario...) agora se edita com um toque */}
   {d.show_title?<BlockTitle value={d.title||''} onCommit={(title:string)=>{const next=clone(d);next.title=title;commit(next,'collection-title:'+block.id);}}/>:null}
