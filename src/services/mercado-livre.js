@@ -16,7 +16,10 @@ async function fromApi(m,stores,b,pin,{expectedSellerId}){
   return {ok:true,reading};
  }catch(e){
   const code=e&&e.code||'ML_API';
-  if(code==='ML_NOT_CONNECTED'||code==='ML_FORBIDDEN')return null; // conta caiu, ou anuncio de terceiro sem catalogo: pagina decide
+  if(code==='ML_NOT_CONNECTED')return null; // conta caiu no meio: pagina decide
+  // 0.3.236: o ML fecha /items de outros vendedores e a pagina pede verificacao; sem o catalogo no link nao ha caminho.
+  // Em vez de "VERIFICATION_REQUIRED", diz o que fazer: usar o endereco /p/MLB... que aparece ao abrir o link.
+  if(code==='ML_FORBIDDEN')return {ok:false,code:'ML_NEEDS_CATALOG_LINK',message:'Esse link não mostra o catálogo do produto, e o Mercado Livre não libera o preço por ele. Abra o link no navegador: o endereço muda para “…/p/MLB…”. Copie esse endereço da barra e use no Price Tracker. Se não mudar, o anúncio está fora do catálogo e o Mercado Livre não permite ler o preço automaticamente.',keepLastPrice:true,retryable:false,needsUserAction:true};
   const retryable=['RATE_LIMITED','ML_API','ML_TOKEN','UNAVAILABLE'].includes(code);
   return {ok:false,code,message:(e&&e.message)||'A API do Mercado Livre nao respondeu. Preco anterior preservado.',keepLastPrice:true,retryable,needsUserAction:code==='ML_NOT_FOUND'};
  }

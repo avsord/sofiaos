@@ -129,3 +129,10 @@ test('0.3.235: anuncio que saiu do catalogo -> aviso claro e preco anterior pres
  const r=await f.call('/api/mobile/price-tracker/mercadolivre/read',{link:LINK});
  const text=JSON.stringify(r.body);assert.match(text,/ITEM_NOT_IN_CATALOG/);assert.match(text,/preco anterior preservado/);assert.ok(!/"amountCents":1000/.test(text));
 });
+
+test('0.3.236: link sem catalogo (produto.mercadolivre.com.br/MLB-...) com /items bloqueado -> mensagem clara pedindo o link /p/, sem tentar a pagina',async t=>{
+ const f=await setup(t,{items:{MLB5296520523:ITEM},forbidden:true,catalog:CATALOG});await connect(f);
+ const r=await f.call('/api/mobile/price-tracker/mercadolivre/read',{link:'https://produto.mercadolivre.com.br/MLB-5296520523-fone-shokz-_JM'});
+ const text=JSON.stringify(r.body);
+ assert.match(text,/ML_NEEDS_CATALOG_LINK/,text);assert.match(text,/Copie esse endereço da barra/);assert.ok(!/VERIFICATION_REQUIRED/.test(text));
+});
