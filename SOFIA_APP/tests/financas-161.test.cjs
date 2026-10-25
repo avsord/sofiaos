@@ -137,7 +137,7 @@ test('0.3.177: ao pagar, a conta fica verde e continua na lista do mes',()=>{
 test('0.3.178: apagar no historico um pagamento de pendencia desfaz o pagamento (volta como a pagar)',()=>{
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes("if (tx.manualDue && tx.paid && (tx.recurrence === 'monthly' || !!tx.seriesId)) {"),'0.3.181: so conta fixa volta como nao paga');
-  assert.ok(s.includes("await api.saveEntity({...tx.entity!, data: {...tx.entity!.data, paid: false}})"),'nao apaga o registro, so desfaz o pagamento');
+  assert.ok(s.includes("await api.saveEntity({...tx.entity!, data: {...tx.entity!.data, paid: false, paid_at: ''}})"),'nao apaga o registro, so desfaz o pagamento');
   assert.ok(s.includes("'Desfazer o ' + kind + '?'"));
   assert.ok(s.includes('accessibilityLabel={tx.manualDue && tx.paid && (tx.recurrence === \'monthly\' || !!tx.seriesId) ? "Desfazer pagamento" : "Apagar lançamento"}'));
   // e a pendencia desfeita aparece de novo no mes como a pagar
@@ -198,7 +198,7 @@ test('0.3.192: contas fixas editaveis, linha inteira das pendencias abre a edica
   assert.ok(s.includes('const target = due.tx;'),'0.3.193: pela lista do mes, abre o proprio mes');
   assert.ok(s.includes("accessibilityLabel={'Editar ' + due.title} disabled={!target} onPress={openEdit}"),'linha inteira');
   assert.ok(s.includes("const isSeries=!!tx&&!tx.virtual&&tx.recurrence==='monthly'&&!tx.seriesId&&repeat==='monthly';"),'mudar a data muda o dia, nao o inicio');
-  assert.ok(s.includes("if (tab !== 'home') {setTab('home');setTabHistory([]);return;}"),'voltar: aba -> Resumo -> Apps');
+  assert.ok(s.includes("if (tab !== 'home') {setTab('home');setTabHistory([]);scrollY.current = 0;setTimeout(() => mainScroll.current?.scrollTo({y: 0, animated: false}), 0);return;}"),'voltar: aba -> Resumo (no topo, 0.3.225) -> Apps');
 });
 
 test('0.3.192: ajustar o Saldo ao valor do banco muda so o ponto de partida; lancamentos seguem contando',()=>{
@@ -360,7 +360,7 @@ test('0.3.208: Relatorios com secoes que abrem e fecham (lembra a escolha), guar
   assert.ok(!s.includes('Recomeçar de hoje</Text>')&&!s.includes('Recuperar itens apagados</Text>'),'0.3.212: recomecar e recuperar sairam');assert.ok(s.includes('>Redefinir Finanças</Text>'),'0.3.223: Redefinir Financas na engrenagem');
   assert.ok(s.includes("manualDues(d.txs, accountId, today, 3)")&&s.includes('nos próximos 3 dias'),'vencimentos com 3 dias');
   assert.ok(s.includes("label: 'Contas'")&&s.includes("label: 'Lançamentos'"),'0.3.213: abas Resumo, Contas, Lancamentos, Cartoes, Relatorios');
-  assert.ok(s.includes('async function saveFresh(')&&s.includes("return saveFresh(api, t.desc, {paid: true, ...extra}, t.entity)"),'Paguei sobre a versao atual');
+  assert.ok(s.includes('async function saveFresh(')&&s.includes("return saveFresh(api, t.desc, {paid: true, paid_at: todayISO(), ...extra}, t.entity)"),'Paguei sobre a versao atual');
   assert.ok(s.includes('aparece {g.items.length} vezes'),'aviso de repetido');
 });
 
@@ -368,7 +368,7 @@ test('0.3.212: previsto e controle pelo mes da tela; extrato do saldo; pular o p
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes("const monthRange = useMemo(() => ({start: dayIn(month, 1), end: dayIn(month, daysIn(month))}), [month]);"));
   assert.ok(!s.includes('além do que sobra'));
-  assert.ok(s.includes("'Extrato do saldo'")&&!s.includes('Conferir item por item'));
+  assert.ok(!s.includes("'Extrato do saldo'")&&!s.includes('Conferir item por item'),'0.3.225: extrato do saldo saiu');
   assert.ok(s.includes('Pular: só a conta. O resto a Sofia cadastra pelos seus prints'));
   assert.ok(s.includes("api.financeReset()"));
   const b=require('node:fs').readFileSync(require('node:path').join(__dirname,'..','..','src/core/app-bridge.js'),'utf8');assert.ok(b.includes('PRINT COM VARIAS CONTAS')&&b.includes('intent "compound" com UM create_entity fin_tx POR LINHA'));

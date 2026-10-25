@@ -7,7 +7,7 @@ export type TxKind = 'expense' | 'income' | 'transfer' | 'card_payment';
 export type Recurrence = 'none' | 'monthly' | 'weekly' | 'yearly';
 export type Account = {carry?: number; id: string; name: string; type: string; initial: number; color: string; include: boolean; archived: boolean; cycleDay: number; reportStart: string; monthStarts: Record<string, number>; entity: Entity};
 export type Card = {id: string; name: string; limit: number; closing: number; due: number; color: string; accountId: string; archived: boolean; entity: Entity};
-export type Tx = {reservePart: number; time: string; 
+export type Tx = {paidAt: string; reservePart: number; time: string; 
   id: string; kind: TxKind; desc: string; amount: number; date: string; category: string; accountId: string; toAccountId: string; cardId: string;
   invoice: string; paid: boolean; seriesId: string; installment: number; installments: number; recurrence: Recurrence; recurrenceEnd: string;
   virtual?: boolean; manualDue?: boolean; remindDays?: number; entity?: Entity;
@@ -74,7 +74,7 @@ export function toTx(e: Entity): Tx {
   return {id: e.id, kind: (d.kind || 'expense') as TxKind, desc: e.title, amount: num(d.amount), date: String(d.date || ''), category: String(d.category || ''),
     accountId: String(d.account_id || ''), toAccountId: String(d.to_account_id || ''), cardId: String(d.card_id || ''), invoice: String(d.invoice_month || ''),
     paid: !!d.paid, seriesId: String(d.series_id || ''), installment: num(d.installment), installments: num(d.installments), recurrence: (d.recurrence || 'none') as Recurrence,
-    recurrenceEnd: String(d.recurrence_end || ''), manualDue: String(d.import_id || '').startsWith('sofia-pendencia:'), reservePart: Number(d.reserve_part) > 0 ? Number(d.reserve_part) : 0, time: /^\d{2}:\d{2}$/.test(String(d.time || '')) ? String(d.time) : '', remindDays: Math.max(0, Math.min(15, Number(d.remind_days) || 0)), entity: e};
+    recurrenceEnd: String(d.recurrence_end || ''), manualDue: String(d.import_id || '').startsWith('sofia-pendencia:'), reservePart: Number(d.reserve_part) > 0 ? Number(d.reserve_part) : 0, time: /^\d{2}:\d{2}$/.test(String(d.time || '')) ? String(d.time) : '', paidAt: d.paid === true && /^\d{4}-\d{2}-\d{2}$/.test(String(d.paid_at || '')) ? String(d.paid_at) : '', remindDays: Math.max(0, Math.min(15, Number(d.remind_days) || 0)), entity: e};
 }
 export function toBudget(e: Entity): Budget { return {id: e.id, category: String(e.data?.category || e.title), limit: num(e.data?.limit), entity: e}; }
 export function toGoal(e: Entity): Goal {

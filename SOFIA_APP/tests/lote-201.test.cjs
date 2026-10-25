@@ -139,7 +139,7 @@ test('0.3.211: desfazer importacao na engrenagem e conferencia do Saldo item por
   const s=read('src/screens/Finance.tsx'),a=read('src/lib/api.ts');
   assert.ok(a.includes("financeImportUndo(targetId: string)"));
   assert.ok(!s.includes('Desfazer importação de extrato</Text>'),'0.3.219: saiu da engrenagem (apagar o extrato faz isso)');
-  assert.ok(s.includes("'Extrato do saldo'")&&s.includes("{show(r.run)}"),'saldo depois de cada item');
+  assert.ok(!s.includes("'Extrato do saldo'"),'0.3.225: o extrato do saldo saiu a pedido do Pedro');
 });
 
 test('0.3.213: Financas reestruturadas - abas, Lancamentos com Extrato do banco (conciliacao), "+" com cinco entradas',()=>{
@@ -315,7 +315,7 @@ test('0.3.222: Previsto no fim do proximo mes; agenda fixa; meta sem espaco extr
   assert.equal(r.toPay,9586.86);assert.equal(r.aporte,0,'a parte do guardado do salario ja e o aporte');assert.equal(r.left,2116.15);
   const sem=f.moneyLeft([tx('c','expense',100,'2026-10-25')],[],{start:'2026-10-01',end:'2026-11-30'},'a1',1000,4000,'2026-10-20');assert.equal(sem.aporte,4000,'sem parte do guardado, o aporte planejado conta inteiro');
   const s=read('src/screens/Finance.tsx'),h=read('src/screens/Home.tsx');
-  assert.ok(s.includes('const r = {start: cur.start, end: upcoming ? cycleRange(cycleDay, nextPay).end : cur.end};'),'0.3.224: previsto ate a vespera do proximo salario');
+  assert.ok(s.includes('const r = upcoming ? cycleRange(cycleDay, nextPay) : cur;'),'0.3.224: previsto ate a vespera do proximo salario');
   const ai=h.indexOf('<MiniAgenda '),si=h.indexOf('<SortableWidgets fixed={HOME_FIXED_WIDGETS}');assert.ok(ai>0&&ai<si,'agenda fixa antes da lista');
   assert.ok(!h.includes("{id:'agenda'"),'agenda fora do organizador');
   assert.ok(!s.includes('<View style={{marginBottom: 18}}><GoalProgressCard'),'meta sem margem extra');
@@ -428,12 +428,12 @@ test('0.3.232: Contas so com programadas, avulsas so no extrato; copias identica
 
 test('0.3.234: o previsto conta so os aportes de hoje em diante (nao o do ciclo que ja passou)',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('aportePendingIn({start: today > r.start ? today : r.start, end: r.end})'));
+  assert.ok(s.includes('simpleForecast(d.txs, d.cards, r, accountId, today, aporteInCycle(r))'));
 });
 
 test('0.3.234: previsto conta so os aportes de hoje em diante; itens de Financas com descricao breve',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('aportePendingIn({start: today > r.start ? today : r.start, end: r.end})'),'aporte do ciclo que ja passou nao entra');
+  assert.ok(s.includes('simpleForecast(d.txs, d.cards, r, accountId, today, aporteInCycle(r))'),'aporte do ciclo que ja passou nao entra');
   assert.ok(s.includes("const {__content, ...rest} = data, content = typeof __content === 'string' ? __content : undefined;"),'descricao vai no conteudo do registro');
   assert.ok(s.includes("time: time || '', __content: note.trim()};")&&s.includes("__content:note.trim(),"),'lancamento e conta');
   assert.ok((s.match(/Descrição \(opcional\)<\/Text>/g)||[]).length===2&&s.includes('maxLength={280}'),'caixa pequena nos dois formularios');
@@ -442,7 +442,7 @@ test('0.3.234: previsto conta so os aportes de hoje em diante; itens de Financas
 
 test('0.3.233-0.3.236: aporte do previsto so de hoje em diante; descricao nos itens; Biblioteca sem fotos da conversa; apagar regra; apps sem animacao ao abrir',()=>{
   const s=read('src/screens/Finance.tsx'),w=read('src/screens/Workspace.tsx'),m=read('src/screens/Mail.tsx'),g=read('src/components/AppGrid.tsx');
-  assert.ok(s.includes('aportePendingIn({start: today > r.start ? today : r.start, end: r.end})'),'aporte que ja passou nao entra no previsto');
+  assert.ok(s.includes('simpleForecast(d.txs, d.cards, r, accountId, today, aporteInCycle(r))'),'aporte que ja passou nao entra no previsto');
   assert.ok(s.includes('const {__content, ...rest} = data')&&s.includes("__content: note.trim()}")&&s.includes('__content:note.trim(),'),'descricao no lancamento e na conta');
   assert.ok((s.match(/Descrição \(opcional\)/g)||[]).length>=2&&s.includes('maxLength={280}'),'caixa pequena');
   assert.ok(w.includes("(e.tags||[]).includes('chat-attachment')")&&w.includes('!isChatAttachment(item)'),'Biblioteca sem anexos da conversa');

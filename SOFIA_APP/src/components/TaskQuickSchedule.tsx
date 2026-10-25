@@ -8,6 +8,7 @@ import {DateTimeField} from './DateTimeField';
 import {Button} from './UI';
 import {TASK_PRIORITIES,taskPriority} from '../lib/task-filters';
 import {errorText} from '../lib/chat-model';
+import {appAlert} from '../lib/app-alert';
 import {requestAgendaPermission} from '../lib/agenda-notifications';
 
 const pad=(n:number)=>String(n).padStart(2,'0');
@@ -16,7 +17,7 @@ const REMINDERS=[{value:-1,label:'Sem lembrete'},{value:0,label:'No horário'},{
 
 /** 0.3.201: tocar numa tarefa e programar em segundos - dia, hora, lembrete e importancia. Com data, ela
  * aparece na Agenda e o lembrete avisa no celular. */
-export function TaskQuickSchedule({api,task,onClose,onSaved,onDetails,detailsLabel}:{api:SofiaApi;task:Task;onClose:()=>void;onSaved:(t:Task)=>void;onDetails?:()=>void;detailsLabel?:string}){
+export function TaskQuickSchedule({api,task,onClose,onSaved,onDetails,detailsLabel,onRemoved}:{api:SofiaApi;task:Task;onClose:()=>void;onSaved:(t:Task)=>void;onDetails?:()=>void;detailsLabel?:string;onRemoved?:(id:string)=>void}){
  const c=useTheme();
  const due=task.due_at?new Date(task.due_at):null;
  const [date,setDate]=useState(due?dayKey(due):''),[time,setTime]=useState(due&&!(due.getHours()===9&&due.getMinutes()===0&&!task.notifications?.length)?pad(due.getHours())+':'+pad(due.getMinutes()):'');
@@ -60,6 +61,11 @@ export function TaskQuickSchedule({api,task,onClose,onSaved,onDetails,detailsLab
     {onDetails?<Pressable accessibilityRole="button" onPress={onDetails} style={{paddingVertical:10}}><Text style={{color:c.accent,fontWeight:'700'}}>{detailsLabel||'Ver detalhes'}</Text></Pressable>:<View/>}
     {task.due_at?<Pressable accessibilityRole="button" onPress={()=>void save(true)} style={{paddingVertical:10}}><Text style={{color:c.muted}}>Tirar a data</Text></Pressable>:null}
    </View>
+   {/* 0.3.225: remover a tarefa direto daqui */}
+   {onRemoved&&task.id?<Pressable accessibilityRole="button" accessibilityLabel="Remover tarefa" disabled={saving} onPress={()=>appAlert('Remover tarefa?','A tarefa "'+(task.title||'')+'" sai da lista e do site.',[
+    {text:'Cancelar',style:'cancel'},
+    {text:'Remover',style:'destructive',onPress:()=>{void(async()=>{setSaving(true);setError('');try{await api.deleteTask(task.id);onRemoved(task.id);}catch(e){setError(errorText(e));}finally{setSaving(false);}})();}}
+   ])} style={{paddingVertical:10,alignItems:'center'}}><Text style={{color:c.danger,fontWeight:'700'}}>Remover tarefa</Text></Pressable>:null}
   </ScrollView>
  </Sheet>;
 }

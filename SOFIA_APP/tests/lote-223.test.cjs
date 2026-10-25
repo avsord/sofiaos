@@ -40,8 +40,8 @@ test('Despesas: a compra de 21/10 cobrada em novembro nao conta em outubro, cont
 
 test('previsto: despesas = Total do mes de Contas (pagas ou nao, inclusive no cartao); aporte em vermelho',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes("const left = Math.round((base.saldo + base.toReceive - fixed.total - card - base.aporte) * 100) / 100;"));
-  assert.ok(s.includes("['Contas do mês (total em Contas)', forecastP.toPay, BAD"));
+  assert.ok(s.includes("const f = simpleForecast(d.txs, d.cards, r, accountId, today, aporteInCycle(r));"));
+  assert.ok(s.includes("['Despesas do ciclo (pagas ou não)', forecastP.toPay, BAD"));
   // a conta do Pedro: 279,45 + 9.674,54 - 4.793,43 - 0 - 4.000 = 1.160,56
   assert.equal(Math.round((279.45+9674.54-4793.43-0-4000)*100)/100,1160.56);
 });
@@ -53,7 +53,7 @@ test('conta do mes no cartao grava o cartao na primeira vez (caminho "so este me
 
 test('controle de gastos sem piscar: so mostra numero e cor com os dados atualizados do mes',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('<HomeTab fresh={liveKey === windowKey}')&&s.includes('{!fresh && !future ? <ShimmerGroup>'));
+  assert.ok(s.includes('<HomeTab failed={!!error} fresh={liveKey === windowKey}')&&s.includes('{!fresh && !future && !failed ? <ShimmerGroup>'));
   assert.ok(s.includes("if (window.from === addMonths(monthOf(todayISO()), -1) && window.to === addMonths(monthOf(todayISO()), 1)) writeCache(api, bundle);"),'copia so do periodo padrao');
 });
 
