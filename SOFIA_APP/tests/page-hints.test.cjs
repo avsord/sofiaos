@@ -29,7 +29,7 @@ test('undo and redo share the right-hand tools group, after the flexible breadcr
  const source=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
  const breadcrumb=source.indexOf("path.map(p=>p.title)"),group=source.indexOf('testID="page-tools-right"');
  assert.ok(breadcrumb<group);const tools=source.slice(group,source.indexOf('</View>',group));
- let prev=-1;for(const name of ['undo','redo','plus','trash']){const i=tools.indexOf('name="'+name+'"');assert.ok(i>prev);prev=i;}
+ let prev=-1;for(const name of ['undo','redo','more']){const i=tools.indexOf('name="'+name+'"');assert.ok(i>prev);prev=i;}// 0.3.230: + e lixeira foram para o ⋯
  assert.equal((source.match(/name="undo"/g)||[]).length,1);assert.equal((source.match(/name="redo"/g)||[]).length,1);
 });
 
