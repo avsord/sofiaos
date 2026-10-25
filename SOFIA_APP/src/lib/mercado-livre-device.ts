@@ -103,3 +103,25 @@ export function canonicalMercadoLivreUrl(raw: string): string {
   return url;
 }
 function decodeURIComponentSafe(v: string) { try { return decodeURIComponent(v); } catch { return v; } }
+
+/** 0.3.237: link de compartilhar (produto.mercadolivre.com.br/MLB-...) redireciona para a pagina de catalogo
+ * (/p/MLB...?pdp_filters=item_id:...). O celular segue o redirecionamento e devolve so o ENDERECO final (nao le a
+ * pagina). Se parar numa tela de verificacao, o destino costuma vir dentro do endereco: procura o /p/ ali tambem. */
+export async function resolveMercadoLivreCatalogUrl(
+  url: string,
+  {signal, fetchImpl = (globalThis as any).fetch, timeoutMs = 12000}: {signal?: AbortSignal; fetchImpl?: typeof fetch; timeoutMs?: number} = {}
+): Promise<string | null> {
+  const target = String(url || '').trim().replace(/^http:\/\//i, 'https://');
+  if (!HOST.test(target) || typeof fetchImpl !== 'function' || signal?.aborted) return null;
+  const controller = new AbortController(), stop = () => controller.abort(), timer = setTimeout(stop, timeoutMs);
+  signal?.addEventListener?.('abort', stop);
+  try {
+    const res = await fetchImpl(target, {method: 'GET', headers: HEADERS, signal: controller.signal});
+    const finalUrl = String((res as any).url || '');
+    try { controller.abort(); } catch { /* nao precisa do corpo */ }
+    let decoded = finalUrl; try { decoded = decodeURIComponent(finalUrl); } catch { /* mantem */ }
+    const m = /\/p\/(MLB\d{6,16})/i.exec(decoded);
+    return m && HOST.test(finalUrl) ? finalUrl : null;
+  } catch { return null; }
+  finally { clearTimeout(timer); signal?.removeEventListener?.('abort', stop); }
+}

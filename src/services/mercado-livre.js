@@ -10,6 +10,8 @@ async function fromApi(m,stores,b,pin,{expectedSellerId}){
  let itemId=pin?.itemId||null,catalogId=pin?.catalogProductId||null;
  if(!itemId||!catalogId){try{const id=m.normalizeMercadoLivreLink(b.link);itemId=itemId||id.itemId;catalogId=catalogId||id.catalogProductId||null;}catch(e){if(e&&e.code==='SHORT_LINK'&&b.finalUrl){try{const f=m.normalizeMercadoLivreLink(b.finalUrl);itemId=itemId||f.itemId;catalogId=catalogId||f.catalogProductId||null;}catch{}}}}
  if(!itemId)return null;
+ // 0.3.237: o celular seguiu o link de compartilhar e mandou o endereco final com o catalogo (/p/MLB...)
+ if(!catalogId&&b.finalUrl){let f=String(b.finalUrl);try{f=decodeURIComponent(f);}catch{}if(/^https:\/\/([\w-]+\.)*mercadoli(vre|bre)\.com(\.br)?\//i.test(f)){const mm=/\/p\/(MLB\d{6,16})/i.exec(f);if(mm)catalogId=mm[1].toUpperCase();}}
  try{
   const reading=await stores.readMercadoLivre(itemId,{catalogId});
   if(expectedSellerId!=null&&String(expectedSellerId)!==reading.seller.id)return {ok:false,code:'SELLER_MISMATCH',message:'O vendedor mudou; confirme antes de continuar o historico.',keepLastPrice:true,retryable:false,needsUserAction:true};

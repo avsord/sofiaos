@@ -136,3 +136,11 @@ test('0.3.236: link sem catalogo (produto.mercadolivre.com.br/MLB-...) com /item
  const text=JSON.stringify(r.body);
  assert.match(text,/ML_NEEDS_CATALOG_LINK/,text);assert.match(text,/Copie esse endereço da barra/);assert.ok(!/VERIFICATION_REQUIRED/.test(text));
 });
+
+test('0.3.237: link de compartilhar + endereco final que o celular seguiu (/p/MLB...) -> le pelo catalogo o MESMO anuncio',async t=>{
+ const f=await setup(t,{items:{MLB5296520523:ITEM},forbidden:true,catalog:CATALOG});await connect(f);
+ const r=await f.call('/api/mobile/price-tracker/mercadolivre/read',{link:'https://produto.mercadolivre.com.br/MLB-5296520523-fone-shokz-_JM',finalUrl:'https://www.mercadolivre.com.br/fone/p/MLB42258825?pdp_filters=item_id%3AMLB5296520523'});
+ assert.equal(r.body.ok,true,JSON.stringify(r.body));assert.equal(r.body.reading.itemId,'MLB5296520523');assert.equal(r.body.reading.amountCents,141283);
+ const evil=await f.call('/api/mobile/price-tracker/mercadolivre/read',{link:'https://produto.mercadolivre.com.br/MLB-5296520523-fone-shokz-_JM',finalUrl:'https://evil.example/p/MLB42258825'});
+ assert.match(JSON.stringify(evil.body),/ML_NEEDS_CATALOG_LINK/,'endereco fora do ML e ignorado');
+});
