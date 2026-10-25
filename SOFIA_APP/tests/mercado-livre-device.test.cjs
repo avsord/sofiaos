@@ -77,3 +77,22 @@ test('0.3.237: parou na tela de verificacao, mas o destino /p/ vem no endereco -
   assert.equal(await dev.resolveMercadoLivreCatalogUrl('https://evil.example/p/MLB2126351596',{fetchImpl:async()=>assert.fail('nao busca fora do ML')}),null);
   assert.equal(await dev.resolveMercadoLivreCatalogUrl('https://produto.mercadolivre.com.br/MLB-1',{fetchImpl:async()=>{throw Error('rede');}}),null);
 });
+
+// 0.3.238: o ML troca para /p/ pelo JavaScript da pagina; o navegador invisivel devolve onde terminou
+test('0.3.238: navegador invisivel devolve o /p/MLB... onde parou (ate quando depois pede verificacao); fora do catalogo -> null',async()=>{
+  const cat='https://www.mercadolivre.com.br/tend-skin/p/MLB2126351596?pdp_filters=item_id%3AMLB5851563564';
+  dev.setMercadoLivrePageReader(async()=>({ok:true,html:BLOCK,finalUrl:cat}));
+  assert.equal(await dev.resolveCatalogViaBrowser('https://produto.mercadolivre.com.br/MLB-5851563564'),cat);
+  dev.setMercadoLivrePageReader(async()=>({ok:false,code:'VERIFICATION_REQUIRED',finalUrl:cat}));
+  assert.equal(await dev.resolveCatalogViaBrowser('https://produto.mercadolivre.com.br/MLB-5851563564'),cat,'verificacao depois do /p/ ainda serve');
+  dev.setMercadoLivrePageReader(async()=>({ok:false,code:'STATE_NOT_FOUND',finalUrl:'https://produto.mercadolivre.com.br/MLB-5851563564'}));
+  assert.equal(await dev.resolveCatalogViaBrowser('https://produto.mercadolivre.com.br/MLB-5851563564'),null);
+  dev.setMercadoLivrePageReader(async()=>({ok:false,code:'X',finalUrl:'https://evil.example/p/MLB2126351596'}));
+  assert.equal(await dev.resolveCatalogViaBrowser('https://produto.mercadolivre.com.br/MLB-5851563564'),null,'so endereco do ML');
+  dev.setMercadoLivrePageReader(null);
+});
+test('0.3.238: o app tenta a consulta simples e, sem catalogo, o navegador invisivel; a falha do navegador guarda onde parou',()=>{
+  const a=fs.readFileSync(path.join(__dirname,'../src/lib/api.ts'),'utf8'),r=fs.readFileSync(path.join(__dirname,'../src/lib/price-reader.tsx'),'utf8');
+  assert.ok(a.includes('(await resolveMercadoLivreCatalogUrl(fetchUrl||link,{signal}))||(await resolveCatalogViaBrowser(fetchUrl||link,signal))'));
+  assert.ok(r.includes("...(typeof m.finalUrl === 'string' && ML_HOST.test(m.finalUrl) ? {finalUrl: m.finalUrl} : {})"));
+});

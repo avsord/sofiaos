@@ -133,7 +133,8 @@ export function parseMercadoLivreStateMessage(raw: string): DevicePage {
     const m = JSON.parse(String(raw || ''));
     if (!m || m.kind !== 'ml-state') return {ok: false, code: 'STATE_NOT_FOUND'};
     if (m.ok === true && typeof m.html === 'string' && m.html.length > 200 && m.html.length < 6_000_000 && typeof m.finalUrl === 'string' && ML_HOST.test(m.finalUrl)) return {ok: true, html: m.html, finalUrl: m.finalUrl};
-    return {ok: false, code: typeof m.code === 'string' && /^[A-Z_]{3,40}$/.test(m.code) ? m.code : 'STATE_NOT_FOUND'};
+    // 0.3.238: guarda onde o navegador parou (ex.: /p/MLB... antes da verificacao) - so endereco do ML
+    return {ok: false, code: typeof m.code === 'string' && /^[A-Z_]{3,40}$/.test(m.code) ? m.code : 'STATE_NOT_FOUND', ...(typeof m.finalUrl === 'string' && ML_HOST.test(m.finalUrl) ? {finalUrl: m.finalUrl} : {})};
   } catch { return {ok: false, code: 'STATE_NOT_FOUND'}; }
 }
 

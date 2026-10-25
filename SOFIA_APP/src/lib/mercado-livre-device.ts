@@ -10,7 +10,7 @@
  *  - não interpreta preço aqui: recorta só o bloco __NORDIC_RENDERING_CTX__ e o
  *    servidor faz a extração estrita (anúncio + vendedor + preço conferidos).
  */
-export type DevicePage = {ok: true; html: string; finalUrl: string} | {ok: false; code: string};
+export type DevicePage = {ok: true; html: string; finalUrl: string} | {ok: false; code: string; finalUrl?: string};
 
 const HOST = /^https:\/\/(?:www\.|produto\.)?mercadolivre\.com\.br(?:\/|$)|^https:\/\/(?:www\.)?mercadolivre\.com\/sec\//i;
 const VERIFY = /\/(jms|login|registration|gz\/account-verification|account-verification|captcha|security|challenge)\b/i;
@@ -119,9 +119,22 @@ export async function resolveMercadoLivreCatalogUrl(
     const res = await fetchImpl(target, {method: 'GET', headers: HEADERS, signal: controller.signal});
     const finalUrl = String((res as any).url || '');
     try { controller.abort(); } catch { /* nao precisa do corpo */ }
-    let decoded = finalUrl; try { decoded = decodeURIComponent(finalUrl); } catch { /* mantem */ }
-    const m = /\/p\/(MLB\d{6,16})/i.exec(decoded);
-    return m && HOST.test(finalUrl) ? finalUrl : null;
+    return catalogUrlOrNull(finalUrl);
   } catch { return null; }
   finally { clearTimeout(timer); signal?.removeEventListener?.('abort', stop); }
+}
+
+/** O endereco so serve se for do Mercado Livre e trouxer o catalogo (/p/MLB...), direto ou dentro do destino. */
+export function catalogUrlOrNull(url: unknown): string | null {
+  const u = typeof url === 'string' ? url : '';
+  if (!HOST.test(u)) return null;
+  let decoded = u; try { decoded = decodeURIComponent(u); } catch { /* mantem */ }
+  return /\/p\/MLB\d{6,16}/i.test(decoded) ? u : null;
+}
+/** 0.3.238: o ML troca o endereco para /p/MLB... pelo JavaScript da pagina (nao e redirecionamento comum).
+ * O navegador invisivel executa a pagina como o navegador da pessoa e devolve ONDE terminou - mesmo que depois
+ * peca verificacao. Usado so quando a consulta simples nao achou o catalogo. */
+export async function resolveCatalogViaBrowser(url: string, signal?: AbortSignal): Promise<string | null> {
+  if (!pageReader || signal?.aborted) return null;
+  try { const r = await pageReader(url, signal); return catalogUrlOrNull((r as any).finalUrl); } catch { return null; }
 }

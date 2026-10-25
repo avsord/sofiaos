@@ -8,7 +8,7 @@ export function waitForActive(maxMs=15000){if(!appState||appState.currentState==
 export function isChatSend(path:string,method:string){return method==='POST'&&/^\/(chat|conversations|messages)/.test(path)&&!path.startsWith('/chat-sync');}
 import type {MercadoLivreOptions, MercadoLivreResponse} from './mercado-livre-types';
 import type {StoreConnectionsState} from './store-connections-types';
-import {readMercadoLivrePageOnDevice,canonicalMercadoLivreUrl,resolveMercadoLivreCatalogUrl} from './mercado-livre-device';
+import {readMercadoLivrePageOnDevice,canonicalMercadoLivreUrl,resolveMercadoLivreCatalogUrl,resolveCatalogViaBrowser} from './mercado-livre-device';
 import {AUTH_STORAGE_KEY,PREFS_STORAGE_KEY,takeStartupAuth,takeStartupPrefs,invalidateStartupAuth,invalidateStartupPrefs} from './startup-read-ahead';
 import {StartupSnapshot} from './startup-snapshot';
 import {encryptedStorage} from './encrypted-storage';
@@ -282,7 +282,8 @@ export class SofiaApi {
     const connected=await this.mlAccountConnected();
     const page=connected?{ok:false as const,code:'API'}:await readMercadoLivrePageOnDevice(fetchUrl||canonicalMercadoLivreUrl(link),signal);
     // 0.3.237: com a conta conectada, link sem catalogo -> o celular segue o redirecionamento e manda o endereco /p/MLB...
-    const catalogUrl=connected&&!/\/p\/MLB\d/i.test(link)?await resolveMercadoLivreCatalogUrl(fetchUrl||link,{signal}):null;
+    // 0.3.238: se a consulta simples nao achar, o navegador invisivel executa a pagina e devolve o endereco /p/MLB...
+    const catalogUrl=connected&&!/\/p\/MLB\d/i.test(link)?(await resolveMercadoLivreCatalogUrl(fetchUrl||link,{signal}))||(await resolveCatalogViaBrowser(fetchUrl||link,signal)):null;
     if(!page.ok&&page.code==='CANCELLED')return {ok:false,code:'CANCELLED',message:'Leitura cancelada.',keepLastPrice:true as const};
     const body=page.ok?{link,...params,html:page.html,finalUrl:page.finalUrl}:{link,...params,...(catalogUrl?{finalUrl:catalogUrl}:{})};
     const r=await this.fetchRequest<MercadoLivreResponse>('/price-tracker/mercadolivre/read',body,'POST',40000,signal);
