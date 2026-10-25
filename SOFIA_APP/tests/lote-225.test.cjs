@@ -16,7 +16,7 @@ test('0.3.225: voltar ao topo; data do pagamento; editar aporte; salvar fecha an
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes("setTimeout(() => mainScroll.current?.scrollTo({y: 0, animated: false}), 0);return;}"),'voltar no topo');
   assert.ok(s.includes('paid_at: todayISO()')&&s.includes("const histDate = (t: Tx) => t.paid && t.paidAt ? t.paidAt : t.date;"),'historico no dia do pagamento');
-  assert.ok(s.includes("onPress={() => { setAporteEdit(monthAporte); setReserveHistoryOpen(true); }}"),'editar aporte do mes');
+  assert.ok(!s.includes("onPress={() => { setAporteEdit(monthAporte); setReserveHistoryOpen(true); }}"),'0.3.226: sem edicao duplicada fora da meta');
   assert.ok(s.includes('Keyboard.dismiss(); setAdjusting(false); onClose(); afterSheet(() => { void reload?.(); });'),'fecha e depois recarrega');
   assert.ok(s.includes('onOptimistic(tx.id, {kind, amount: value, desc: title, date,'),'valor e totais na hora');
   assert.ok(s.includes('{!fresh && !future && !failed ? <ShimmerGroup>'),'sem esqueleto eterno');

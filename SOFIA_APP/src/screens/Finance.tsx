@@ -177,6 +177,10 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
     if (next === tab) return;
     setTabHistory(h => [...h, tab].slice(-16)); setTab(next);
   },[tab]);
+  // 0.3.226: editar/apagar muda a tela na hora (item, totais de Receitas/Despesas, Historico); o servidor segue por tras
+  const patchTx = useCallback((id: string, ch: Partial<Tx>) => setData(prev => prev ? {...prev, txs: prev.txs.map(x => x.id === id ? {...x, ...ch} : x)} : prev), []);
+  const removeTx = useCallback((id: string) => setData(prev => prev ? {...prev, txs: prev.txs.filter(x => x.id !== id)} : prev), []);
+  const putTx = useCallback((t: Tx, replaceId: string | null) => setData(prev => prev ? {...prev, txs: replaceId ? prev.txs.map(x => x.id === replaceId ? t : x) : [...prev.txs, t]} : prev), []);
   const markPaid = useCallback((t: Tx) => setData(prev => {
     if (!prev) return prev;
     if (t.virtual) return {...prev, txs: [...prev.txs, {...t, id: 'local:' + t.id, virtual: false, paid: true, recurrence: 'none'} as Tx]};
@@ -296,7 +300,7 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
         ) : (
           <ScrollView ref={mainScroll} onScroll={e => { scrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={64} keyboardShouldPersistTaps="handled" contentContainerStyle={{paddingHorizontal: 20, paddingTop: 2, paddingBottom: 84, gap: 16}} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void reload()} />}>
             {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
-            {tab === 'home' ? <HomeTab failed={!!error} fresh={liveKey === windowKey} d={scoped || d} month={month} api={api} reload={reload} onTx={setEditing} onTab={navigateFinance} accountId={accountId} isPrimary={isPrimary} onBill={t => { setBillScope('series'); setBillEditor(t || 'new'); }} aporteKey={aporteKey} />
+            {tab === 'home' ? <HomeTab onPatchTx={patchTx} onRemoveTx={removeTx} failed={!!error} fresh={liveKey === windowKey} d={scoped || d} month={month} api={api} reload={reload} onTx={setEditing} onTab={navigateFinance} accountId={accountId} isPrimary={isPrimary} onBill={t => { setBillScope('series'); setBillEditor(t || 'new'); }} aporteKey={aporteKey} />
               : tab === 'bills' ? <PendingTab d={scoped || d} api={api} month={month} accountId={accountId} isPrimary={isPrimary} onAporte={() => { navigateFinance('home'); setAporteKey(k => k + 1); }} warning={notificationWarning} onBill={(t, scope) => { setBillScope(scope || 'series'); setBillFlow('expense'); setBillEditor(t); }} onNew={flow => { setBillScope('series'); setBillFlow(flow); setBillEditor('new'); }} onMonth={setMonth} side={pendingSide} onSide={setPendingSide} reload={reload} />
               : tab === 'cards' ? <CardsTab d={scoped || d} month={month} api={api} reload={reload} onTx={setEditing} onManage={() => setManage(true)} onNewBill={cid => { setBillScope('series'); setBillFlow('expense'); setBillCard(cid); setBillEditor('new'); }} onEditBill={t => { setBillScope('series'); setBillCard(''); setBillEditor(t); }} />
               : <ReportsTab d={scoped || d} month={month} reserve={reserveFor((scoped || d).goals, accountId, isPrimary)} api={api} reload={reload} />}
@@ -322,12 +326,14 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
           </Sheet>
         </> : null}
 
-        {editing && d ? <TxEditor api={api} d={d} tx={editing} defaultAccountId={accountId} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} onOptimistic={(id, ch) => setData(prev => prev ? {...prev, txs: prev.txs.map(x => x.id === id ? {...x, ...ch} : x)} : prev)} /> : null}
+        {editing && d ? <TxEditor api={api} d={d} tx={editing} defaultAccountId={accountId} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} onOptimistic={patchTx} onOptimisticRemove={removeTx} /> : null}
         {billEditor && d ? <BillEditor api={api} scope={billScope} initialFlow={billFlow} hasReserve={!!reserveOf(d.goals)} finance={d} initialCard={billCard} tx={billEditor === 'new' ? null : billEditor} accountId={accountId} onClose={() => { setBillEditor(null); setBillCard(''); }} onSaved={saved => {setBillEditor(null); setBillCard('');
           // 0.3.207: depois de salvar, vai para o mes e para o lado (A pagar / A receber) da conta e confirma onde ficou
           if(saved){setMonth(monthOf(saved.date));setPendingSide(saved.kind==='income'?'receber':'pagar');navigateFinance('bills');
             }
-          void reload();}} /> : null}
+          void reload();}}
+          onOptimistic={(t, replaceId) => { setData(prev => prev ? {...prev, txs: replaceId ? prev.txs.map(x => x.id === replaceId ? t : x) : [...prev.txs, t]} : prev);
+            setBillEditor(null); setBillCard(''); setMonth(monthOf(t.date)); setPendingSide(t.kind === 'income' ? 'receber' : 'pagar'); navigateFinance('bills'); }} /> : null}
         {manage && d ? <ManageSheet api={api} d={d} onClose={() => setManage(false)} onFinished={goHome} reload={reload} /> : null}
         <Sheet visible={accountPicker} onClose={() => setAccountPicker(false)} label="Fechar seletor de contas">
           <View style={{gap:14,paddingBottom:12}}>
@@ -637,6 +643,7 @@ function ReserveHistorySheet({api, reserve, moves, show, onClose, reload, startE
 function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = ''}: {accountId?: string; api: SofiaApi; kind: 'setup' | 'in' | 'out' | 'plan' | 'goal'; reserve: Goal | null; split: ReturnType<typeof moneySplit> | null; onClose: () => void; onDone: () => Promise<void>}) {
   const c = useTheme();
   // 0.3.188: aportar abre ja com o valor que falta no mes (ex.: R$ 4.000,00); da para trocar na hora
+  const [savedNow, setSavedNow] = useState(kind === 'goal' && split ? finishMoneyInput(String(split.saved).replace('.', ',')) : '');
   const [name, setName] = useState(reserve?.name || 'Dinheiro guardado'), [amount, setAmount] = useState(kind === 'in' && split && split.missing > 0 ? finishMoneyInput(String(split.missing).replace('.', ',')) : ''), [note, setNote] = useState(''),
     [plan, setPlan] = useState(reserve?.entity?.data?.monthly_plan ? finishMoneyInput(String(reserve.entity.data.monthly_plan).replace('.', ',')) : ''),
     [goalValue, setGoalValue] = useState(reserve?.target ? finishMoneyInput(String(reserve.target).replace('.', ',')) : ''),
@@ -679,7 +686,15 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
         if (saved < 0 || monthly < 0) throw Error('Use valores positivos.');
         await api.saveEntity({kind: 'fin_goal', title: name.trim() || 'Dinheiro guardado', content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {role: 'reserve', saved, ...planFields, ...goalFields, monthly_plan: monthly, color: GOOD, account_id: accountId || ''}});
       } else if ((kind === 'plan' || kind === 'goal') && reserve) {
-        await api.saveEntity({...reserve.entity, data: {...reserve.entity.data, ...planFields, ...goalFields}});
+        let savedBase: Record<string, any> = {};
+        if (kind === 'goal' && split) {
+          const want = parseMoney(savedNow);
+          if (want === null || !Number.isFinite(want) || want < 0) throw Error('Informe o valor guardado hoje.');
+          // guardado = base da meta + movimentos; a base nova faz o total ficar exatamente no valor informado
+          const net = Math.round((split.saved - (Number(reserve.saved) || 0)) * 100) / 100;
+          if (Math.abs(want - split.saved) >= 0.005) savedBase = {saved: Math.round((want - net) * 100) / 100};
+        }
+        await api.saveEntity({...reserve.entity, data: {...reserve.entity.data, ...planFields, ...goalFields, ...savedBase}});
       } else if (reserve) {
         const v = parseMoney(amount);
         if (!v || v <= 0) throw Error('Informe o valor.');
@@ -725,6 +740,9 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
         {parseMoney(plan) ? planEditor : null}
         {goalEditor}
       </> : kind === 'goal' ? <>
+        {/* 0.3.226: ajustar o valor guardado de hoje, como o Ajustar saldo - nao mexe no Saldo nem conta como aporte */}
+        {reserve ? input('Valor guardado hoje', savedNow, setSavedNow, 'Ex.: 19.000') : null}
+        {reserve ? <Text style={{color: c.muted, fontSize: 12, lineHeight: 17}}>Corrige o total guardado. Não mexe no Saldo e não conta como aporte.</Text> : null}
         <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Quanto você quer juntar e até quando. A Sofia mostra se o aporte atual chega lá e quanto por mês fecharia no prazo.</Text>
         {goalEditor}
         {reserve?.target ? <Pressable accessibilityRole="button" onPress={() => { setGoalValue(''); setGoalMonth(''); }}><Text style={{color: BAD, fontSize: 13, fontWeight: '700'}}>Tirar a meta</Text></Pressable> : null}
@@ -847,7 +865,7 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
     </Card_>
   </>;
 }
-function BillEditor({api,tx,accountId,onClose,onSaved,scope='series',initialFlow='expense',hasReserve=false,finance,initialCard=''}:{initialCard?:string;finance?:Data;hasReserve?:boolean;api:SofiaApi;tx:Tx|null;accountId:string;onClose:()=>void;onSaved:(saved?:{id:string;kind:string;date:string;title:string})=>void;scope?:'month'|'series';initialFlow?:'expense'|'income'}) {
+function BillEditor({api,tx,accountId,onClose,onSaved,onOptimistic,scope='series',initialFlow='expense',hasReserve=false,finance,initialCard=''}:{onOptimistic?:(t:Tx,replaceId:string|null)=>void;initialCard?:string;finance?:Data;hasReserve?:boolean;api:SofiaApi;tx:Tx|null;accountId:string;onClose:()=>void;onSaved:(saved?:{id:string;kind:string;date:string;title:string})=>void;scope?:'month'|'series';initialFlow?:'expense'|'income'}) {
   const c=useTheme(),existing=!!tx?.entity&&!tx?.virtual;
   // 0.3.193: aberta por "A vencer e atrasadas", a edicao de uma conta que se repete vale SO para aquele mes;
   // por "Contas fixas", vale para todos os meses.
@@ -934,6 +952,23 @@ function BillEditor({api,tx,accountId,onClose,onSaved,scope='series',initialFlow
         __content:note.trim(),
         import_id:existing?String(tx?.entity?.data?.import_id||''): 'sofia-pendencia:'+uid(),
       };
+      // 0.3.226: editar ou criar conta/receita em Contas muda a tela e os totais NA HORA e fecha; a gravacao segue
+      // por tras (antes esperava o servidor e recarregava Financas inteira). Se falhar, avisa e volta ao que esta salvo.
+      if(onOptimistic){
+        const baseEntity:any=existing&&tx?.entity?tx.entity:{id:'local:'+uid(),kind:'fin_tx',area:'Pessoal',privacy:'private',state:'active',tags:[]};
+        const local=toTx({...baseEntity,title:name.trim(),content:note.trim(),data:{...(baseEntity.data||{}),...data}} as Entity);
+        onOptimistic(local,existing&&tx?.entity?tx.entity.id:null);
+        void (async()=>{
+          try{
+            let saved=await saveEntity(api,'fin_tx',name.trim(),data,existing?tx?.entity:undefined);
+            if(String(saved?.data?.card_id||'')!==String(cardFor||''))saved=await api.saveEntity({...saved,data:{...saved.data,card_id:cardFor,invoice_month:'',paid:cardFor?false:saved.data?.paid}});
+            if(flow==='income'&&finance){const g=reserveOf(finance.goals);if(g)await syncIncomeReserve(api,finance,saved.id,g.id,reserveAmt,!!data.paid,finalDate,name.trim());}
+            await clearDraft();
+          }catch(e){appAlert('Não consegui salvar',errorText(e)+' Os valores voltaram ao que está salvo.');}
+          onSaved();
+        })();
+        return;
+      }
       let saved=await saveEntity(api,'fin_tx',name.trim(),data,existing?tx?.entity:undefined);
       // 0.3.222: confere que o cartao ficou gravado (antes, as vezes era preciso salvar duas vezes para o cartao pegar)
       if(String(saved?.data?.card_id||'')!==String(cardFor||'')){saved=await api.saveEntity({...saved,data:{...saved.data,card_id:cardFor,invoice_month:'',paid:cardFor?false:saved.data?.paid}});
@@ -1004,7 +1039,7 @@ function planReminder(d: Data, today: string) {
   return {split: moneySplit(reserve, d.moves || [], d.accounts, d.txs, d.cards, monthOf(today), today), title: reserve.name};
 }
 
-function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBill, aporteKey = 0, fresh = true, failed = false}: {failed?: boolean; fresh?: boolean; aporteKey?: number; d: Data; month: string; api: SofiaApi; reload: () => Promise<void>; onTx: (t: Partial<Tx>) => void; onTab: (t: Tab) => void; accountId: string; isPrimary: boolean; onBill: (t?: Tx) => void}) {
+function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBill, aporteKey = 0, fresh = true, failed = false, onPatchTx, onRemoveTx}: {onPatchTx?: (id: string, ch: Partial<Tx>) => void; onRemoveTx?: (id: string) => void; failed?: boolean; fresh?: boolean; aporteKey?: number; d: Data; month: string; api: SofiaApi; reload: () => Promise<void>; onTx: (t: Partial<Tx>) => void; onTab: (t: Tab) => void; accountId: string; isPrimary: boolean; onBill: (t?: Tx) => void}) {
   const c = useTheme(), today = todayISO();
   // Contas pesadas só quando os dados ou o mês mudam (não a cada toque, como esconder valores).
   const {s, total: accountsTotal, forecast: accountsForecast, dues} = useMemo(() => ({s: monthSummary(d.txs, month), total: totalBalance(d.accounts, d.txs), forecast: forecastBalance(d.accounts, d.txs, month, d.cards),
@@ -1086,7 +1121,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
   const aporteDue = !!split && split.planned > 0 && split.missing > 0 && month === monthOf(today) && Number(today.slice(8, 10)) >= Math.max(1, (split.planDay || 1) - Math.max(3, split.remindBefore || 0));
   return (
     <>
-      {breakdown ? <MonthBreakdown kind={breakdown} d={d} month={month} show={show} net={net} api={api} accountId={accountId} reload={reload} onTx={(t: Tx) => { setBreakdown(null); afterSheet(() => onTx(t)); }} onClose={() => setBreakdown(null)} /> : null}
+      {breakdown ? <MonthBreakdown kind={breakdown} d={d} month={month} show={show} net={net} api={api} accountId={accountId} reload={reload} onPatch={onPatchTx} onRemove={onRemoveTx} onTx={(t: Tx) => { setBreakdown(null); afterSheet(() => onTx(t)); }} onClose={() => setBreakdown(null)} /> : null}
       {forecastOpen ? <Sheet visible onClose={() => setForecastOpen(false)} label="Fechar previsão">
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 12, paddingBottom: 18}}>
           <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Previsto até {forecastEnd}</Text>
@@ -1192,16 +1227,6 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
         <View style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: WARN + '33'}}><Text style={{color: c.text, fontWeight: '800', fontSize: 12}}>Aportar</Text></View>
       </Pressable> : null}
 
-      {/* 0.3.225: aporte do mes ja feito -> da para editar o valor dele, como o Ajustar saldo */}
-      {!aporteDue && monthAporte ? <Pressable accessibilityRole="button" accessibilityLabel={'Editar o aporte de ' + monthLabel(month).split(' ')[0].toLowerCase()} onPress={() => { setAporteEdit(monthAporte); setReserveHistoryOpen(true); }}
-        style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.surface, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: c.line}}>
-        <Text style={{fontSize: 16}}>🔒</Text>
-        <View style={{flex: 1, gap: 2}}>
-          <Text style={{color: c.text, fontWeight: '700', fontSize: 14}}>Aporte de {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
-          <Text style={{color: c.muted, fontSize: 12}}>{show(monthAporte.amount)} · feito em {monthAporte.date.slice(8, 10)}/{monthAporte.date.slice(5, 7)}</Text>
-        </View>
-        <View style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: c.input}}><Text style={{color: c.text, fontWeight: '800', fontSize: 12}}>Editar</Text></View>
-      </Pressable> : null}
 
       {/* 0.3.161: quanto ainda da para gastar neste ciclo, depois das contas fixas e do aporte */}
       {!fresh && !future && !failed ? <ShimmerGroup><View accessibilityRole="progressbar" accessibilityLabel="Atualizando o controle de gastos" style={{backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 12, borderWidth: 1, borderColor: c.line}}>
@@ -1626,7 +1651,7 @@ function TxRow({t, d, first, onPress, api, reload, inInvoice = false}: {inInvoic
 }
 
 // ============================ EDITOR ============================
-function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic}: {onOptimistic?: (id: string, changes: Partial<Tx>) => void; api: SofiaApi; d: Data; tx: Partial<Tx>; defaultAccountId?: string; onClose: () => void; onSaved: () => void}) {
+function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic, onOptimisticRemove}: {onOptimisticRemove?: (id: string) => void; onOptimistic?: (id: string, changes: Partial<Tx>) => void; api: SofiaApi; d: Data; tx: Partial<Tx>; defaultAccountId?: string; onClose: () => void; onSaved: () => void}) {
   const c = useTheme(), editing = !!tx.entity && !tx.virtual;
   const [kind, setKind] = useState<TxKind>(tx.kind || 'expense');
   const [amount, setAmount] = useState(tx.amount ? finishMoneyInput(String(tx.amount).replace('.', ',')) : ''), [desc, setDesc] = useState(tx.desc || '');
@@ -1707,7 +1732,12 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic}
     }
     const series = tx.seriesId;
     const others = series ? d.txs.filter(x => x.seriesId === series && x.id !== tx.id) : [];
-    const del = async (all: boolean) => { try { await api.deleteEntity(tx.entity!.id); if (all) for (const o of others) if (o.entity && !o.paid) await api.deleteEntity(o.entity.id); onSaved(); } catch (e) { setError(errorText(e)); } };
+    const del = async (all: boolean) => {
+      // 0.3.226: apagar some da tela na hora (item, total, Historico); o servidor apaga por tras
+      if (onOptimisticRemove && tx.id && tx.entity) { const id = tx.entity.id, rest = all ? others.filter(o => o.entity && !o.paid).map(o => o.entity!.id) : [];
+        onOptimisticRemove(tx.id); for (const o of all ? others.filter(o => o.entity && !o.paid) : []) onOptimisticRemove(o.id); onClose();
+        void (async () => { try { await api.deleteEntity(id); for (const r of rest) await api.deleteEntity(r); } catch (e) { appAlert('Não consegui apagar', errorText(e) + ' O item voltou.'); } onSaved(); })(); return; }
+      try { await api.deleteEntity(tx.entity!.id); if (all) for (const o of others) if (o.entity && !o.paid) await api.deleteEntity(o.entity.id); onSaved(); } catch (e) { setError(errorText(e)); } };
     appAlert('Apagar lançamento?', others.length ? 'Este lançamento faz parte de uma série.' : 'Essa ação não pode ser desfeita.' + (guarded ? ' A parte de ' + guarded + ' que foi para o guardado também é apagada do guardado (só esse aporte; os seus outros aportes não mudam).' : ''), others.length
       ? [{text: 'Cancelar', style: 'cancel'}, {text: 'Só este', onPress: () => void del(false)}, {text: 'Este e os pendentes', style: 'destructive', onPress: () => void del(true)}]
       : [{text: 'Cancelar', style: 'cancel'}, {text: 'Apagar', style: 'destructive', onPress: () => void del(false)}]);
@@ -2105,7 +2135,7 @@ function ReportsTab({d: full, month, reserve, api, reload}: {d: Data; month: str
 
 // ============================ 0.3.182: DETALHES DO SALDO, RECEITAS E DESPESAS ============================
 /** Tocar no Saldo mostra de onde ele vem; tocar em Receitas ou Despesas lista as do mes. */
-function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountId = '', reload}: {kind: 'saldo' | 'income' | 'expense'; d: Data; month: string; show: (v: number) => string; net: number; onTx: (t: Tx) => void; onClose: () => void; api?: SofiaApi; accountId?: string; reload?: () => Promise<void>}) {
+function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountId = '', reload, onPatch, onRemove}: {onPatch?: (id: string, ch: Partial<Tx>) => void; onRemove?: (id: string) => void; kind: 'saldo' | 'income' | 'expense'; d: Data; month: string; show: (v: number) => string; net: number; onTx: (t: Tx) => void; onClose: () => void; api?: SofiaApi; accountId?: string; reload?: () => Promise<void>}) {
   const c = useTheme();
   // 0.3.192: ajustar o Saldo para o valor real do banco. Muda o ponto de partida da conta (saldo inicial)
   // pela diferenca; nada e apagado e os lancamentos continuam contando a partir dali.
@@ -2127,6 +2157,24 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountI
     } catch (e) { setAdjError(errorText(e)); } finally { setAdjBusy(false); }
   }
   const list = useMemo(() => monthTxs(d.txs, month).filter(t => t.paid && t.kind === kind).sort((a, b) => b.date.localeCompare(a.date)), [d, month, kind]);
+  const [rowEdit, setRowEdit] = useState<string | null>(null), [rowAmount, setRowAmount] = useState(''), [rowError, setRowError] = useState('');
+  function saveRow(t: Tx) {
+    const v = parseMoney(rowAmount);
+    if (v === null || !Number.isFinite(v) || v <= 0) { setRowError('Digite o valor.'); return; }
+    if (!api || !t.entity || !onPatch) return;
+    Keyboard.dismiss(); onPatch(t.id, {amount: v}); setRowEdit(null); setRowError('');
+    const entity = t.entity;
+    void (async () => { try { await saveFresh(api, t.desc, {amount: v}, entity); } catch (e) { appAlert('Não consegui salvar', errorText(e) + ' O valor voltou ao que está salvo.'); } await reload?.(); })();
+  }
+  function removeRow(t: Tx) {
+    if (!api || !t.entity || !onRemove) return;
+    const entity = t.entity;
+    appAlert('Apagar ' + (t.kind === 'income' ? 'esta receita' : 'esta despesa') + '?', t.desc + ' · ' + show(t.amount) + ' sai do total e do Histórico.', [
+      {text: 'Cancelar', style: 'cancel'},
+      {text: 'Apagar', style: 'destructive', onPress: () => { Keyboard.dismiss(); onRemove(t.id); setRowEdit(null);
+        void (async () => { try { await api.deleteEntity(entity.id); } catch (e) { appAlert('Não consegui apagar', errorText(e) + ' O item voltou.'); } await reload?.(); })(); }},
+    ]);
+  }
   const total = list.reduce((s, t) => s + t.amount, 0);
   const [ledgerOpen, setLedgerOpen] = useState(false), reserve = reserveOf(d.goals);
   const [changes, setChanges] = useState<SaldoChange[]>([]);
@@ -2216,7 +2264,21 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountI
         <Text style={{color: kind === 'income' ? GOOD : BAD, fontWeight: '800', fontSize: 22}}>{show(total)}</Text>
       </View>}
       {parts ? null : <View>
-        {list.length ? list.map((t, i) => <Pressable key={t.id} accessibilityRole="button" onPress={() => onTx(t)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderColor: c.line}}>
+        {/* 0.3.226: editar o valor ou apagar o item AQUI DENTRO; o item, o total e o Historico mudam na hora */}
+        {list.length ? list.map((t, i) => rowEdit === t.id ? <View key={t.id} style={{gap: 10, paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderColor: c.line}}>
+          <Text numberOfLines={1} style={{color: c.text, fontWeight: '700'}}>{categoryOf(t.category).icon}  {t.desc}</Text>
+          <TextInput accessibilityLabel={'Valor de ' + t.desc} autoFocus value={rowAmount} onChangeText={v => setRowAmount(old => formatMoneyInput(v, old))} keyboardType="decimal-pad" placeholder="0,00" placeholderTextColor={c.muted}
+            style={{fontSize: 22, fontWeight: '800', color: c.text, borderWidth: 1, borderColor: c.line, borderRadius: 12, padding: 12, backgroundColor: c.input}} />
+          {rowError ? <Text style={{color: BAD}}>{rowError}</Text> : null}
+          <View style={{flexDirection: 'row', gap: 8}}>
+            <View style={{flex: 1}}><Button title="Salvar" onPress={() => saveRow(t)} /></View>
+            <View style={{flex: 1}}><Button title="Apagar" secondary onPress={() => removeRow(t)} /></View>
+          </View>
+          <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
+            <Pressable accessibilityRole="button" onPress={() => onTx(t)} style={{paddingVertical: 6}}><Text style={{color: c.accent, fontWeight: '700'}}>Mais opções</Text></Pressable>
+            <Pressable accessibilityRole="button" onPress={() => { Keyboard.dismiss(); setRowEdit(null); setRowError(''); }} style={{paddingVertical: 6}}><Text style={{color: c.muted}}>Cancelar</Text></Pressable>
+          </View>
+        </View> : <Pressable key={t.id} accessibilityRole="button" accessibilityLabel={'Editar ' + t.desc} onPress={() => { if (onPatch && t.entity) { setRowEdit(t.id); setRowError(''); setRowAmount(finishMoneyInput(String(t.amount).replace('.', ','))); } else onTx(t); }} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderColor: c.line}}>
           <Text style={{fontSize: 18}}>{categoryOf(t.category).icon}</Text>
           <View style={{flex: 1, gap: 2}}>
             <Text numberOfLines={1} style={{color: c.text, fontWeight: '600'}}>{t.desc}</Text>

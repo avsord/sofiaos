@@ -53,7 +53,7 @@ test('conta do mes no cartao grava o cartao na primeira vez (caminho "so este me
 
 test('controle de gastos sem piscar: so mostra numero e cor com os dados atualizados do mes',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('<HomeTab failed={!!error} fresh={liveKey === windowKey}')&&s.includes('{!fresh && !future && !failed ? <ShimmerGroup>'));
+  assert.ok(s.includes('<HomeTab onPatchTx={patchTx} onRemoveTx={removeTx} failed={!!error} fresh={liveKey === windowKey}')&&s.includes('{!fresh && !future && !failed ? <ShimmerGroup>'));
   assert.ok(s.includes("if (window.from === addMonths(monthOf(todayISO()), -1) && window.to === addMonths(monthOf(todayISO()), 1)) writeCache(api, bundle);"),'copia so do periodo padrao');
 });
 
