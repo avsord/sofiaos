@@ -6,7 +6,7 @@ const {OWNER}=require('../memory/store');
 const {AppError,now,id,cleanText,rejectSecrets,normalize}=require('./util');
 const AREAS=['Pessoal','Sofia OS','AVSORD','AVSORD Studio','AVSORD Technology','Enjoy The Void','Estudos','Assets','Geral'];
 const PRIV=['private','local','shared','public'];
-const SYSTEM_KEYS={mail_account:['last_uid','uid_validity','last_check','last_error','secret_set'],package:['status','events','checked_at','ok_at','error','blocked_until','last_event_at']};
+const SYSTEM_KEYS={mail_account:['last_uid','uid_validity','last_check','last_error','secret_set'],package:['status','events','checked_at','ok_at','error','blocked_until','last_event_at','ship24_tracker_id','milestone','milestone_label','fee','estimated']};
 function parse(row){if(!row)return row;return {...row,data:JSON.parse(row.data),tags:JSON.parse(row.tags)};}
 function dateISO(v,field='Data'){if(!v)return '';if(!/^\d{4}-\d{2}-\d{2}$/.test(v)||!Number.isFinite(Date.parse(v+'T12:00:00Z'))||new Date(v+'T12:00:00Z').toISOString().slice(0,10)!==v)throw new AppError('BAD_DATE',field+': informe uma data válida.');return v;}
 // 0.3.146: horario sem fuso ("2026-10-15T10:00", vindo do chat ou do app) e lido no fuso da

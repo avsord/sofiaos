@@ -2119,7 +2119,12 @@ const CATALOG={
       { "key": "error", "label": "Motivo da falha", "type": "text", "max": 160 },
       { "key": "blocked_until", "label": "Consulta pausada até", "type": "text", "max": 40 },
       { "key": "ok_at", "label": "Última atualização com sucesso", "type": "text", "max": 40 },
-      { "key": "note", "label": "Observação", "type": "text", "max": 300 }
+      { "key": "note", "label": "Observação", "type": "text", "max": 300 },
+      { "key": "ship24_tracker_id", "label": "Rastreio na Ship24", "type": "text", "max": 80 },
+      { "key": "milestone", "label": "Etapa", "type": "text", "max": 40 },
+      { "key": "milestone_label", "label": "Etapa (texto)", "type": "text", "max": 80 },
+      { "key": "fee", "label": "Taxa a pagar", "type": "checkbox" },
+      { "key": "estimated", "label": "Previsão de entrega", "type": "text", "max": 40 }
     ]
   },
   "mail_hit": {
