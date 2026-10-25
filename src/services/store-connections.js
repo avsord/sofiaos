@@ -119,7 +119,11 @@ class StoreConnections {
     if (res.status === 401) { this.access = null; throw new AppError('ML_TOKEN', 'O Mercado Livre recusou o acesso; tente de novo.', 502); }
     if (res.status === 404) throw new AppError('ML_NOT_FOUND', 'Anuncio nao encontrado no Mercado Livre.', 404);
     if (res.status === 429) throw new AppError('RATE_LIMITED', 'O Mercado Livre limitou as consultas; aguardando.', 429);
-    if (!res.ok) throw new AppError('ML_API', 'O Mercado Livre respondeu com erro (' + res.status + ').', 502);
+    if (!res.ok) {
+      // 0.3.234: mostra o motivo que o Mercado Livre manda junto (codigo + mensagem), sem token nem dados pessoais
+      const why = [data.code || data.error, data.message].filter(Boolean).map(x => String(x).replace(/[^\w .,:;()\-/'"À-ú]/g, '').slice(0, 140)).join(' — ');
+      throw new AppError('ML_API', 'O Mercado Livre respondeu com erro (' + res.status + ')' + (why ? ': ' + why : '') + '.', 502);
+    }
     return data;
   }
 
