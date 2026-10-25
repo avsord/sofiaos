@@ -22,7 +22,9 @@ function fakeML(state={}){
   if(!auth.startsWith('Bearer AT-'))return json({error:'unauthorized'},401);
   if(state.revoked&&!state.tokens.slice(-1).includes(auth.slice(7)))return json({error:'unauthorized'},401);
   if(u.includes('/users/me'))return json({id:999,nickname:'PEDRO_SILVA'});
-  if(state.forbidden&&/\/items\//.test(u))return json({blocked_by:'PolicyAgent',code:'PA_UNAUTHORIZED_RESULT_FROM_POLICIES',status:403,message:'At least one policy returned UNAUTHORIZED.'},403);
+  if(state.forbidden&&/\/items\//.test(u))return json({status:403,error:'access_denied',message:'Access to the requested resource is forbidden',code:'FORBIDDEN'},403);
+  const pi=/\/products\/(MLB\d+)\/items/.exec(u);if(pi)return state.catalog&&state.catalog[pi[1]]?json({paging:{total:state.catalog[pi[1]].items.length},results:state.catalog[pi[1]].items}):json({error:'not_found'},404);
+  const pr=/\/products\/(MLB\d+)(?:\?|$)/.exec(u);if(pr)return state.catalog&&state.catalog[pr[1]]?json({id:pr[1],name:state.catalog[pr[1]].name}):json({error:'not_found'},404);
   const it=/\/items\/(MLB\d+)/.exec(u);if(it)return state.items[it[1]]?json(state.items[it[1]]):json({error:'not_found'},404);
   const us=/\/users\/(\d+)/.exec(u);if(us)return json({id:+us[1],nickname:us[1]==='427963557'?'TechPrime':'Outro'});
   return json({error:'unknown'},404);
@@ -113,10 +115,17 @@ test('AliExpress: assinatura HMAC-SHA256 da Open Platform e leitura pela chave d
  await assert.rejects(()=>s2.readAliExpress('1005009140414'),e=>e.code==='ALI_NOT_CONFIGURED');
 });
 
-test('0.3.234: 403 do Mercado Livre mostra o motivo exato que ele mandou (codigo + mensagem), sem token',async t=>{
- const f=await setup(t,{items:{MLB5296520523:ITEM},forbidden:true});await connect(f);
+const CATALOG={MLB42258825:{name:'Fone de Ouvido Shokz OpenRun Pro 2',items:[{item_id:'MLB9999999999',price:1399.9,currency_id:'BRL',seller_id:111},{item_id:'MLB5296520523',price:1412.83,currency_id:'BRL',seller_id:427963557,condition:'new',available_quantity:6}]}};
+test('0.3.235: o ML bloqueia /items de outro vendedor (403 access_denied) -> le o MESMO anuncio pelo catalogo, com preco, vendedor e nome',async t=>{
+ const f=await setup(t,{items:{MLB5296520523:ITEM},forbidden:true,catalog:CATALOG});await connect(f);
  const r=await f.call('/api/mobile/price-tracker/mercadolivre/read',{link:LINK});
- const text=JSON.stringify(r.body);
- assert.match(text,/respondeu com erro \(403\): PA_UNAUTHORIZED_RESULT_FROM_POLICIES — At least one policy returned UNAUTHORIZED/,text);
- assert.ok(!/AT-\d/.test(text),'nunca mostra o token');
+ assert.equal(r.status,200);assert.equal(r.body.ok,true,JSON.stringify(r.body));
+ const x=r.body.reading;assert.equal(x.itemId,'MLB5296520523','o anuncio do link, nao o mais barato');assert.equal(x.amountCents,141283);
+ assert.equal(x.seller.id,'427963557');assert.equal(x.seller.name,'TechPrime');assert.equal(x.title,'Fone de Ouvido Shokz OpenRun Pro 2');
+ assert.equal(x.source,'api.mercadolibre.com/products');assert.equal(x.catalogProductId,'MLB42258825');
+});
+test('0.3.235: anuncio que saiu do catalogo -> aviso claro e preco anterior preservado (nunca pega o de outro vendedor)',async t=>{
+ const f=await setup(t,{items:{MLB5296520523:ITEM},forbidden:true,catalog:{MLB42258825:{name:'X',items:[{item_id:'MLB9999999999',price:10,currency_id:'BRL',seller_id:111}]}}});await connect(f);
+ const r=await f.call('/api/mobile/price-tracker/mercadolivre/read',{link:LINK});
+ const text=JSON.stringify(r.body);assert.match(text,/ITEM_NOT_IN_CATALOG/);assert.match(text,/preco anterior preservado/);assert.ok(!/"amountCents":1000/.test(text));
 });

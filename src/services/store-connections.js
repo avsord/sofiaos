@@ -122,16 +122,50 @@ class StoreConnections {
     if (!res.ok) {
       // 0.3.234: mostra o motivo que o Mercado Livre manda junto (codigo + mensagem), sem token nem dados pessoais
       const why = [data.code || data.error, data.message].filter(Boolean).map(x => String(x).replace(/[^\w .,:;()\-/'"À-ú]/g, '').slice(0, 140)).join(' — ');
-      throw new AppError('ML_API', 'O Mercado Livre respondeu com erro (' + res.status + ')' + (why ? ': ' + why : '') + '.', 502);
+      // 0.3.235: 403 = o Mercado Livre fecha /items de anuncios de OUTROS vendedores (mesmo com token); o catalogo segue aberto
+      throw new AppError(res.status === 403 ? 'ML_FORBIDDEN' : 'ML_API', 'O Mercado Livre respondeu com erro (' + res.status + ')' + (why ? ': ' + why : '') + '.', 502);
     }
     return data;
   }
 
   // ---------- Mercado Livre: leitura pela API ----------
   mlConnected() { const l = this.link('mercadolivre'); return !!(l && l.refresh); }
-  async readMercadoLivre(itemId) {
+  async readMercadoLivre(itemId, {catalogId = null} = {}) {
     const id = String(itemId || '').toUpperCase().replace(/^MLB-/, 'MLB');
     if (!ITEM.test(id)) throw new AppError('INVALID_ITEM_ID', 'Identificador de anuncio invalido.', 400);
+    try { return await this.readItemDirect(id); }
+    catch (e) {
+      if (!(e && e.code === 'ML_FORBIDDEN')) throw e;
+      const cat = String(catalogId || '').toUpperCase();
+      if (!ITEM.test(cat)) throw e; // sem catalogo: quem chama cai no caminho da pagina
+      return this.readViaCatalog(id, cat);
+    }
+  }
+  /** 0.3.235: preco do MESMO anuncio pela lista do catalogo (/products/{cat}/items), que o ML deixa ler. */
+  async readViaCatalog(id, cat) {
+    const list = await this.mlGet('/products/' + cat + '/items');
+    const rows = Array.isArray(list && list.results) ? list.results : [];
+    const r = rows.find(x => String(x && (x.item_id || x.id) || '').toUpperCase() === id);
+    if (!r) throw new AppError('ITEM_NOT_IN_CATALOG', 'Esse anuncio nao aparece mais no catalogo do Mercado Livre (pausado, sem estoque ou saiu do catalogo); preco anterior preservado.', 409);
+    const price = Number(r.price);
+    if (!Number.isFinite(price) || price <= 0) throw new AppError('PRICE_MISSING', 'O anuncio esta sem preco no catalogo.', 502);
+    if (r.currency_id && r.currency_id !== 'BRL') throw new AppError('CURRENCY_MISMATCH', 'Preco em moeda diferente de BRL.', 502);
+    const sellerId = String(r.seller_id || '');
+    if (!/^\d{1,18}$/.test(sellerId)) throw new AppError('SELLER_MISSING', 'O catalogo nao informou o vendedor.', 502);
+    let title = '';
+    try { const pr = await this.mlGet('/products/' + cat); title = String(pr && pr.name || '').trim(); } catch { title = ''; }
+    let sellerName = this.sellerNames.get(sellerId);
+    if (!sellerName) { try { const u = await this.mlGet('/users/' + sellerId + '?attributes=id,nickname'); sellerName = String(u.nickname || ''); if (sellerName) this.sellerNames.set(sellerId, sellerName); } catch { sellerName = ''; } }
+    return {
+      provider: 'mercadolivre', siteId: 'MLB', itemId: id, catalogProductId: cat, identityKey: 'mercadolivre:' + id,
+      itemSelectedBy: 'link', normalizedUrl: 'https://www.mercadolivre.com.br/p/' + cat + '?pdp_filters=item_id%3A' + id, cleanPermalink: null,
+      title: title || id, seller: {id: sellerId, name: sellerName || 'Vendedor ' + sellerId},
+      amount: Math.round(price * 100) / 100, amountCents: Math.round(price * 100), currency: 'BRL', inStock: true,
+      layout: 'api', source: 'api.mercadolibre.com/products', identitySource: 'api', observedAt: now(), shippingAmount: null,
+      extras: {condition: r.condition || null, soldQuantityMin: null, availableQuantity: Number.isFinite(Number(r.available_quantity)) ? Number(r.available_quantity) : null},
+    };
+  }
+  async readItemDirect(id) {
     const it = await this.mlGet('/items/' + id + '?attributes=id,title,price,currency_id,available_quantity,status,seller_id,catalog_product_id,permalink,sold_quantity,condition');
     if (String(it.id || '').toUpperCase() !== id) throw new AppError('ITEM_MISMATCH', 'A API devolveu outro anuncio.', 502);
     const price = Number(it.price);

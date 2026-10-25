@@ -7,16 +7,16 @@ const load=()=>modulePromise||(modulePromise=import('./stores/mercado-livre.mjs'
 /** Leitura pela API oficial. Devolve null quando o link nao diz qual anuncio e (catalogo sem
  * vendedor): ai os caminhos de pagina decidem. Erros da API viram falha no mesmo formato. */
 async function fromApi(m,stores,b,pin,{expectedSellerId}){
- let itemId=pin?.itemId||null;
- if(!itemId){try{const id=m.normalizeMercadoLivreLink(b.link);itemId=id.itemId;}catch(e){if(e&&e.code==='SHORT_LINK'&&b.finalUrl){try{itemId=m.normalizeMercadoLivreLink(b.finalUrl).itemId;}catch{}}}}
+ let itemId=pin?.itemId||null,catalogId=pin?.catalogProductId||null;
+ if(!itemId||!catalogId){try{const id=m.normalizeMercadoLivreLink(b.link);itemId=itemId||id.itemId;catalogId=catalogId||id.catalogProductId||null;}catch(e){if(e&&e.code==='SHORT_LINK'&&b.finalUrl){try{const f=m.normalizeMercadoLivreLink(b.finalUrl);itemId=itemId||f.itemId;catalogId=catalogId||f.catalogProductId||null;}catch{}}}}
  if(!itemId)return null;
  try{
-  const reading=await stores.readMercadoLivre(itemId);
+  const reading=await stores.readMercadoLivre(itemId,{catalogId});
   if(expectedSellerId!=null&&String(expectedSellerId)!==reading.seller.id)return {ok:false,code:'SELLER_MISMATCH',message:'O vendedor mudou; confirme antes de continuar o historico.',keepLastPrice:true,retryable:false,needsUserAction:true};
   return {ok:true,reading};
  }catch(e){
   const code=e&&e.code||'ML_API';
-  if(code==='ML_NOT_CONNECTED')return null; // conta caiu no meio: pagina decide
+  if(code==='ML_NOT_CONNECTED'||code==='ML_FORBIDDEN')return null; // conta caiu, ou anuncio de terceiro sem catalogo: pagina decide
   const retryable=['RATE_LIMITED','ML_API','ML_TOKEN','UNAVAILABLE'].includes(code);
   return {ok:false,code,message:(e&&e.message)||'A API do Mercado Livre nao respondeu. Preco anterior preservado.',keepLastPrice:true,retryable,needsUserAction:code==='ML_NOT_FOUND'};
  }
