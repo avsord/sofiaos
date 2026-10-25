@@ -62,7 +62,7 @@ export function Packages({api,active,onBack}:{api:SofiaApi;active:boolean;onBack
    {section('Entregues',groups.delivered)}
    {!records.loaded&&!records.error?<Text style={{color:c.muted,padding:18}}>Carregando encomendas…</Text>:null}
    {records.loaded&&!groups.active.length&&!groups.delivered.length?<Empty icon="box" title="Sua primeira encomenda" body="Cole o código de rastreio (ex.: AA123456789BR) e dê um nome. A Sofia consulta a transportadora e avisa a cada mudança."/>:null}
-   <Text style={{color:c.muted,fontSize:11,lineHeight:18,paddingHorizontal:4}}>Correios são consultados automaticamente a cada 2 horas. Para outras transportadoras, a Sofia guarda o código e abre o rastreio oficial com um toque.</Text>
+   <Text style={{color:c.muted,fontSize:11,lineHeight:18,paddingHorizontal:4}}>Todas as transportadoras (Correios, AliExpress, Shopee e outras) são acompanhadas automaticamente pela Ship24, e você recebe aviso quando o status muda. Cada encomenda nova usa 1 das 10 grátis do mês; atualizar não gasta.</Text>
   </ScrollView>
   <Sheet visible={!!editing} onClose={()=>{if(!busy)setEditing(null);}} label="Fechar encomenda">
    <View style={{flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,color:c.text,fontSize:22,fontWeight:'700'}}>Nova encomenda</Text><IconButton name="close" label="Fechar encomenda" disabled={busy} onPress={()=>setEditing(null)}/></View>
@@ -78,6 +78,10 @@ export function Packages({api,active,onBack}:{api:SofiaApi;active:boolean;onBack
   <Sheet visible={!!viewing} onClose={()=>setViewing(null)} label="Fechar linha do tempo">
    {viewing?<View style={{gap:14,paddingBottom:18}}>
     <View style={{flexDirection:'row',alignItems:'center'}}><View style={{flex:1}}><Text style={{color:c.text,fontSize:22,fontWeight:'700'}}>{viewing.title}</Text><Text style={{color:c.muted,fontSize:12}}>{CARRIER_LABEL[String(viewing.data?.carrier)]||'Transportadora'} · {String(viewing.data?.code||'')}</Text></View><IconButton name="close" label="Fechar linha do tempo" onPress={()=>setViewing(null)}/></View>
+    {/* 0.3.232: etapa em portugues, taxa a pagar e previsao de entrega (Ship24) */}
+    {viewing.data?.milestone_label?<View style={{alignSelf:'flex-start',paddingHorizontal:10,paddingVertical:5,borderRadius:99,backgroundColor:c.accentSoft}}><Text style={{color:c.accent,fontWeight:'800',fontSize:12}}>{String(viewing.data.milestone_label)}</Text></View>:null}
+    {viewing.data?.fee?<View style={{padding:12,borderRadius:12,backgroundColor:c.danger+'1f',gap:4}}><Text style={{color:c.danger,fontWeight:'800'}}>💰 Taxa a pagar</Text><Text style={{color:c.text,fontSize:13}}>A encomenda está esperando o pagamento de taxa/imposto. Toque em "Abrir rastreio oficial" para pagar.</Text></View>:null}
+    {viewing.data?.estimated&&viewing.state!=='delivered'?<Text style={{color:c.muted,fontSize:12}}>Previsão de entrega: {String(viewing.data.estimated).slice(8,10)+'/'+String(viewing.data.estimated).slice(5,7)}</Text>:null}
     {viewing.data?.error?<Text style={{color:c.danger,fontSize:12}}>Última consulta falhou: {String(viewing.data.error)}</Text>:null}
     {viewing.data?.ok_at?<Text style={{color:c.muted,fontSize:11}}>Última atualização com sucesso: {whenLabel(String(viewing.data.ok_at))}</Text>:<Text style={{color:c.muted,fontSize:11}}>Ainda sem nenhuma atualização com sucesso.</Text>}
     {viewing.data?.checked_at?<Text style={{color:c.muted,fontSize:11}}>Última tentativa: {whenLabel(String(viewing.data.checked_at))}</Text>:null}

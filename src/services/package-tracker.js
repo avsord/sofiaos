@@ -40,9 +40,49 @@ function parseCorreios(payload, code) {
 // CORREIOS_API_USER e CORREIOS_API_KEY, a Sofia usa a API oficial; senao, tenta o proxyapp e,
 // no 403, explica e espera 24 h antes de tentar de novo (sem martelar os Correios).
 const BLOCKED_MSG = 'Os Correios fecharam a consulta automática gratuita. Toque em "Abrir rastreio oficial".';
+// 0.3.232: Ship24 (https://docs.ship24.com) rastreia todas as transportadoras (Correios, AliExpress/Cainiao, Shopee...).
+// Plano gratis: 10 encomendas NOVAS por mes (renova todo mes). Cadastrar = POST /trackers/track (gasta 1, idempotente);
+// atualizar = GET /trackers/{id}/results (NAO gasta cota). Chave na Railway: SHIP24_API_KEY.
+const SHIP24 = 'https://api.ship24.com/public/v1';
+const MILESTONE_PT = { pending: 'Aguardando a primeira atualização', info_received: 'Postado — informações recebidas', in_transit: 'Em trânsito',
+  out_for_delivery: 'Saiu para entrega', failed_attempt: 'Tentativa de entrega sem sucesso', available_for_pickup: 'Disponível para retirada',
+  delivered: 'Entregue', exception: 'Problema na entrega' };
+const FEE = /aguardando pagamento|pagamento de taxa|taxa|tribut|imposto|despacho postal/i;
+function parseShip24(json) {
+  const t = json && json.data && Array.isArray(json.data.trackings) ? json.data.trackings[0] : null;
+  if (!t) throw new Error('A Ship24 não devolveu o rastreio desta encomenda.');
+  const milestone = String(t.shipment && t.shipment.statusMilestone || 'pending');
+  const events = (Array.isArray(t.events) ? t.events : []).map(e => ({ at: String(e.occurrenceDatetime || e.datetime || '').slice(0, 25),
+    status: String(e.status || '').trim().slice(0, 160), local: String(e.location || '').trim().slice(0, 120), milestone: String(e.statusMilestone || '') })).filter(e => e.status);
+  const top = events[0];
+  return { status: top ? top.status : (MILESTONE_PT[milestone] || 'Sem eventos ainda'), milestone, milestoneLabel: MILESTONE_PT[milestone] || '',
+    events, found: events.length > 0, delivered: milestone === 'delivered', fee: !!(top && FEE.test(top.status)),
+    trackerId: t.tracker && t.tracker.trackerId || '', estimated: t.shipment && t.shipment.delivery && t.shipment.delivery.estimatedDeliveryDate || '' };
+}
 class PackageTracker {
   constructor(workspace, options = {}) { this.w = workspace; this.fetch = options.fetchImpl || global.fetch; this.timer = null; this.timeoutMs = options.timeoutMs || 15000; this.env = options.env || process.env; this.token = null; }
   officialConfigured() { return !!(this.env.CORREIOS_API_USER && this.env.CORREIOS_API_KEY); }
+  ship24Configured() { return !!this.env.SHIP24_API_KEY; }
+  async ship24(method, path, body) {
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), Math.max(this.timeoutMs, 70000));
+    try {
+      const res = await this.fetch(SHIP24 + path, { method, signal: ctrl.signal, headers: { Authorization: 'Bearer ' + this.env.SHIP24_API_KEY, 'Content-Type': 'application/json', Accept: 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
+      let json = null; try { json = await res.json(); } catch { json = null; }
+      if (!res.ok) {
+        const msg = json && Array.isArray(json.errors) && json.errors[0] ? String(json.errors[0].message || json.errors[0].code || '') : '';
+        if (res.status === 401) throw new Error('A chave da Ship24 (SHIP24_API_KEY) foi recusada. Confira na Railway.');
+        if (res.status === 403) throw new Error('A Ship24 recusou: ' + (msg || 'limite do plano grátis (10 encomendas novas por mês) ou permissão da chave') + '.');
+        if (res.status === 429) throw new Error('Muitas consultas seguidas na Ship24; tento de novo mais tarde.');
+        throw new Error('A Ship24 respondeu ' + res.status + (msg ? ': ' + msg : '') + '.');
+      }
+      return json;
+    } finally { clearTimeout(t); }
+  }
+  /** Ship24: cadastra uma vez (gasta 1 da cota mensal) e depois so le os resultados (gratis). */
+  async fetchShip24(code, d) {
+    if (d && d.ship24_tracker_id) return parseShip24(await this.ship24('GET', '/trackers/' + encodeURIComponent(d.ship24_tracker_id) + '/results'));
+    return parseShip24(await this.ship24('POST', '/trackers/track', { trackingNumber: normalizeCode(code), destinationCountryCode: 'BR' }));
+  }
   async officialToken() {
     if (this.token && this.token.until > Date.now() + 60000) return this.token.value;
     const basic = Buffer.from(this.env.CORREIOS_API_USER + ':' + this.env.CORREIOS_API_KEY).toString('base64');
@@ -67,7 +107,8 @@ class PackageTracker {
       return parseCorreios(await res.json(), code);
     } finally { clearTimeout(t); }
   }
-  async lookup(carrier, code) {
+  async lookup(carrier, code, d = {}) {
+    if (this.ship24Configured()) return this.fetchShip24(code, d);
     if (carrier === 'correios') return this.officialConfigured() ? this.fetchOfficial(code) : this.fetchCorreios(code);
     return { status: 'Acompanhamento automático só para Correios por enquanto', events: [], found: false, unsupported: true };
   }
@@ -75,7 +116,7 @@ class PackageTracker {
   async refresh(item) {
     const d = { ...(item.data || {}) }, code = normalizeCode(d.code), carrier = d.carrier || detectCarrier(code);
     let result, error = '', blocked = false;
-    try { result = await this.lookup(carrier, code); } catch (e) { error = String(e && e.message || e).slice(0, 160); blocked = !!(e && e.blocked); }
+    try { result = await this.lookup(carrier, code, d); } catch (e) { error = String(e && e.message || e).slice(0, 160); blocked = !!(e && e.blocked); }
     const now = new Date().toISOString();
     if (!result) {
       const saved = this.w.save({ ...item, data: { ...d, carrier, checked_at: now, error, blocked_until: blocked ? new Date(Date.now() + 24 * 3600000).toISOString() : '' } }, item.id);
@@ -84,12 +125,12 @@ class PackageTracker {
     const previous = (() => { try { return JSON.parse(d.events || '[]'); } catch { return []; } })();
     const key = e => e.at + '|' + e.status;
     const changed = result.found && result.events.length && (!previous.length || key(result.events[0]) !== key(previous[0]));
-    const delivered = result.events.some(e => DELIVERED.test(e.status));
+    const delivered = !!result.delivered || result.events.some(e => DELIVERED.test(e.status));
     const saved = this.w.save({ ...item, state: delivered ? 'delivered' : item.state === 'archived' ? 'archived' : 'active',
-      data: { ...d, carrier, status: result.status, last_event_at: result.events[0] ? result.events[0].at : d.last_event_at || '', events: JSON.stringify(result.events.slice(0, 60)), checked_at: now, ok_at: result.found ? now : d.ok_at || '', error: result.found ? '' : result.status } }, item.id);
+      data: { ...d, carrier, status: result.status, last_event_at: result.events[0] ? result.events[0].at : d.last_event_at || '', events: JSON.stringify(result.events.slice(0, 60)), checked_at: now, ok_at: result.found ? now : d.ok_at || '', error: result.found ? '' : result.status, ...(result.trackerId ? { ship24_tracker_id: result.trackerId } : {}), ...(result.milestone ? { milestone: result.milestone, milestone_label: result.milestoneLabel || '' } : {}), fee: !!result.fee, estimated: result.estimated || d.estimated || '' } }, item.id);
     if (changed) {
       const top = result.events[0];
-      this.w.notify('package', (delivered ? '📦 Entregue: ' : '📦 ') + (item.title || code), top.status + (top.local ? ' · ' + top.local : ''), saved.id, delivered ? 'opportunity' : 'info', 'package:' + saved.id + ':' + key(top));
+      this.w.notify('package', (delivered ? '📦 Entregue: ' : result.fee ? '💰 Taxa a pagar: ' : '📦 ') + (item.title || code), top.status + (top.local ? ' · ' + top.local : ''), saved.id, delivered ? 'opportunity' : result.fee ? 'warning' : 'info', 'package:' + saved.id + ':' + key(top));
     }
     return { item: saved, changed: !!changed, error: '' };
   }
@@ -112,4 +153,4 @@ class PackageTracker {
   }
   stop() { if (this.timer) clearInterval(this.timer); this.timer = null; }
 }
-module.exports = { BLOCKED_MSG, PackageTracker, detectCarrier, carrierLabel, officialUrl, normalizeCode, parseCorreios, CARRIERS };
+module.exports = { BLOCKED_MSG, PackageTracker, parseShip24, MILESTONE_PT, detectCarrier, carrierLabel, officialUrl, normalizeCode, parseCorreios, CARRIERS };
