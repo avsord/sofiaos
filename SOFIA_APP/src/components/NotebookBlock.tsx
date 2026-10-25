@@ -51,10 +51,10 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange}:{data
  const isInside=(id:string,ancestor:string):boolean=>{let cur=books.find(b=>b.id===id),guard=0;while(cur&&guard++<50){if(cur.id===ancestor)return true;cur=books.find(b=>b.id===parentOf(cur!));}return false;};
  const booksRef=useRef(books);booksRef.current=books;const openedRef=useRef(opened);openedRef.current=opened;
  const dragRef=useRef<DragItem|null>(null),[drag,setDrag]=useState<DragItem|null>(null),[hover,setHover]=useState<string|null>(null),hoverRef=useRef<string|null>(null);
- const ghost=useRef(new Animated.ValueXY({x:0,y:0})).current,rootRef=useRef<View>(null),rootPos=useRef({x:0,y:0}),targets=useRef<Record<string,View|null>>({}),rects=useRef<{id:string;x:number;y:number;w:number;h:number}[]>([]),moved=useRef(false),startPt=useRef({x:0,y:0});
+ const ghost=useRef(new Animated.ValueXY({x:0,y:0})).current,rootRef=useRef<View>(null),rootPos=useRef({x:0,y:0}),targets=useRef<Record<string,View|null>>({}),rects=useRef<{id:string;x:number;y:number;w:number;h:number}[]>([]),moved=useRef(false),captured=useRef(false),startPt=useRef({x:0,y:0});
  function hit(x:number,y:number){const d=dragRef.current;for(const r of rects.current){if(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h){if(d&&d.kind==='folder'&&(r.id===d.id))continue;return r.id;}}return null;}
  function startDrag(item:DragItem,e:{nativeEvent:{pageX:number;pageY:number}}){
-  dragRef.current=item;moved.current=false;startPt.current={x:e.nativeEvent.pageX,y:e.nativeEvent.pageY};hoverRef.current=null;setHover(null);setDrag(item);onInteractionChange?.(true);
+  dragRef.current=item;moved.current=false;captured.current=false;startPt.current={x:e.nativeEvent.pageX,y:e.nativeEvent.pageY};hoverRef.current=null;setHover(null);setDrag(item);onInteractionChange?.(true);
   rects.current=[];rootRef.current?.measureInWindow((x,y)=>{rootPos.current={x,y};ghost.setValue({x:startPt.current.x-x-60,y:startPt.current.y-y-22});});
  }
  // mede as pastas-alvo DEPOIS que a tela se redesenhou com o item levantado (nao por tempo fixo)
@@ -79,7 +79,7 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange}:{data
  const endRef=useRef(endDrag);endRef.current=endDrag;
  const pan=useMemo(()=>PanResponder.create({
   onStartShouldSetPanResponder:()=>false,
-  onMoveShouldSetPanResponderCapture:()=>!!dragRef.current,
+  onMoveShouldSetPanResponderCapture:()=>{if(dragRef.current){captured.current=true;return true;}return false;},
   onMoveShouldSetPanResponder:()=>!!dragRef.current,
   onPanResponderTerminationRequest:()=>false,
   onPanResponderMove:e=>{const {pageX,pageY}=e.nativeEvent;if(Math.abs(pageX-startPt.current.x)+Math.abs(pageY-startPt.current.y)>8)moved.current=true;
@@ -87,8 +87,9 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange}:{data
   onPanResponderRelease:()=>endRef.current(true),
   onPanResponderTerminate:()=>endRef.current(false),
  }),[]);// eslint-disable-line react-hooks/exhaustive-deps
- /** soltou sem arrastar: volta a ser o toque longo de antes (menu da pasta) */
- function pressOut(then?:()=>void){if(dragRef.current&&!moved.current){endDrag(false);then?.();}}
+ /** 0.3.229: soltou sem arrastar -> so cancela (sem menu). Quando o arrastar pega o dedo, o Android avisa o cartao que
+  * ele perdeu o toque; antes isso era lido como "soltou" e cancelava o arrastar abrindo Renomear. */
+ function pressOut(){if(dragRef.current&&!captured.current&&!moved.current)endDrag(false);}
  function update(fn:(next:Book[])=>void,group='notebooks'){const next=clone(books);fn(next);onChange({...data,mode:'notebooks',notebooks:next},group);}
  function addLeaf(id?:string){
   let target=id||openBook||books[0]?.id;const p={id:uid(),title:'',content:'',created_at:new Date().toISOString()};
@@ -106,7 +107,7 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange}:{data
  const folderTile=(b:Book)=>{const last=lastEdited(b),subs=foldersIn(b.id).length,over=hover===b.id,lifted=drag?.kind==='folder'&&drag.id===b.id;
   return <View key={b.id} ref={r=>{targets.current[b.id]=r;}} collapsable={false} style={{width:'48%'}}>
    <Pressable accessibilityRole="button" accessibilityLabel={'Abrir pasta '+(b.name||'Sem título')} accessibilityHint="Segure e arraste para mover" onPress={()=>{if(!dragRef.current)setOpenBook(b.id);}} delayLongPress={300}
-    onLongPress={e=>startDrag({kind:'folder',id:b.id,from:parentOf(b),label:(b.emoji||'📁')+' '+(b.name||'Sem título')},e)} onPressOut={()=>pressOut(()=>setFolderMenu(b.id))}
+    onLongPress={e=>startDrag({kind:'folder',id:b.id,from:parentOf(b),label:(b.emoji||'📁')+' '+(b.name||'Sem título')},e)} onPressOut={()=>pressOut()}
     style={({pressed})=>({minHeight:118,backgroundColor:over?c.accentSoft:c.surface,borderRadius:18,borderWidth:over?2:1,borderColor:over?c.accent:c.line,padding:14,gap:6,opacity:lifted?0.35:pressed?0.75:1})}>
     <Text style={{fontSize:28}}>{b.emoji||'📁'}</Text>
     <Text numberOfLines={1} style={{color:c.text,fontSize:15,fontWeight:'700'}}>{b.name||'Sem título'}</Text>
@@ -130,10 +131,11 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange}:{data
   <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
    {opened?<Pressable accessibilityRole="button" accessibilityLabel="Voltar às pastas" onPress={()=>setOpenBook(opened&&!opened.root?(parentOf(opened)||null):null)} hitSlop={10} style={{paddingRight:4}}><Text style={{color:c.accent,fontSize:26,fontWeight:'300'}}>‹</Text></Pressable>:null}
    <View style={{flex:1}}>
-    {opened?<Pressable onLongPress={()=>setFolderMenu(opened.id)}><Text numberOfLines={1} style={{fontSize:22,fontWeight:'800',color:c.text}}>{(opened.emoji||'📁')+' '+(opened.name||'Sem título')}</Text></Pressable>
+    {opened?<Text numberOfLines={1} style={{fontSize:22,fontWeight:'800',color:c.text}}>{(opened.emoji||'📁')+' '+(opened.name||'Sem título')}</Text>
      :<TextInput accessibilityLabel="Título do bloco de notas" value={title} onChangeText={setTitle} onEndEditing={commitTitle} onBlur={commitTitle} blurOnSubmit returnKeyType="done" style={{fontSize:22,fontWeight:'800',color:c.text,paddingVertical:0}}/>}
     <Text style={{color:c.muted,fontSize:12}}>{opened?opened.pages.length+(opened.pages.length===1?' nota':' notas'):foldersIn('').length+(foldersIn('').length===1?' pasta':' pastas')+' · '+total+(total===1?' nota':' notas')}</Text>
    </View>
+   {opened&&!opened.root?<Pressable accessibilityRole="button" accessibilityLabel="Opções da pasta" onPress={()=>setFolderMenu(opened.id)} hitSlop={8} style={{paddingHorizontal:10,paddingVertical:6,borderRadius:99,backgroundColor:c.input}}><Text style={{color:c.text,fontWeight:'800',fontSize:16,lineHeight:18}}>⋯</Text></Pressable>:null}
    {!opened||!opened.root?<Pressable accessibilityRole="button" accessibilityLabel={opened?'Nova pasta dentro desta':'Nova pasta'} onPress={()=>{setEditingBook(null);setNewName('');setCreate(true);}} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:99,backgroundColor:c.input}}><Text style={{color:c.text,fontWeight:'700',fontSize:12}}>＋ Pasta</Text></Pressable>:null}
    <Pressable accessibilityRole="button" accessibilityLabel="Nova nota" onPress={()=>addLeaf()} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:99,backgroundColor:c.accent}}><Text style={{color:c.onAccent,fontWeight:'700',fontSize:12}}>＋ Nota</Text></Pressable>
   </View>

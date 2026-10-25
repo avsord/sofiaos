@@ -34,7 +34,10 @@ async function drag(st,fromLabel,toTarget){
  for(const k of Object.keys(rects))delete rects[k];
  rects.root={x:0,y:0,w:400,h:900};
  if(toTarget)rects[toTarget]={x:200,y:300,w:150,h:100};
- await act(async()=>{st.press(fromLabel).props.onLongPress({nativeEvent:{pageX:20,pageY:20}});await sleep(90);});
+ const card=st.press(fromLabel);
+ await act(async()=>{card.props.onLongPress({nativeEvent:{pageX:20,pageY:20}});await sleep(90);});
+ // como no Android: o arrastar pega o dedo (captura) e o cartao recebe o aviso de que perdeu o toque
+ await act(async()=>{assert.equal(pan.onMoveShouldSetPanResponderCapture(),true);card.props.onPressOut&&card.props.onPressOut();});
  await act(async()=>{pan.onPanResponderMove({nativeEvent:{pageX:120,pageY:200}});pan.onPanResponderMove({nativeEvent:{pageX:260,pageY:340}});});
  await act(async()=>{pan.onPanResponderRelease();});
  st.sync();
@@ -68,12 +71,21 @@ test('pasta dentro de pasta: arrastar Viagens para Casa; abrir Casa mostra Viage
  await drag(st,'Abrir pasta Viagens','__up__');
  assert.equal(book(st,'C').parent,undefined,'voltou para a raiz');
 });
-test('soltar sem mover nao muda nada e abre o menu da pasta (como o toque longo de antes)',async()=>{
+test('0.3.229: segurar e soltar sem arrastar nao muda nada e NAO abre Renomear',async()=>{
  const st=setup(base());const before=JSON.stringify(st.data);
  await act(async()=>{st.press('Abrir pasta Casa').props.onLongPress({nativeEvent:{pageX:20,pageY:20}});await sleep(90);});
  await act(async()=>{st.press('Abrir pasta Casa').props.onPressOut();});
  assert.equal(JSON.stringify(st.data),before);
- assert.ok(st.tree.root.findAll(n=>n.type==='Sheet').length>0,'menu da pasta abriu');
+ assert.equal(st.tree.root.findAll(n=>n.type==='Sheet').length,0,'nenhum menu abriu');
+ assert.deepEqual(JSON.parse(JSON.stringify(locks)),[true,false],'arrastar terminou e a rolagem voltou');
+});
+test('0.3.229: as opcoes da pasta ficam no ⋯ do topo da pasta aberta (como no Notion)',async()=>{
+ const st=setup(base());
+ assert.ok(!st.has('Opções da pasta'),'na tela das pastas nao ha ⋯ de pasta');
+ act(()=>{st.press('Abrir pasta Casa').props.onPress();});
+ act(()=>{st.press('Opções da pasta').props.onPress();});
+ const sheet=st.tree.root.findAll(n=>n.type==='Sheet');assert.ok(sheet.length>0,'menu da pasta abriu pelo ⋯');
+ assert.ok(st.tree.root.findAll(n=>n.type==='Button'&&n.props.title==='Renomear').length>0,'Renomear esta no ⋯');
 });
 test('soltar fora de qualquer pasta nao muda nada',async()=>{
  const st=setup(base());const before=JSON.stringify(st.data);
