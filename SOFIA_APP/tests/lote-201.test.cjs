@@ -288,7 +288,7 @@ test('0.3.219: extrato do banco so fica guardado (nao mexe na conta); arrastar p
 test('0.3.220: seletores compactos (do tamanho do texto) - Lancamentos | Extrato do banco e A pagar | A receber',()=>{
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes("function Segmented<T extends string>")&&s.includes("alignSelf: 'flex-start'"),'nao estica na largura toda');
-  assert.ok(s.includes("<Segmented value={source} onChange={setSource} options={[{value: 'app' as const, label: 'Lançamentos'}, {value: 'import' as const, label: 'Extrato do banco'}]} />"));
+  assert.ok(s.includes("<Segmented value={source} onChange={setSource} options={[{value: 'app' as const, label: 'Lançamentos'}, {value: 'months' as const, label: 'Histórico'}]} />"));
   assert.ok(s.includes("<Segmented value={side} onChange={setSide} options={[{value: 'pagar' as const, label: 'A pagar'}, {value: 'receber' as const, label: 'A receber'}]} />"));
   assert.ok(!s.includes("borderRadius:14,padding:4}}>"),'o seletor esticado saiu');
 });

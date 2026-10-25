@@ -914,6 +914,7 @@ function BillEditor({api,tx,accountId,onClose,onSaved,onOptimistic,scope='series
     if(!value||value<=0){setError(flow==='income'?'Informe o valor a receber.':'Informe o valor a pagar.');return;}
     if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T12:00:00Z'))){setError('Selecione uma data de vencimento válida.');return;}
     if(!accountId){setError('Selecione uma conta financeira primeiro.');return;}
+    if(repeat!=='monthly'&&!(tx&&(tx.virtual||tx.seriesId||tx.recurrence==='monthly'))&&isClosedMonth(monthOf(date))){setError(CLOSED_MSG);return;}
     const reserveAmt=flow==='income'&&hasReserve?(parseMoney(toReserve)||0):0;
     const cardFor=flow==='expense'?payCard:'';
     if(reserveAmt>value){setError('O valor para o guardado passa do valor da receita.');return;}
@@ -1395,6 +1396,9 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
 /** Pagar/receber: lançamento real vira pago; repetição prevista vira um lançamento real daquele mês. */
 /** Espera a janela que esta fechando terminar de sair antes de abrir a proxima. */
 // 0.3.227: a janela que fecha segura o fundo ate a proxima aparecer (sem piscar) e a pausa caiu de 230 para 120 ms
+// 0.3.231: mes que ja passou esta FECHADO - nao entra nem muda mais nenhum lancamento; fica no Historico para consulta
+const CLOSED_MSG = 'Esse mês já fechou e está no Histórico só para consulta. Use uma data deste mês.';
+function isClosedMonth(m: string) { return !!m && m < monthOf(todayISO()); }
 function afterSheet(run: () => void) { markSheetHandoff(); setTimeout(run, 120); }
 // 0.3.175: atualizacoes locais imediatas (o servidor confirma por tras, sem a pessoa esperar).
 const FinanceLocal = React.createContext<{markPaid: (t: Tx) => void} | null>(null);
@@ -1576,21 +1580,25 @@ function BankStatements({d, api, reload, onImport}: {d: Data; api: SofiaApi; rel
 function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {d: Data; month: string; accountFilter: string; setAccountFilter: (v: string) => void; onTx: (t: Partial<Tx>) => void; api: SofiaApi; reload: () => Promise<void>}) {
   const c = useTheme(), [kind, setKind] = useState<'all' | TxKind>('all'), [cat, setCat] = useState(''), [status, setStatus] = useState<'all' | 'pending'>('all');
   // 0.3.153: o que voce registrou na Sofia e o extrato importado do banco ficam separados, com troca.
-  const [source, setSource] = useState<'app' | 'import'>('app');
+  const [source, setSource] = useState<'app' | 'months'>('app'), [openMonth, setOpenMonth] = useState('');
   const imported = (t: Tx) => { const id = String(t.entity?.data?.import_id || ''); return !!id && !id.startsWith('sofia-pendencia:'); };
   // 0.3.160: em vez de digitar uma busca, filtros prontos com as categorias que JA foram usadas nos
   // lancamentos (nada inventado), da mais usada para a menos usada. Sem nenhuma categoria, sem filtro.
-  const catPresets = useMemo(() => { const n = new Map<string, number>(); for (const t of d.txs) { if ((t.manualDue && !t.paid) || (source === 'import' ? !imported(t) : imported(t)) || (kind !== 'all' && t.kind !== kind)) continue; const name = String(t.category || '').trim(); if (name) n.set(name, (n.get(name) || 0) + 1); } return [...n.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR')).map(([name]) => name); }, [d.txs, source, kind]);
+  const catPresets = useMemo(() => { const n = new Map<string, number>(); for (const t of d.txs) { if ((t.manualDue && !t.paid) || imported(t) || (kind !== 'all' && t.kind !== kind)) continue; const name = String(t.category || '').trim(); if (name) n.set(name, (n.get(name) || 0) + 1); } return [...n.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR')).map(([name]) => name); }, [d.txs, source, kind]);
   const activeCat = catPresets.includes(cat) ? cat : '';
-  const hasAnyTx = d.txs.some(t => (!t.manualDue || t.paid) && (source === 'import' ? imported(t) : !imported(t)));
+  const hasAnyTx = d.txs.some(t => (!t.manualDue || t.paid) && !imported(t));
   // 0.3.226: salario e qualquer receita programada (inclusive as de Contas) aparecem no Historico desde o comeco do mes,
   // como "a receber", ate serem confirmadas; conta a pagar segue so em Contas
   const pendingIncome = (t: Tx) => t.kind === 'income' && !t.paid;
   // 0.3.232: conta avulsa aparece so aqui no extrato; as programadas ficam em Contas
   // 0.3.225: pago antes ou depois do vencimento -> fica no Historico no dia em que foi pago
   const histDate = (t: Tx) => t.paid && t.paidAt ? t.paidAt : t.date;
+  const monthItems = (m: string) => [...monthTxs(d.txs, m).filter(t => monthOf(histDate(t)) === m), ...d.txs.filter(t => !t.virtual && t.paid && t.paidAt && monthOf(t.paidAt) === m && monthOf(t.date) !== m)]
+    .filter(t => !t.virtual && (t.paid || t.kind !== 'expense' || !isScheduled(t)) && !imported(t));
+  const daysOf = (its: Tx[]) => { const g = new Map<string, Tx[]>(); for (const t of its) { const k = histDate(t); if (!g.has(k)) g.set(k, []); g.get(k)!.push(t); } return [...g.entries()].sort((a, b) => b[0].localeCompare(a[0])); };
+  const closedMonths = useMemo(() => { const cur = monthOf(todayISO()), ms = new Set<string>(); for (const t of d.txs) { if (t.virtual || imported(t)) continue; const m = monthOf(t.paid && t.paidAt ? t.paidAt : t.date); if (m && m < cur) ms.add(m); } return [...ms].sort().reverse(); }, [d]); // eslint-disable-line react-hooks/exhaustive-deps
   const histSource = [...monthTxs(d.txs, month).filter(t => monthOf(histDate(t)) === month), ...d.txs.filter(t => !t.virtual && t.paid && t.paidAt && monthOf(t.paidAt) === month && monthOf(t.date) !== month)];
-  const list = histSource.filter(t => (pendingIncome(t) || !t.manualDue || t.paid || !isScheduled(t)) && (source === 'import' ? imported(t) : !imported(t)) && (kind === 'all' || t.kind === kind) && (!accountFilter || t.accountId === accountFilter || t.toAccountId === accountFilter || t.cardId === accountFilter)
+  const list = histSource.filter(t => (pendingIncome(t) || !t.manualDue || t.paid || !isScheduled(t)) && !imported(t) && (kind === 'all' || t.kind === kind) && (!accountFilter || t.accountId === accountFilter || t.toAccountId === accountFilter || t.cardId === accountFilter)
     && (status === 'all' || (!t.paid && !t.cardId)) && (!activeCat || t.category === activeCat));
   const days = useMemo(() => { const m = new Map<string, Tx[]>(); for (const t of list) { const k = histDate(t); if (!m.has(k)) m.set(k, []); m.get(k)!.push(t); } return [...m.entries()].map(([k, v]) => [k, [...v].sort((a, b) => (b.time || '').localeCompare(a.time || ''))] as [string, Tx[]]); }, [list]);
   const sum = list.reduce((s, t) => s + (t.kind === 'income' ? t.amount : t.kind === 'expense' ? -t.amount : 0), 0);
@@ -1602,12 +1610,24 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 2}}>
         <Text style={{flex: 1, fontSize: 18, fontWeight: '800', color: c.text}}>Histórico</Text>
         {hasAnyTx ? <IconButton name="filter" label={tools ? 'Esconder filtros' : 'Filtrar'} onPress={() => setTools(v => !v)} /> : null}
-        <IconButton name="plus" label="Importar extrato (OFX ou CSV)" onPress={() => setImporting(true)} />
       </View>
-      <Segmented value={source} onChange={setSource} options={[{value: 'app' as const, label: 'Lançamentos'}, {value: 'import' as const, label: 'Extrato do banco'}]} />
-      {source === 'import' ? <BankStatements d={d} api={api} reload={reload} onImport={() => setImporting(true)} /> : null}
-      {importing ? <ImportSheet api={api} d={d} onClose={() => setImporting(false)} onDone={async () => { setImporting(false); setSource('import'); await reload(); }} /> : null}
-      {source === 'import' ? null : hasAnyTx && (tools || activeCat || kind !== 'all' || status !== 'all') ? <View style={{gap: 10}}>
+      <Segmented value={source} onChange={setSource} options={[{value: 'app' as const, label: 'Lançamentos'}, {value: 'months' as const, label: 'Histórico'}]} />
+      {/* 0.3.231: Historico = meses que ja fecharam, pelo nome; abrir mostra aquele mes (so consulta) */}
+      {source === 'months' ? (closedMonths.length ? closedMonths.map(m => { const its = monthItems(m), res = its.reduce((t, x) => t + (x.kind === 'income' ? x.amount : x.kind === 'expense' ? -x.amount : 0), 0), open = openMonth === m;
+        return <Card_ key={m} style={{padding: 0, gap: 0}}>
+          <Pressable accessibilityRole="button" accessibilityLabel={(open ? 'Fechar ' : 'Abrir ') + monthLabel(m)} onPress={() => setOpenMonth(open ? '' : m)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14}}>
+            <Text style={{fontSize: 16}}>🔒</Text>
+            <View style={{flex: 1, gap: 2}}><Text style={{color: c.text, fontWeight: '800', fontSize: 15}}>{monthLabel(m)}</Text>
+              <Text style={{color: c.muted, fontSize: 12}}>{its.length} {its.length === 1 ? 'lançamento' : 'lançamentos'} · resultado {money(res)}</Text></View>
+            <Chevron open={open} />
+          </Pressable>
+          {open ? <View style={{paddingHorizontal: 10, paddingBottom: 10, gap: 8}}>{daysOf(its).map(([date, items]) => <View key={date} style={{gap: 6}}>
+            <Text style={{color: c.muted, fontSize: 12, fontWeight: '700', paddingLeft: 4}}>{weekday(date)}</Text>
+            {items.map((t, i) => <TxRow key={t.id} t={t} d={d} first={i === 0} onPress={() => appAlert('Mês fechado', CLOSED_MSG)} api={api} reload={reload} />)}
+          </View>)}</View> : null}
+        </Card_>; }) : <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>Nenhum mês fechado ainda. Quando o mês virar, ele aparece aqui para consulta.</Text>) : null}
+      {importing ? <ImportSheet api={api} d={d} onClose={() => setImporting(false)} onDone={async () => { setImporting(false); await reload(); }} /> : null}
+      {source === 'months' ? null : hasAnyTx && (tools || activeCat || kind !== 'all' || status !== 'all') ? <View style={{gap: 10}}>
       {catPresets.length ? <Chips scroll value={activeCat} onChange={setCat} options={[{value: '', label: 'Todas as categorias'}, ...catPresets.map(name => ({value: name, label: name}))]} /> : null}
       <Chips scroll value={kind} onChange={setKind} options={[{value: 'all' as const, label: 'Todos'}, {value: 'expense' as const, label: 'Despesas'}, {value: 'income' as const, label: 'Receitas'}, {value: 'transfer' as const, label: 'Transferências'}, {value: 'card_payment' as const, label: 'Faturas'}]} />
       <View style={{flexDirection: 'row', gap: 8, flexWrap: 'wrap', alignItems: 'center'}}>
@@ -1615,9 +1635,10 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
         {filterName ? <Pressable onPress={() => setAccountFilter('')} style={{paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99, backgroundColor: c.accentSoft}}><Text style={{color: c.accent, fontWeight: '600', fontSize: 12}}>{filterName} ✕</Text></Pressable> : null}
       </View>
       </View> : null}
-      {source === 'import' ? null : <>
+      {source === 'months' ? null : <>
+      {isClosedMonth(month) ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 12, backgroundColor: c.input}}><Text>🔒</Text><Text style={{flex: 1, color: c.text, fontSize: 13}}>{monthLabel(month)} já fechou — só consulta. Nada entra nem muda neste mês.</Text></View> : null}
       {list.length ? <Text style={{color: c.muted, fontSize: 12}}>{list.length} movimentações no mês · resultado {money(sum)}</Text> : null}
-      {!days.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>{activeCat || kind !== 'all' || status !== 'all' ? 'Nenhum lançamento com esses filtros.' : 'Nenhum lançamento neste mês. Toque em ＋ para registrar.'}</Text> : days.map(([date, items]) => (
+      {!days.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>{activeCat || kind !== 'all' || status !== 'all' ? 'Nenhum lançamento com esses filtros.' : (isClosedMonth(month) ? 'Nenhum lançamento neste mês.' : 'Nenhum lançamento neste mês. Toque em ＋ para registrar.')}</Text> : days.map(([date, items]) => (
         <View key={date} style={{gap: 8}}>
           <Text style={{color: c.muted, fontSize: 12, fontWeight: '700', paddingLeft: 4}}>{weekday(date)}</Text>
           <Card_ style={{padding: 10, gap: 0}}>{items.map((t, i) => <TxRow key={t.id} t={t} d={d} first={i === 0} onPress={() => onTx(t)} api={api} reload={reload} />)}</Card_>
@@ -1675,6 +1696,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
   const plan = repeat === 'installments' && value ? installmentPlan(value, parts, date) : null;
 
   async function save() {
+    if (isClosedMonth(monthOf(date)) || (tx.entity && !tx.virtual && tx.date && isClosedMonth(monthOf(tx.date)))) { setError(CLOSED_MSG); return; }
     if (!value || value <= 0) { setError('Digite o valor.'); return; }
     if (kind !== 'transfer' && !category) { setError('Escolha a categoria.'); return; }
     if (kind === 'transfer' && (!to || to === source)) { setError('Escolha a conta de destino.'); return; }
@@ -1736,6 +1758,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
     const series = tx.seriesId;
     const others = series ? d.txs.filter(x => x.seriesId === series && x.id !== tx.id) : [];
     const del = async (all: boolean) => {
+      if (tx.date && !tx.virtual && isClosedMonth(monthOf(tx.date))) { setError(CLOSED_MSG); return; }
       // 0.3.226: apagar some da tela na hora (item, total, Historico); o servidor apaga por tras
       if (onOptimisticRemove && tx.id && tx.entity) { const id = tx.entity.id, rest = all ? others.filter(o => o.entity && !o.paid).map(o => o.entity!.id) : [];
         onOptimisticRemove(tx.id); for (const o of all ? others.filter(o => o.entity && !o.paid) : []) onOptimisticRemove(o.id); onClose();
@@ -2285,7 +2308,7 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountI
             <Pressable accessibilityRole="button" onPress={() => onTx(t)} style={{paddingVertical: 6}}><Text style={{color: c.accent, fontWeight: '700'}}>Mais opções</Text></Pressable>
             <Pressable accessibilityRole="button" onPress={() => { Keyboard.dismiss(); setRowEdit(null); setRowError(''); }} style={{paddingVertical: 6}}><Text style={{color: c.muted}}>Cancelar</Text></Pressable>
           </View>
-        </View> : <Pressable key={t.id} accessibilityRole="button" accessibilityLabel={'Editar ' + t.desc} onPress={() => { if (onPatch && t.entity) { setRowEdit(t.id); setRowError(''); setRowAmount(finishMoneyInput(String(t.amount).replace('.', ','))); } else onTx(t); }} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderColor: c.line}}>
+        </View> : <Pressable key={t.id} accessibilityRole="button" accessibilityLabel={'Editar ' + t.desc} onPress={() => { if (isClosedMonth(monthOf(t.date))) { appAlert('Mês fechado', CLOSED_MSG); return; } if (onPatch && t.entity) { setRowEdit(t.id); setRowError(''); setRowAmount(finishMoneyInput(String(t.amount).replace('.', ','))); } else onTx(t); }} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderColor: c.line}}>
           <Text style={{fontSize: 18}}>{categoryOf(t.category).icon}</Text>
           <View style={{flex: 1, gap: 2}}>
             <Text numberOfLines={1} style={{color: c.text, fontWeight: '600'}}>{t.desc}</Text>
