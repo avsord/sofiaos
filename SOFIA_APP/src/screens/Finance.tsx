@@ -15,7 +15,7 @@ import type {Entity} from '../lib/types';
 import {errorText} from '../lib/chat-model';
 import {useRenderCost} from '../lib/render-cost';
 import {MotionModal} from '../components/MotionModal';
-import {Sheet} from '../components/Sheet';
+import {Sheet, markSheetHandoff} from '../components/Sheet';
 import {InternalBackGesture} from '../components/InternalBackGesture';
 import {DateTimeField} from '../components/DateTimeField';
 import {Icon} from '../components/Icon';
@@ -181,6 +181,7 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
   const patchTx = useCallback((id: string, ch: Partial<Tx>) => setData(prev => prev ? {...prev, txs: prev.txs.map(x => x.id === id ? {...x, ...ch} : x)} : prev), []);
   const removeTx = useCallback((id: string) => setData(prev => prev ? {...prev, txs: prev.txs.filter(x => x.id !== id)} : prev), []);
   const putTx = useCallback((t: Tx, replaceId: string | null) => setData(prev => prev ? {...prev, txs: replaceId ? prev.txs.map(x => x.id === replaceId ? t : x) : [...prev.txs, t]} : prev), []);
+  useEffect(() => { void preloadFolds(); }, []);
   const markPaid = useCallback((t: Tx) => setData(prev => {
     if (!prev) return prev;
     if (t.virtual) return {...prev, txs: [...prev.txs, {...t, id: 'local:' + t.id, virtual: false, paid: true, recurrence: 'none'} as Tx]};
@@ -1392,7 +1393,8 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
 }
 /** Pagar/receber: lançamento real vira pago; repetição prevista vira um lançamento real daquele mês. */
 /** Espera a janela que esta fechando terminar de sair antes de abrir a proxima. */
-function afterSheet(run: () => void) { setTimeout(run, 230); }
+// 0.3.227: a janela que fecha segura o fundo ate a proxima aparecer (sem piscar) e a pausa caiu de 230 para 120 ms
+function afterSheet(run: () => void) { markSheetHandoff(); setTimeout(run, 120); }
 // 0.3.175: atualizacoes locais imediatas (o servidor confirma por tras, sem a pessoa esperar).
 const FinanceLocal = React.createContext<{markPaid: (t: Tx) => void} | null>(null);
 /** 0.3.208: grava sobre a versao ATUAL do registro: se ele mudou desde que a tela carregou (chat, outra tela),
@@ -2033,14 +2035,18 @@ export function FinanceGoalHome({api, onOpen}: {api: SofiaApi; onOpen?: () => vo
 /** 0.3.208: secao dos Relatorios que abre e fecha; lembra como a pessoa deixou da ultima vez (aberta por padrao). */
 const FOLD_KEY = 'sofia_fin_folds_v1';
 let foldMemory: Record<string, boolean> | null = null;
+// 0.3.227: as secoes dos Relatorios so desenham depois de saber se estavam abertas ou fechadas (antes abriam e,
+// um instante depois, fechavam - a Meta piscava ao aparecer). A escolha ja e lida ao abrir Financas.
+let foldLoading: Promise<void> | null = null;
+function preloadFolds(): Promise<void> { if (foldMemory) return Promise.resolve(); if (!foldLoading) foldLoading = SecureStore.getItemAsync(FOLD_KEY).then(v => { try { foldMemory = JSON.parse(v || '{}') || {}; } catch { foldMemory = {}; } }).catch(() => { foldMemory = {}; }); return foldLoading; }
 function Fold({id, title, children}: {id: string; title: string; children: React.ReactNode}) {
-  const c = useTheme(), [open, setOpen] = useState<boolean>(foldMemory?.[id] ?? true);
-  useEffect(() => { if (foldMemory) return; SecureStore.getItemAsync(FOLD_KEY).then(v => { try { foldMemory = JSON.parse(v || '{}') || {}; } catch { foldMemory = {}; } if (foldMemory && id in foldMemory) setOpen(!!foldMemory[id]); }).catch(() => { foldMemory = {}; }); }, [id]);
-  const toggle = () => { const next = !open; setOpen(next); foldMemory = {...(foldMemory || {}), [id]: next}; void SecureStore.setItemAsync(FOLD_KEY, JSON.stringify(foldMemory)).catch(() => {}); };
+  const c = useTheme(), [open, setOpen] = useState<boolean | null>(foldMemory ? (foldMemory[id] ?? true) : null);
+  useEffect(() => { if (open !== null) return; let alive = true; void preloadFolds().then(() => { if (alive) setOpen(foldMemory?.[id] ?? true); }); return () => { alive = false; }; }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const toggle = () => { const next = !(open ?? true); setOpen(next); foldMemory = {...(foldMemory || {}), [id]: next}; void SecureStore.setItemAsync(FOLD_KEY, JSON.stringify(foldMemory)).catch(() => {}); };
   return <Card_>
-    <Pressable accessibilityRole="button" accessibilityState={{expanded: open}} accessibilityLabel={(open ? 'Fechar ' : 'Abrir ') + title} onPress={toggle} style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+    <Pressable accessibilityRole="button" accessibilityState={{expanded: !!open}} accessibilityLabel={(open ? 'Fechar ' : 'Abrir ') + title} onPress={toggle} style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
       <Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 16}}>{title}</Text>
-      <Chevron open={open} />
+      <Chevron open={!!open} />
     </Pressable>
     {open ? children : null}
   </Card_>;

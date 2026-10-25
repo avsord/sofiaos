@@ -281,7 +281,7 @@ test('0.3.219: extrato do banco so fica guardado (nao mexe na conta); arrastar p
   const b=s.slice(s.indexOf('function BankStatements('),s.indexOf('\nfunction ',s.indexOf('function BankStatements(')+20));
   assert.ok(!b.includes('Lançar</Text>')&&!b.includes('Acertar Saldo</Text>'),'o extrato nao lanca nem acerta o saldo');
   assert.ok(b.includes('<SwipeToDelete key={st.id}')&&s.includes('function SwipeToDelete(')&&a.includes('financeStatementDelete(id: string)'),'arrastar para apagar');
-  assert.ok(s.includes('function Chevron(')&&b.includes('<Chevron open={open === st.id} />')&&s.includes('<Chevron open={open} />'),'mesma setinha no extrato e nos Relatorios');
+  assert.ok(s.includes('function Chevron(')&&b.includes('<Chevron open={open === st.id} />')&&s.includes('<Chevron open={!!open} />'),'mesma setinha no extrato e nos Relatorios');
   assert.ok(!s.includes('Desfazer importação de extrato</Text>'),'saiu da engrenagem');
 });
 

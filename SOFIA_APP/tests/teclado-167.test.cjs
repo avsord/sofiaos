@@ -37,7 +37,7 @@ test('0.3.191: calendario dentro do formulario (sem janela por cima) e uma janel
   assert.ok(!dt.includes("from './Sheet'")&&!dt.includes('<Sheet'),'sem segunda janela');
   assert.ok(dt.includes('{open?<View style={{marginTop:8,backgroundColor:c.input'),'abre logo abaixo do campo');
   assert.ok(dt.includes('if(dateOnly)commit(next);'),'so data: tocar no dia ja escolhe');
-  assert.ok(fin.includes('function afterSheet(run: () => void) { setTimeout(run, 230); }'));
+  assert.ok(fin.includes('function afterSheet(run: () => void) { markSheetHandoff(); setTimeout(run, 120); }'));
   assert.ok(fin.includes("setNewMenu(false); setBillScope('series'); setBillFlow(flow); afterSheet(() => setBillEditor('new'));"));
   assert.ok(fin.includes("setBreakdown(null); afterSheet(() => onTx(t));"));
 });

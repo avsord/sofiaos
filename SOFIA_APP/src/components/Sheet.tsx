@@ -3,6 +3,12 @@ import React,{useEffect,useRef,useState} from 'react';
 import {Animated,Keyboard,KeyboardAvoidingView,LayoutAnimation,Modal,Platform,Pressable,StyleSheet,useWindowDimensions,View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTheme} from '../lib/theme';
+// 0.3.227: troca de janela sem piscar. Quando uma janela fecha para abrir outra (menu -> "Editar aportes"), a de
+// baixo segura o fundo escuro ate a nova aparecer por cima, e a nova entra com o fundo ja escuro. Antes o fundo
+// clareava e escurecia de novo entre as duas (o "pisca") e havia uma pausa de 230 ms.
+let handoffUntil=0;const holders=new Set<()=>void>();
+export function markSheetHandoff(ms=800){handoffUntil=Date.now()+ms;}
+function releaseHolders(){const fns=[...holders];holders.clear();fns.forEach(f=>f());}
 export function Sheet({visible,onClose,children,label='Fechar painel'}:{visible:boolean;onClose:()=>void;children:React.ReactNode;label?:string}){
  const c=useTheme(),insets=useSafeAreaInsets(),{height:windowHeight}=useWindowDimensions(),[shown,setShown]=useState(false),[height,setHeight]=useState(0);
  // 0.3.167: no Android o teclado cobria os campos das folhas (o Modal translucido nao redimensiona
@@ -21,10 +27,21 @@ export function Sheet({visible,onClose,children,label='Fechar painel'}:{visible:
   return()=>{show.remove();hide.remove();};
  },[]);
  const {mounted,progress,reduced}=useMotionPresence(visible,{enterReady:shown&&height>0,enterDuration:220,exitDuration:180}),last=useRef(children);
+ const [hold,setHold]=useState(false),[darkFromStart,setDarkFromStart]=useState(false),wasVisible=useRef(visible);
+ useEffect(()=>{
+  const was=wasVisible.current;wasVisible.current=visible;
+  if(was&&!visible&&Date.now()<handoffUntil){
+   setHold(true);const release=()=>setHold(false);holders.add(release);
+   const safety=setTimeout(()=>{holders.delete(release);setHold(false);},500);
+   return()=>clearTimeout(safety);
+  }
+  if(!was&&visible&&Date.now()<handoffUntil){setDarkFromStart(true);return;}
+  if(!visible)setDarkFromStart(false);
+ },[visible]);
  useEffect(()=>{if(!mounted){setShown(false);setHeight(0);}},[mounted]);
  if(visible)last.current=children;
- return <Modal visible={mounted} onShow={()=>setShown(true)} transparent statusBarTranslucent navigationBarTranslucent animationType="none" onRequestClose={()=>{if(visible)onClose();}}><KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
- <Animated.View testID="sheet-backdrop" style={[StyleSheet.absoluteFill,{backgroundColor:'#00000066',opacity:progress}]}><Pressable accessibilityLabel={label} style={{flex:1}} onPress={onClose}/></Animated.View>
+ return <Modal visible={mounted||hold} onShow={()=>{setShown(true);if(darkFromStart){handoffUntil=0;setTimeout(releaseHolders,40);}}} transparent statusBarTranslucent navigationBarTranslucent animationType="none" onRequestClose={()=>{if(visible)onClose();}}><KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
+ <Animated.View testID="sheet-backdrop" style={[StyleSheet.absoluteFill,{backgroundColor:'#00000066',opacity:hold||darkFromStart?1:progress}]}><Pressable accessibilityLabel={label} style={{flex:1}} onPress={onClose}/></Animated.View>
  <View ref={rootRef} onLayout={e=>{setRootH(e.nativeEvent.layout.height);if(kbTop.current)measure();}} pointerEvents={visible?'box-none':'none'} style={{flex:1,justifyContent:'flex-end',paddingTop:insets.top+16}}><Animated.View testID="sheet-panel" onLayout={event=>setHeight(event.nativeEvent.layout.height)} accessibilityViewIsModal style={{maxHeight:Math.max(220,(rootH||windowHeight)-keyboard-insets.top-24),backgroundColor:c.surface,borderTopLeftRadius:24,borderTopRightRadius:24,padding:20,marginBottom:keyboard,paddingBottom:kbOpen?16:Math.max(28,insets.bottom+24),opacity:progress,transform:[{translateY:progress.interpolate({inputRange:[0,1],outputRange:[reduced?0:height+insets.bottom,0]})}]}}>{visible?children:last.current}</Animated.View></View>
  </KeyboardAvoidingView></Modal>;
 }
