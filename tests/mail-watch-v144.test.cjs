@@ -124,3 +124,32 @@ test('0.3.146: mensagem ja registrada por uma regra ganha o nome da outra regra 
  await mw.checkAll(undefined,7);
  const hits=w.list({kind:'mail_hit'});assert.equal(hits.length,1);assert.match(hits[0].data.rule_names,/Banco/);assert.match(hits[0].data.rule_names,/Faturas/);
 });
+
+// 0.3.241: a verificacao do Gmail levava ~18 s (80 mensagens, uma depois da outra). Agora em paralelo, na mesma ordem.
+test('Gmail: busca as mensagens em paralelo (no maximo 6 ao mesmo tempo) e o resultado e igual ao de antes',async t=>{
+ const {core,config}=fixture(t);const w=core.workspace;
+ const N=80,msgs=Array.from({length:N},(_,i)=>({id:'m'+i,internalDate:String(Date.parse('2026-10-12T10:00:00Z')+i*60000),snippet:'texto '+i,payload:{headers:[{name:'From',value:(i%10===0?'"Ana" <ana@empresa.com>':'loja'+i+'@x.com')},{name:'Subject',value:'Assunto '+i}]}}));
+ let inflight=0,peak=0;const order=[];
+ const google={link:()=>({refresh:'x',scopes:'https://www.googleapis.com/auth/gmail.readonly'}),call:async(m,url)=>{const u=new URL(url);
+  if(u.pathname.endsWith('/messages'))return {messages:msgs.map(x=>({id:x.id}))};
+  inflight++;peak=Math.max(peak,inflight);order.push(u.pathname.split('/').pop());await new Promise(r=>setTimeout(r,15));inflight--;
+  return msgs.find(x=>u.pathname.endsWith('/'+x.id));}};
+ const mw=new MailWatcher(w,config,{client:()=>{throw Error('não deve usar IMAP');}});mw.google=google;
+ w.save({kind:'mail_account',title:'Gmail',area:'Pessoal',data:{provider:'gmail_google',address:'pedro@gmail.com'}});
+ w.save({kind:'mail_rule',title:'Ana',area:'Pessoal',data:{field:'from',contains:'ana@empresa.com',notify:true}});
+ const t0=Date.now();const r=await mw.checkAll(undefined,14);const ms=Date.now()-t0;
+ assert.equal(r.errors.length,0);assert.equal(r.scanned,N);assert.equal(r.hits,8,'as 8 mensagens da Ana (0,10,...,70)');
+ assert.ok(peak>1&&peak<=6,'em paralelo, mas nunca mais de 6 de uma vez (cota do Gmail): pico '+peak);
+ assert.ok(ms<N*15/2,'bem abaixo do tempo em sequencia ('+N*15+' ms): levou '+ms+' ms');
+ assert.equal(w.list({kind:'mail_hit'}).length,8);
+});
+test('Gmail: se uma mensagem falha, a conta inteira falha com o motivo (como antes), sem registrar meia leitura',async t=>{
+ const {core,config}=fixture(t);const w=core.workspace;
+ const google={link:()=>({refresh:'x',scopes:'https://www.googleapis.com/auth/gmail.readonly'}),call:async(m,url)=>{const u=new URL(url);
+  if(u.pathname.endsWith('/messages'))return {messages:[{id:'a'},{id:'b'},{id:'c'}]};
+  if(u.pathname.endsWith('/b'))throw new Error('Gmail 500');return {id:u.pathname.split('/').pop(),internalDate:String(Date.now()),snippet:'x',payload:{headers:[{name:'From',value:'ana@empresa.com'},{name:'Subject',value:'x'}]}};}};
+ const mw=new MailWatcher(w,config,{client:()=>{throw Error('x');}});mw.google=google;
+ w.save({kind:'mail_account',title:'Gmail',area:'Pessoal',data:{provider:'gmail_google',address:'pedro@gmail.com'}});
+ w.save({kind:'mail_rule',title:'Ana',area:'Pessoal',data:{field:'from',contains:'ana@empresa.com',notify:true}});
+ const r=await mw.checkAll();assert.equal(r.errors.length,1);assert.match(r.errors[0].error,/Gmail 500/);assert.equal(w.list({kind:'mail_hit'}).length,0);
+});

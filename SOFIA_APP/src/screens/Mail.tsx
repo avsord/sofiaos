@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useState} from 'react';
 import {ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Platform, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTheme} from '../lib/theme';
+import {rescanAfterRule, type RuleAction} from '../lib/mail-rules';
 import type {SofiaApi} from '../lib/api';
 import type {Entity} from '../lib/types';
 import {errorText} from '../lib/chat-model';
@@ -195,7 +196,7 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
           </ScrollView>
         )}
         {addAccount ? <AccountSheet groups={groups} api={api} account={addAccount === 'new' ? null : addAccount} onClose={() => setAddAccount(null)} onDone={() => { setAddAccount(null); void load(); }} /> : null}
-        {ruleSheet ? <RuleSheet api={api} rule={ruleSheet} accounts={accounts || []} onClose={() => setRuleSheet(null)} onDone={() => { setRuleSheet(null); void load(); void check(14); }} /> : null}
+        {ruleSheet ? <RuleSheet api={api} rule={ruleSheet} accounts={accounts || []} onClose={() => setRuleSheet(null)} onDone={(action) => { setRuleSheet(null); void load(); if (rescanAfterRule(action)) void check(14); }} /> : null}
         {picker && accounts ? <SelectionSheet api={api} accounts={accounts} selection={selection} onSelect={v => { setSelection(v); setPicker(false); }} onClose={() => setPicker(false)} onChanged={() => void load()} /> : null}
         <Sheet visible={!!open} onClose={() => setOpen(null)} label="Fechar e-mail">
           {open ? (
@@ -294,7 +295,7 @@ function AccountSheet({api, account, onClose, onDone, groups = []}: {api: SofiaA
   );
 }
 
-function RuleSheet({api, rule, accounts, onClose, onDone}: {api: SofiaApi; rule: Entity | Partial<Entity>; accounts: Entity[]; onClose: () => void; onDone: () => void}) {
+function RuleSheet({api, rule, accounts, onClose, onDone}: {api: SofiaApi; rule: Entity | Partial<Entity>; accounts: Entity[]; onClose: () => void; onDone: (action: RuleAction) => void}) {
   const c = useTheme(), existing = (rule as Entity).id ? rule as Entity : null, d = rule.data || {};
   const [deleting, setDeleting] = useState(false);
   const [title, setTitle] = useState(rule.title || ''), [field, setField] = useState(String(d.field || 'from')), [contains, setContains] = useState(String(d.contains || ''));
@@ -306,7 +307,7 @@ function RuleSheet({api, rule, accounts, onClose, onDone}: {api: SofiaApi; rule:
     setBusy(true); setError('');
     const data = {field, contains: contains.trim(), account_id: accountId, notify, important, emoji: important ? emoji : ''};
     const name = title.trim() || contains.split(',')[0].trim().slice(0, 60);
-    try { if (existing) await api.saveEntity({...existing, title: name, data: {...existing.data, ...data}}); else await api.saveEntity({kind: 'mail_rule', title: name, content: '', area: 'Pessoal', state: 'active', privacy: 'private', tags: [], data}); onDone(); }
+    try { if (existing) await api.saveEntity({...existing, title: name, data: {...existing.data, ...data}}); else await api.saveEntity({kind: 'mail_rule', title: name, content: '', area: 'Pessoal', state: 'active', privacy: 'private', tags: [], data}); onDone('save'); }
     catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
   return (
@@ -329,9 +330,9 @@ function RuleSheet({api, rule, accounts, onClose, onDone}: {api: SofiaApi; rule:
         <Button title="Salvar regra" loading={busy} onPress={() => void save()} />
         {existing ? (
           <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
-            <Pressable onPress={async () => { await api.saveEntity({...existing, state: existing.state === 'paused' ? 'active' : 'paused'}).catch(() => {}); onDone(); }} style={{padding: 10}}><Text style={{color: c.text}}>{existing.state === 'paused' ? 'Reativar' : 'Pausar'}</Text></Pressable>
+            <Pressable onPress={async () => { const resuming = existing.state === 'paused'; await api.saveEntity({...existing, state: resuming ? 'active' : 'paused'}).catch(() => {}); onDone(resuming ? 'resume' : 'pause'); }} style={{padding: 10}}><Text style={{color: c.text}}>{existing.state === 'paused' ? 'Reativar' : 'Pausar'}</Text></Pressable>
             {/* 0.3.235: mostra que esta apagando e, se falhar, o motivo (antes o erro era engolido e parecia carregar para sempre) */}
-            <Pressable disabled={deleting} onPress={async () => { setDeleting(true); setError(''); try { await api.deleteEntity(existing.id); onDone(); } catch (e) { setError(errorText(e)); } finally { setDeleting(false); } }} style={{padding: 10}}><Text style={{color: c.danger}}>{deleting ? 'Apagando…' : 'Apagar regra'}</Text></Pressable>
+            <Pressable disabled={deleting} onPress={async () => { setDeleting(true); setError(''); try { await api.deleteEntity(existing.id); onDone('delete'); } catch (e) { setError(errorText(e)); } finally { setDeleting(false); } }} style={{padding: 10}}><Text style={{color: c.danger}}>{deleting ? 'Apagando…' : 'Apagar regra'}</Text></Pressable>
           </View>
         ) : null}
       </ScrollView>

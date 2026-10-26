@@ -14,7 +14,7 @@ test('e-mails: grupos e selecao pelo titulo; Conta Google nao aparece como "falt
   assert.ok(m.includes('export function selectionAccounts(sel: MailSelection, accounts: Entity[])'));
   assert.ok(m.includes("a.data.provider === 'gmail_google' ? 'pela Conta Google'"));
   assert.ok(m.includes('title="Abrir no Gmail"'));
-  assert.ok(m.includes("onDone={() => { setRuleSheet(null); void load(); void check(14); }}"),'regra nova reavalia 14 dias');
+  assert.ok(m.includes("onDone={(action) => { setRuleSheet(null); void load(); if (rescanAfterRule(action)) void check(14); }}"),'regra nova reavalia 14 dias');
   assert.ok(m.includes("if (r.errors.length) { setError('Conta salva como Conta Google, mas o teste falhou: '"));
 });
 test('retomada: erro de demora so do chat fala em "mensagem"; leitura interrompida repete; teclado e abas na volta',()=>{

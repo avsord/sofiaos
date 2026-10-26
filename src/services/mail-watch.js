@@ -18,6 +18,8 @@ const PROVIDERS = {
 };
 const FIRST_LOOKBACK_DAYS = 2, MAX_PER_CHECK = 80, SNIPPET = 240;
 
+/** Quantas mensagens do Gmail buscar ao mesmo tempo (a cota do Gmail aguenta com folga; 6 em paralelo ~ 130 de 250 unidades/s). */
+const GMAIL_PARALLEL = 6;
 function norm(t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
 function clean(t, max) { return String(t || '').replace(/\s+/g, ' ').trim().slice(0, max); }
 
@@ -155,8 +157,12 @@ class MailWatcher {
     const q = rescanDays ? 'in:inbox newer_than:' + Math.min(60, Math.max(1, Math.floor(rescanDays))) + 'd' : since ? 'in:inbox after:' + Math.floor(since / 1000) : 'in:inbox newer_than:2d';
     const list = await g.call('GET', API + '?maxResults=80&q=' + encodeURIComponent(q));
     let scanned = 0, hits = 0, newest = since;
-    for (const ref of (list.messages || []).slice(0, 80)) {
-      const m = await g.call('GET', API + '/' + encodeURIComponent(ref.id) + '?format=metadata&metadataHeaders=From&metadataHeaders=Subject');
+    // 0.3.241: as mensagens eram buscadas UMA POR UMA (ate 80 x ~0,23 s = ~18 s por verificacao). Agora em grupos de
+    // GMAIL_PARALLEL em paralelo; o resultado e processado na MESMA ordem de antes, e qualquer falha continua abortando a conta.
+    const refs = (list.messages || []).slice(0, 80), fetched = [];
+    for (let i = 0; i < refs.length; i += GMAIL_PARALLEL)
+      fetched.push(...await Promise.all(refs.slice(i, i + GMAIL_PARALLEL).map(ref => g.call('GET', API + '/' + encodeURIComponent(ref.id) + '?format=metadata&metadataHeaders=From&metadataHeaders=Subject'))));
+    for (const m of fetched) {
       const at = Number(m.internalDate) || Date.now();
       if (since && at <= since) continue;
       scanned++; newest = Math.max(newest, at);
