@@ -3,7 +3,7 @@ import type {GoalNumbers} from '../components/GoalProgress';
 import {GOAL_WIDGET_PATH} from './startup-snapshot';
 /** 0.3.240: guarda o ultimo estado da Meta da Inicio para o PRIMEIRO quadro ja vir pronto, sem atrasar a abertura.
  * Mesmo padrao do widget do Price Tracker: leitura sincrona no estado inicial, gravacao so quando algo mudou. */
-type Store = {cached<T>(path: string): T | undefined | null; rememberLocal(path: string, value: unknown): void};
+type Store = {cached<T>(path: string): T | undefined | null; rememberLocal(path: string, value: unknown): void; persistLaunchProjection?: () => Promise<void>};
 export type GoalWidgetCache = {v: 1; goal: Omit<GoalNumbers, 'today'> | null; hidden: boolean};
 const num = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
 export function validStoredGoal(x: any): Omit<GoalNumbers, 'today'> | null {
@@ -36,6 +36,9 @@ export function writeGoalWidget(api: Store, patch: {goal?: GoalNumbers | null; h
   if ('hidden' in patch) next.hidden = patch.hidden === true;
   if (ok && JSON.stringify(next) === JSON.stringify({v: 1, goal: baseGoal, hidden: cur.hidden === true})) return;
   api.rememberLocal(GOAL_WIDGET_PATH, next);
+  // 0.3.243: grava JA no pacote de abertura (com o app aberto). Antes dependia de o app ir para segundo plano e
+  // terminar a gravacao antes do Android congelar/matar o processo - abrir, olhar e fechar rapido perdia a Meta.
+  void api.persistLaunchProjection?.().catch(() => {});
 }
 /** Estado inicial da Meta: o ultimo conhecido, ja no primeiro quadro. */
 export function useCachedGoal(api: Store, today: string) { return useState<GoalNumbers | null>(() => readGoalWidget(api, today).goal); }

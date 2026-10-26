@@ -78,6 +78,8 @@ export class SofiaApi {
   }
   async hydrate(){if(!this.hydration)this.hydration=this.snapshots.hydrate().then(()=>{for(const [key,value] of this.snapshots.all())this.startupReads.seed(key,value);});return this.hydration;}
   async persistLaunch(){await this.snapshots.flush();}
+  /** 0.3.243: grava ja so o pacote pequeno da abertura (ver StartupSnapshot.persistLaunchNow). */
+  async persistLaunchProjection(){await this.snapshots.persistLaunchNow();}
   async prefetchCache(path:string){if(!/^\/(workspace\/|conversations\?|agenda\?|md\/dashboard)/.test(path))return;const value=await this.fetchRequest(path,undefined,'GET',20000);this.startupReads.seed(path,value);}
   cached<T>(path:string){return this.snapshots.peek<T>(path);}
   /** Guarda um resumo calculado no app (ex.: widget da Início) no mesmo cache criptografado da abertura. */

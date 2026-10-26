@@ -80,6 +80,10 @@ export class StartupSnapshot {
    try{const t=perfNow();const raw=await this.storage.read(this.scope);perfEvent('hidratar:read',t);this.importRaw(raw,revision);}catch{}finally{this.launchOnly=false;}
   })();}return this.hydration;
  }
+ /** 0.3.243: grava SO o pacote pequeno da abertura, agora (sem esperar o arquivo grande nem a saida do app).
+  * Usado quando um dado do primeiro quadro muda (ex.: a Meta): se o Android congelar ou matar o app logo depois,
+  * a abertura seguinte ja tem o dado. Nao toca no arquivo grande de historico. */
+ async persistLaunchNow(){await this.flushLaunch();}
  private async flushLaunch(){
   if(this.closed)return;
   const pairs=[...this.entries].filter(([path])=>launchRead(path,this.now())).map(([path,e])=>{

@@ -2048,15 +2048,17 @@ export function useFinanceGoal(api: SofiaApi, refresh = true): GoalNumbers | nul
   // so redesenha se os numeros mudaram; e a leitura de Financas espera como as outras do Inicio (nao compete com o 1o quadro).
   const [g, setG] = useCachedGoal(api, todayISO());
   useEffect(() => { if (!refresh) return; let live = true;
-    const show = (b: Bundle | null) => { if (!live || !b) return; const dd = toData(b.items, b.carry), reserve = reserveOf(dd.goals);
+    // 0.3.243: a leitura LOCAL nunca esconde a Meta; so o servidor pode dizer "sem meta" (evita sumir e voltar)
+    const show = (b: Bundle | null, fromServer: boolean) => { if (!live || !b) return; const dd = toData(b.items, b.carry), reserve = reserveOf(dd.goals);
       let next: GoalNumbers | null = null;
       if (reserve && Number(reserve.target) > 0) {
         const sp = moneySplit(reserve, dd.moves || [], dd.accounts, dd.txs, dd.cards, monthOf(todayISO()));
         next = {name: reserve.name || 'Sua meta', saved: sp.saved, target: Number(reserve.target), monthly: sp.planned || 0, deadline: String(reserve.entity?.data?.deadline || ''), today: todayISO()};
       }
+      if (!next && !fromServer) return;
       setG(prev => keepIfSame(prev, next)); writeGoalWidget(api, {goal: next}); };
-    void readCache(api).then(show).catch(() => {});
-    const cancel = scheduleIdleTask(() => { void loadAll(api, financeWindow(monthOf(todayISO()), 'home')).then(show).catch(() => {}); });
+    void readCache(api).then(b => show(b, false)).catch(() => {});
+    const cancel = scheduleIdleTask(() => { void loadAll(api, financeWindow(monthOf(todayISO()), 'home')).then(b => show(b, true)).catch(() => {}); });
     return () => { live = false; cancel(); }; }, [api, refresh]); // eslint-disable-line react-hooks/exhaustive-deps
   return g;
 }
