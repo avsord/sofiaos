@@ -144,3 +144,12 @@ test('0.3.237: link de compartilhar + endereco final que o celular seguiu (/p/ML
  const evil=await f.call('/api/mobile/price-tracker/mercadolivre/read',{link:'https://produto.mercadolivre.com.br/MLB-5296520523-fone-shokz-_JM',finalUrl:'https://evil.example/p/MLB42258825'});
  assert.match(JSON.stringify(evil.body),/ML_NEEDS_CATALOG_LINK/,'endereco fora do ML e ignorado');
 });
+
+test('0.3.240: AliExpress mostra o motivo exato (erro da plataforma e resp_code/resp_msg), sem chave',async t=>{
+ const {StoreConnections}=require('../src/services/store-connections');const f=fixture(t);
+ const mk=json=>new StoreConnections(f.store,f.config,{env:{ALIEXPRESS_APP_KEY:'k',ALIEXPRESS_APP_SECRET:'s'},fetchImpl:async()=>({ok:true,status:200,json:async()=>json})});
+ await assert.rejects(mk({error_response:{code:'27',msg:'Invalid session',sub_code:'isv.appkey-not-exists',sub_msg:'App nao aprovado'}}).readAliExpress('1005006123456789'),e=>/isv\.appkey-not-exists/.test(e.message)&&/App nao aprovado/.test(e.message)&&!/\bs\b|sign/.test(e.message.replace(/sub/g,'')));
+ await assert.rejects(mk({aliexpress_affiliate_productdetail_get_response:{resp_result:{resp_code:405,resp_msg:'The products not exist or not affiliate'}}}).readAliExpress('1005006123456789'),e=>/405 — The products not exist or not affiliate/.test(e.message));
+ const down=new StoreConnections(f.store,f.config,{env:{ALIEXPRESS_APP_KEY:'k',ALIEXPRESS_APP_SECRET:'s'},fetchImpl:async()=>({ok:false,status:503,json:async()=>{throw Error('html');}})});
+ await assert.rejects(down.readAliExpress('1005006123456789'),e=>/respondeu 503 sem dados/.test(e.message));
+});

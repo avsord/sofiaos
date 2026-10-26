@@ -201,11 +201,15 @@ class StoreConnections {
       product_ids: id, target_currency: 'BRL', target_language: 'PT', country: 'BR', ...(this.env.ALIEXPRESS_TRACKING_ID ? {tracking_id: this.env.ALIEXPRESS_TRACKING_ID} : {})};
     params.sign = this.aliSign(params);
     const res = await this.fetch(ALI_GATEWAY + '?' + new URLSearchParams(params).toString(), {headers: {accept: 'application/json'}});
-    const data = await res.json().catch(() => ({}));
-    if (data.error_response) throw new AppError('ALI_API', 'O AliExpress recusou a consulta (' + (data.error_response.msg || data.error_response.code) + ').', 502);
-    const body = data.aliexpress_affiliate_productdetail_get_response?.resp_result?.result;
+    const data = await res.json().catch(() => null);
+    // 0.3.240: sempre mostra o motivo que o AliExpress devolve (codigo + mensagem), sem chave nem assinatura
+    const clean = x => String(x == null ? '' : x).replace(/[^\w .,:;()\-/'"À-ú]/g, '').slice(0, 160);
+    if (!data) throw new AppError('ALI_API', 'O AliExpress respondeu ' + res.status + ' sem dados (fora do ar ou bloqueado).', 502);
+    if (data.error_response) { const e = data.error_response; throw new AppError('ALI_API', 'O AliExpress recusou a consulta: ' + [e.code, e.sub_code, e.msg, e.sub_msg].filter(Boolean).map(clean).join(' — ') + '.', 502); }
+    const rr = data.aliexpress_affiliate_productdetail_get_response?.resp_result;
+    const body = rr?.result;
     const p = body?.products?.product?.[0];
-    if (!p) throw new AppError('ALI_NOT_FOUND', 'Produto nao encontrado na API do AliExpress.', 404);
+    if (!p) throw new AppError('ALI_NOT_FOUND', 'O AliExpress nao devolveu esse produto' + (rr && (rr.resp_code || rr.resp_msg) ? ': ' + [rr.resp_code, rr.resp_msg].filter(Boolean).map(clean).join(' — ') : '') + '. Produtos fora do programa de afiliados nao aparecem na API.', 404);
     const price = Number(p.target_sale_price ?? p.sale_price);
     if (!Number.isFinite(price) || price <= 0) throw new AppError('PRICE_MISSING', 'O produto esta sem preco na API.', 502);
     const currency = String(p.target_sale_price_currency || p.sale_price_currency || 'BRL');
