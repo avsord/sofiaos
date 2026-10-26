@@ -30,6 +30,9 @@ function makeConfig(overrides = {}) {
     smtpPass: process.env.SOFIA_SMTP_PASS || '',
     smtpFrom: process.env.SOFIA_SMTP_FROM?.trim() || process.env.SOFIA_SMTP_USER?.trim() || '',
     privateApiKey: process.env.OPENAI_PRIVATE_API_KEY?.trim() || '', sharedApiKey: process.env.OPENAI_SHARED_API_KEY?.trim() || '',
+    // 0.3.244: a pedido do Pedro, o Filtro Privado roda com a chave do projeto COMPARTILHADO (cota gratuita);
+    // mesmo comportamento, contexto e modelo. SOFIA_PRIVATE_VIA_SHARED=0 na Railway volta ao projeto privado.
+    privateViaShared: process.env.SOFIA_PRIVATE_VIA_SHARED?.trim() !== '0',
     apiTimeoutMs: 90000, turnTimeoutMs: 120000,
     // No short product ceiling: one million characters is a transport/memory safety rail.
     maxMessageChars: 1000000, maxContextChars: 20000,

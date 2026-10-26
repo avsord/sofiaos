@@ -4,6 +4,8 @@ class AudioService{
   constructor(config,fetchImpl=global.fetch){this.config=config;this.fetch=fetchImpl;}
   key(route='auto'){
     if(route==='shared')return this.config.sharedApiKey||this.config.apiKey||this.config.privateApiKey;
+    // 0.3.244: com privateViaShared, privado/auto transcrevem pela chave do compartilhado (cota gratuita)
+    if(this.config.privateViaShared&&this.config.sharedApiKey)return this.config.sharedApiKey;
     if(route==='private')return this.config.privateApiKey||this.config.apiKey||this.config.sharedApiKey;
     // Auto transcreve primeiro na rota privada quando disponível, pois o áudio ainda não foi semanticamente classificado.
     return this.config.privateApiKey||this.config.apiKey||this.config.sharedApiKey;

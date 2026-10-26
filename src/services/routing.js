@@ -5,17 +5,20 @@ class RoutingService {
  constructor(store,config,providerFactory){this.store=store;this.config=config;this.factory=providerFactory||((c)=>new OpenAIProvider(c));}
  profile(route){const s=this.store.settings();if(!['private','shared'].includes(route))throw new AppError('BAD_ROUTE','Rota inválida.');
    const privateRoute=route==='private';
-   const key=(privateRoute?this.config.privateApiKey:this.config.sharedApiKey)||(s.legacyRoute===route?this.config.apiKey:'');
+   const ownKey=(privateRoute?this.config.privateApiKey:this.config.sharedApiKey)||(s.legacyRoute===route?this.config.apiKey:'');
+   // 0.3.244: privado pela chave do compartilhado (cota gratuita); a chave privada fica so como reserva se a cota acabar
+   const viaShared=privateRoute&&!!this.config.privateViaShared&&!!this.config.sharedApiKey;
+   const key=viaShared?this.config.sharedApiKey:ownKey,fallbackKey=viaShared&&ownKey&&ownKey!==key?ownKey:'';
    if(!key)throw new AppError('ROUTE_KEY_MISSING',privateRoute?'Esta mensagem precisa do Filtro Privado, mas a chave privada ainda não está presente no servidor. A mensagem não foi enviada ao Filtro Compartilhado.':'O Filtro Compartilhado ainda não tem uma chave configurada.',409);
    if(!s.routingEnabled)throw new AppError('ROUTING_SETUP','A inteligência ainda não foi conectada aos filtros. Abra Configuração no modo desenvolvedor.',409);
    if(!s[route+'Confirmed'])throw new AppError('PROJECT_NOT_CONFIRMED',privateRoute?'Confirme no modo desenvolvedor que o projeto privado está configurado para o tratamento de dados desejado.':'Confirme o projeto de tráfego compartilhado no modo desenvolvedor.',409);
    if(!privateRoute&&!s.sharedBillingAcknowledged)throw new AppError('BILLING_ACK','Confirme no modo desenvolvedor que benefícios/cobrança do projeto compartilhado foram revisados.',409);
    const other=(privateRoute?this.config.sharedApiKey:this.config.privateApiKey)||(s.legacyRoute===(privateRoute?'shared':'private')?this.config.apiKey:'');
-   if(other&&other===key)throw new AppError('SAME_PROJECT_KEY','As rotas estão usando a mesma chave. Separe os projetos; a Sofia não consegue verificar a política de dados pela chave.',409);
+   if(!viaShared&&other&&other===key)throw new AppError('SAME_PROJECT_KEY','As rotas estão usando a mesma chave. Separe os projetos; a Sofia não consegue verificar a política de dados pela chave.',409);
    const model=s[route+'Model']||(route==='shared'?'gpt-5.6-terra':this.config.model);
    const inputRate=s[route+'InputPerMillion'],outputRate=s[route+'OutputPerMillion'];
    const priced=inputRate>0&&outputRate>0&&s[route+'DailyUSD']>0&&s[route+'MonthlyUSD']>0;
-   return {route,key,model,inputRate,outputRate,daily:s[route+'DailyUSD'],monthly:s[route+'MonthlyUSD'],priced,settings:s};
+   return {route,key,model,inputRate,outputRate,daily:s[route+'DailyUSD'],monthly:s[route+'MonthlyUSD'],priced,settings:s,viaShared,fallbackKey};
  }
  usage(route){
    const stamp=now(),day=stamp.slice(0,10),month=stamp.slice(0,7);
@@ -42,8 +45,18 @@ class RoutingService {
    });
  }
  settle(key,result,profile){const u=result?.usage;if(u&&Number.isSafeInteger(u.input_tokens)&&Number.isSafeInteger(u.output_tokens)){const cost=profile.priced?Math.ceil(u.input_tokens*profile.inputRate+u.output_tokens*profile.outputRate):0;this.store.db.prepare("UPDATE route_reservations SET status='settled',charged_microusd=?,input_tokens=?,output_tokens=? WHERE id=?").run(cost,u.input_tokens,u.output_tokens,key);}else this.store.db.prepare("UPDATE route_reservations SET status='uncertain' WHERE id=?").run(key);}
- async respond(route,request,attemptId){const profile=this.profile(route),key=this.reserve(profile,request,attemptId);try{const provider=this.factory({...this.config,apiKey:profile.key,model:profile.model});const result=await provider.respond(request);this.settle(key,result,profile);return {...result,route,model:profile.model};}catch(e){this.settle(key,e,profile);throw e;}}
- async respondStructured(route,request,attemptId){const profile=this.profile(route),key=this.reserve(profile,request,attemptId);try{const provider=this.factory({...this.config,apiKey:profile.key,model:profile.model});if(typeof provider.structured!=='function')throw new AppError('STRUCTURED_UNAVAILABLE','O provedor configurado não oferece interpretação estruturada nesta instalação.',503);const result=await provider.structured(request);this.settle(key,result,profile);return {...result,route,model:profile.model};}catch(e){this.settle(key,e,profile);throw e;}}
+ /** 0.3.244: uma chamada; se for pelo compartilhado e a OpenAI disser cota/limite (API_QUOTA), refaz UMA vez pela chave privada. */
+ async run(route,request,attemptId,structured){const profile=this.profile(route),key=this.reserve(profile,request,attemptId);
+  const call=async apiKey=>{const provider=this.factory({...this.config,apiKey,model:profile.model});
+   if(structured&&typeof provider.structured!=='function')throw new AppError('STRUCTURED_UNAVAILABLE','O provedor configurado não oferece interpretação estruturada nesta instalação.',503);
+   return structured?provider.structured(request):provider.respond(request);};
+  try{let result;
+   try{result=await call(profile.key);}
+   catch(e){if(!(profile.viaShared&&profile.fallbackKey&&e&&e.code==='API_QUOTA'))throw e;result=await call(profile.fallbackKey);result={...result,keyUsed:'private-fallback'};}
+   this.settle(key,result,profile);return {...result,route,model:profile.model};}
+  catch(e){this.settle(key,e,profile);throw e;}}
+ async respond(route,request,attemptId){return this.run(route,request,attemptId,false);}
+ async respondStructured(route,request,attemptId){return this.run(route,request,attemptId,true);}
  log(messageId,route,reason){this.store.db.prepare('INSERT INTO routing_log VALUES(?,?,?,?,?)').run(id(),messageId||null,route,reason,now());}
  status(){const s=this.store.settings();const privateKey=Boolean(this.config.privateApiKey||(s.legacyRoute==='private'&&this.config.apiKey)),sharedKey=Boolean(this.config.sharedApiKey||(s.legacyRoute==='shared'&&this.config.apiKey));return {private_key_present:privateKey,shared_key_present:sharedKey,admin_key_present:Boolean(this.config.adminApiKey),legacy_key_present:Boolean(this.config.apiKey),private_ready:Boolean(privateKey&&s.privateConfirmed&&s.routingEnabled),shared_ready:Boolean(sharedKey&&s.sharedConfirmed&&s.sharedBillingAcknowledged&&s.routingEnabled),usage:[this.usage('private'),this.usage('shared')],notice:'Tokens e chamadas locais são apenas alertas na v69; não bloqueiam a conversa. Tetos financeiros em USD continuam sendo proteções explícitas quando configurados.'};}
 }
