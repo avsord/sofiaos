@@ -1,6 +1,8 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {GoalProgressCard} from '../components/GoalProgress';
 import type {GoalNumbers} from '../components/GoalProgress';
+import {keepIfSame, useCachedGoal, writeGoalWidget} from '../lib/goal-widget';
+import {scheduleIdleTask} from '../lib/idle-task';
 import * as SecureStore from 'expo-secure-store';
 import {ActivityIndicator, Alert, BackHandler, Keyboard, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View, Dimensions, PanResponder, Animated} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -2041,15 +2043,21 @@ function Donut({slices, size = 170}: {slices: Array<{value: number; color: strin
 /** 0.3.208: meta no Inicio, no mesmo estilo do Controle de gastos. Usa o cache criptografado de Financas e atualiza
  * por tras; sem meta configurada, nao aparece. */
 /** 0.3.222: meta do guardado para o Inicio (cache criptografado e atualiza por tras); null sem meta configurada. */
-export function useFinanceGoal(api: SofiaApi): GoalNumbers | null {
-  const [g, setG] = useState<GoalNumbers | null>(null);
-  useEffect(() => { let live = true;
-    const show = (b: Bundle | null) => { if (!live || !b) return; const dd = toData(b.items, b.carry), reserve = reserveOf(dd.goals); if (!reserve || !(Number(reserve.target) > 0)) { setG(null); return; }
-      const sp = moneySplit(reserve, dd.moves || [], dd.accounts, dd.txs, dd.cards, monthOf(todayISO()));
-      setG({name: reserve.name || 'Sua meta', saved: sp.saved, target: Number(reserve.target), monthly: sp.planned || 0, deadline: String(reserve.entity?.data?.deadline || ''), today: todayISO()}); };
+export function useFinanceGoal(api: SofiaApi, refresh = true): GoalNumbers | null {
+  // 0.3.240: nasce do ULTIMO estado conhecido (a Meta ja aparece no primeiro quadro, sem entrar depois e empurrar a tela);
+  // so redesenha se os numeros mudaram; e a leitura de Financas espera como as outras do Inicio (nao compete com o 1o quadro).
+  const [g, setG] = useCachedGoal(api, todayISO());
+  useEffect(() => { if (!refresh) return; let live = true;
+    const show = (b: Bundle | null) => { if (!live || !b) return; const dd = toData(b.items, b.carry), reserve = reserveOf(dd.goals);
+      let next: GoalNumbers | null = null;
+      if (reserve && Number(reserve.target) > 0) {
+        const sp = moneySplit(reserve, dd.moves || [], dd.accounts, dd.txs, dd.cards, monthOf(todayISO()));
+        next = {name: reserve.name || 'Sua meta', saved: sp.saved, target: Number(reserve.target), monthly: sp.planned || 0, deadline: String(reserve.entity?.data?.deadline || ''), today: todayISO()};
+      }
+      setG(prev => keepIfSame(prev, next)); writeGoalWidget(api, {goal: next}); };
     void readCache(api).then(show).catch(() => {});
-    void loadAll(api, financeWindow(monthOf(todayISO()), 'home')).then(show).catch(() => {});
-    return () => { live = false; }; }, [api]);
+    const cancel = scheduleIdleTask(() => { void loadAll(api, financeWindow(monthOf(todayISO()), 'home')).then(show).catch(() => {}); });
+    return () => { live = false; cancel(); }; }, [api, refresh]); // eslint-disable-line react-hooks/exhaustive-deps
   return g;
 }
 export function FinanceGoalHome({api, onOpen}: {api: SofiaApi; onOpen?: () => void}) {

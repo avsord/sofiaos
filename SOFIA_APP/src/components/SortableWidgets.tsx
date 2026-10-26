@@ -11,7 +11,7 @@ const HOLD=450;
 export function SortableWidgets({items,order,onSave,onLock,fixed=[],noHold=[]}:{items:Item[];order:string[];onSave:(order:string[])=>Promise<void>;onLock:(locked:boolean)=>void;fixed?:string[];noHold?:string[]}){
  const c=useTheme(),[open,setOpen]=useState(false),[draft,setDraft]=useState(order),[nonce,setNonce]=useState<Record<string,number>>({});
  const timer=useRef<ReturnType<typeof setTimeout>|null>(null),start=useRef({x:0,y:0});
- useEffect(()=>{if(!open)setDraft(order);},[order,open]);
+ useEffect(()=>{if(!open)setDraft(prev=>prev.length===order.length&&prev.every((x,i)=>x===order[i])?prev:order);},[order,open]);// 0.3.240: lista igual nao redesenha
  const cancel=()=>{if(timer.current)clearTimeout(timer.current);timer.current=null;};
  useEffect(()=>()=>{cancel();onLock(false);},[]);
  // 0.3.227: ao abrir o seletor, o widget segurado e remontado - o toque dele e cancelado e ele nao abre a tela/app ao soltar

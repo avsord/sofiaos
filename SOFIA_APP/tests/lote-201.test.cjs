@@ -125,7 +125,7 @@ test('0.3.208: meta com progresso de 0 ate a meta, marcos e projecao (Relatorios
   const atras=g.goalStats({name:'',saved:1000,target:40000,monthly:500,deadline:'2027-06-30',today:'2026-10-20'});assert.ok(atras.diff<0&&atras.needed>4000,'atrasado: mostra quanto por mes precisa');
   const f=read('src/screens/Finance.tsx'),h=read('src/screens/Home.tsx');
   assert.ok(f.includes('{goal ? <Fold id="meta" title="Dinheiro guardado"><GoalProgressCard g={goal} flat /></Fold> : null}'),'Relatorios (secao Dinheiro guardado)');
-  assert.ok(h.includes('const goal=useFinanceGoal(api);')&&h.includes("<GoalProgressCard g={goal} compact onPress={()=>onOpenModule?onOpenModule('finance'):navigate('apps')}/>"),'Inicio');
+  assert.ok(h.includes('const goal=useFinanceGoal(api,active&&launchVisible);')&&h.includes("<GoalProgressCard g={goal} compact onPress={()=>onOpenModule?onOpenModule('finance'):navigate('apps')}/>"),'Inicio');
 });
 
 test('0.3.210: importar extrato - lista com altura maxima (rola por dentro) e botao Importar sempre visivel',()=>{
