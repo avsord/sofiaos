@@ -119,11 +119,17 @@ export async function resolveMercadoLivreCatalogUrl(
     const res = await fetchImpl(target, {method: 'GET', headers: HEADERS, signal: controller.signal});
     const finalUrl = String((res as any).url || '');
     try { controller.abort(); } catch { /* nao precisa do corpo */ }
+    trace('consulta', String((res as any).status || '?') + ' ' + where(finalUrl));
     return catalogUrlOrNull(finalUrl);
-  } catch { return null; }
+  } catch { trace('consulta', 'falhou'); return null; }
   finally { clearTimeout(timer); signal?.removeEventListener?.('abort', stop); }
 }
 
+/** 0.3.239: diagnostico - onde cada etapa do celular parou (so host + caminho; nunca parametros, cookies ou pagina). */
+export let lastCatalogTrace = '';
+export function resetCatalogTrace() { lastCatalogTrace = ''; }
+function where(u: unknown): string { const m = /^https?:\/\/([^/?#]+)(\/[^?#]*)?/i.exec(typeof u === 'string' ? u : ''); return m ? (m[1] + (m[2] || '/')).slice(0, 90) : 'sem endereço'; }
+function trace(step: string, info: string) { lastCatalogTrace = (lastCatalogTrace ? lastCatalogTrace + '; ' : '') + step + ': ' + info; }
 /** O endereco so serve se for do Mercado Livre e trouxer o catalogo (/p/MLB...), direto ou dentro do destino. */
 export function catalogUrlOrNull(url: unknown): string | null {
   const u = typeof url === 'string' ? url : '';
@@ -135,6 +141,6 @@ export function catalogUrlOrNull(url: unknown): string | null {
  * O navegador invisivel executa a pagina como o navegador da pessoa e devolve ONDE terminou - mesmo que depois
  * peca verificacao. Usado so quando a consulta simples nao achou o catalogo. */
 export async function resolveCatalogViaBrowser(url: string, signal?: AbortSignal): Promise<string | null> {
-  if (!pageReader || signal?.aborted) return null;
-  try { const r = await pageReader(url, signal); return catalogUrlOrNull((r as any).finalUrl); } catch { return null; }
+  if (!pageReader || signal?.aborted) { trace('navegador', pageReader ? 'cancelado' : 'indisponível'); return null; }
+  try { const r = await pageReader(url, signal); trace('navegador', (r.ok ? 'OK' : (r as any).code) + ' ' + where((r as any).finalUrl)); return catalogUrlOrNull((r as any).finalUrl); } catch { trace('navegador', 'falhou'); return null; }
 }

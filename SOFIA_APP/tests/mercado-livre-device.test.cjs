@@ -93,6 +93,22 @@ test('0.3.238: navegador invisivel devolve o /p/MLB... onde parou (ate quando de
 });
 test('0.3.238: o app tenta a consulta simples e, sem catalogo, o navegador invisivel; a falha do navegador guarda onde parou',()=>{
   const a=fs.readFileSync(path.join(__dirname,'../src/lib/api.ts'),'utf8'),r=fs.readFileSync(path.join(__dirname,'../src/lib/price-reader.tsx'),'utf8');
-  assert.ok(a.includes('(await resolveMercadoLivreCatalogUrl(fetchUrl||link,{signal}))||(await resolveCatalogViaBrowser(fetchUrl||link,signal))'));
+  assert.ok(a.includes('const cleanUrl=canonicalMercadoLivreUrl(fetchUrl||link);')&&a.includes('(await resolveMercadoLivreCatalogUrl(cleanUrl,{signal}))||(await resolveCatalogViaBrowser(cleanUrl,signal))'),'0.3.239: sempre o link limpo');
+  assert.ok(!a.includes('resolveMercadoLivreCatalogUrl(fetchUrl||link'),'nunca o link cru de compartilhar');
   assert.ok(r.includes("...(typeof m.finalUrl === 'string' && ML_HOST.test(m.finalUrl) ? {finalUrl: m.finalUrl} : {})"));
+});
+
+test('0.3.239: o link de compartilhar real e limpo antes de buscar o catalogo (sem matt_tool, ua e #origin=share)',()=>{
+  const share='https://produto.mercadolivre.com.br/MLB-5851563564?matt_tool=38524122&ua=ibvyIQyxi2qY8BdQVKyBKfbDuwFzASGrmFGbsaqR3pEpfC8#origin=share&sid=share&action=copy';
+  assert.equal(dev.canonicalMercadoLivreUrl(share),'https://produto.mercadolivre.com.br/MLB-5851563564');
+});
+
+test('0.3.239: diagnostico diz onde cada etapa parou (so host + caminho, sem parametros)',async()=>{
+  dev.resetCatalogTrace();
+  await dev.resolveMercadoLivreCatalogUrl('https://produto.mercadolivre.com.br/MLB-5851563564',{fetchImpl:async()=>({url:'https://www.mercadolivre.com.br/gz/app-interstitial?token=SEGREDO',status:200})});
+  dev.setMercadoLivrePageReader(async()=>({ok:false,code:'VERIFICATION_REQUIRED',finalUrl:'https://www.mercadolivre.com.br/gz/account-verification?x=1'}));
+  await dev.resolveCatalogViaBrowser('https://produto.mercadolivre.com.br/MLB-5851563564');dev.setMercadoLivrePageReader(null);
+  const tr=require('./load-ts.cjs')&&dev.lastCatalogTrace;
+  assert.match(tr,/consulta: 200 www\.mercadolivre\.com\.br\/gz\/app-interstitial/);assert.match(tr,/navegador: VERIFICATION_REQUIRED www\.mercadolivre\.com\.br\/gz\/account-verification/);
+  assert.ok(!/SEGREDO|x=1|token/.test(tr),'nunca leva parametros');
 });

@@ -23,7 +23,7 @@ test('leitura do Mercado Livre: quando falha e a conta nao esta conectada, a tel
 test('com a conta conectada o celular nao abre o navegador invisivel: vai direto ao servidor (API)',()=>{
  const a=read('src/lib/api.ts');
  assert.ok(a.includes("const connected=await this.mlAccountConnected();")&&a.includes("const page=connected?{ok:false as const,code:'API'}:await readMercadoLivrePageOnDevice("));
- assert.ok(a.includes("(await resolveMercadoLivreCatalogUrl(fetchUrl||link,{signal}))||(await resolveCatalogViaBrowser(fetchUrl||link,signal))")&&!/connected[^;]*readMercadoLivrePageOnDevice\(fetchUrl\|\|link/.test(a),'0.3.237: so segue o redirecionamento (fetch simples), sem navegador');
+ assert.ok(a.includes("(await resolveMercadoLivreCatalogUrl(cleanUrl,{signal}))||(await resolveCatalogViaBrowser(cleanUrl,signal))")&&!/connected[^;]*readMercadoLivrePageOnDevice\(fetchUrl\|\|link/.test(a),'0.3.237: so segue o redirecionamento (fetch simples), sem navegador');
  assert.ok(a.includes("page.code!=='API'"),'o atalho da API nao vira "(celular: ...)" na mensagem');
  assert.ok(a.includes('this.mlConnectedCache=null; return this.request<{url:string}>'),'conectar invalida o cache');
 });

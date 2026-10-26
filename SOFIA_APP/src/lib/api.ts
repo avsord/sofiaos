@@ -8,7 +8,7 @@ export function waitForActive(maxMs=15000){if(!appState||appState.currentState==
 export function isChatSend(path:string,method:string){return method==='POST'&&/^\/(chat|conversations|messages)/.test(path)&&!path.startsWith('/chat-sync');}
 import type {MercadoLivreOptions, MercadoLivreResponse} from './mercado-livre-types';
 import type {StoreConnectionsState} from './store-connections-types';
-import {readMercadoLivrePageOnDevice,canonicalMercadoLivreUrl,resolveMercadoLivreCatalogUrl,resolveCatalogViaBrowser} from './mercado-livre-device';
+import {readMercadoLivrePageOnDevice,canonicalMercadoLivreUrl,resolveMercadoLivreCatalogUrl,resolveCatalogViaBrowser,resetCatalogTrace,lastCatalogTrace} from './mercado-livre-device';
 import {AUTH_STORAGE_KEY,PREFS_STORAGE_KEY,takeStartupAuth,takeStartupPrefs,invalidateStartupAuth,invalidateStartupPrefs} from './startup-read-ahead';
 import {StartupSnapshot} from './startup-snapshot';
 import {encryptedStorage} from './encrypted-storage';
@@ -283,11 +283,16 @@ export class SofiaApi {
     const page=connected?{ok:false as const,code:'API'}:await readMercadoLivrePageOnDevice(fetchUrl||canonicalMercadoLivreUrl(link),signal);
     // 0.3.237: com a conta conectada, link sem catalogo -> o celular segue o redirecionamento e manda o endereco /p/MLB...
     // 0.3.238: se a consulta simples nao achar, o navegador invisivel executa a pagina e devolve o endereco /p/MLB...
-    const catalogUrl=connected&&!/\/p\/MLB\d/i.test(link)?(await resolveMercadoLivreCatalogUrl(fetchUrl||link,{signal}))||(await resolveCatalogViaBrowser(fetchUrl||link,signal)):null;
+    // 0.3.239: busca o catalogo SEMPRE pelo link LIMPO (sem matt_tool/ua/#origin=share, que levam a tela "Abra o app"),
+    // como a leitura da pagina ja fazia. A 0.3.237/0.3.238 usavam o link cru e nunca chegavam ao /p/.
+    const cleanUrl=canonicalMercadoLivreUrl(fetchUrl||link);
+    resetCatalogTrace();
+    const catalogUrl=connected&&!/\/p\/MLB\d/i.test(link)?(await resolveMercadoLivreCatalogUrl(cleanUrl,{signal}))||(await resolveCatalogViaBrowser(cleanUrl,signal)):null;
     if(!page.ok&&page.code==='CANCELLED')return {ok:false,code:'CANCELLED',message:'Leitura cancelada.',keepLastPrice:true as const};
     const body=page.ok?{link,...params,html:page.html,finalUrl:page.finalUrl}:{link,...params,...(catalogUrl?{finalUrl:catalogUrl}:{})};
     const r=await this.fetchRequest<MercadoLivreResponse>('/price-tracker/mercadolivre/read',body,'POST',40000,signal);
     // Diagnostico: se o celular tambem falhou, o motivo dele vai junto (sem conteudo da pagina).
+    if(!r.ok&&r.code==='ML_NEEDS_CATALOG_LINK'&&lastCatalogTrace)return {...r,message:r.message+' [diagnóstico — '+lastCatalogTrace+']'};
     return !r.ok&&!page.ok&&page.code!=='API'?{...r,message:r.message+' (celular: '+page.code+')'}:r;
   }
   monitorObservations() { return this.request<{items: Record<string, any[]>}>('/md/monitors/observations'); }
