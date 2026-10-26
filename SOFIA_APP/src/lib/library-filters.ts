@@ -29,3 +29,6 @@ const normalized=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').t
 export function libraryFacets(record:Partial<Entity>):string[]{const p=libraryPresentation(record.kind||'');return [...new Map(libraryTopic(record).split(/[,;/|]/).map(s=>s.trim()).filter(Boolean).map(s=>[normalized(s),p.labels?.[s]||s])).values()];}
 export function facetOptions(records:Entity[]){return [...new Map(records.flatMap(r=>libraryFacets(r).map(label=>[normalized(label),label] as const))).entries()].sort((a,b)=>a[1].localeCompare(b[1],'pt-BR')).map(([value,label])=>({value,label}));}
 export function filterLibrary(records:Entity[],stars:string,facet:string){return records.filter(r=>(stars==='all'||libraryRating(r)===Number(stars))&&(!facet||libraryFacets(r).some(value=>normalized(value)===normalized(facet))));}
+
+/** 0.3.242: mesma comparacao usada nos filtros (ignora maiusculas, acentos e espacos) - as etiquetas usam a mesma. */
+export {normalized as normalizeLibraryTag};
