@@ -128,6 +128,11 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
   const unread = scoped.filter(h => h.state === 'new').length, shown = scoped.filter(h => !onlyImportant || h.data.important);
   const groups = groupNames(accounts || []);
   const accountName = (id: string) => accounts?.find(a => a.id === id)?.data.address || '';
+  // 0.3.249: cada regra e de UMA conta. A aba Regras mostra so as da conta (ou grupo) escolhida no topo.
+  const oldestAccount = [...(accounts || [])].sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))[0]?.id || '';
+  const ruleOwner = (r: Entity) => String(r.data.account_id || oldestAccount);
+  const scopedRules = rules.filter(r => inSel.has(ruleOwner(r)));
+  const newRuleAccount = selection.type === 'account' && inSel.has(selection.id) ? selection.id : ([...inSel][0] || oldestAccount);
 
   return (
     <InternalBackGesture enabled={active && !open && !addAccount && !ruleSheet} onBack={onBack}>
@@ -138,7 +143,7 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
           <IconButton name="refresh" label="Verificar agora" disabled={checking || !accounts?.length} onPress={() => void check()} />
         </View>
         <View style={{paddingHorizontal: 16, paddingBottom: 8}}>
-          <Chips value={tab} onChange={setTab} options={[{value: 'hits' as Tab, label: 'Encontrados' + (unread ? ' · ' + unread : '')}, {value: 'rules' as Tab, label: 'Regras ' + rules.length}, {value: 'accounts' as Tab, label: 'Contas ' + (accounts?.length || 0)}]} />
+          <Chips value={tab} onChange={setTab} options={[{value: 'hits' as Tab, label: 'Encontrados' + (unread ? ' · ' + unread : '')}, {value: 'rules' as Tab, label: 'Regras ' + scopedRules.length}, {value: 'accounts' as Tab, label: 'Contas ' + (accounts?.length || 0)}]} />
         </View>
         {accounts === null ? <View style={{padding: 16, gap: 6}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Spinner size={16} stroke={1.8} /><Text style={{color: c.muted, fontSize: 13}}>Carregando e-mails</Text></View><LoadingLines rows={4} /></View> : (
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 16, gap: 12, paddingBottom: insets.bottom + 40}} refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load()} />}>
@@ -171,13 +176,13 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
               </>
             ) : tab === 'rules' ? (
               <>
-                <Button title="+ Nova regra" onPress={() => setRuleSheet({data: {field: 'from', notify: true}})} />
-                {!rules.length ? <View style={{gap: 8}}><Text style={{color: c.muted, fontSize: 12}}>Comece por um modelo:</Text>{TEMPLATES.map(t => <Pressable key={t.title} onPress={() => setRuleSheet({title: t.title, data: {field: t.field, contains: t.contains, notify: true, important: t.important}})} style={{padding: 12, borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}><Text style={{color: c.text, fontWeight: '600'}}>{t.title}</Text><Text style={{color: c.muted, fontSize: 12}}>{t.contains}</Text></Pressable>)}</View> : null}
-                {rules.map(r => (
+                <Button title="+ Nova regra" onPress={() => setRuleSheet({data: {field: 'from', notify: true, account_id: newRuleAccount}})} />
+                {!scopedRules.length ? <View style={{gap: 8}}><Text style={{color: c.muted, fontSize: 12}}>Comece por um modelo:</Text>{TEMPLATES.map(t => <Pressable key={t.title} onPress={() => setRuleSheet({title: t.title, data: {field: t.field, contains: t.contains, notify: true, important: t.important, account_id: newRuleAccount}})} style={{padding: 12, borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}><Text style={{color: c.text, fontWeight: '600'}}>{t.title}</Text><Text style={{color: c.muted, fontSize: 12}}>{t.contains}</Text></Pressable>)}</View> : null}
+                {scopedRules.map(r => (
                   <Pressable key={r.id} onPress={() => setRuleSheet(r)} style={{padding: 14, borderRadius: 16, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, gap: 4, opacity: r.state === 'paused' ? 0.55 : 1}}>
                     <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>{r.data.important ? <Text>{String(r.data.emoji || '') || '⭐'}</Text> : null}<Text style={{flex: 1, color: c.text, fontWeight: '700'}}>{r.title}</Text><Text style={{color: c.muted, fontSize: 11}}>{hits.filter(h => String(h.data.rule_names).includes(r.title)).length} encontrados</Text></View>
                     <Text style={{color: c.muted, fontSize: 12}}>{FIELDS.find(f => f.value === r.data.field)?.label} contém: <Text style={{color: c.text}}>{r.data.contains}</Text></Text>
-                    <Text style={{color: c.muted, fontSize: 11}}>{r.data.account_id ? 'Só em ' + accountName(r.data.account_id) : 'Todas as contas'} · {r.data.notify === false ? 'sem aviso' : 'avisa no celular'}{r.state === 'paused' ? ' · pausada' : ''}</Text>
+                    <Text style={{color: c.muted, fontSize: 11}}>{accountName(ruleOwner(r)) || 'Conta removida'} · {r.data.notify === false ? 'sem aviso' : 'avisa no celular'}{r.state === 'paused' ? ' · pausada' : ''}</Text>
                   </Pressable>
                 ))}
               </>
@@ -305,13 +310,13 @@ function RuleSheet({api, rule, accounts, onClose, onDone}: {api: SofiaApi; rule:
   const c = useTheme(), existing = (rule as Entity).id ? rule as Entity : null, d = rule.data || {};
   const [deleting, setDeleting] = useState(false);
   const [title, setTitle] = useState(rule.title || ''), [field, setField] = useState(String(d.field || 'from')), [contains, setContains] = useState(String(d.contains || ''));
-  const [accountId, setAccountId] = useState(String(d.account_id || '')), [notify, setNotify] = useState(d.notify !== false), [important, setImportant] = useState(!!d.important), [emoji, setEmoji] = useState(String(d.emoji || '⭐'));
+  const [accountId, setAccountId] = useState(String(d.account_id || [...accounts].sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))[0]?.id || '')), [notify, setNotify] = useState(d.notify !== false), [important, setImportant] = useState(!!d.important), [emoji, setEmoji] = useState(String(d.emoji || '⭐'));
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const hint = field === 'from' ? 'Ex.: ana@empresa.com, Banco Itaú, @receita.fazenda' : field === 'subject' ? 'Ex.: contrato, aprovado, entrevista' : 'Ex.: nota fiscal, ingresso';
   async function save() {
     if (!contains.trim()) { setError('Diga o que procurar.'); return; }
     setBusy(true); setError('');
-    const data = {field, contains: contains.trim(), account_id: accountId, notify, important, emoji: important ? emoji : ''};
+    const data = {field, contains: contains.trim(), account_id: accountId || accounts[0]?.id || '', notify, important, emoji: important ? emoji : ''};
     const name = title.trim() || contains.split(',')[0].trim().slice(0, 60);
     try { if (existing) await api.saveEntity({...existing, title: name, data: {...existing.data, ...data}}); else await api.saveEntity({kind: 'mail_rule', title: name, content: '', area: 'Pessoal', state: 'active', privacy: 'private', tags: [], data}); onDone('save'); }
     catch (e) { setError(errorText(e)); } finally { setBusy(false); }
@@ -324,7 +329,7 @@ function RuleSheet({api, rule, accounts, onClose, onDone}: {api: SofiaApi; rule:
         <Chips value={field} onChange={setField} options={FIELDS} />
         <Field label="Contém (separe opções por vírgula)" value={contains} onChange={setContains} placeholder={hint} />
         <Field label="Nome da regra (opcional)" value={title} onChange={setTitle} placeholder="Ex.: Mensagens da Ana" />
-        {accounts.length > 1 ? <><Text style={{fontSize: 12, color: c.muted}}>Em qual conta</Text><Chips value={accountId} onChange={setAccountId} options={[{value: '', label: 'Todas'}, ...accounts.map(a => ({value: a.id, label: String(a.data.address)}))]} /></> : null}
+        {accounts.length > 1 ? <><Text style={{fontSize: 12, color: c.muted}}>Em qual conta</Text><Chips value={accountId} onChange={setAccountId} options={accounts.map(a => ({value: a.id, label: String(a.data.address)}))} /></> : null}
         <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text}}>Avisar no celular</Text><Switch value={notify} onValueChange={setNotify} /></View>
         <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text}}>Marcar como importante {important ? emoji : '⭐'}</Text><Switch value={important} onValueChange={setImportant} /></View>
         {important ? <View style={{gap: 6}}>

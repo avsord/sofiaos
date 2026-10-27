@@ -124,11 +124,25 @@ class MailWatcher {
 
   /** 0.3.146: rescanDays > 0 reavalia os ultimos N dias (regra nova ou editada), sem mexer no
    * marcador de leitura; as mensagens ja registradas so ganham as regras novas, sem duplicar. */
+  assignOrphanRules() {
+    const all = this.w.list({kind: 'mail_account', limit: 50});
+    if (!all.length) return 0;
+    const oldest = [...all].sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))[0];
+    let n = 0;
+    for (const r of this.w.list({kind: 'mail_rule', limit: 200})) {
+      if (r.data && r.data.account_id && all.some(a => a.id === r.data.account_id)) continue;
+      try { this.w.save({...r, data: {...r.data, account_id: oldest.id}}, r.id); n++; } catch { /* segue */ }
+    }
+    return n;
+  }
   async checkAll(only, rescanDays = 0) {
     if (this.busy) return {skipped: true};
     this.busy = true;
     const report = {accounts: 0, scanned: 0, hits: 0, errors: []};
     try {
+      // 0.3.249: cada regra e de UMA conta. Regras antigas "em todas as contas" passam a ser da conta mais antiga
+      // (foram criadas antes de existir a segunda); a pessoa pode trocar a conta na propria regra.
+      this.assignOrphanRules();
       const accounts = this.w.list({kind: 'mail_account', limit: 50}).filter(a => a.state === 'active' && (!only || a.id === only));
       const rules = this.w.list({kind: 'mail_rule', limit: 200}).filter(r => r.state === 'active');
       for (const account of accounts) {

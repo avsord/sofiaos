@@ -172,3 +172,22 @@ test('Conta Google: conta com outro e-mail NAO le a caixa conectada, mostra o mo
  assert.equal(hits.filter(h=>h.data.account_id===outra.id).length,0,'o que entrou por engano saiu');
  assert.equal(hits.filter(h=>h.data.account_id===certa.id).length,1,'a conta certa continua lendo a propria caixa');
 });
+
+// 0.3.249: cada regra e de UMA conta - nenhuma regra vale para duas caixas.
+test('regras sem conta passam a ser da conta mais antiga (gravado); regra de uma conta nao bate na outra',async t=>{
+ const {core,config}=fixture(t);const w=core.workspace;
+ const box={a:[{id:'a1',from:'boleto@llz.com.br'}],b:[{id:'b1',from:'boleto@llz.com.br'}]};
+ const mk=(acc,list)=>list.map(x=>({id:x.id,internalDate:String(Date.parse('2026-10-26T10:00:00Z')),snippet:'x',payload:{headers:[{name:'From',value:x.from},{name:'Subject',value:'BOLETO '+acc}]}}));
+ const mw=new MailWatcher(w,config,{client:()=>{throw Error('x');}});
+ const antiga=w.save({kind:'mail_account',title:'A',area:'Pessoal',data:{provider:'gmail_google',address:'01.pedro@gmail.com'}});
+ await new Promise(r=>setTimeout(r,15));
+ const nova=w.save({kind:'mail_account',title:'B',area:'Pessoal',data:{provider:'gmail_google',address:'01.pedro@gmail.com'}});
+ const orfa=w.save({kind:'mail_rule',title:'Cobranças',area:'Pessoal',data:{field:'from',contains:'boleto',notify:true}});
+ mw.google={link:()=>({refresh:'x',email:'01.pedro@gmail.com',scopes:'https://www.googleapis.com/auth/gmail.readonly'}),call:async(m,url)=>{const u=new URL(url);if(u.pathname.endsWith('/messages'))return {messages:[{id:'a1'}]};return mk('A',box.a)[0];}};
+ await mw.checkAll();
+ assert.equal(w.get(orfa.id).data.account_id,antiga.id,'regra antiga ficou com a conta mais antiga');
+ const hits=w.list({kind:'mail_hit'});
+ assert.ok(hits.every(h=>h.data.account_id===antiga.id),'so a conta da regra encontrou e-mails: '+JSON.stringify(hits.map(h=>h.data.account_id)));
+ assert.ok(hits.length>=1);
+ const again=mw.assignOrphanRules();assert.equal(again,0,'nao mexe de novo');
+});
