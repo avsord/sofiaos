@@ -56,13 +56,16 @@ function makeMobileApi(runtime, deps) {
     if (!['mobile', 'web', 'test'].includes(c.channel) || !(history ? ['active','paused','archived'].includes(c.state) : c.state === 'active')) fail('NOT_FOUND', 'Conversa não disponível neste canal.', 404);
     return c;
   }
+  // 0.3.246: áudio apagado (limpeza automática ou à mão em Arquivos da Sofia): o app mostra o aviso no lugar do player.
+  let removedStmt = null;
+  function voiceRemoved(messageId) { try { removedStmt = removedStmt || store.db.prepare('SELECT removed_at FROM voice_messages WHERE message_id=?'); const r = removedStmt.get(messageId); return !!(r && r.removed_at); } catch { return false; } }
   function messages(id, before = Number.MAX_SAFE_INTEGER) {
     const rows = store.messages(id, 101, before), voices = store.voiceForMessages(rows);
     return { messages: rows.slice(-100).map(m => {
       const voice = voices.get(m.id);
       return { id: m.id, sequence: m.sequence, conversation_id: m.conversation_id, role: m.role, content: m.content,
         client_id: m.client_id, created_at: m.created_at, status: m.status, error_code: m.error_code || null,
-        voice: voice ? { mime: voice.mime, duration_ms: voice.duration_ms, audio_url: '/api/mobile/messages/' + m.id + '/audio' } : null };
+        voice: voice ? { mime: voice.mime, duration_ms: voice.duration_ms, audio_url: '/api/mobile/messages/' + m.id + '/audio', ...(voiceRemoved(m.id) ? { removed: true } : {}) } : null };
     }), has_more: rows.length > 100 };
   }
   const IMAGE_LINK = /!\[[^\]\n]*\]\(https?:\/\/[^\s)]*\/api\/attachments\/[A-Za-z0-9_-]+\?inline=1\)/;
@@ -258,6 +261,7 @@ function makeMobileApi(runtime, deps) {
     const driveDel = p.match(/^\/api\/mobile\/md\/drive\/files\/([A-Za-z0-9_-]+)$/);
     if (driveDel && m === 'DELETE') { rate(session, 'drive-files', 60); await bodyJson(req, 256).catch(() => ({})); return send(await runtime.google.driveDelete(driveDel[1])); }
     if (p === '/api/mobile/md/drive/receipts-cleanup' && m === 'POST') { rate(session, 'google', 20); const b = await bodyJson(req, 256); return send(runtime.google.setReceiptsCleanup(b.enabled !== false)); }
+    if (p === '/api/mobile/md/drive/cleanup' && m === 'POST') { rate(session, 'google', 20); const b = await bodyJson(req, 512); return send(runtime.google.setCleanup(String(b.cat || ''), b.enabled !== false)); }
     if (p === '/api/mobile/md/drive/export' && m === 'POST') {
       rate(session, 'google', 20); const b = await bodyJson(req, 4096).catch(() => ({}));
       return send({ export: await runtime.google.startExport(Array.isArray(b.categories) ? b.categories.map(String).slice(0, 20) : undefined) });

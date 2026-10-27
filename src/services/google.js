@@ -444,7 +444,7 @@ class GoogleService {
     {key: 'Páginas', label: 'Páginas', hint: 'Cada página sua em texto (.md), atualizada quando muda.'},
     {key: 'Anexos', label: 'Anexos', hint: 'Capas, fotos e arquivos das páginas e registros.'},
     {key: 'Comprovantes', label: 'Comprovantes', hint: 'Fotos enviadas na conversa (cupons e notas para Finanças).'},
-    {key: 'Áudios', label: 'Áudios', hint: 'Mensagens de voz com mais de 1 dia.'},
+    {key: 'Áudios', label: 'Áudios', hint: 'Mensagens de voz da conversa (a transcrição fica na conversa).'},
     {key: 'Backup com senha', label: 'Backup com senha', hint: 'Abre sem o servidor, com a senha de backup (veja COMO-RESTAURAR.md).'},
     {key: 'Backups', label: 'Backups diários', hint: 'Cópias criptografadas do banco; só abrem com a chave do servidor.'},
   ];
@@ -691,7 +691,7 @@ class GoogleService {
     if (this.legacyPending(l)) for (const node of await this.legacyTree()) for (const f of await this.legacyFiles(node, 1000)) add(node.cat, f.size);
     let quota = null;
     quota = await this.driveQuota();
-    const out = {...this.driveState(this.link()), categories: GoogleService.CATS.map(c => ({...c, ...counts[c.key], deletable: GoogleService.deletable(c.key)})), quota, receipts_cleanup: this.receiptsCleanup()};
+    const out = {...this.driveState(this.link()), categories: GoogleService.CATS.map(c => ({...c, ...counts[c.key], deletable: GoogleService.deletable(c.key)})), quota, receipts_cleanup: this.receiptsCleanup(), voices_cleanup: this.voicesCleanup()};
     this.summaryCache = {at: Date.now(), value: out};
     return out;
   }
@@ -833,41 +833,61 @@ class GoogleService {
     return {ok: true, name: meta.name || ''};
   }
   static RECEIPT_DAYS = 7;
-  receiptsCleanup() { const v = this.kvGet('drive_receipts_cleanup') || {}; return {enabled: v.enabled !== false, days: GoogleService.RECEIPT_DAYS, last_at: v.last_at || '', last_removed: v.last_removed || 0}; }
-  setReceiptsCleanup(enabled) {
-    const cur = this.kvGet('drive_receipts_cleanup') || {}; this.kvSet('drive_receipts_cleanup', {...cur, enabled: !!enabled});
-    if (enabled) this.cleanReceipts(true).catch(() => {});
-    return this.receiptsCleanup();
+  // Limpeza automática (pedidos do dono, 26/10/2026): comprovantes (fotos da conversa para Finanças) e áudios
+  // da conversa saem com mais de 7 dias. A despesa lançada, a miniatura e a transcrição continuam.
+  static CLEANUPS = {
+    'Comprovantes': {kv: 'drive_receipts_cleanup', what: 'comprovantes'},
+    'Áudios': {kv: 'drive_voices_cleanup', what: 'áudios'},
+  };
+  cleanupState(cat) { const c = GoogleService.CLEANUPS[cat]; const v = this.kvGet(c.kv) || {}; return {enabled: v.enabled !== false, days: GoogleService.RECEIPT_DAYS, last_at: v.last_at || '', last_removed: v.last_removed || 0}; }
+  receiptsCleanup() { return this.cleanupState('Comprovantes'); }
+  voicesCleanup() { return this.cleanupState('Áudios'); }
+  setCleanup(cat, enabled) {
+    const c = GoogleService.CLEANUPS[cat]; if (!c) throw new AppError('BAD_CATEGORY', 'Essa categoria não tem limpeza automática.', 400);
+    const cur = this.kvGet(c.kv) || {}; this.kvSet(c.kv, {...cur, enabled: !!enabled});
+    if (enabled) this.cleanCategory(cat, true).catch(() => {});
+    return this.cleanupState(cat);
   }
-  /** Limpeza semanal (pedido do dono): fotos enviadas na conversa (cupons e notas para Finanças) com mais de
-   * 7 dias saem do Drive e do servidor. A despesa lançada e a miniatura na conversa continuam. Roda no máximo
-   * a cada 6 h; cada comprovante vive 7 dias contados de quando foi enviado. */
-  async cleanReceipts(force = false) {
-    const l = this.link(), cfg = this.receiptsCleanup();
-    if (!this.driveOn(l) || !cfg.enabled || this.cleaningReceipts) return {skipped: true};
+  setReceiptsCleanup(enabled) { return this.setCleanup('Comprovantes', enabled); }
+  cleanReceipts(force = false) { return this.cleanCategory('Comprovantes', force); }
+  cleanVoices(force = false) { return this.cleanCategory('Áudios', force); }
+  /** Apaga do Drive e do servidor o que tem mais de 7 dias na categoria (contados de quando foi enviado).
+   * Roda no máximo a cada 6 h por categoria. */
+  async cleanCategory(cat, force = false) {
+    const c = GoogleService.CLEANUPS[cat], l = this.link(), cfg = this.cleanupState(cat);
+    this.cleaning = this.cleaning || new Set();
+    if (!c || !this.driveOn(l) || !cfg.enabled || this.cleaning.has(cat)) return {skipped: true};
     if (!force && cfg.last_at && Date.now() - Date.parse(cfg.last_at) < GoogleService.FOLDER_RECHECK_MS) return {skipped: true};
-    this.cleaningReceipts = true; let removed = 0;
+    this.cleaning.add(cat); let removed = 0;
     try {
       const cutoff = new Date(Date.now() - GoogleService.RECEIPT_DAYS * 864e5).toISOString(), when = now();
-      ensureThumbColumn(this.db);
-      let rows = [];
-      try { rows = this.db.prepare("SELECT a.id, a.mime, a.blob, a.thumb, a.drive_id FROM attachments a JOIN entities e ON e.id=a.entity_id WHERE COALESCE(e.tags,'') LIKE '%chat-attachment%' AND a.mime LIKE 'image/%' AND a.created_at < ? AND a.removed_at IS NULL LIMIT 200").all(cutoff); } catch { rows = []; }
-      for (const a of rows) {
-        if ((!a.thumb || !a.thumb.length) && a.blob && a.blob.length) { const t = makeThumb(Buffer.from(a.blob), a.mime); if (t) this.db.prepare('UPDATE attachments SET thumb=? WHERE id=?').run(t, a.id); }
-        if (a.drive_id) { try { await this.call('DELETE', DRIVE + '/files/' + a.drive_id); } catch (e) { if (e.googleStatus !== 404) continue; } this.forgetDriveFile(a.drive_id, when); }
-        else this.db.prepare('UPDATE attachments SET blob=?, removed_at=? WHERE id=?').run(Buffer.alloc(0), when, a.id);
-        removed++;
+      const drop = async driveId => { try { await this.call('DELETE', DRIVE + '/files/' + driveId); } catch (e) { if (e.googleStatus !== 404) return false; } this.forgetDriveFile(driveId, when); return true; };
+      if (cat === 'Comprovantes') {
+        ensureThumbColumn(this.db);
+        let rows = [];
+        try { rows = this.db.prepare("SELECT a.id, a.mime, a.blob, a.thumb, a.drive_id FROM attachments a JOIN entities e ON e.id=a.entity_id WHERE COALESCE(e.tags,'') LIKE '%chat-attachment%' AND a.mime LIKE 'image/%' AND a.created_at < ? AND a.removed_at IS NULL LIMIT 200").all(cutoff); } catch { rows = []; }
+        for (const a of rows) {
+          if ((!a.thumb || !a.thumb.length) && a.blob && a.blob.length) { const t = makeThumb(Buffer.from(a.blob), a.mime); if (t) this.db.prepare('UPDATE attachments SET thumb=? WHERE id=?').run(t, a.id); }
+          if (a.drive_id) { if (!(await drop(a.drive_id))) continue; }
+          else this.db.prepare('UPDATE attachments SET blob=?, removed_at=? WHERE id=?').run(Buffer.alloc(0), when, a.id);
+          removed++;
+        }
+      } else {
+        let rows = [];
+        try { rows = this.db.prepare('SELECT message_id, drive_id FROM voice_messages WHERE created_at < ? AND removed_at IS NULL AND (drive_id IS NOT NULL OR length(blob) > 0) LIMIT 300').all(cutoff); } catch { rows = []; }
+        for (const v of rows) {
+          if (v.drive_id) { if (!(await drop(v.drive_id))) continue; }
+          else this.db.prepare('UPDATE voice_messages SET blob=?, removed_at=? WHERE message_id=?').run(Buffer.alloc(0), when, v.message_id);
+          removed++;
+        }
       }
       // o que sobrou na categoria (ex.: de antes desta versão, sem linha aqui) também sai depois de 7 dias
-      const list = await this.listCat('Comprovantes', {orderBy: 'createdTime', pageSize: 200, fields: 'files(id,createdTime)'});
-      for (const f of (list.files || []).filter(f => f.createdTime && f.createdTime < cutoff)) {
-        try { await this.call('DELETE', DRIVE + '/files/' + f.id); } catch (e) { if (e.googleStatus !== 404) continue; }
-        this.forgetDriveFile(f.id, when); removed++;
-      }
-      const cur = this.kvGet('drive_receipts_cleanup') || {}; this.kvSet('drive_receipts_cleanup', {...cur, last_at: when, last_removed: removed});
+      const list = await this.listCat(cat, {orderBy: 'createdTime', pageSize: 200, fields: 'files(id,createdTime)'});
+      for (const f of (list.files || []).filter(f => f.createdTime && f.createdTime < cutoff)) if (await drop(f.id)) removed++;
+      const cur = this.kvGet(c.kv) || {}; this.kvSet(c.kv, {...cur, last_at: when, last_removed: removed});
       if (removed) this.summaryCache = null;
       return {removed};
-    } finally { this.cleaningReceipts = false; }
+    } finally { this.cleaning.delete(cat); }
   }
 
   // ---------- Anexos no Drive ----------
@@ -1072,7 +1092,7 @@ class GoogleService {
 
   start(intervalMs = 15 * 60000) {
     if (this.timer) return;
-    const tick = () => { const l = this.link(); if (!l?.refresh || this.busy) return; this.offloadAttachments().catch(() => {}); this.shrinkDriveCovers(3).catch(() => {}); this.offloadVoices().catch(() => {}); this.exportPages().catch(() => {}); this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); try { this.kickMigration(); this.kickExport(); } catch { /* segue na próxima rodada */ } this.checkHidden().catch(() => {}); this.cleanReceipts().catch(() => {}); };
+    const tick = () => { const l = this.link(); if (!l?.refresh || this.busy) return; this.offloadAttachments().catch(() => {}); this.shrinkDriveCovers(3).catch(() => {}); this.offloadVoices().catch(() => {}); this.exportPages().catch(() => {}); this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); try { this.kickMigration(); this.kickExport(); } catch { /* segue na próxima rodada */ } this.checkHidden().catch(() => {}); this.cleanReceipts().catch(() => {}); this.cleanVoices().catch(() => {}); };
     this.timer = setInterval(tick, intervalMs); this.timer.unref?.();
     setTimeout(tick, 30000).unref?.();
   }

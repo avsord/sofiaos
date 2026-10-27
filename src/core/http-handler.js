@@ -190,6 +190,7 @@ function createHandler(runtime) {
       {const fm=p.match(/^\/api\/drive\/files\/([A-Za-z0-9_-]+)\/content$/);if(m==='GET'&&fm&&runtime.google){await GoogleService.sendFile(res,await runtime.google.driveContent(fm[1]),{inline:url.searchParams.get('inline')==='1'});return;}}
       {const dm=p.match(/^\/api\/drive\/files\/([A-Za-z0-9_-]+)$/);if(m==='DELETE'&&dm&&runtime.google){await bodyJson(req,256).catch(()=>({}));return json(res,200,await runtime.google.driveDelete(dm[1]));}}
       if(m==='POST'&&p==='/api/drive/receipts-cleanup'&&runtime.google){const b=await bodyJson(req,256);return json(res,200,runtime.google.setReceiptsCleanup(b.enabled!==false));}
+      if(m==='POST'&&p==='/api/drive/cleanup'&&runtime.google){const b=await bodyJson(req,512);return json(res,200,runtime.google.setCleanup(String(b.cat||''),b.enabled!==false));}
       if(m==='POST'&&p==='/api/drive/export'&&runtime.google){const b=await bodyJson(req,4096);return json(res,200,{export:await runtime.google.startExport(Array.isArray(b.categories)?b.categories.map(String).slice(0,20):undefined)});}
       if(await chatSync(req,res,p,m,url))return;
       if(await extra(req,res,p,m,url))return;

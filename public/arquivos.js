@@ -64,11 +64,14 @@
     catch(e){btn.disabled=false;btn.textContent='Apagar';alert(e.message);}
   }
   function renderCleanup(){
-    var box=$('cleanup');box.replaceChildren();box.hidden=state.cat!=='Comprovantes'||!state.summary||!state.summary.receipts_cleanup;if(box.hidden)return;
-    var rc=state.summary.receipts_cleanup,l=el('label'),i=el('input');i.type='checkbox';i.checked=rc.enabled;
-    l.append(i,document.createTextNode(' Apagar sozinho os comprovantes com mais de '+rc.days+' dias'));box.append(l);
-    box.append(el('small','muted',rc.last_at?'Última limpeza: '+when(rc.last_at)+(rc.last_removed?' · '+rc.last_removed+(rc.last_removed===1?' apagado':' apagados'):''):'A despesa lançada em Finanças e a miniatura na conversa continuam.'));
-    i.onchange=async function(){i.disabled=true;try{var r=await api('/api/drive/receipts-cleanup',{method:'POST',body:{enabled:i.checked}});state.summary.receipts_cleanup=r;renderCleanup();if(r.enabled)setTimeout(function(){refreshSummary().then(function(){openCat('Comprovantes');});},1500);}catch(e){i.checked=!i.checked;alert(e.message);}finally{i.disabled=false;}};
+    var key=state.cat==='Comprovantes'?'receipts_cleanup':state.cat==='Áudios'?'voices_cleanup':'';
+    var box=$('cleanup');box.replaceChildren();box.hidden=!key||!state.summary||!state.summary[key];if(box.hidden)return;
+    var rc=state.summary[key],l=el('label'),i=el('input');i.type='checkbox';i.checked=rc.enabled;
+    l.append(i,document.createTextNode(' Apagar sozinho com mais de '+rc.days+' dias'));box.append(l);
+    var keep=state.cat==='Áudios'?'A transcrição de cada áudio continua na conversa.':'A despesa lançada em Finanças e a miniatura na conversa continuam.';
+    box.append(el('small','muted',(rc.last_at?'Última limpeza: '+when(rc.last_at)+(rc.last_removed?' · '+rc.last_removed+(rc.last_removed===1?' apagado':' apagados'):'')+'. ':'')+keep));
+    var cat=state.cat;
+    i.onchange=async function(){i.disabled=true;try{var r=await api('/api/drive/cleanup',{method:'POST',body:{cat:cat,enabled:i.checked}});state.summary[key]=r;renderCleanup();if(r.enabled)setTimeout(function(){refreshSummary().then(function(){openCat(cat);});},1500);}catch(e){i.checked=!i.checked;alert(e.message);}finally{i.disabled=false;}};
   }
   async function openCat(key,more){
     state.cat=key;if(!more){state.page='';state.items=[];}

@@ -51,9 +51,13 @@ export function SofiaFiles({api,visible=true,onClose}:{api:SofiaApi;visible?:boo
    api.driveDelete(f.id).then(()=>void load()).catch(e=>{appAlert('Não consegui apagar',errorText(e));if(cat)void openCat(cat);});
   }}]);
  }
+ // Limpeza automática: Comprovantes e Áudios, cada um com a sua chave (7 dias, igual para os dois).
+ const cleanupKey=(k?:string)=>k==='Comprovantes'?'receipts_cleanup':k==='Áudios'?'voices_cleanup':null;
+ const cleanup=cat&&cleanupKey(cat.key)&&summary?summary[cleanupKey(cat.key) as 'receipts_cleanup'|'voices_cleanup']:undefined;
  function toggleCleanup(on:boolean){
-  setSummary(s=>s&&s.receipts_cleanup?{...s,receipts_cleanup:{...s.receipts_cleanup,enabled:on}}:s);
-  api.driveReceiptsCleanup(on).then(r=>{setSummary(s=>s?{...s,receipts_cleanup:r}:s);if(on)setTimeout(()=>{void load();if(cat?.key==='Comprovantes')void openCat(cat);},1500);}).catch(e=>{appAlert('Não consegui mudar a limpeza',errorText(e));void load();});
+  const k=cat&&cleanupKey(cat.key);if(!cat||!k)return;const which=cat.key as 'Comprovantes'|'Áudios';
+  setSummary(s=>s&&s[k]?{...s,[k]:{...s[k]!,enabled:on}}:s);
+  api.driveCleanup(which,on).then(r=>{setSummary(s=>s?{...s,[k]:r}:s);if(on)setTimeout(()=>{void load();if(cat)void openCat(cat);},1500);}).catch(e=>{appAlert('Não consegui mudar a limpeza',errorText(e));void load();});
  }
  function startExport(){
   const cats=picked||[];if(!cats.length){appAlert('Exportar cópia','Escolha pelo menos um tipo de arquivo.');return;}
@@ -64,7 +68,7 @@ export function SofiaFiles({api,visible=true,onClose}:{api:SofiaApi;visible?:boo
  return <MotionModal visible={visible} animationType="slide" onRequestClose={back}><View style={{flex:1,backgroundColor:c.bg}}>{header}
   {cat?<FlatList keyboardShouldPersistTaps="handled" data={items||[]} keyExtractor={f=>f.id} contentContainerStyle={{padding:18,paddingTop:6,gap:10,flexGrow:1}}
     ListHeaderComponent={<View style={{gap:10,marginBottom:6}}><Text style={{color:c.muted,fontSize:13,lineHeight:19}}>{cat.hint} Toque num arquivo para abrir, salvar ou compartilhar.{cat.deletable===false?' Para apagar, apague a página em Páginas.':''}</Text>
-     {cat.key==='Comprovantes'&&summary?.receipts_cleanup?<View style={{backgroundColor:c.accentSoft,borderRadius:16,padding:14,gap:6}}><View style={{flexDirection:'row',alignItems:'center',gap:12}}><Text style={{flex:1,color:c.text,fontSize:14,fontWeight:'600'}}>Apagar sozinho com mais de {summary.receipts_cleanup.days} dias</Text><Switch accessibilityLabel="Limpeza automática dos comprovantes" value={summary.receipts_cleanup.enabled} onValueChange={toggleCleanup} trackColor={{true:c.accent,false:c.line}} thumbColor={c.surface}/></View><Text style={{color:c.muted,fontSize:12,lineHeight:17}}>{summary.receipts_cleanup.last_at?'Última limpeza: '+when(summary.receipts_cleanup.last_at)+(summary.receipts_cleanup.last_removed?' · '+summary.receipts_cleanup.last_removed+(summary.receipts_cleanup.last_removed===1?' apagado':' apagados'):'')+'. ':''}A despesa lançada em Finanças e a miniatura na conversa continuam.</Text></View>:null}</View>}
+     {cleanup?<View style={{backgroundColor:c.accentSoft,borderRadius:16,padding:14,gap:6}}><View style={{flexDirection:'row',alignItems:'center',gap:12}}><Text style={{flex:1,color:c.text,fontSize:14,fontWeight:'600'}}>Apagar sozinho com mais de {cleanup.days} dias</Text><Switch accessibilityLabel={'Limpeza automática: '+cat.label} value={cleanup.enabled} onValueChange={toggleCleanup} trackColor={{true:c.accent,false:c.line}} thumbColor={c.surface}/></View><Text style={{color:c.muted,fontSize:12,lineHeight:17}}>{cleanup.last_at?'Última limpeza: '+when(cleanup.last_at)+(cleanup.last_removed?' · '+cleanup.last_removed+(cleanup.last_removed===1?' apagado':' apagados'):'')+'. ':''}{cat.key==='Áudios'?'A transcrição de cada áudio continua na conversa.':'A despesa lançada em Finanças e a miniatura na conversa continuam.'}</Text></View>:null}</View>}
     ListEmptyComponent={listError?<ErrorBanner text={listError} onRetry={()=>void openCat(cat)}/>:items?<Text style={{color:c.muted,textAlign:'center',paddingVertical:30}}>Nada aqui ainda.</Text>:<Skeleton/>}
     ListFooterComponent={page?<Button title="Mostrar mais" secondary onPress={()=>void openCat(cat,true)}/>:null}
     renderItem={({item})=><Pressable accessibilityRole="button" accessibilityLabel={'Abrir '+item.name} onPress={()=>void open(item)} style={({pressed})=>({backgroundColor:pressed?c.card:c.surface,borderRadius:18,borderWidth:1,borderColor:c.line,padding:14,flexDirection:'row',gap:12,alignItems:'center'})}>

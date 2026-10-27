@@ -12,7 +12,7 @@ export type Message = {
   id: string; sequence?: number; conversation_id?: string; client_id?: string;
   role: 'user' | 'assistant'; content: string; created_at: string; status: string;
   error_code?: string | null; error?: string;
-  voice?: { mime: string; duration_ms: number; audio_url: string } | null;
+  voice?: { mime: string; duration_ms: number; audio_url: string; removed?: boolean } | null;
   localVoice?: VoiceDraft;
   localAttachments?: AttachmentDraft[];
 };

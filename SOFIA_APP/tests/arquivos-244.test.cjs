@@ -37,7 +37,7 @@ test('tela: apagar pede confirmação e cópia de página não tem lixeira; comp
  const s=read('src/components/SofiaFiles.tsx');
  assert.ok(s.includes("appAlert('Apagar este arquivo?'")&&s.includes("style:'destructive'"));
  assert.ok(s.includes('{item.deletable?<IconButton name="trash"'));
- assert.ok(s.includes("cat.key==='Comprovantes'&&summary?.receipts_cleanup")&&s.includes('onValueChange={toggleCleanup}'));
+ assert.ok(s.includes("k==='Comprovantes'?'receipts_cleanup':k==='Áudios'?'voices_cleanup':null")&&s.includes('onValueChange={toggleCleanup}'),'chave de limpeza nos Comprovantes e nos Áudios');
  assert.ok(s.includes('<Skeleton rows={6}/>')&&s.includes('ShimmerGroup'),'nunca tela cinza: esqueleto com brilho');
  assert.ok(s.includes('Sharing.shareAsync(file.uri'),'abrir = tela do Android para abrir/salvar/compartilhar');
  assert.ok(s.includes("BackHandler.addEventListener('hardwareBackPress',back)"),'voltar do Android volta da lista para os tipos');
@@ -59,4 +59,11 @@ test('0.3.245 Armazenamento fica nas configurações, acima da Conta Google, car
  assert.ok(s.includes("state==='off'")&&s.includes('Conecte a Conta Google'),'sem conta: explica, sem erro vermelho');
  assert.ok(s.includes('<DeferredScreen load={loadSofiaFiles}')&&s.includes('Ver arquivos da Sofia'));
  assert.ok(s.includes(' livres · ')&&s.includes(' usados'));
+});
+
+test('0.3.246 áudios na limpeza: a conversa mostra "Áudio apagado" no lugar do player e a tela usa a mesma chave dos comprovantes',()=>{
+ const chat=read('src/screens/Chat.tsx');assert.ok(chat.includes('message.voice&&message.voice.removed?')&&chat.includes('Áudio apagado · a transcrição continua'));
+ assert.ok(read('src/lib/types.ts').includes('audio_url: string; removed?: boolean'));
+ assert.ok(read('src/lib/api.ts').includes("'/md/drive/cleanup',{cat,enabled}"));
+ const s=read('src/components/SofiaFiles.tsx');assert.ok(s.includes("api.driveCleanup(which,on)")&&s.includes('A transcrição de cada áudio continua na conversa.'));
 });

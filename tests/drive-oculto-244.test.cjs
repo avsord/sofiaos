@@ -327,3 +327,34 @@ test('Armazenamento (0.3.245): total, usado no Drive, lixeira, Gmail e Fotos e o
  g.quota={usage:'10',usageInDrive:'10'};svc.summaryCache=null;assert.equal((await svc.driveStorage()).quota.limit,0,'sem limite = 0');
  const off=service(t,fakeDrive(),SC_BOTH);off.svc.saveLink({});await assert.rejects(off.svc.driveStorage(),/Conecte a Conta Google/);
 });
+
+test('0.3.246 limpeza dos áudios: voz com mais de 7 dias sai do Drive e do servidor; a recente fica; a conversa avisa no lugar do player',async t=>{
+ const f=fixture(t);f.config.loginPassword='test-only-password-246';f.config.loginEmail='owner@example.com';
+ const g=fakeDrive();
+ const runtime=createRuntime(f.config,{store:f.store,provider:f.provider,secureDir:path.join(f.dir,'secure'),googleFetch:g.fetch,googleEnv:ENV});
+ const server=http.createServer(runtime.handler);await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ const base='http://127.0.0.1:'+server.address().port;f.config.publicBaseUrl=base;
+ t.after(async()=>{server.closeAllConnections();await new Promise(r=>server.close(r));});
+ const svc=runtime.google,store=f.store;svc.saveLink({refresh:svc.seal('rt'),email:'p@gmail.com',scopes:SC_BOTH,connected_at:new Date().toISOString(),sync:{},drive:{migration:{state:'done'}}});
+ const conv=store.createConversation('Chat','mobile');
+ const voz=(cid,txt,days)=>{const m=store.userMessage({conversationId:conv.id,clientId:cid,message:txt,channel:'mobile'});const id=m.message?m.message.id:m.id;store.saveVoiceMessage(id,{mime:'audio/mp4',duration_ms:1000,transcript:txt,bytes:Buffer.from('VOZ-'+cid)});store.db.prepare('UPDATE voice_messages SET created_at=? WHERE message_id=?').run(new Date(Date.now()-days*864e5).toISOString(),id);return id;};
+ const velha=voz('a','compra antiga',10),media=voz('b','lista de ontem',3),nova=voz('c','agora',0);
+ await svc.offloadVoices();
+ const velhaDrive=store.voiceMessage(velha).drive_id;assert.ok(velhaDrive);
+ assert.equal(svc.voicesCleanup().enabled,true,'ligada por padrão, igual aos comprovantes');
+ assert.equal((await svc.cleanVoices(true)).removed,1);
+ assert.ok(!g.files.some(x=>x.id===velhaDrive),'saiu do Drive');
+ assert.ok(store.voiceMessage(velha).removed_at);assert.equal(store.voiceMessage(media).removed_at,null);assert.equal(store.voiceMessage(nova).removed_at,null);
+ await assert.rejects(svc.voiceBytes(store.voiceMessage(velha)),/transcrição continua/);
+ assert.equal((await svc.voiceBytes(store.voiceMessage(media))).toString(),'VOZ-b');
+ const login=await (await fetch(base+'/api/mobile/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'owner@example.com',password:'test-only-password-246'})})).json();
+ const auth={Authorization:'Bearer '+login.token};
+ const conversa=await (await fetch(base+'/api/mobile/conversations/'+conv.id,{headers:auth})).json();
+ const msgs=conversa.messages||[];const by=id=>msgs.find(m=>m.id===id);
+ assert.equal(by(velha).voice.removed,true,'a conversa sabe que o áudio foi apagado');assert.equal(by(velha).content,'compra antiga','a transcrição fica');
+ assert.equal(by(media).voice.removed,undefined);
+ const off=await (await fetch(base+'/api/mobile/md/drive/cleanup',{method:'POST',headers:{...auth,'Content-Type':'application/json'},body:JSON.stringify({cat:'Áudios',enabled:false})})).json();assert.equal(off.enabled,false);
+ assert.deepEqual(await svc.cleanVoices(true),{skipped:true},'desligada não apaga');
+ const s=await svc.driveSummary();assert.equal(s.voices_cleanup.enabled,false);assert.equal(s.receipts_cleanup.enabled,true,'cada uma tem a sua chave');
+ const bad=await fetch(base+'/api/mobile/md/drive/cleanup',{method:'POST',headers:{...auth,'Content-Type':'application/json'},body:JSON.stringify({cat:'Backups',enabled:true})});assert.equal(bad.status,400);
+});

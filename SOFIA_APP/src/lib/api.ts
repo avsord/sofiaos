@@ -15,7 +15,7 @@ import {encryptedStorage} from './encrypted-storage';
 export type DriveCategory={key:string;label:string;hint:string;count:number;bytes:number;deletable?:boolean};
 export type ReceiptsCleanup={enabled:boolean;days:number;last_at:string;last_removed:number};
 export type DriveExport={state:'running'|'done'|'error';folder_name:string;link:string;total:number;done:number;failed:number;bytes:number;started_at:string;finished_at:string;error:string};
-export type DriveSummary={connected:boolean;mode:'hidden'|'folder';needs_reconnect:boolean;migration:{state:string;moved:number;left:number;error:string;finished_at:string};export:DriveExport|null;wiped_at:string;categories:DriveCategory[];quota:DriveQuota|null;receipts_cleanup?:ReceiptsCleanup};
+export type DriveSummary={connected:boolean;mode:'hidden'|'folder';needs_reconnect:boolean;migration:{state:string;moved:number;left:number;error:string;finished_at:string};export:DriveExport|null;wiped_at:string;categories:DriveCategory[];quota:DriveQuota|null;receipts_cleanup?:ReceiptsCleanup;voices_cleanup?:ReceiptsCleanup};
 export type DriveQuota={limit:number;usage:number;usage_in_drive:number;usage_in_trash:number};
 export type DriveStorage={quota:DriveQuota|null;categories:{key:string;label:string;count:number;bytes:number}[];sofia_bytes:number;mode:'hidden'|'folder'};
 export type DriveFile={id:string;name:string;mime:string;size:number;modified:string;origin:string;deletable?:boolean};
@@ -229,6 +229,7 @@ export class SofiaApi {
   driveList(cat:string,page='') { return this.request<{cat:string;items:DriveFile[];next_page:string}>('/md/drive/files?cat='+encodeURIComponent(cat)+(page?'&page='+encodeURIComponent(page):''),undefined,'GET',30000); }
   driveFileSource(id:string) { if(!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('Arquivo inválido.');return {uri:SITE+'/api/mobile/md/drive/files/'+encodeURIComponent(id)+'/content',headers:{Authorization:'Bearer '+this.token}}; }
   driveDelete(id:string) { if(!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('Arquivo inválido.');return this.request<{ok:boolean;name:string}>('/md/drive/files/'+encodeURIComponent(id),{},'DELETE',30000); }
+  driveCleanup(cat:'Comprovantes'|'Áudios',enabled:boolean) { return this.request<ReceiptsCleanup>('/md/drive/cleanup',{cat,enabled},'POST',30000); }
   driveReceiptsCleanup(enabled:boolean) { return this.request<ReceiptsCleanup>('/md/drive/receipts-cleanup',{enabled},'POST',30000); }
   driveExport(categories:string[]) { return this.request<{export:DriveExport}>('/md/drive/export',{categories},'POST',120000); }
   driveBackup() { return this.request<{ok?:boolean;skipped?:boolean;bytes?:number}>('/md/drive/backup',{},'POST',120000); }
