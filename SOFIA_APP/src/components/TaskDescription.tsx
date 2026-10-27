@@ -1,4 +1,5 @@
 import React,{useRef,useState} from 'react';
+import {useDesktop} from '../lib/desktop';
 import {Pressable,ScrollView,Text,TextInput,View,type TextStyle} from 'react-native';
 import {editBlockText,formatRange,textRuns,type Mark,type LeafBlock} from '../lib/leaf-document';
 import {useTheme} from '../lib/theme';
@@ -6,7 +7,8 @@ import type {Task} from '../lib/types';
 type Document=NonNullable<Task['description_document']>;
 function blockFor(text:string,doc?:Document):LeafBlock{return {id:'description',type:'text',text,marks:doc?.text===text?doc.marks:[]};}
 function runStyle(m:Partial<Mark>):TextStyle{return {fontWeight:m.bold?'700':'400',fontStyle:m.italic?'italic':'normal',textDecorationLine:m.underline&&m.strike?'underline line-through':m.underline?'underline':m.strike?'line-through':'none',...(m.color?{color:m.color}:m.highlight?{color:'#16151D'}:{}),...(m.highlight?{backgroundColor:m.highlight}:{}),...(m.code?{fontFamily:'monospace'}:{})};}
-export function TaskDescription({text,document,lines}:{text:string;document?:Document;lines?:number}){const c=useTheme();return <Text selectable numberOfLines={lines} style={{color:text?c.text:c.muted,fontSize:16,lineHeight:24}}>{text?textRuns(blockFor(text,document)).map((r,i)=><Text key={i} style={runStyle(r.style)}>{r.text}</Text>):'Sem descrição'}</Text>;}
+// 0.3.254 (computador): na lista, a previa da descricao fica abaixo do titulo na hierarquia (menor e discreta); antes era maior que o titulo
+export function TaskDescription({text,document,lines}:{text:string;document?:Document;lines?:number}){const c=useTheme(),preview=useDesktop()&&!!lines;return <Text selectable numberOfLines={lines} style={preview?{color:c.muted,fontSize:14,lineHeight:20}:{color:text?c.text:c.muted,fontSize:16,lineHeight:24}}>{text?textRuns(blockFor(text,document)).map((r,i)=><Text key={i} style={runStyle(r.style)}>{r.text}</Text>):'Sem descrição'}</Text>;}
 export function TaskDescriptionEditor({text,document,onChange,disabled=false}:{text:string;document?:Document;onChange:(text:string,doc:Document)=>void;disabled?:boolean}){
  const c=useTheme(),input=useRef<TextInput>(null),selection=useRef({start:0,end:0}),[typing,setTyping]=useState<Partial<Mark>>({}),[palette,setPalette]=useState<'color'|'highlight'|null>(null);const block=blockFor(text,document);
  function commit(b:LeafBlock){onChange(b.text,{version:1,text:b.text,marks:b.marks});}
