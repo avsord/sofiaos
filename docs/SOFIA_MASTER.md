@@ -182,6 +182,12 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Toda máscara monetária usa separação pt-BR e evita transformar milhares em centavos ao apagar um caractere. A carteira não armazena senhas de banco nem faz transferências reais.
 - Implementação desta rodada está em candidato 0.3.150, ainda não é aprovação de atualização OTA.
 
+### 7.5 Arquivos da Sofia no Drive (dono, 26/10/2026)
+- Tudo o que a Sofia guarda no Drive fica na **área oculta do app** (`appDataFolder`, escopo `drive.appdata`): não aparece no Drive (web, celular, PC), ninguém apaga sem querer. `drive.file` continua só para a cópia visível pedida pela pessoa.
+- Porta de entrada: tela **Arquivos da Sofia** (Perfil → Conta Google, e o site em `/arquivos`): tipos com quantidade/espaço, abrir/compartilhar, **apagar** (de vez; menos as cópias .md das páginas, que acompanham a página) e **Exportar cópia** numa pasta visível.
+- Conta conectada antes da 0.3.244: segue na pasta visível até tocar em Reconectar; a migração copia, confere o tamanho, troca a referência e só então manda o original para a lixeira. Arquivo que falha 3 vezes fica onde está e a pasta antiga não é apagada.
+- **Comprovantes** (fotos da conversa para Finanças) se apagam sozinhos com mais de 7 dias (ligado por padrão, desligável na tela); a despesa e a miniatura na conversa ficam. Arquivo apagado deixa a linha com `removed_at` e a rota responde 410 com o motivo.
+
 ## 8. Regras que não se quebram
 
 - Preservar assinatura, package `com.avsord.sofiaapp`, versionCode crescente,
@@ -206,6 +212,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 - Todo commit que muda o app aumenta a versão (app.json, package.json, package-lock.json em 2 pontos, src/lib/update.ts, 2 testes e RELEASE_<versão>.md). O CI não numera sozinho: sem isso o APK sai com a versão anterior e não é reconhecido como atualização.
 
 ## 9. Pendências (atualizar a cada rodada)
+
+- **0.3.244 Arquivos da Sofia:** depois do deploy, tocar em Reconectar (Perfil → Conta Google) para a permissão `drive.appdata`; conferir no celular a migração (pasta "Sofia OS" na lixeira do Drive e aviso no sino), abrir/apagar um arquivo, Exportar cópia e a limpeza dos comprovantes. Se o Google recusar o escopo novo, incluir `drive.appdata` em Google Cloud → Acesso a dados.
 
 - **Finanças 0.3.150:** executar checks e CI Android, testar no aparelho a troca de conta, gesto voltar, datas/avisos Android com app fechado, baixa sem duplicidade, render da faixa laranja, cartas ocultadas e restauráveis e extratos de contas diferentes. Candidato não aprovado para OTA; quando os testes falharem, corrigir sem apagar dados ou desabilitar validações.
 
@@ -242,6 +250,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
    12 h, filtro privado preservado em updates.
 
 ## 10. Diário de rodadas (só acrescentar; uma linha por rodada)
+- 26/10/2026 · 0.3.244 (code 245) · candidato manual: Arquivos da Sofia na área oculta do Drive, migração da pasta visível, tela no app e no site (/arquivos), apagar, exportar cópia, limpeza semanal dos comprovantes, proteções (pasta na lixeira, área oculta apagada) e correção do backup que regravava o estado do Drive. Servidor 384/384, app 869 + verificações Python, tsc 0 erros. Celular e reconexão real pendentes.
 - 16/10/2026 · 0.3.150 · candidato manual em elaboração: selector de conta, reserva sobreposta, resumo com extrato, Pendentes manuais + notificações Android, exclusão segura de cartões e análise por conta. Sem alterar dados existentes no backend ou liberar OTA; validação CI/celular pendente.
 
 - 13/10/2026 · candidato 0.3.137 / código 142, patch local, sem PR: leitor ML unificado com rota autenticada, cancelamento, fila limitada, identidade estável e integração Android sem fallback. Validações e limitações constam de `LEIA-ME.md` e relatórios do pacote de entrega. Sem deploy nem APK gerado nesta sessão.

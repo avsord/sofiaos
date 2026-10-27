@@ -23,6 +23,7 @@ export const loadWorkspace=()=>once('apps',()=>require('../screens/Workspace').W
 export const loadEntityEditor=()=>once('entity-editor',()=>require('../screens/Workspace').EntityEditor);
 export const loadProfile=()=>once('profile',()=>require('../screens/Profile').Profile);
 export const loadNotifications=()=>once('notifications',()=>require('../screens/Notifications').Notifications);
+export const loadSofiaFiles=()=>once('sofia-files',()=>require('../components/SofiaFiles').SofiaFiles);
 export const loadBackgroundServices=()=>once('background-services',()=>require('../components/BackgroundServices').BackgroundServices);
 
 // Prepare lazy module definitions, without mounting hidden screens or fetching data.

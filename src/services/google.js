@@ -4,8 +4,9 @@
 // HTTP 410), todos os calendários visíveis (o escolhido nos dois sentidos, os
 // outros somente leitura), dia inteiro, fuso, recorrências expandidas,
 // cancelados, recusados, conflitos sem sobrescrever nada.
-// Drive (escopo drive.file: a Sofia só enxerga o que ela mesma criou): backup
-// criptografado diário na pasta "Sofia OS/Backups", guardando os 14 últimos.
+// Drive (drive.appdata + drive.file: a Sofia só enxerga o que ela mesma criou): tudo dela fica na
+// área oculta do app no Drive (backups, anexos, áudios, páginas); a pasta visível só aparece quando a
+// pessoa pede uma cópia em "Arquivos da Sofia" → Exportar.
 // Tokens ficam criptografados (AES-256-GCM) com SOFIA_CALENDAR_TOKEN_KEY.
 const crypto = require('node:crypto'), fs = require('node:fs'), path = require('node:path');
 const {makeThumb} = require('./thumb');
@@ -23,7 +24,7 @@ function cleanData(kind, data) {
   return out;
 }
 
-const SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/gmail.readonly'];
+const SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.appdata', 'https://www.googleapis.com/auth/gmail.readonly'];
 const AUTH = 'https://accounts.google.com/o/oauth2/v2/auth', TOKEN = 'https://oauth2.googleapis.com/token', REVOKE = 'https://oauth2.googleapis.com/revoke';
 const CAL = 'https://www.googleapis.com/calendar/v3', DRIVE = 'https://www.googleapis.com/drive/v3', UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
 const TZ = 'America/Sao_Paulo', MAX_PAGES = 20, KEEP_BACKUPS = 14, CALLBACK = '/google/oauth/callback';
@@ -57,6 +58,9 @@ class GoogleService {
     // Mensagens de voz (as maiores: até dezenas de MB cada) também podem morar no Drive.
     // sha256 guarda a impressão do áudio original para o reenvio idempotente continuar seguro sem o blob aqui.
     try { const cols = this.db.prepare('PRAGMA table_info(voice_messages)').all().map(c => c.name); if (!cols.includes('drive_id')) this.db.exec('ALTER TABLE voice_messages ADD COLUMN drive_id TEXT'); if (!cols.includes('sha256')) this.db.exec('ALTER TABLE voice_messages ADD COLUMN sha256 TEXT'); } catch { /* sem tabela de voz */ }
+    // 0.3.244: arquivo apagado em "Arquivos da Sofia" (à mão ou na limpeza semanal dos comprovantes): a linha
+    // fica (com a miniatura, se houver) e removed_at diz que o conteúdo não existe mais, para a tela explicar.
+    for (const table of ['attachments', 'voice_messages']) { try { if (!this.db.prepare(`PRAGMA table_info(${table})`).all().some(c => c.name === 'removed_at')) this.db.exec(`ALTER TABLE ${table} ADD COLUMN removed_at TEXT`); } catch { /* sem tabela */ } }
     this.blobCache = new Map(); this.blobCacheBytes = 0; this.offloading = false;
     // 0.3.200: capa antiga apagada na Sofia tambem sai do Drive
     if (typeof workspace.dropAttachment === 'function') {
@@ -127,7 +131,7 @@ class GoogleService {
     const old = this.link() || {};
     this.saveLink({...old, refresh: this.seal(tokens.refresh_token), email, scopes: String(tokens.scope || ''), connected_at: now(), calendar_id: old.calendar_id || 'primary', sync: {}, last_error: '', conflicts: []});
     this.access = {token: tokens.access_token, exp: Date.now() + (Number(tokens.expires_in) || 3000) * 1000 - 60000};
-    setTimeout(() => { this.ensureFolders().catch(() => {}).then(() => { this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); this.offloadAttachments().catch(() => {}); this.offloadVoices().catch(() => {}); this.exportPages().catch(() => {}); }); }, 50).unref?.();
+    setTimeout(() => { this.ensureFolders().catch(() => {}).then(() => { this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); this.offloadAttachments().catch(() => {}); this.offloadVoices().catch(() => {}); this.exportPages().catch(() => {}); try { this.kickMigration(); } catch { /* segue na próxima rodada */ } }); }, 50).unref?.();
     return {ok: true, message: 'Conta Google conectada' + (email ? ' (' + email + ')' : '') + '. Pode voltar para a Sofia.'};
   }
   /** Do app (janela do Google aberta pela própria Sofia): devolve um redirecionamento
@@ -204,7 +208,7 @@ class GoogleService {
     return {...base, syncing: this.busy, email: l.email, last_sync: l.last_sync, error: l.last_error || undefined, calendar_id: cal?.id || 'primary', calendar_name: cal?.summary || 'Principal',
       calendars, warnings, conflicts: l.conflicts || [], item_errors: l.item_errors || [], history: (l.history || []).slice(0, 10),
       gmail: {connected: /gmail\.readonly/.test(l.scopes || '')},
-      drive: {connected: /drive\.file/.test(l.scopes || ''), portable: {configured: String(process.env.SOFIA_BACKUP_PASSPHRASE || '').length >= 12, at: l.drive?.portable_at || '', error: l.drive?.portable_error || ''}, last_backup: l.drive?.last_backup, last_backup_error: l.drive?.last_error, backups: l.drive?.count || 0, folder: 'Sofia OS/Backups', folders: l.drive?.folders ? Object.keys(l.drive.folders) : [], attachments: this.attachmentStats(), voices: this.voiceStats(), pages: l.drive?.pages_exported || 0}};
+      drive: {...this.driveState(l), portable: {configured: String(process.env.SOFIA_BACKUP_PASSPHRASE || '').length >= 12, at: l.drive?.portable_at || '', error: l.drive?.portable_error || ''}, last_backup: l.drive?.last_backup, last_backup_error: l.drive?.last_error, backups: l.drive?.count || 0, folder: this.hiddenOn(l) ? 'área oculta da Sofia no seu Drive' : 'Sofia OS/Backups', folders: l.drive?.folders ? Object.keys(l.drive.folders) : [], attachments: this.attachmentStats(), voices: this.voiceStats(), pages: l.drive?.pages_exported || 0}};
   }
   select(calendarId) {
     const l = this.link(); if (!l?.refresh) throw new AppError('GOOGLE_NOT_CONNECTED', 'Conta Google não conectada.', 409);
@@ -416,18 +420,63 @@ class GoogleService {
   }
 
   // ---------- Drive ----------
+  // 0.3.244: os arquivos da Sofia moram na ÁREA OCULTA do app no Drive (appDataFolder, escopo drive.appdata).
+  // Ela não aparece no Drive (site, celular, computador), então ninguém apaga sem querer; só "Excluir dados
+  // ocultos do app" nas configurações do Drive remove, e isso é de propósito. A pessoa vê, abre e copia tudo
+  // pela tela "Arquivos da Sofia" (app e site) e pode exportar uma cópia visível quando quiser.
+  // Conta conectada antes disso (só drive.file) continua na pasta visível "Sofia OS" até reconectar; depois
+  // a migração copia cada arquivo para a área oculta, confere o tamanho, repõe a referência e só então
+  // manda o original para a lixeira.
+  driveOn(l = this.link()) { return !!(l?.refresh && /drive\.(file|appdata)/.test(l.scopes || '')); }
+  hiddenOn(l = this.link()) { return !!(l?.refresh && /drive\.appdata/.test(l.scopes || '')); }
+  visibleOn(l = this.link()) { return !!(l?.refresh && /drive\.file/.test(l.scopes || '')); }
+  /** Ainda há (ou pode haver) arquivos na pasta visível antiga para levar à área oculta. */
+  legacyPending(l = this.link()) { return this.visibleOn(l) && (!this.hiddenOn(l) || l.drive?.migration?.state !== 'done'); }
+  /** Grava só o que mudou no estado do Drive, sem apagar o resto (antes o backup apagava a lista de pastas). */
+  saveDrive(patch) { const cur = this.link(); if (cur) this.saveLink({...cur, drive: {...(cur.drive || {}), ...patch}}); }
+  static q(v) { return String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+  static multipart(meta, mime, bytes) {
+    const boundary = 'sofia' + id(), type = mime || 'application/octet-stream';
+    const body = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: ${type}\r\n\r\n`), bytes, Buffer.from(`\r\n--${boundary}--`)]);
+    return {body, type: 'multipart/related; boundary=' + boundary};
+  }
+  static CATS = [
+    {key: 'Páginas', label: 'Páginas', hint: 'Cada página sua em texto (.md), atualizada quando muda.'},
+    {key: 'Anexos', label: 'Anexos', hint: 'Capas, fotos e arquivos das páginas e registros.'},
+    {key: 'Comprovantes', label: 'Comprovantes', hint: 'Fotos enviadas na conversa (cupons e notas para Finanças).'},
+    {key: 'Áudios', label: 'Áudios', hint: 'Mensagens de voz com mais de 1 dia.'},
+    {key: 'Backup com senha', label: 'Backup com senha', hint: 'Abre sem o servidor, com a senha de backup (veja COMO-RESTAURAR.md).'},
+    {key: 'Backups', label: 'Backups diários', hint: 'Cópias criptografadas do banco; só abrem com a chave do servidor.'},
+  ];
+  /** Onde um arquivo novo daquela categoria vai morar: área oculta, ou a pasta visível antiga se ainda não reconectou. */
+  async target(cat) {
+    const l = this.link(); if (!this.driveOn(l)) return null;
+    if (this.hiddenOn(l)) return {parents: ['appDataFolder'], appProperties: {sofia_cat: cat}};
+    const dir = await this.folderId(cat); return dir ? {parents: [dir], appProperties: {sofia_cat: cat}} : null;
+  }
+  async upload({name, mime, bytes, cat, description, props, extra}) {
+    const t = await this.target(cat); if (!t) return null;
+    const meta = {name, parents: t.parents, mimeType: mime || 'application/octet-stream', ...(description ? {description} : {}), appProperties: {...(props || {}), ...t.appProperties}, ...(extra || {})};
+    const {body, type} = GoogleService.multipart(meta, mime, bytes);
+    return this.call('POST', UPLOAD + '/files?uploadType=multipart&fields=id,size', body, {'Content-Type': type});
+  }
+  /** Lista os arquivos de uma categoria, na área oculta ou na pasta visível (conforme a conexão). */
+  async listCat(cat, {orderBy = 'createdTime desc', pageSize = 100, fields = 'files(id,name)', pageToken = ''} = {}) {
+    const l = this.link(); if (!this.driveOn(l)) return {files: []};
+    const params = new URLSearchParams({orderBy, pageSize: String(pageSize), fields: /nextPageToken/.test(fields) ? fields : 'nextPageToken,' + fields});
+    if (pageToken) params.set('pageToken', pageToken);
+    if (this.hiddenOn(l)) { params.set('spaces', 'appDataFolder'); params.set('q', `appProperties has { key='sofia_cat' and value='${GoogleService.q(cat)}' } and trashed=false`); }
+    else { const dir = await this.folderId(cat); if (!dir) return {files: []}; params.set('q', `'${dir}' in parents and trashed=false`); }
+    return this.call('GET', DRIVE + '/files?' + params.toString());
+  }
   async folder(name, parent) {
     const q = `mimeType='application/vnd.google-apps.folder' and name='${name.replace(/'/g, "\\'")}' and trashed=false` + (parent ? ` and '${parent}' in parents` : '');
     const found = await this.call('GET', DRIVE + '/files?fields=files(id,name)&q=' + encodeURIComponent(q));
     if (found.files?.length) return found.files[0].id;
     return (await this.call('POST', DRIVE + '/files?fields=id', {name, mimeType: 'application/vnd.google-apps.folder', ...(parent ? {parents: [parent]} : {})})).id;
   }
-  // ---------- Estrutura de pastas no Drive ----------
-  // Assim que a pessoa conecta, a Sofia cria a casa dela no Drive, organizada:
-  //   Sofia OS/Backups   (cópias criptografadas do banco, uma por dia)
-  //   Sofia OS/Anexos    (capas de página, fotos e arquivos; aqui no servidor fica só a referência)
-  //   Sofia OS/Áudios    (mensagens de voz da conversa com mais de 1 dia)
-  //   Sofia OS/Páginas   (cada página sua como um arquivo .md legível, atualizado quando muda)
+  // ---------- Pasta visível antiga (só para quem ainda não reconectou) ----------
+  //   Sofia OS/Backups, Backup com senha, Anexos, Comprovantes, Áudios e Páginas.
   // Os ids ficam guardados no link; nunca se cria pasta repetida (folder() reaproveita).
   static FOLDERS = ['Backups', 'Anexos', 'Áudios', 'Páginas', 'Comprovantes', 'Backup com senha'];
   // offloadAttachments/offloadVoices/exportPages rodam juntos, sem esperar um pelo outro: se
@@ -439,10 +488,21 @@ class GoogleService {
     return this.ensureFoldersPromise;
   }
   async ensureFoldersOnce() {
-    const l = this.link(); if (!l?.refresh || !/drive\.file/.test(l.scopes || '')) return null;
+    const l = this.link(); if (!this.visibleOn(l) || this.hiddenOn(l)) return null; // área oculta: nenhuma pasta visível é criada
+    // 0.3.244: a pasta foi para a lixeira (sem querer)? Tira de lá antes de qualquer coisa, para nada se perder.
+    const cachedRoot = l.drive?.folders?.root;
+    if (cachedRoot) {
+      try {
+        const meta = await this.call('GET', DRIVE + '/files/' + cachedRoot + '?fields=id,trashed');
+        if (meta && meta.trashed === true) {
+          await this.call('PATCH', DRIVE + '/files/' + cachedRoot, {trashed: false});
+          this.w.notify('drive', 'Pasta da Sofia restaurada', 'A pasta "Sofia OS" do seu Google Drive tinha ido para a lixeira e a Sofia a tirou de lá. Para ela sair do Drive sem risco, abra Perfil → Conta Google e toque em Reconectar: os arquivos passam para uma área oculta que só a Sofia acessa.', null, 'info', 'drive-restored-' + now().slice(0, 10));
+        }
+      } catch { /* a conferência é cortesia: se falhar, segue como antes */ }
+    }
     const root = await this.dedupedFolder('Sofia OS'); const folders = {root};
     for (const name of GoogleService.FOLDERS) folders[name] = await this.dedupedFolder(name, root);
-    this.saveLink({...this.link(), drive: {...(this.link().drive || {}), folders}});
+    this.saveDrive({folders});
     return folders;
   }
   /** Como folder(), mas se achar MAIS de uma pasta com o mesmo nome (de uma corrida antiga, antes
@@ -476,6 +536,320 @@ class GoogleService {
     return cached || null;
   }
 
+  // ---------- Migração: pasta visível → área oculta ----------
+  /** As pastas "Sofia OS" visíveis que a Sofia criou (pode haver mais de uma, de versões antigas) e as subpastas. Só procura, nunca cria. */
+  async legacyTree() {
+    const l = this.link(); if (!this.visibleOn(l)) return [];
+    const roots = new Set(); if (l.drive?.folders?.root) roots.add(l.drive.folders.root);
+    const found = await this.call('GET', DRIVE + '/files?fields=files(id)&q=' + encodeURIComponent("mimeType='application/vnd.google-apps.folder' and name='Sofia OS' and trashed=false"));
+    for (const f of found.files || []) roots.add(f.id);
+    const out = [];
+    for (const root of roots) {
+      out.push({id: root, cat: 'Anexos', root: true});
+      const subs = await this.call('GET', DRIVE + '/files?fields=files(id,name)&q=' + encodeURIComponent(`'${root}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`));
+      for (const s of subs.files || []) out.push({id: s.id, cat: GoogleService.FOLDERS.includes(s.name) ? s.name : 'Anexos', parent: root});
+    }
+    return out;
+  }
+  async legacyFiles(node, pageSize = 100) {
+    const r = await this.call('GET', DRIVE + '/files?' + new URLSearchParams({pageSize: String(pageSize), fields: 'files(id,name,mimeType,size,modifiedTime,appProperties)', q: `'${node.id}' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false`}).toString());
+    return (r.files || []).filter(f => !String(f.mimeType || '').startsWith('application/vnd.google-apps.'));
+  }
+  /** Troca, no banco, a referência do arquivo antigo pela cópia nova (anexos, áudios e páginas). */
+  repoint(oldId, newId) {
+    try { this.db.prepare('UPDATE attachments SET drive_id=? WHERE drive_id=?').run(newId, oldId); } catch { /* sem tabela */ }
+    try { this.db.prepare('UPDATE voice_messages SET drive_id=? WHERE drive_id=?').run(newId, oldId); } catch { /* sem tabela */ }
+    const map = this.kvGet('drive_pages');
+    if (map) { let changed = false; for (const k of Object.keys(map)) if (map[k] && map[k].file === oldId) { map[k] = {...map[k], file: newId}; changed = true; } if (changed) this.kvSet('drive_pages', map); }
+  }
+  /** Copia um arquivo da pasta visível para a área oculta. Ordem segura: lê, envia, confere o tamanho,
+   * repõe a referência e só então manda o original para a lixeira (fica lá 30 dias). Se uma rodada
+   * anterior já tinha copiado (e caiu antes de jogar o original fora), reaproveita a cópia. */
+  async copyToHidden(f) {
+    const meta = await this.call('GET', DRIVE + '/files/' + f.id + '?fields=id,name,mimeType,description,appProperties,size,createdTime,modifiedTime');
+    const already = await this.call('GET', DRIVE + '/files?' + new URLSearchParams({spaces: 'appDataFolder', pageSize: '1', fields: 'files(id,size)', q: `appProperties has { key='sofia_from' and value='${GoogleService.q(f.id)}' } and trashed=false`}).toString());
+    let copy = (already.files || [])[0];
+    if (!copy) {
+      const res = await this.fetch(DRIVE + '/files/' + f.id + '?alt=media', {headers: {Authorization: 'Bearer ' + await this.token()}});
+      if (!res.ok) throw new AppError('GOOGLE_API', 'Não consegui ler "' + meta.name + '" no Drive (' + res.status + ').', 502);
+      const bytes = Buffer.from(await res.arrayBuffer());
+      if (meta.size != null && Number(meta.size) !== bytes.length) throw new AppError('GOOGLE_API', 'Leitura incompleta de "' + meta.name + '".', 502);
+      const times = {...(meta.createdTime ? {createdTime: meta.createdTime} : {}), ...(meta.modifiedTime ? {modifiedTime: meta.modifiedTime} : {})};
+      copy = await this.upload({name: meta.name, mime: meta.mimeType, bytes, cat: f.cat, description: meta.description, props: {...(meta.appProperties || {}), sofia_from: f.id}, extra: times});
+      if (!copy?.id) throw new AppError('GOOGLE_API', 'O Drive não confirmou a cópia de "' + meta.name + '".', 502);
+      if (copy.size != null && Number(copy.size) !== bytes.length) { await this.call('DELETE', DRIVE + '/files/' + copy.id).catch(() => {}); throw new AppError('GOOGLE_API', 'A cópia de "' + meta.name + '" chegou com tamanho diferente.', 502); }
+    }
+    this.repoint(f.id, copy.id);
+    await this.call('PATCH', DRIVE + '/files/' + f.id, {trashed: true});
+    return copy.id;
+  }
+  /** Uma rodada da migração (até `batch` arquivos). Um arquivo que falha 3 vezes fica onde está e é contado. */
+  async migrateToHidden(batch = 6) {
+    const l = this.link();
+    if (!this.hiddenOn(l) || !this.visibleOn(l) || l.drive?.migration?.state === 'done') return {done: true, moved: 0};
+    if (this.migrating || this.exportingPages || this.shrinking) return {busy: true, moved: 0};
+    this.migrating = true; let moved = 0;
+    try {
+      const prev = l.drive?.migration || {};
+      const mig = {moved: 0, failed: 0, skipped: [], started_at: now(), ...prev, state: 'running'};
+      const skip = new Set(mig.skipped || []), tree = await this.legacyTree(), files = [];
+      for (const node of tree) {
+        if (files.length >= batch) break;
+        for (const f of await this.legacyFiles(node)) if (files.length < batch && !skip.has(f.id)) files.push({...f, cat: node.cat});
+      }
+      this.migrationTries = this.migrationTries || new Map();
+      for (const f of files) {
+        try { await this.copyToHidden(f); moved++; mig.error = ''; }
+        catch (e) {
+          if (e.code === 'GOOGLE_TOKEN' || e.code === 'GOOGLE_NOT_CONNECTED') throw e;
+          const n = (this.migrationTries.get(f.id) || 0) + 1; this.migrationTries.set(f.id, n);
+          mig.error = String(e.message).slice(0, 200);
+          if (n >= 3) { skip.add(f.id); mig.failed = (mig.failed || 0) + 1; }
+        }
+      }
+      mig.moved = (mig.moved || 0) + moved; mig.skipped = [...skip];
+      if (files.length) { this.saveDrive({migration: mig}); return {done: false, moved}; }
+      // Acabou: sem nada pendurado, a pasta visível antiga vai para a lixeira (fica 30 dias no Drive).
+      const roots = tree.filter(n => n.root), left = mig.skipped.length;
+      if (!left) for (const r of roots) await this.call('PATCH', DRIVE + '/files/' + r.id, {trashed: true}).catch(() => {});
+      const cur = this.link(), drive = {...(cur.drive || {}), migration: {...mig, state: 'done', finished_at: now(), left, error: ''}};
+      delete drive.folders; this.saveLink({...cur, drive});
+      if (roots.length) this.w.notify('drive', 'Arquivos da Sofia protegidos',
+        'Seus arquivos agora ficam numa área oculta do seu Google Drive, que só a Sofia acessa: ninguém apaga sem querer. Veja e abra tudo em Perfil → Conta Google → Arquivos da Sofia. '
+        + (left ? left + (left === 1 ? ' arquivo não pôde ser copiado e continua' : ' arquivos não puderam ser copiados e continuam') + ' na pasta "Sofia OS", que por isso não foi apagada.' : 'A pasta antiga "Sofia OS" foi para a lixeira do Drive (fica lá 30 dias).'),
+        null, 'info', 'drive-migrated');
+      return {done: true, moved};
+    } finally { this.migrating = false; }
+  }
+  /** Roda a migração até o fim, em rodadas curtas (o servidor segue respondendo entre elas). */
+  kickMigration() {
+    const l = this.link();
+    if (this.migrationChain || !this.hiddenOn(l) || !this.visibleOn(l) || l.drive?.migration?.state === 'done') return this.migrationChain || null;
+    const pause = ms => new Promise(r => setTimeout(r, this.migrationPauseMs ?? ms));
+    this.migrationChain = (async () => {
+      try { for (let i = 0; i < 5000; i++) { const r = await this.migrateToHidden(); if (r.done) break; await pause(r.busy ? 3000 : 300); } }
+      catch (e) { const cur = this.link(); if (cur) this.saveDrive({migration: {...(cur.drive?.migration || {}), error: String(e.message).slice(0, 200)}}); }
+      finally { this.migrationChain = null; }
+    })();
+    return this.migrationChain;
+  }
+  /** Área oculta apagada de propósito (Drive → Gerenciar apps → Excluir dados ocultos)? A Sofia percebe,
+   * reenvia as páginas e um backup novo e conta com clareza o que não volta sozinho. A cada 6 h. */
+  async checkHidden(force = false) {
+    const l = this.link();
+    if (!this.hiddenOn(l) || this.migrating || this.migrationChain || (this.visibleOn(l) && l.drive?.migration?.state !== 'done')) return {skipped: true};
+    if (!force && this.hiddenCheckedAt && Date.now() - this.hiddenCheckedAt < GoogleService.FOLDER_RECHECK_MS) return {skipped: true};
+    this.hiddenCheckedAt = Date.now();
+    let inDrive = 0; try { inDrive = this.db.prepare('SELECT COUNT(*) AS n FROM attachments WHERE drive_id IS NOT NULL').get().n; } catch { /* sem tabela */ }
+    let voices = 0; try { voices = this.db.prepare('SELECT COUNT(*) AS n FROM voice_messages WHERE drive_id IS NOT NULL').get().n; } catch { /* sem tabela */ }
+    const pages = Object.keys(this.kvGet('drive_pages') || {}).length;
+    if (!inDrive && !voices && !pages && !l.drive?.last_backup) return {ok: true};
+    const r = await this.call('GET', DRIVE + '/files?' + new URLSearchParams({spaces: 'appDataFolder', pageSize: '1', fields: 'files(id)', q: 'trashed=false'}).toString());
+    if ((r.files || []).length) return {ok: true};
+    this.kvSet('drive_pages', {});
+    const lost = inDrive + voices;
+    this.w.notify('drive', 'Os dados ocultos da Sofia no Drive foram apagados',
+      'Alguém usou "Excluir dados ocultos do app" nas configurações do Google Drive. A Sofia já está enviando de novo as páginas e um backup novo.'
+      + (lost ? ' ' + lost + (lost === 1 ? ' anexo ou áudio antigo estava' : ' anexos e áudios antigos estavam') + ' só lá e não voltam sozinhos; dá para recuperar restaurando um backup.' : ''),
+      null, 'info', 'drive-wiped-' + now().slice(0, 10));
+    this.saveDrive({wiped_at: now()});
+    this.backupToDrive(true).catch(() => {}); this.exportPages().catch(() => {});
+    return {wiped: true, lost};
+  }
+
+  // ---------- Arquivos da Sofia (tela no app e no site) ----------
+  notConnected() { return new AppError('GOOGLE_NOT_CONNECTED', 'Conecte a Conta Google em Perfil → Conta Google para ver os arquivos da Sofia.', 409); }
+  driveState(l = this.link()) {
+    const d = l?.drive || {}, e = d.export;
+    return {connected: this.driveOn(l), mode: this.hiddenOn(l) ? 'hidden' : 'folder', needs_reconnect: this.driveOn(l) && !this.hiddenOn(l),
+      migration: d.migration ? {state: d.migration.state, moved: d.migration.moved || 0, left: d.migration.left || 0, error: d.migration.error || '', finished_at: d.migration.finished_at || ''} : {state: this.hiddenOn(l) ? 'running' : 'none', moved: 0, left: 0, error: '', finished_at: ''},
+      export: e ? {state: e.state, folder_name: e.folder_name, link: e.link || '', total: e.total || 0, done: e.done || 0, failed: e.failed || 0, bytes: e.bytes || 0, started_at: e.started_at || '', finished_at: e.finished_at || '', error: e.error || ''} : null,
+      wiped_at: d.wiped_at || ''};
+  }
+  describe(f) {
+    const p = f.appProperties || {};
+    const title = entityId => { try { const e = this.w.get(entityId); return e && e.title ? String(e.title) : ''; } catch { return ''; } };
+    let origin = '';
+    if (p.sofia_page) { const t = title(p.sofia_page); origin = t ? 'Página “' + t + '”' : 'Página apagada na Sofia'; }
+    else if (p.sofia_entity) { const t = title(p.sofia_entity); origin = t ? 'De “' + t + '”' : ''; }
+    else if (p.sofia_voice) origin = 'Mensagem de voz da conversa';
+    return {id: f.id, name: f.name || 'arquivo', mime: f.mimeType || '', size: Number(f.size) || 0, modified: f.modifiedTime || '', origin, deletable: GoogleService.deletable(p.sofia_cat || f.cat, p)};
+  }
+  /** Resumo: quantos arquivos e quanto espaço por categoria, e o espaço do Drive. */
+  async driveSummary() {
+    const l = this.link(); if (!this.driveOn(l)) throw this.notConnected();
+    const counts = Object.fromEntries(GoogleService.CATS.map(c => [c.key, {count: 0, bytes: 0}]));
+    const add = (cat, size) => { const k = counts[cat] ? cat : 'Anexos'; counts[k].count++; counts[k].bytes += Number(size) || 0; };
+    if (this.hiddenOn(l)) {
+      let token = '';
+      for (let i = 0; i < 30; i++) {
+        const r = await this.call('GET', DRIVE + '/files?' + new URLSearchParams({spaces: 'appDataFolder', pageSize: '1000', fields: 'nextPageToken,files(size,appProperties)', q: 'trashed=false', ...(token ? {pageToken: token} : {})}).toString());
+        for (const f of r.files || []) add(f.appProperties?.sofia_cat || 'Anexos', f.size);
+        if (!r.nextPageToken) break; token = r.nextPageToken;
+      }
+    }
+    if (this.legacyPending(l)) for (const node of await this.legacyTree()) for (const f of await this.legacyFiles(node, 1000)) add(node.cat, f.size);
+    let quota = null;
+    try { const a = await this.call('GET', DRIVE + '/about?fields=storageQuota'); const s = a.storageQuota || {}; quota = {limit: Number(s.limit) || 0, usage: Number(s.usage) || 0}; } catch { /* sem cota: segue sem */ }
+    return {...this.driveState(this.link()), categories: GoogleService.CATS.map(c => ({...c, ...counts[c.key], deletable: GoogleService.deletable(c.key)})), quota, receipts_cleanup: this.receiptsCleanup()};
+  }
+  /** Arquivos de uma categoria, do mais novo para o mais antigo (100 por página). */
+  async driveList(cat, pageToken = '') {
+    if (!GoogleService.CATS.some(c => c.key === cat)) throw new AppError('BAD_CATEGORY', 'Categoria de arquivos desconhecida.', 400);
+    const l = this.link(); if (!this.driveOn(l)) throw this.notConnected();
+    const items = []; let next = '';
+    if (this.hiddenOn(l)) {
+      const r = await this.call('GET', DRIVE + '/files?' + new URLSearchParams({spaces: 'appDataFolder', pageSize: '100', orderBy: 'modifiedTime desc', fields: 'nextPageToken,files(id,name,mimeType,size,modifiedTime,appProperties)', q: `appProperties has { key='sofia_cat' and value='${GoogleService.q(cat)}' } and trashed=false`, ...(pageToken ? {pageToken} : {})}).toString());
+      items.push(...(r.files || [])); next = r.nextPageToken || '';
+    }
+    if (!pageToken && this.legacyPending(l)) for (const node of (await this.legacyTree()).filter(n => n.cat === cat && !n.root)) items.push(...(await this.legacyFiles(node, 1000)).map(f => ({...f, cat})));
+    items.sort((a, b) => String(b.modifiedTime || '').localeCompare(String(a.modifiedTime || '')));
+    return {cat, items: items.map(f => this.describe(f)), next_page: next};
+  }
+  /** Conteúdo de um arquivo da Sofia (o escopo só deixa o servidor ler o que a própria Sofia criou). */
+  async driveContent(fileId) {
+    if (!/^[A-Za-z0-9_-]{6,200}$/.test(String(fileId || ''))) throw new AppError('BAD_FILE', 'Arquivo inválido.', 400);
+    const l = this.link(); if (!this.driveOn(l)) throw this.notConnected();
+    const meta = await this.call('GET', DRIVE + '/files/' + fileId + '?fields=id,name,mimeType,size');
+    if (String(meta.mimeType || '').startsWith('application/vnd.google-apps.')) throw new AppError('BAD_FILE', 'Esse item não é um arquivo.', 400);
+    const res = await this.fetch(DRIVE + '/files/' + fileId + '?alt=media', {headers: {Authorization: 'Bearer ' + await this.token()}});
+    if (!res.ok) throw new AppError('GOOGLE_API', 'Não consegui baixar o arquivo do Drive (' + res.status + ').', 502);
+    return {meta, res};
+  }
+  /** Envia o arquivo para quem pediu (app ou site). Só imagem, PDF, áudio e vídeo abrem no navegador; o resto baixa. */
+  static async sendFile(res, out, {inline = false} = {}) {
+    const {meta, res: r} = out, name = String(meta.name || 'arquivo'), mime = String(meta.mimeType || 'application/octet-stream');
+    const safeInline = inline && /^(image\/(png|jpeg|webp|gif)|application\/pdf|audio\/[\w.+-]+|video\/(mp4|webm))$/.test(mime);
+    const ascii = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
+    res.statusCode = 200;
+    res.setHeader('Content-Type', safeInline || !/^text\//.test(mime) ? mime : 'application/octet-stream');
+    res.setHeader('Content-Disposition', (safeInline ? 'inline' : 'attachment') + '; filename="' + ascii + '"; filename*=UTF-8\'\'' + encodeURIComponent(name));
+    if (meta.size != null && Number.isFinite(Number(meta.size))) res.setHeader('Content-Length', String(Number(meta.size)));
+    if (r.body && typeof r.body.getReader === 'function') {
+      const {Readable} = require('node:stream');
+      await new Promise((ok, bad) => { const s = Readable.fromWeb(r.body); s.once('error', bad); res.once('finish', ok); res.once('close', ok); s.pipe(res); });
+    } else {
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (!res.getHeader('Content-Length')) res.setHeader('Content-Length', String(buf.length));
+      res.end(buf);
+    }
+  }
+  /** "Exportar tudo": cria uma pasta VISÍVEL no Drive com uma cópia (aparece também nos computadores com o
+   * Drive instalado). Os originais continuam onde estão. Roda em segundo plano, com o progresso no status. */
+  async startExport(cats) {
+    const l = this.link(); if (!this.driveOn(l)) throw this.notConnected();
+    if (!this.visibleOn(l)) throw new AppError('GOOGLE_RECONNECT', 'Para exportar, reconecte a Conta Google em Perfil → Conta Google.', 409);
+    const cur = l.drive?.export; if (cur?.state === 'running') return this.driveState(l).export;
+    const keys = (Array.isArray(cats) && cats.length ? cats : GoogleService.CATS.map(c => c.key)).filter(k => GoogleService.CATS.some(c => c.key === k));
+    if (!keys.length) throw new AppError('BAD_EXPORT', 'Escolha pelo menos um tipo de arquivo.', 400);
+    const queue = [];
+    for (const k of keys) { let page = ''; for (let i = 0; i < 100; i++) { const r = await this.driveList(k, page); queue.push(...r.items.map(f => ({id: f.id, cat: k}))); if (!r.next_page) break; page = r.next_page; } }
+    const stamp = new Date().toLocaleString('pt-BR', {timeZone: TZ, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'}).replace(/\//g, '-').replace(',', '').replace(':', 'h');
+    const name = 'Sofia OS — cópia de ' + stamp;
+    const folder = await this.call('POST', DRIVE + '/files?fields=id,webViewLink', {name, mimeType: 'application/vnd.google-apps.folder', description: 'Cópia dos arquivos da Sofia OS feita a seu pedido. Pode mover, renomear ou apagar: os originais continuam guardados pela Sofia.'});
+    this.kvSet('drive_export_queue', queue);
+    const exp = {state: queue.length ? 'running' : 'done', folder_id: folder.id, folder_name: name, link: folder.webViewLink || '', total: queue.length, done: 0, failed: 0, bytes: 0, subfolders: {}, started_at: now(), finished_at: queue.length ? '' : now(), error: ''};
+    this.saveDrive({export: exp});
+    if (queue.length) this.kickExport();
+    return this.driveState(this.link()).export;
+  }
+  async exportBatch(batch = 5) {
+    const l = this.link(), exp = l?.drive?.export;
+    if (!exp || exp.state !== 'running') return {done: true};
+    if (this.exporting) return {busy: true};
+    this.exporting = true;
+    try {
+      const queue = this.kvGet('drive_export_queue') || [], part = queue.slice(0, batch), subfolders = {...(exp.subfolders || {})};
+      let {done = 0, failed = 0, bytes = 0} = exp;
+      for (const item of part) {
+        try {
+          if (!subfolders[item.cat]) { const label = (GoogleService.CATS.find(c => c.key === item.cat) || {}).label || item.cat; subfolders[item.cat] = (await this.call('POST', DRIVE + '/files?fields=id', {name: label, mimeType: 'application/vnd.google-apps.folder', parents: [exp.folder_id]})).id; }
+          const got = await this.driveContent(item.id), buf = Buffer.from(await got.res.arrayBuffer());
+          const {body, type} = GoogleService.multipart({name: got.meta.name, parents: [subfolders[item.cat]], mimeType: got.meta.mimeType || 'application/octet-stream'}, got.meta.mimeType, buf);
+          await this.call('POST', UPLOAD + '/files?uploadType=multipart&fields=id', body, {'Content-Type': type});
+          done++; bytes += buf.length;
+        } catch (e) { if (e.code === 'GOOGLE_TOKEN' || e.code === 'GOOGLE_NOT_CONNECTED') throw e; failed++; }
+      }
+      this.kvSet('drive_export_queue', queue.slice(part.length));
+      const finished = queue.length <= part.length;
+      this.saveDrive({export: {...exp, done, failed, bytes, subfolders, ...(finished ? {state: 'done', finished_at: now()} : {})}});
+      if (finished) this.w.notify('drive', 'Cópia dos arquivos pronta', 'A pasta "' + exp.folder_name + '" está no seu Google Drive com ' + done + (done === 1 ? ' arquivo' : ' arquivos') + (failed ? '; ' + failed + (failed === 1 ? ' não pôde ser copiado' : ' não puderam ser copiados') : '') + '. Ela aparece também nos computadores com o Google Drive instalado.', null, 'info', 'drive-export-' + exp.started_at);
+      return {done: finished};
+    } catch (e) {
+      this.saveDrive({export: {...exp, state: 'error', error: String(e.message).slice(0, 200), finished_at: now()}});
+      return {done: true, error: e.message};
+    } finally { this.exporting = false; }
+  }
+  kickExport() {
+    if (this.exportChain || this.link()?.drive?.export?.state !== 'running') return this.exportChain || null;
+    const pause = ms => new Promise(r => setTimeout(r, this.migrationPauseMs ?? ms));
+    this.exportChain = (async () => {
+      try { for (let i = 0; i < 20000; i++) { const r = await this.exportBatch(); if (r.done) break; await pause(r.busy ? 2000 : 200); } }
+      finally { this.exportChain = null; }
+    })();
+    return this.exportChain;
+  }
+
+  // ---------- Apagar e limpeza semanal dos comprovantes ----------
+  /** O que referenciava aquele arquivo passa a saber que ele foi apagado (a linha e a miniatura ficam). */
+  forgetDriveFile(fileId, when = now()) {
+    let atts = []; try { atts = this.db.prepare('SELECT id FROM attachments WHERE drive_id=?').all(fileId).map(r => r.id); } catch { /* sem tabela */ }
+    try { this.db.prepare('UPDATE attachments SET drive_id=NULL, blob=?, removed_at=? WHERE drive_id=?').run(Buffer.alloc(0), when, fileId); } catch { /* sem tabela */ }
+    try { this.db.prepare('UPDATE voice_messages SET drive_id=NULL, blob=?, removed_at=? WHERE drive_id=?').run(Buffer.alloc(0), when, fileId); } catch { /* sem tabela */ }
+    for (const a of atts) { const hit = this.blobCache.get(a); if (hit) { this.blobCacheBytes -= hit.buf.length; this.blobCache.delete(a); } }
+    return atts.length;
+  }
+  static deletable(cat, props = {}) { return cat !== 'Páginas' && !props.sofia_page; }
+  /** Apaga um arquivo da Sofia no Drive (de vez: a área oculta não tem lixeira). As cópias .md das páginas
+   * não se apagam aqui: elas acompanham a página e voltariam sozinhas. */
+  async driveDelete(fileId) {
+    if (!/^[A-Za-z0-9_-]{6,200}$/.test(String(fileId || ''))) throw new AppError('BAD_FILE', 'Arquivo inválido.', 400);
+    const l = this.link(); if (!this.driveOn(l)) throw this.notConnected();
+    const meta = await this.call('GET', DRIVE + '/files/' + fileId + '?fields=id,name,mimeType,appProperties');
+    if (meta.mimeType === 'application/vnd.google-apps.folder') throw new AppError('BAD_FILE', 'Pastas não se apagam por aqui.', 400);
+    const props = meta.appProperties || {};
+    if (!GoogleService.deletable(props.sofia_cat, props)) throw new AppError('PAGE_COPY', 'Essa é a cópia em texto de uma página e volta sozinha enquanto a página existir. Para apagar, apague a página em Páginas.', 409);
+    await this.call('DELETE', DRIVE + '/files/' + fileId).catch(e => { if (e.googleStatus !== 404) throw e; });
+    this.forgetDriveFile(fileId);
+    return {ok: true, name: meta.name || ''};
+  }
+  static RECEIPT_DAYS = 7;
+  receiptsCleanup() { const v = this.kvGet('drive_receipts_cleanup') || {}; return {enabled: v.enabled !== false, days: GoogleService.RECEIPT_DAYS, last_at: v.last_at || '', last_removed: v.last_removed || 0}; }
+  setReceiptsCleanup(enabled) {
+    const cur = this.kvGet('drive_receipts_cleanup') || {}; this.kvSet('drive_receipts_cleanup', {...cur, enabled: !!enabled});
+    if (enabled) this.cleanReceipts(true).catch(() => {});
+    return this.receiptsCleanup();
+  }
+  /** Limpeza semanal (pedido do dono): fotos enviadas na conversa (cupons e notas para Finanças) com mais de
+   * 7 dias saem do Drive e do servidor. A despesa lançada e a miniatura na conversa continuam. Roda no máximo
+   * a cada 6 h; cada comprovante vive 7 dias contados de quando foi enviado. */
+  async cleanReceipts(force = false) {
+    const l = this.link(), cfg = this.receiptsCleanup();
+    if (!this.driveOn(l) || !cfg.enabled || this.cleaningReceipts) return {skipped: true};
+    if (!force && cfg.last_at && Date.now() - Date.parse(cfg.last_at) < GoogleService.FOLDER_RECHECK_MS) return {skipped: true};
+    this.cleaningReceipts = true; let removed = 0;
+    try {
+      const cutoff = new Date(Date.now() - GoogleService.RECEIPT_DAYS * 864e5).toISOString(), when = now();
+      ensureThumbColumn(this.db);
+      let rows = [];
+      try { rows = this.db.prepare("SELECT a.id, a.mime, a.blob, a.thumb, a.drive_id FROM attachments a JOIN entities e ON e.id=a.entity_id WHERE COALESCE(e.tags,'') LIKE '%chat-attachment%' AND a.mime LIKE 'image/%' AND a.created_at < ? AND a.removed_at IS NULL LIMIT 200").all(cutoff); } catch { rows = []; }
+      for (const a of rows) {
+        if ((!a.thumb || !a.thumb.length) && a.blob && a.blob.length) { const t = makeThumb(Buffer.from(a.blob), a.mime); if (t) this.db.prepare('UPDATE attachments SET thumb=? WHERE id=?').run(t, a.id); }
+        if (a.drive_id) { try { await this.call('DELETE', DRIVE + '/files/' + a.drive_id); } catch (e) { if (e.googleStatus !== 404) continue; } this.forgetDriveFile(a.drive_id, when); }
+        else this.db.prepare('UPDATE attachments SET blob=?, removed_at=? WHERE id=?').run(Buffer.alloc(0), when, a.id);
+        removed++;
+      }
+      // o que sobrou na categoria (ex.: de antes desta versão, sem linha aqui) também sai depois de 7 dias
+      const list = await this.listCat('Comprovantes', {orderBy: 'createdTime', pageSize: 200, fields: 'files(id,createdTime)'});
+      for (const f of (list.files || []).filter(f => f.createdTime && f.createdTime < cutoff)) {
+        try { await this.call('DELETE', DRIVE + '/files/' + f.id); } catch (e) { if (e.googleStatus !== 404) continue; }
+        this.forgetDriveFile(f.id, when); removed++;
+      }
+      const cur = this.kvGet('drive_receipts_cleanup') || {}; this.kvSet('drive_receipts_cleanup', {...cur, last_at: when, last_removed: removed});
+      return {removed};
+    } finally { this.cleaningReceipts = false; }
+  }
+
   // ---------- Anexos no Drive ----------
   voiceStats() {
     try { const r = this.db.prepare('SELECT COUNT(*) AS total, SUM(CASE WHEN drive_id IS NOT NULL THEN 1 ELSE 0 END) AS in_drive, SUM(CASE WHEN drive_id IS NULL THEN length(blob) ELSE 0 END) AS local_bytes FROM voice_messages').get(); return {total: r.total || 0, in_drive: r.in_drive || 0, local_mb: Math.round((r.local_bytes || 0) / 1048576 * 10) / 10}; } catch { return {total: 0, in_drive: 0, local_mb: 0}; }
@@ -483,20 +857,18 @@ class GoogleService {
   /** Leva para o Drive as mensagens de voz com mais de 1 dia (as recentes ficam aqui: tocam na hora
    * e ainda podem ser reenviadas). Só depois de o Drive confirmar, o blob sai daqui. */
   async offloadVoices(limit = 5) {
-    const l = this.link(); if (!l?.refresh || !/drive\.file/.test(l.scopes || '') || this.offloadingVoice) return {moved: 0};
+    const l = this.link(); if (!this.driveOn(l) || this.offloadingVoice) return {moved: 0};
     this.offloadingVoice = true; let moved = 0;
     try {
-      const dir = await this.folderId('Áudios'); if (!dir) return {moved: 0};
+      if (!(await this.target('Áudios'))) return {moved: 0};
       const cutoff = new Date(Date.now() - 864e5).toISOString();
       const rows = this.db.prepare('SELECT message_id, mime, blob, created_at FROM voice_messages WHERE drive_id IS NULL AND length(blob) > 0 AND created_at < ? ORDER BY created_at LIMIT ?').all(cutoff, limit);
       for (const v of rows) {
         const buf = Buffer.from(v.blob), sha = crypto.createHash('sha256').update(buf).digest('hex');
         const ext = /mp4|m4a|aac/.test(v.mime) ? '.m4a' : /ogg/.test(v.mime) ? '.ogg' : /mpeg|mp3/.test(v.mime) ? '.mp3' : /wav/.test(v.mime) ? '.wav' : '.webm';
-        const name = 'voz-' + String(v.created_at).slice(0, 19).replace(/[:T]/g, '-') + ext, boundary = 'sofia' + id();
-        const meta = JSON.stringify({name, parents: [dir], mimeType: v.mime || 'application/octet-stream', description: 'Mensagem de voz da Sofia OS', appProperties: {sofia_voice: v.message_id}});
-        const body = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${v.mime || 'application/octet-stream'}\r\n\r\n`), buf, Buffer.from(`\r\n--${boundary}--`)]);
-        const up = await this.call('POST', UPLOAD + '/files?uploadType=multipart&fields=id', body, {'Content-Type': 'multipart/related; boundary=' + boundary});
-        if (!up.id) continue;
+        const name = 'voz-' + String(v.created_at).slice(0, 19).replace(/[:T]/g, '-') + ext;
+        const up = await this.upload({name, mime: v.mime || 'application/octet-stream', bytes: buf, cat: 'Áudios', description: 'Mensagem de voz da Sofia OS', props: {sofia_voice: v.message_id}});
+        if (!up?.id) continue;
         this.db.prepare('UPDATE voice_messages SET drive_id=?, sha256=?, blob=? WHERE message_id=?').run(up.id, sha, Buffer.alloc(0), v.message_id);
         moved++;
       }
@@ -506,6 +878,7 @@ class GoogleService {
   /** Bytes de uma mensagem de voz: daqui se ainda estiver; senão do Drive (mesmo cache dos anexos). */
   async voiceBytes(v) {
     if (v.blob && v.blob.length) return Buffer.from(v.blob);
+    if (v.removed_at) throw new AppError('FILE_REMOVED', 'Este áudio foi apagado em Arquivos da Sofia. A transcrição continua na conversa.', 410);
     if (!v.drive_id) return Buffer.alloc(0);
     return this.attachmentBytes({id: 'voice:' + v.message_id, blob: null, drive_id: v.drive_id});
   }
@@ -535,10 +908,10 @@ class GoogleService {
   /** Cada página vira um .md em Sofia OS/Páginas e é atualizada quando muda (pela revisão).
    * Apagou a página na Sofia: o arquivo vai para a lixeira do Drive. Até `limit` por rodada. */
   async exportPages(limit = 20) {
-    const l = this.link(); if (!l?.refresh || !/drive\.file/.test(l.scopes || '') || this.exportingPages) return {exported: 0};
+    const l = this.link(); if (!this.driveOn(l) || this.exportingPages || this.migrating) return {exported: 0};
     this.exportingPages = true; let exported = 0, removed = 0;
     try {
-      const dir = await this.folderId('Páginas'); if (!dir) return {exported: 0};
+      if (!(await this.target('Páginas'))) return {exported: 0};
       const map = this.kvGet('drive_pages') || {};
       const pages = []; for (let offset = 0; offset < 20000; offset += 500) { const page = this.w.list({kind: 'user_page', limit: 500, offset}); pages.push(...page); if (page.length < 500) break; }
       const alive = new Set(pages.filter(p => p.state !== 'archived').map(p => p.id));
@@ -547,18 +920,18 @@ class GoogleService {
         if (exported >= limit) break;
         const known = map[page.id]; if (known && known.rev === page.revision) continue;
         const md = Buffer.from(GoogleService.pageMarkdown(page), 'utf8');
-        const name = (String(page.title || 'Sem título').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 100) || 'Sem título') + '.md', boundary = 'sofia' + id();
-        const meta = known ? {name} : {name, parents: [dir], mimeType: 'text/markdown', description: 'Página da Sofia OS', appProperties: {sofia_page: page.id}};
-        const body = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: text/markdown; charset=UTF-8\r\n\r\n`), md, Buffer.from(`\r\n--${boundary}--`)]);
-        const res = known
-          ? await this.call('PATCH', UPLOAD + '/files/' + known.file + '?uploadType=multipart&fields=id', body, {'Content-Type': 'multipart/related; boundary=' + boundary}).catch(e => (e.googleStatus === 404 ? null : Promise.reject(e)))
-          : await this.call('POST', UPLOAD + '/files?uploadType=multipart&fields=id', body, {'Content-Type': 'multipart/related; boundary=' + boundary});
+        const name = (String(page.title || 'Sem título').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 100) || 'Sem título') + '.md';
+        let res;
+        if (known) {
+          const {body, type} = GoogleService.multipart({name}, 'text/markdown; charset=UTF-8', md);
+          res = await this.call('PATCH', UPLOAD + '/files/' + known.file + '?uploadType=multipart&fields=id', body, {'Content-Type': type}).catch(e => (e.googleStatus === 404 ? null : Promise.reject(e)));
+        } else res = await this.upload({name, mime: 'text/markdown', bytes: md, cat: 'Páginas', description: 'Página da Sofia OS', props: {sofia_page: page.id}});
         if (!res) { delete map[page.id]; continue; } // arquivo apagado à mão no Drive: recria na próxima rodada
         map[page.id] = {file: res.id || known.file, rev: page.revision};
         exported++;
       }
       this.kvSet('drive_pages', map);
-      const cur = this.link(); if (cur) this.saveLink({...cur, drive: {...(cur.drive || {}), pages_exported: Object.keys(map).length}});
+      this.saveDrive({pages_exported: Object.keys(map).length});
       return {exported, removed};
     } finally { this.exportingPages = false; }
   }
@@ -567,10 +940,10 @@ class GoogleService {
   }
   /** Leva para o Drive os anexos que ainda estão só no servidor (até `limit` por rodada), e aqui fica só a referência. */
   async offloadAttachments(limit = 10) {
-    const l = this.link(); if (!l?.refresh || !/drive\.file/.test(l.scopes || '') || this.offloading) return {moved: 0};
+    const l = this.link(); if (!this.driveOn(l) || this.offloading) return {moved: 0};
     this.offloading = true; let moved = 0;
     try {
-      const dir = await this.folderId('Anexos'); if (!dir) return {moved: 0};
+      if (!(await this.target('Anexos'))) return {moved: 0};
       ensureThumbColumn(this.db);
       // 0.3.206: foto da conversa fica 24 h aqui (a Sofia le e voce abre na hora, sem depender do Drive); depois vai
       const chatCutoff = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
@@ -578,28 +951,24 @@ class GoogleService {
       for (const a of rows) {
         // 0.3.199: foto enviada na conversa (ex.: cupom) vai para "Sofia OS/Comprovantes"; a miniatura fica aqui
         const fromChat = String(a.tags || '').includes('chat-attachment') && /^image\//.test(String(a.mime || ''));
-        const target = fromChat ? (await this.folderId('Comprovantes')) || dir : dir;
         if (fromChat) { const t = makeThumb(Buffer.from(a.blob), a.mime); if (t) this.db.prepare('UPDATE attachments SET thumb=? WHERE id=?').run(t, a.id); }
-        const boundary = 'sofia' + id();
-        const meta = JSON.stringify({name: a.name, parents: [target], mimeType: a.mime || 'application/octet-stream', description: 'Anexo da Sofia OS (' + a.entity_id + ')', appProperties: {sofia_attachment: a.id, sofia_entity: a.entity_id}});
-        const body = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${a.mime || 'application/octet-stream'}\r\n\r\n`), Buffer.from(a.blob), Buffer.from(`\r\n--${boundary}--`)]);
-        const up = await this.call('POST', UPLOAD + '/files?uploadType=multipart&fields=id,size', body, {'Content-Type': 'multipart/related; boundary=' + boundary});
-        if (!up.id) continue;
+        const up = await this.upload({name: a.name, mime: a.mime || 'application/octet-stream', bytes: Buffer.from(a.blob), cat: fromChat ? 'Comprovantes' : 'Anexos', description: 'Anexo da Sofia OS (' + a.entity_id + ')', props: {sofia_attachment: a.id, sofia_entity: a.entity_id}});
+        if (!up?.id) continue;
         // Só depois de o Drive confirmar: aqui fica a referência e um blob vazio (o tamanho original segue em bytes).
         this.db.prepare('UPDATE attachments SET drive_id=?, blob=? WHERE id=?').run(up.id, Buffer.alloc(0), a.id);
         moved++;
       }
-      const cur = this.link(); if (cur) this.saveLink({...cur, drive: {...(cur.drive || {}), attachments_moved_at: now(), attachments_error: ''}});
+      this.saveDrive({attachments_moved_at: now(), attachments_error: ''});
       return {moved};
     } catch (e) {
-      const cur = this.link(); if (cur) this.saveLink({...cur, drive: {...(cur.drive || {}), attachments_error: String(e.message).slice(0, 200)}});
+      this.saveDrive({attachments_error: String(e.message).slice(0, 200)});
       throw e;
     } finally { this.offloading = false; }
   }
   /** 0.3.200: reduz as capas JPEG que ja estao no Drive (baixa, reduz para 1600 px e troca o conteudo no mesmo
    * arquivo). Poucas por rodada; cada capa e conferida uma vez por execucao do servidor. */
   async shrinkDriveCovers(limit = 3) {
-    const l = this.link(); if (!l?.refresh || !/drive\.file/.test(l.scopes || '') || this.offloading || this.shrinking) return {shrunk: 0};
+    const l = this.link(); if (!this.driveOn(l) || this.offloading || this.shrinking || this.migrating) return {shrunk: 0};
     this.shrinking = true; let shrunk = 0; this.coversChecked = this.coversChecked || new Set();
     try {
       const {shrinkJpeg} = require('./thumb');
@@ -624,6 +993,7 @@ class GoogleService {
   /** Bytes de um anexo: do servidor se ainda estão aqui; senão do Drive (com cache de até 30 MB em memória). */
   async attachmentBytes(a) {
     if (a.blob && a.blob.length) return Buffer.from(a.blob);
+    if (a.removed_at) throw new AppError('FILE_REMOVED', 'Este arquivo foi apagado em Arquivos da Sofia' + (a.thumb && a.thumb.length ? '; ficou só a miniatura.' : '.'), 410);
     if (!a.drive_id) return Buffer.alloc(0);
     const hit = this.blobCache.get(a.id); if (hit) { hit.at = Date.now(); return hit.buf; }
     const l = this.link(); if (!l?.refresh) throw new AppError('GOOGLE_NOT_CONNECTED', 'Este anexo está no seu Google Drive. Conecte a Conta Google em Perfil → Conta Google para abrir.', 503);
@@ -640,14 +1010,10 @@ class GoogleService {
   async uploadPortableBackup() {
     const pass = String(process.env.SOFIA_BACKUP_PASSPHRASE || '');
     if (pass.length < 12) return null;
-    const dir = await this.folderId('Backup com senha'); if (!dir) return null;
+    if (!(await this.target('Backup com senha'))) return null;
     const bytes = this.backups.portable(pass), name = 'sofia-com-senha-' + now().slice(0, 10) + '.sofia-backup';
-    const up = async (fileName, mime, content, description) => {
-      const boundary = 'sofia' + id(), meta = JSON.stringify({name: fileName, parents: [dir], mimeType: mime, description});
-      const body = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`), content, Buffer.from(`\r\n--${boundary}--`)]);
-      return this.call('POST', UPLOAD + '/files?uploadType=multipart&fields=id', body, {'Content-Type': 'multipart/related; boundary=' + boundary});
-    };
-    const list = await this.call('GET', DRIVE + '/files?orderBy=createdTime desc&pageSize=100&fields=files(id,name)&q=' + encodeURIComponent(`'${dir}' in parents and trashed=false`));
+    const up = (fileName, mime, content, description) => this.upload({name: fileName, mime, bytes: content, cat: 'Backup com senha', description});
+    const list = await this.listCat('Backup com senha');
     const files = list.files || [];
     // o do dia e substituido (um por dia)
     for (const f of files.filter(f => f.name === name)) await this.call('DELETE', DRIVE + '/files/' + f.id).catch(() => {});
@@ -661,34 +1027,32 @@ class GoogleService {
   }
   async backupToDrive(force = false) {
     const l = this.link();
-    if (!l?.refresh || !/drive\.file/.test(l.scopes || '') || !this.backups) return {skipped: true};
+    if (!this.driveOn(l) || !this.backups) return {skipped: true};
     if (!force && l.drive?.last_backup && l.drive.last_backup.slice(0, 10) === now().slice(0, 10)) return {skipped: true};
     try {
       const made = this.backups.create('drive');
       const bytes = fs.readFileSync(path.join(this.backups.directory, made.name));
-      const dir = await this.folderId('Backups');
-      const boundary = 'sofia' + id();
-      const meta = JSON.stringify({name: made.name, parents: [dir], mimeType: 'application/octet-stream', description: 'Backup criptografado da Sofia OS'});
-      const body = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/octet-stream\r\n\r\n`), bytes, Buffer.from(`\r\n--${boundary}--`)]);
-      await this.call('POST', UPLOAD + '/files?uploadType=multipart&fields=id', body, {'Content-Type': 'multipart/related; boundary=' + boundary});
-      const list = await this.call('GET', DRIVE + '/files?orderBy=createdTime desc&pageSize=100&fields=files(id,name)&q=' + encodeURIComponent(`'${dir}' in parents and trashed=false`));
+      const sent = await this.upload({name: made.name, mime: 'application/octet-stream', bytes, cat: 'Backups', description: 'Backup criptografado da Sofia OS'});
+      if (!sent?.id) throw new AppError('GOOGLE_API', 'O Drive não confirmou o backup.', 502);
+      const list = await this.listCat('Backups');
       for (const old of (list.files || []).slice(KEEP_BACKUPS)) await this.call('DELETE', DRIVE + '/files/' + old.id).catch(() => {});
       // No servidor ficam só os 3 mais novos: o Drive guarda o histórico.
       for (const b of this.backups.list().slice(3)) { try { fs.unlinkSync(path.join(this.backups.directory, b.name)); } catch { /* ignore */ } }
       // 0.3.201: tambem o backup COM SENHA, que abre sem este servidor (veja scripts/COMO-RESTAURAR.md)
       let portable = {at: l.drive?.portable_at || '', error: ''};
       try { const p = await this.uploadPortableBackup(); if (p) portable = {at: now(), error: ''}; } catch (e) { portable = {...portable, error: String(e.message).slice(0, 200)}; }
-      this.saveLink({...this.link(), drive: {last_backup: now(), last_error: '', count: Math.min(KEEP_BACKUPS, (list.files || []).length), bytes: bytes.length, portable_at: portable.at, portable_error: portable.error}});
+      // 0.3.244: grava só esses campos (antes regravava o estado do Drive inteiro e perdia o resto).
+      this.saveDrive({last_backup: now(), last_error: '', count: Math.min(KEEP_BACKUPS, (list.files || []).length), bytes: bytes.length, portable_at: portable.at, portable_error: portable.error});
       return {ok: true, name: made.name, bytes: bytes.length, portable: !!portable.at && !portable.error};
     } catch (e) {
-      const cur = this.link(); if (cur) this.saveLink({...cur, drive: {...(cur.drive || {}), last_error: String(e.message).slice(0, 200)}});
+      this.saveDrive({last_error: String(e.message).slice(0, 200)});
       throw e;
     }
   }
 
   start(intervalMs = 15 * 60000) {
     if (this.timer) return;
-    const tick = () => { const l = this.link(); if (!l?.refresh || this.busy) return; this.offloadAttachments().catch(() => {}); this.shrinkDriveCovers(3).catch(() => {}); this.offloadVoices().catch(() => {}); this.exportPages().catch(() => {}); this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); };
+    const tick = () => { const l = this.link(); if (!l?.refresh || this.busy) return; this.offloadAttachments().catch(() => {}); this.shrinkDriveCovers(3).catch(() => {}); this.offloadVoices().catch(() => {}); this.exportPages().catch(() => {}); this.sync().catch(() => {}); this.backupToDrive().catch(() => {}); try { this.kickMigration(); this.kickExport(); } catch { /* segue na próxima rodada */ } this.checkHidden().catch(() => {}); this.cleanReceipts().catch(() => {}); };
     this.timer = setInterval(tick, intervalMs); this.timer.unref?.();
     setTimeout(tick, 30000).unref?.();
   }

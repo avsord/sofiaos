@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:,">
+<title>Arquivos da Sofia · Sofia OS</title>
+<link rel="stylesheet" href="/arquivos.css?v=244">
+<script src="/arquivos.js?v=244" defer></script>
+</head>
+<body>
+<main class="wrap">
+  <header class="top">
+    <a class="back" href="/">← Voltar para a Sofia</a>
+    <div class="title-row"><span class="mark" aria-hidden="true">S</span><h1>Arquivos da Sofia</h1></div>
+    <p class="lead">Ficam numa área oculta do seu Google Drive, que só a Sofia acessa. Não aparecem no Drive, então ninguém apaga sem querer. Aqui você vê, baixa, apaga e faz uma cópia visível quando quiser.</p>
+  </header>
+  <div id="notice" class="notice" role="status" hidden></div>
+  <section id="usage" class="usage" hidden>
+    <div class="usage-row"><span id="usageText"></span><span id="usageSofia" class="muted"></span></div>
+    <div class="bar"><span id="usageBar"></span></div>
+  </section>
+  <div class="layout">
+    <nav id="cats" class="cats" aria-label="Tipos de arquivo"></nav>
+    <section class="files" aria-live="polite">
+      <header class="files-head"><h2 id="catTitle">Carregando…</h2><p id="catHint" class="muted"></p></header>
+      <div id="cleanup" class="cleanup" hidden></div>
+      <ul id="fileList" class="file-list"></ul>
+      <button id="more" class="ghost" type="button" hidden>Mostrar mais</button>
+    </section>
+  </div>
+  <section class="export" aria-labelledby="exportTitle">
+    <h2 id="exportTitle">Cópia visível no Drive</h2>
+    <p class="muted">Cria uma pasta normal no seu Drive com uma cópia dos tipos escolhidos. Ela aparece também nos computadores com o Google Drive instalado. Os originais continuam guardados pela Sofia.</p>
+    <div id="exportCats" class="checks"></div>
+    <div class="export-row"><button id="exportButton" class="primary" type="button">Exportar cópia para o Drive</button><span id="exportStatus" class="muted" role="status"></span></div>
+  </section>
+</main>
+</body>
+</html>

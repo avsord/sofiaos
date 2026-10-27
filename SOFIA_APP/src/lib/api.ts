@@ -12,7 +12,12 @@ import {readMercadoLivrePageOnDevice,canonicalMercadoLivreUrl,resolveMercadoLivr
 import {AUTH_STORAGE_KEY,PREFS_STORAGE_KEY,takeStartupAuth,takeStartupPrefs,invalidateStartupAuth,invalidateStartupPrefs} from './startup-read-ahead';
 import {StartupSnapshot} from './startup-snapshot';
 import {encryptedStorage} from './encrypted-storage';
-export type CalendarState={configured:boolean;connected:boolean;syncing?:boolean;last_sync?:string;error?:string;calendar_name?:string;calendar_id?:string;warnings?:string[];item_errors?:{id:string;title:string;reason:string}[];conflicts?:{id:string;reason:string}[];calendars?:{id:string;summary:string;accessRole:string;selected?:boolean;primary?:boolean}[];email?:string;redirect_uri?:string;history?:{at:string;imported:number;created:number;updated:number;sent:number;removed:number;skipped:number;conflicts:number;ms:number}[];gmail?:{connected:boolean};drive?:{connected:boolean;portable?:{configured:boolean;at:string;error:string};folders?:string[];attachments?:{total:number;in_drive:number;local_mb:number};voices?:{total:number;in_drive:number;local_mb:number};pages?:number;last_backup?:string;last_backup_error?:string;backups:number;folder:string}};
+export type DriveCategory={key:string;label:string;hint:string;count:number;bytes:number;deletable?:boolean};
+export type ReceiptsCleanup={enabled:boolean;days:number;last_at:string;last_removed:number};
+export type DriveExport={state:'running'|'done'|'error';folder_name:string;link:string;total:number;done:number;failed:number;bytes:number;started_at:string;finished_at:string;error:string};
+export type DriveSummary={connected:boolean;mode:'hidden'|'folder';needs_reconnect:boolean;migration:{state:string;moved:number;left:number;error:string;finished_at:string};export:DriveExport|null;wiped_at:string;categories:DriveCategory[];quota:{limit:number;usage:number}|null;receipts_cleanup?:ReceiptsCleanup};
+export type DriveFile={id:string;name:string;mime:string;size:number;modified:string;origin:string;deletable?:boolean};
+export type CalendarState={configured:boolean;connected:boolean;syncing?:boolean;last_sync?:string;error?:string;calendar_name?:string;calendar_id?:string;warnings?:string[];item_errors?:{id:string;title:string;reason:string}[];conflicts?:{id:string;reason:string}[];calendars?:{id:string;summary:string;accessRole:string;selected?:boolean;primary?:boolean}[];email?:string;redirect_uri?:string;history?:{at:string;imported:number;created:number;updated:number;sent:number;removed:number;skipped:number;conflicts:number;ms:number}[];gmail?:{connected:boolean};drive?:{connected:boolean;mode?:'hidden'|'folder';needs_reconnect?:boolean;migration?:{state:string;moved:number;left:number;error:string;finished_at:string};portable?:{configured:boolean;at:string;error:string};folders?:string[];attachments?:{total:number;in_drive:number;local_mb:number};voices?:{total:number;in_drive:number;local_mb:number};pages?:number;last_backup?:string;last_backup_error?:string;backups:number;folder:string}};
 import {StartupReads,preloadStartup} from './startup-preload';
 import {themeTimes} from './theme-schedule';
 import {agendaChanged} from './agenda-events';
@@ -216,6 +221,13 @@ export class SofiaApi {
   clearNotification(id:string) { return this.md.clear(id); }
   // Não depende mais de page_order: o servidor responde a agenda Google por conta própria.
   async calendarStatus():Promise<CalendarState> { try{return await this.request<CalendarState>('/md/calendar/status');}catch(e){if((e as ApiError).status===404)return {configured:false,connected:false};throw e;} }
+  /** 0.3.244: Arquivos da Sofia (área oculta do Drive). */
+  driveFiles() { return this.request<DriveSummary>('/md/drive/files',undefined,'GET',30000); }
+  driveList(cat:string,page='') { return this.request<{cat:string;items:DriveFile[];next_page:string}>('/md/drive/files?cat='+encodeURIComponent(cat)+(page?'&page='+encodeURIComponent(page):''),undefined,'GET',30000); }
+  driveFileSource(id:string) { if(!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('Arquivo inválido.');return {uri:SITE+'/api/mobile/md/drive/files/'+encodeURIComponent(id)+'/content',headers:{Authorization:'Bearer '+this.token}}; }
+  driveDelete(id:string) { if(!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('Arquivo inválido.');return this.request<{ok:boolean;name:string}>('/md/drive/files/'+encodeURIComponent(id),{},'DELETE',30000); }
+  driveReceiptsCleanup(enabled:boolean) { return this.request<ReceiptsCleanup>('/md/drive/receipts-cleanup',{enabled},'POST',30000); }
+  driveExport(categories:string[]) { return this.request<{export:DriveExport}>('/md/drive/export',{categories},'POST',120000); }
   driveBackup() { return this.request<{ok?:boolean;skipped?:boolean;bytes?:number}>('/md/drive/backup',{},'POST',120000); }
   calendarConnect() { return this.request<{url:string}>('/md/calendar/connect',{app:true}); }
   // Conexoes de lojas (Price Tracker): o mesmo formato para todas as lojas.

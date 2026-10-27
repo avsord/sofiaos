@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const { AppError, validId, cleanText, cleanMessage } = require('../core/util');
 const { VERSION } = require('../config/sofia');
 const { makeApi45 } = require('../core/api45');
+const { GoogleService } = require('../services/google');
 const OWNER = 'owner-local';
 // Product UI has no text-character or audio-duration ceiling. The transport
 // keeps only byte-level safety budgets so one request cannot exhaust server memory.
@@ -157,7 +158,7 @@ function makeMobileApi(runtime, deps) {
       fail('NOT_FOUND', 'Operação de e-mail desconhecida.', 404);
     }
     // Capacidades e rotas /md que o app já chamava e o servidor não tinha.
-    if (p === '/api/mobile/md/capabilities' && m === 'GET') return send({ page_order: false, calendar: runtime.google.configured(), google: runtime.google.configured(), drive_backup: runtime.google.configured(), dashboard_widgets: true, mail_watch: true, mercado_livre_html: true, notifications: true });
+    if (p === '/api/mobile/md/capabilities' && m === 'GET') return send({ page_order: false, calendar: runtime.google.configured(), google: runtime.google.configured(), drive_backup: runtime.google.configured(), dashboard_widgets: true, mail_watch: true, mercado_livre_html: true, notifications: true, drive_files: runtime.google.configured() });
     // Desempenho: todas as leituras de preço numa resposta só (antes era um pedido por produto).
     if (p === '/api/mobile/md/monitors/observations' && m === 'GET') {
       const out = {};
@@ -245,6 +246,20 @@ function makeMobileApi(runtime, deps) {
       if (action === 'select') { const b = await bodyJson(req, 2048); return send(g.select(String(b.id || ''))); }
       if (action === 'backup') return send(await g.backupToDrive(true));
       fail('NOT_FOUND', 'Operação desconhecida.', 404);
+    }
+    // 0.3.244: Arquivos da Sofia (área oculta do Drive): resumo, lista por categoria, conteúdo e cópia visível.
+    if (p === '/api/mobile/md/drive/files' && m === 'GET') {
+      rate(session, 'drive-files', 60); const cat = url.searchParams.get('cat');
+      return send(cat ? await runtime.google.driveList(cat, String(url.searchParams.get('page') || '')) : await runtime.google.driveSummary());
+    }
+    const driveFile = p.match(/^\/api\/mobile\/md\/drive\/files\/([A-Za-z0-9_-]+)\/content$/);
+    if (driveFile && m === 'GET') { rate(session, 'drive-files', 60); await GoogleService.sendFile(res, await runtime.google.driveContent(driveFile[1])); return true; }
+    const driveDel = p.match(/^\/api\/mobile\/md\/drive\/files\/([A-Za-z0-9_-]+)$/);
+    if (driveDel && m === 'DELETE') { rate(session, 'drive-files', 60); await bodyJson(req, 256).catch(() => ({})); return send(await runtime.google.driveDelete(driveDel[1])); }
+    if (p === '/api/mobile/md/drive/receipts-cleanup' && m === 'POST') { rate(session, 'google', 20); const b = await bodyJson(req, 256); return send(runtime.google.setReceiptsCleanup(b.enabled !== false)); }
+    if (p === '/api/mobile/md/drive/export' && m === 'POST') {
+      rate(session, 'google', 20); const b = await bodyJson(req, 4096).catch(() => ({}));
+      return send({ export: await runtime.google.startExport(Array.isArray(b.categories) ? b.categories.map(String).slice(0, 20) : undefined) });
     }
     // Conexoes de lojas (Price Tracker): mesmo formato para todas; login da pessoa so onde a loja exige.
     if (p === '/api/mobile/price-tracker/connections' && m === 'GET') return send(runtime.stores.status());

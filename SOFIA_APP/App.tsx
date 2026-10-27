@@ -32,7 +32,7 @@ import {Spinner,FadeSwap} from './src/components/Loading';
 import {createMenuMotion} from './src/lib/menu-motion';
 import type {TabPagerHandle} from './src/components/TabPager';
 import {useStartupMounts} from './src/lib/startup-mounts';
-import {DeferredScreen,loadAgenda,loadChat,loadHome,loadNotifications,loadPages,loadProfile,loadWorkspace,loadBackgroundServices} from './src/lib/screen-loader';
+import {DeferredScreen,loadAgenda,loadChat,loadHome,loadNotifications,loadPages,loadProfile,loadWorkspace,loadBackgroundServices,loadSofiaFiles} from './src/lib/screen-loader';
 import {Login} from './src/screens/Login';
 
 import {APP_VERSION,checkForUpdate} from './src/lib/update';
@@ -175,7 +175,8 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  const openMonitoringFromHome=useCallback(()=>openMonitoring(),[openMonitoring]);
  const [financeTarget,setFinanceTarget]=useState(0);const openFinance=useCallback(()=>{navigate('apps');setFinanceTarget(v=>v+1);},[navigate]);
  // Tocar num aviso leva ao lugar dele.
- const openNotice=useCallback((n:Notice)=>{const area=noticeArea(n);if(area==='Monitoramento de produtos')openMonitoring(n.entity_id);else if(area==='Finanças')openFinance();else if(area==='E-mails')openMail();else if(area==='Cápsulas')openCapsules();else if(area==='Agenda'||area==='Rotinas')navigate('agenda');else if(area==='Tarefas')navigate('home');},[openMonitoring,openFinance,openMail,openCapsules,navigate]);
+ const [filesOpen,setFilesOpen]=useState(false);const closeFiles=useCallback(()=>setFilesOpen(false),[]);
+ const openNotice=useCallback((n:Notice)=>{const area=noticeArea(n);if(area==='Arquivos da Sofia')setFilesOpen(true);else if(area==='Monitoramento de produtos')openMonitoring(n.entity_id);else if(area==='Finanças')openFinance();else if(area==='E-mails')openMail();else if(area==='Cápsulas')openCapsules();else if(area==='Agenda'||area==='Rotinas')navigate('agenda');else if(area==='Tarefas')navigate('home');},[openMonitoring,openFinance,openMail,openCapsules,navigate]);
 
  const goBack=useCallback(()=>{
   const current=navigation.current;
@@ -208,7 +209,7 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?1:0,backgroundColor:c.bg}]} pointerEvents={tab==='notifications'?'auto':'none'} accessibilityElementsHidden={tab!=='notifications'} importantForAccessibility={tab==='notifications'?'auto':'no-hide-descendants'}>{tab==='notifications'?<DeferredScreen load={loadNotifications} screenProps={{api,onBack:notificationBack}}/>:null}</View>
  </View>
  {!keyboard?<View nativeID="sofia-menu-bar" style={{flexDirection:'row',backgroundColor:c.surface,borderTopWidth:1,borderColor:c.line,paddingHorizontal:8,paddingTop:7,paddingBottom:4}}>{tabs.map(item=><MenuTab locked={locked} motion={menuMotion} key={item.id} item={item} selected={tab===item.id} onSelect={navigate}/>)}</View>:null}</>}
- {visible&&backgroundReady?<DeferredScreen load={loadBackgroundServices} screenProps={{api,scope:auth?.profile.email||'',enabled:!auth?false:servicesReady?true:null,preloadWhenIdle:screenTab==='home',onCapsules:openCapsules,onAgenda:openAgenda}}/>:null}</View></SafeAreaView></NotificationProvider></ThemeContext.Provider>;
+ {filesOpen&&auth&&bootstrap?<DeferredScreen load={loadSofiaFiles} screenProps={{api,visible:true,onClose:closeFiles}}/>:null}{visible&&backgroundReady?<DeferredScreen load={loadBackgroundServices} screenProps={{api,scope:auth?.profile.email||'',enabled:!auth?false:servicesReady?true:null,preloadWhenIdle:screenTab==='home',onCapsules:openCapsules,onAgenda:openAgenda}}/>:null}</View></SafeAreaView></NotificationProvider></ThemeContext.Provider>;
 }
 const launchPreparation=createLaunchPreparation(()=>prepareLocalLaunch(readAuth,readPrefs,startupSnapshotFor));
 export function prepareStartup(){launchPreparation.prime();}
