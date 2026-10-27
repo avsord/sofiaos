@@ -30,7 +30,9 @@ const paths = {
  list:'M9 6h12M9 12h12M9 18h12M3 6h1M3 12h1M3 18h1',
  edit:'M15 4l5 5M4 15L16 3l5 5L9 20l-6 1 1-6z',
  monitor:'M3 4h18v13H3V4zm5 17h8m-4-4v4M6 13l4-4 4 2 4-5',
- wallet:'M3 7h15a3 3 0 0 1 3 3v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7zm0 0V6a2 2 0 0 1 2-2h11v3M16 14h2'
+ wallet:'M3 7h15a3 3 0 0 1 3 3v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7zm0 0V6a2 2 0 0 1 2-2h11v3M16 14h2',
+ search:'M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14zm9 16l-4-4',
+ sidebar:'M4 4h16v16H4V4zm5 0v16'
 } as const;
 export type IconName = keyof typeof paths;
 export function Icon({ name, size=22, color='#7258E8' }: { name: IconName; size?: number; color?: string }) {

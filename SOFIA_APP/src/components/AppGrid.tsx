@@ -1,6 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ShimmerBlock,ShimmerGroup} from './Loading';
 import {useTheme} from '../lib/theme';
+import {gridColumns} from '../lib/desktop';
 import {AccessibilityActionEvent,Animated,Easing,PanResponder,Vibration,View} from 'react-native';
 
 /** 0.3.221: grade de apps como no iPhone - segura o app, ele cresce e segue o dedo; os outros deslizam para abrir
@@ -8,17 +9,18 @@ import {AccessibilityActionEvent,Animated,Easing,PanResponder,Vibration,View} fr
 // 0.3.222: segurar seleciona quase na hora, como no iPhone (antes 320 ms)
 const GAP=12,H=148,COLS=2,HOLD=170;
 export function AppGrid<T extends {id:string;title:string}>({items,renderCard,onOpen,onReorder,onDragging,onMenu}:{items:T[];renderCard:(item:T,lifted:boolean)=>React.ReactNode;onOpen:(id:string)=>void;onReorder:(ids:string[])=>void;onDragging?:(on:boolean)=>void;onMenu?:(id:string)=>void}){
- const [w,setW]=useState(0),cellW=w?(w-GAP)/COLS:0,key=items.map(i=>i.id).join('|');
+ // 0.3.250: no celular 2 colunas; no computador quantas couberem (cartoes de ~220 px)
+ const [w,setW]=useState(0),cols=w?gridColumns(w):COLS,cellW=w?(w-GAP*(cols-1))/cols:0,key=items.map(i=>i.id).join('|');
  const [ids,setIds]=useState(items.map(i=>i.id)),[active,setActive]=useState<string|null>(null),[pressed,setPressed]=useState<string|null>(null);
  const idsRef=useRef(ids);idsRef.current=ids;
- const geo=useRef({cellW:0});geo.current.cellW=cellW;
+ const geo=useRef({cellW:0,cols:COLS});geo.current.cellW=cellW;geo.current.cols=cols;
  const cb=useRef({onOpen,onReorder,onDragging,onMenu});cb.current={onOpen,onReorder,onDragging,onMenu};
  const drag=useRef<{id:string;startX:number;startY:number;moved:boolean;live:boolean;dragged?:boolean;timer:ReturnType<typeof setTimeout>|null}|null>(null);
  const pos=useRef(new Map<string,Animated.ValueXY>()).current,scale=useRef(new Animated.Value(1)).current,placed=useRef(false);
  // 0.3.223: tudo suave como no iPhone - contorno e sombra aparecem e somem em transicao (antes trocavam de uma vez)
  const lift=useRef(new Animated.Value(0)).current,theme=useTheme();
  const ease=(v:Animated.Value|Animated.ValueXY,toValue:any,duration=220)=>Animated.timing(v as any,{toValue,duration,easing:Easing.bezier(0.25,0.1,0.25,1),useNativeDriver:true});
- const slot=(k:number)=>({x:(k%COLS)*(geo.current.cellW+GAP),y:Math.floor(k/COLS)*(H+GAP)});
+ const slot=(k:number)=>({x:(k%geo.current.cols)*(geo.current.cellW+GAP),y:Math.floor(k/geo.current.cols)*(H+GAP)});
  const p=(id:string)=>{let v=pos.get(id);if(!v){const k=Math.max(0,idsRef.current.indexOf(id));v=new Animated.ValueXY(slot(k));pos.set(id,v);}return v;};
  useEffect(()=>{if(!drag.current)setIds(items.map(i=>i.id));},[key]);
  useEffect(()=>{if(!w)return;const first=!placed.current;placed.current=true;
@@ -46,12 +48,12 @@ export function AppGrid<T extends {id:string;title:string}>({items,renderCard,on
    if(Math.abs(g.dx)+Math.abs(g.dy)>8)d.dragged=true;
    p(id).setValue({x:d.startX+g.dx,y:d.startY+g.dy});
    const cw=geo.current.cellW,cx=d.startX+g.dx+cw/2,cy=d.startY+g.dy+H/2;
-   const col=Math.max(0,Math.min(COLS-1,Math.floor(cx/(cw+GAP)))),row=Math.max(0,Math.floor(cy/(H+GAP)));
-   const target=Math.max(0,Math.min(idsRef.current.length-1,row*COLS+col)),cur=idsRef.current.indexOf(id);
+   const col=Math.max(0,Math.min(geo.current.cols-1,Math.floor(cx/(cw+GAP)))),row=Math.max(0,Math.floor(cy/(H+GAP)));
+   const target=Math.max(0,Math.min(idsRef.current.length-1,row*geo.current.cols+col)),cur=idsRef.current.indexOf(id);
    if(target!==cur){const next=[...idsRef.current];next.splice(cur,1);next.splice(target,0,id);idsRef.current=next;setIds(next);}},
   onPanResponderRelease:()=>end(false),onPanResponderTerminate:()=>end(true)});responders.set(id,r);return r;};
  const move=(id:string,delta:number)=>{const cur=idsRef.current.indexOf(id),to=cur+delta;if(cur<0||to<0||to>=idsRef.current.length)return;const next=[...idsRef.current];next.splice(cur,1);next.splice(to,0,id);setIds(next);cb.current.onReorder(next);};
- const rows=Math.ceil(ids.length/COLS);
+ const rows=Math.ceil(ids.length/cols);
  return <View onLayout={e=>{const width=e.nativeEvent.layout.width;if(width>0)setW(width);}} style={{height:rows?rows*H+(rows-1)*GAP:0}}>
   {!w?<AppGridSkeleton count={ids.length} bare/>:null}
   {w?ids.map(id=>{const item=items.find(i=>i.id===id);if(!item)return null;const lifted=active===id;

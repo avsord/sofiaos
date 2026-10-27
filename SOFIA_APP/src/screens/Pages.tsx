@@ -8,7 +8,7 @@ import {KeyboardToolbar} from '../components/KeyboardToolbar';
 import {useKeyboardVisible} from '../lib/motion';
 import {legacyMovePlan} from '../lib/legacy-md';
 import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
-import {View,Text,ScrollView,TextInput,Pressable,Switch,Alert,RefreshControl,BackHandler,AppState,Keyboard,Image} from 'react-native';
+import {View,Text,ScrollView,TextInput,Pressable,Switch,Alert,RefreshControl,BackHandler,AppState,Keyboard,Image,Platform} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {SofiaApi,SITE} from '../lib/api';
 import type {Entity} from '../lib/types';
@@ -35,11 +35,12 @@ import {subscribeSystemChanged} from '../lib/system-events';
 import {Spinner,LoadingLines} from '../components/Loading';
 import type {PageTemplate} from '../lib/page-templates';
 import {appAlert} from '../lib/app-alert';
+import {pagePath,pagesDirectory,samePages} from '../lib/desktop';
 const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'null')??fallback;}catch{return fallback;}};
 const PAGE_LIST_KEY='/workspace/entities?limit=100&kind=user_page&q=&offset=0';
 const cachedPageRows=(api:SofiaApi)=>api.cached<{items:Entity[]}>(PAGE_LIST_KEY)?.items.filter(item=>item.state!=='archived');
 
-export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;active:boolean;storageScope:string;onDepthChange?:(open:boolean)=>void}){useRenderCost('pages');
+export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openPageId='',createPageKey=0}:{api:SofiaApi;active:boolean;storageScope:string;onDepthChange?:(open:boolean)=>void;openPageKey?:number;openPageId?:string;createPageKey?:number}){useRenderCost('pages');
  const keyboardVisible=useKeyboardVisible(),scrollPositions=useRef(new Map<string,number>());
  const c=useTheme(),[pages,setPages]=useState<Entity[]>(()=>cachedPageRows(api)||[]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>()),[pageInteraction,setPageInteraction]=useState(false),[pageDragging,setPageDragging]=useState(false),[pageMenu,setPageMenu]=useState(false);
  const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[loaded,setLoaded]=useState(()=>cachedPageRows(api)!==undefined),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null),[createParent,setCreateParent]=useState<Entity|null|undefined>(undefined);
@@ -122,6 +123,14 @@ export function Pages({api,active,storageScope,onDepthChange}:{api:SofiaApi;acti
  const byId=useMemo(()=>new Map(displayPages.map(p=>[p.id,p])),[displayPages]);
  const children=useMemo(()=>{const m=new Map<string,Entity[]>();for(const p of displayPages){const parent=String(p.data?.parent_id||'');if(!m.has(parent))m.set(parent,[]);m.get(parent)!.push(p);}for(const list of m.values())list.sort(comparePageOrder);return m;},[displayPages]);
  const entry=selectedId?store.get(selectedId):undefined;
+ // 0.3.250 (computador): a barra lateral mostra a arvore destas paginas e abre uma pagina daqui; o caminho
+ // da pagina aberta vai para a barra de cima. No celular nada disso roda.
+ useEffect(()=>{if(Platform.OS==='web'&&loaded&&!samePages(pagesDirectory.get(),displayPages))pagesDirectory.set(displayPages);},[displayPages,loaded]);
+ const handledOpen=useRef(0);
+ useEffect(()=>{if(!openPageKey||handledOpen.current===openPageKey||!openPageId)return;const page=byId.get(openPageId);if(!page)return;handledOpen.current=openPageKey;history.current=[];open(page,false);},[openPageKey,openPageId,byId]);
+ const handledCreate=useRef(0);
+ useEffect(()=>{if(!createPageKey||handledCreate.current===createPageKey||!ready)return;handledCreate.current=createPageKey;if(selectedRef.current){void store.flush(selectedRef.current);history.current=[];setSelectedId(null);}setCreateParent(null);},[createPageKey,ready]);
+ useEffect(()=>{if(Platform.OS!=='web')return;const trail:{id:string;title:string}[]=[];let cur=selectedId?byId.get(selectedId):undefined;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&trail.length<40){seen.add(cur.id);trail.unshift({id:cur.id,title:cur.title||'Sem título'});cur=byId.get(String(cur.data?.parent_id||''));}const prev=pagePath.get();if(prev.length!==trail.length||prev.some((x,i)=>x.id!==trail[i].id||x.title!==trail[i].title))pagePath.set(trail);},[selectedId,byId]);
  useEffect(()=>{if(ready&&selectedId&&!byId.has(selectedId)&&store.get(selectedId)?.state==='saved'){history.current=history.current.filter(id=>byId.has(id));setSelectedId(null);setFocus(null);}},[ready,selectedId,byId,store]);
  const emptyBody=entry?pageBodyIsEmpty(entry.draft.blocks):true;
  const hasSubpageContent=!!(selectedId&&(children.get(selectedId)||[]).length);

@@ -13,7 +13,8 @@ import {useLaunchVisible} from './src/lib/use-launch-visible';
 import {monthKey} from './src/lib/agenda-cache';
 import {preloadAgenda} from './src/lib/use-agenda-month';
 import React,{Component,ErrorInfo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {View,Text,StatusBar,ActivityIndicator,AccessibilityInfo,useColorScheme,AppState,Alert,Keyboard,BackHandler,Linking,StyleSheet} from 'react-native';
+import {View,Text,StatusBar,ActivityIndicator,AccessibilityInfo,useColorScheme,AppState,Alert,Keyboard,BackHandler,Linking,StyleSheet,Platform,useWindowDimensions} from 'react-native';
+import {isDesktopWidth} from './src/lib/desktop';
 import {SafeAreaProvider,SafeAreaView,initialWindowMetrics} from 'react-native-safe-area-context';
 import {SofiaApi,readAuth,saveAuth,forgetAuth,readPrefs,savePrefs,startupSnapshotFor} from './src/lib/api';
 import type {Auth,Bootstrap,Prefs,Tab,Task,Profile as UserProfile,Notice} from './src/lib/types';
@@ -25,7 +26,9 @@ import {silenceVoices} from './src/lib/audio-focus';
 import {Icon,IconName} from './src/components/Icon';
 import {Button,ErrorBanner} from './src/components/UI';
 import {StartupHome} from './src/components/StartupHome';
-import {TabPager} from './src/components/TabPager';
+import {TabPager as NativeTabPager} from './src/components/TabPager';
+// 0.3.250: na web o pager troca direto no computador; no celular e o mesmo TabPager de sempre.
+const TabPager:typeof NativeTabPager=Platform.OS==='web'?require('./src/components/DesktopPages').makeResponsivePager(NativeTabPager):NativeTabPager;
 import {MenuTab} from './src/components/MenuTab';
 import {NotificationProvider,noticeArea} from './src/components/NotificationCenter';
 import {Spinner,FadeSwap} from './src/components/Loading';
@@ -39,10 +42,14 @@ import {APP_VERSION,checkForUpdate} from './src/lib/update';
 import {finishLaunchHandoff} from './src/lib/launch-handoff';
 import {appAlert,AppAlertHost} from './src/lib/app-alert';
 
+// 0.3.250: no navegador com tela larga, a moldura de computador (barra lateral + barra de cima). So carrega na web.
+const DesktopFrame:React.ComponentType<any>|null=Platform.OS==='web'?require('./src/components/DesktopShell').DesktopFrame:null;
+function DesktopGate({on,children,...props}:{on:boolean;children:React.ReactNode;[key:string]:any}){return on&&DesktopFrame?<DesktopFrame {...props}>{children}</DesktopFrame>:<>{children}</>;}
 const tabs:{id:Tab;label:string;icon:IconName}[]=[{id:'home',label:'Início',icon:'home'},{id:'chat',label:'Conversa',icon:'chat'},{id:'pages',label:'Páginas',icon:'book'},{id:'agenda',label:'Agenda',icon:'calendar'},{id:'apps',label:'Apps',icon:'grid'},{id:'profile',label:'Perfil',icon:'user'}];
 function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  const system=useColorScheme(),[ready]=useState(true),[auth,setAuth]=useState<Auth|null>(startup.auth),[bootstrap,setBootstrap]=useState<Bootstrap|null>(()=>startup.auth?fastBootstrap(startup.auth):null),[prefs,setPrefs]=useState<Prefs>(startup.prefs||{appearance:'schedule',enterToSend:false,autoSendVoice:true,lightAt:'05:00',darkAt:'19:00'}),[error,setError]=useState(''),[tab,setTab]=useState<Tab>('home'),[locked,setLocked]=useState(false),[booting,setBooting]=useState(false),[keyboard,setKeyboard]=useState(false),[workspaceDepth,setWorkspaceDepth]=useState(false),[workspaceReset,setWorkspaceReset]=useState(0),[capsulesTarget,setCapsulesTarget]=useState(0),[gestureLocked,setGestureLocked]=useState(false),[pagesDepth,setPagesDepth]=useState(false),[chatEpoch,setChatEpoch]=useState(0);
  const [agendaTarget,setAgendaTarget]=useState<{date:string;id?:string;create?:boolean;nonce:number}>({date:'',nonce:0});
+ const desktop=isDesktopWidth(useWindowDimensions().width);
  const tabHistory=useRef<Tab[]>([]),pager=useRef<TabPagerHandle>(null),navigation=useRef({tab,locked});
  const tabTap=useRef<{tab:Tab;at:number;early:boolean}|null>(null);
  const nativeRevealAt=useRef(0);
@@ -173,6 +180,9 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  const [moduleTarget,setModuleTarget]=useState({n:0,id:''});const openModule=useCallback((id:string)=>{navigate('apps');setModuleTarget(v=>({n:v.n+1,id}));},[navigate]);
  const [mailTarget,setMailTarget]=useState(0);const openMail=useCallback(()=>{navigate('apps');setMailTarget(v=>v+1);},[navigate]);
  const openMonitoringFromHome=useCallback(()=>openMonitoring(),[openMonitoring]);
+ const [pageTarget,setPageTarget]=useState({n:0,id:''}),[createPageKey,setCreatePageKey]=useState(0);
+ const openPage=useCallback((id:string)=>{navigate('pages');setPageTarget(v=>({n:v.n+1,id}));},[navigate]);
+ const createPage=useCallback(()=>{navigate('pages');setCreatePageKey(v=>v+1);},[navigate]);
  const [financeTarget,setFinanceTarget]=useState(0);const openFinance=useCallback(()=>{navigate('apps');setFinanceTarget(v=>v+1);},[navigate]);
  // Tocar num aviso leva ao lugar dele.
  const [filesOpen,setFilesOpen]=useState(false);const closeFiles=useCallback(()=>setFilesOpen(false),[]);
@@ -194,13 +204,13 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  const manualUpdate=useCallback(()=>checkUpdate(true),[checkUpdate]);
  const clearChat=useCallback(()=>setChatEpoch(v=>v+1),[]);
  const notificationBack=useCallback(()=>{void goBack();},[goBack]);
- return <ThemeContext.Provider value={c}><NotificationProvider api={api} onOpen={openNotice} enabled={!!auth&&!!bootstrap&&servicesReady&&fluency!=='pending'} scope={auth?.profile.email||''}><SafeAreaView style={{flex:1,backgroundColor:c.bg}} edges={['top','left','right','bottom']}><StatusBar barStyle={c===dark?'light-content':'dark-content'} backgroundColor={c.bg}/><AppAlertHost/><View onStartShouldSetResponderCapture={()=>{noteFluencyInput();return false;}} onTouchStart={noteFluencyInput} onTouchMove={noteFluencyInput} style={{flex:1,width:'100%',maxWidth:760,alignSelf:'center',backgroundColor:c.bg}}>
- {!ready?<StartupHome/>:!auth?<Login onLogin={login}/>:!bootstrap?<View style={{flex:1,justifyContent:'center',padding:24,gap:14}}>{booting?<Spinner size={26}/>:null}<Text style={{fontSize:23,fontWeight:'600',color:c.text}}>Abrindo sua Sofia…</Text>{error?<ErrorBanner text={error}/>:null}<Button title="Tentar novamente" onPress={()=>void boot()} loading={booting}/><Button title="Voltar para o login" secondary onPress={()=>void logout()}/></View>:!initialDataReady?<View style={{flex:1}}><StartupHome profile={bootstrap.profile}/>{preparationError?<View style={{padding:24,gap:12}}><ErrorBanner text={preparationError}/><Button title="Tentar novamente" onPress={()=>setPrepareAttempt(n=>n+1)}/></View>:null}</View>:<><View style={{flex:1}}>
+ return <ThemeContext.Provider value={c}><NotificationProvider api={api} onOpen={openNotice} enabled={!!auth&&!!bootstrap&&servicesReady&&fluency!=='pending'} scope={auth?.profile.email||''}><SafeAreaView style={{flex:1,backgroundColor:c.bg}} edges={['top','left','right','bottom']}><StatusBar barStyle={c===dark?'light-content':'dark-content'} backgroundColor={c.bg}/><AppAlertHost/><View onStartShouldSetResponderCapture={()=>{noteFluencyInput();return false;}} onTouchStart={noteFluencyInput} onTouchMove={noteFluencyInput} style={{flex:1,width:'100%',maxWidth:desktop?undefined:760,alignSelf:'center',backgroundColor:c.bg}}>
+ {!ready?<StartupHome/>:!auth?<Login onLogin={login}/>:!bootstrap?<View style={{flex:1,justifyContent:'center',padding:24,gap:14}}>{booting?<Spinner size={26}/>:null}<Text style={{fontSize:23,fontWeight:'600',color:c.text}}>Abrindo sua Sofia…</Text>{error?<ErrorBanner text={error}/>:null}<Button title="Tentar novamente" onPress={()=>void boot()} loading={booting}/><Button title="Voltar para o login" secondary onPress={()=>void logout()}/></View>:!initialDataReady?<View style={{flex:1}}><StartupHome profile={bootstrap.profile}/>{preparationError?<View style={{padding:24,gap:12}}><ErrorBanner text={preparationError}/><Button title="Tentar novamente" onPress={()=>setPrepareAttempt(n=>n+1)}/></View>:null}</View>:<DesktopGate on={desktop} api={api} tab={tab} locked={locked} profile={bootstrap.profile} onNavigate={navigate} onOpenModule={openModule} onOpenPage={openPage} onCreatePage={createPage}><View style={{flex:1}}>
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?0:1}]} pointerEvents={tab==='notifications'?'none':'auto'} accessibilityElementsHidden={tab==='notifications'} importantForAccessibility={tab==='notifications'?'no-hide-descendants':'auto'}>
   <TabPager motion={menuMotion} ref={pager} activeTab={tab} readyTabs={mountedTabs} fluencyMode={fluency==='new'?'new':'old'} onPreviewTabs={setPreviewTabs} enabled={!gestureLocked&&!locked&&!keyboard&&tab!=='notifications'&&!(tab==='pages'&&pagesDepth)&&!(tab==='apps'&&workspaceDepth)} onSelect={navigate}>
    {initialDataReady?<DeferredScreen load={loadHome} screenProps={{homeTopKey:homeTop.n,homeTopSmooth:homeTop.smooth,launchVisible:visible,onDiscussTask:discussTask,onOpenCapsules:openCapsules,onOpenMonitoring:openMonitoringFromHome,onOpenTasks:openTasks,onOpenModule:openModule,onGestureLock:setGestureLocked,api,bootstrap,navigate,onOpenAgenda:openAgenda,active:screenTab==='home'}}/>:<StartupHome profile={bootstrap.profile}/>}
    {<FadeSwap ready={mountedTabs.has('chat')} fallback={<ScreenSkeleton tab='chat'/>}><DeferredScreen key={'chat-'+chatEpoch} load={loadChat} screenProps={{taskContext,onClearTaskContext:clearTaskContext,api,bootstrap,enterToSend:prefs.enterToSend,autoSendVoice:prefs.autoSendVoice,onLock:setLocked,active:screenTab==='chat',onRefreshBootstrap:boot}}/></FadeSwap>}
-   {<FadeSwap ready={mountedTabs.has('pages')} fallback={<ScreenSkeleton tab='pages'/>}><DeferredScreen key={bootstrap.profile.email} load={loadPages} screenProps={{api,active:screenTab==='pages',storageScope:bootstrap.profile.email,onDepthChange:setPagesDepth}}/></FadeSwap>}
+   {<FadeSwap ready={mountedTabs.has('pages')} fallback={<ScreenSkeleton tab='pages'/>}><DeferredScreen key={bootstrap.profile.email} load={loadPages} screenProps={{openPageKey:pageTarget.n,openPageId:pageTarget.id,createPageKey,api,active:screenTab==='pages',storageScope:bootstrap.profile.email,onDepthChange:setPagesDepth}}/></FadeSwap>}
    {<FadeSwap ready={mountedTabs.has('agenda')} fallback={<ScreenSkeleton tab='agenda'/>}><DeferredScreen load={loadAgenda} screenProps={{onGestureLock:setGestureLocked,api,target:agendaTarget,active:screenTab==='agenda'}}/></FadeSwap>}
    {<FadeSwap ready={mountedTabs.has('apps')} fallback={<ScreenSkeleton tab='apps'/>}><DeferredScreen load={loadWorkspace} screenProps={{onGestureLock:setGestureLocked,onDiscussTask:discussTask,openCapsulesKey:capsulesTarget,openMonitoringKey:monitoringTarget.n,openMonitoringId:monitoringTarget.id,openFinanceKey:financeTarget,openTasksKey:tasksTarget,openModuleKey:moduleTarget.n,openModuleId:moduleTarget.id,openMailKey:mailTarget,resetKey:workspaceReset,api,navigate,onDepthChange:setWorkspaceDepth,active:screenTab==='apps'}}/></FadeSwap>}
    {<FadeSwap ready={mountedTabs.has('profile')} fallback={<ScreenSkeleton tab='profile'/>}><DeferredScreen load={loadProfile} screenProps={{api,bootstrap,prefs,onPrefs:changePrefs,onProfile:profile,onLogout:logout,onCheckUpdate:manualUpdate,onChatHistoryCleared:clearChat}}/></FadeSwap>}
@@ -208,7 +218,7 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  </View>
  <View style={[StyleSheet.absoluteFill,{opacity:tab==='notifications'?1:0,backgroundColor:c.bg}]} pointerEvents={tab==='notifications'?'auto':'none'} accessibilityElementsHidden={tab!=='notifications'} importantForAccessibility={tab==='notifications'?'auto':'no-hide-descendants'}>{tab==='notifications'?<DeferredScreen load={loadNotifications} screenProps={{api,onBack:notificationBack}}/>:null}</View>
  </View>
- {!keyboard?<View nativeID="sofia-menu-bar" style={{flexDirection:'row',backgroundColor:c.surface,borderTopWidth:1,borderColor:c.line,paddingHorizontal:8,paddingTop:7,paddingBottom:4}}>{tabs.map(item=><MenuTab locked={locked} motion={menuMotion} key={item.id} item={item} selected={tab===item.id} onSelect={navigate}/>)}</View>:null}</>}
+ {!keyboard&&!desktop?<View nativeID="sofia-menu-bar" style={{flexDirection:'row',backgroundColor:c.surface,borderTopWidth:1,borderColor:c.line,paddingHorizontal:8,paddingTop:7,paddingBottom:4}}>{tabs.map(item=><MenuTab locked={locked} motion={menuMotion} key={item.id} item={item} selected={tab===item.id} onSelect={navigate}/>)}</View>:null}</DesktopGate>}
  {filesOpen&&auth&&bootstrap?<DeferredScreen load={loadSofiaFiles} screenProps={{api,visible:true,onClose:closeFiles}}/>:null}{visible&&backgroundReady?<DeferredScreen load={loadBackgroundServices} screenProps={{api,scope:auth?.profile.email||'',enabled:!auth?false:servicesReady?true:null,preloadWhenIdle:screenTab==='home',onCapsules:openCapsules,onAgenda:openAgenda}}/>:null}</View></SafeAreaView></NotificationProvider></ThemeContext.Provider>;
 }
 const launchPreparation=createLaunchPreparation(()=>prepareLocalLaunch(readAuth,readPrefs,startupSnapshotFor));

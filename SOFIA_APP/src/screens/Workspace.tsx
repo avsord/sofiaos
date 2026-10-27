@@ -36,6 +36,7 @@ import {GoogleCalendarProperty} from '../components/GoogleCalendarProperty';
 import React,{useEffect,useLayoutEffect,useRef,useState,useMemo} from 'react';
 import {useReturnToTop} from '../lib/return-to-top';
 import {View,Text,FlatList,ScrollView,TextInput,Pressable,Modal,Switch,Alert,RefreshControl,Linking,KeyboardAvoidingView,Platform,BackHandler} from 'react-native';
+import {appModuleTitle} from '../lib/desktop';
 import {SofiaApi} from '../lib/api';
 import {SafeAreaView,useSafeAreaInsets} from 'react-native-safe-area-context';
 import {DateTimeField} from '../components/DateTimeField';
@@ -169,6 +170,8 @@ export function Workspace({api,navigate,onDepthChange,active,onGestureLock,reset
  useLayoutEffect(()=>{if(!active){setModule('');setKind('');setEditing(null);setFiltersOpen(false);setCreatePicker(false);setAreaEditing(null);setCustomEditing(null);}},[active]);
  useVisibleLoad(()=>{let alive=true;const refresh=()=>{void api.catalog().then(value=>{if(alive)setCatalog(value);}).catch(e=>{if(alive)setError(errorText(e));});};refresh();const stop=subscribeSystemChanged(owner=>{if(owner===api)refresh();});return()=>{alive=false;stop();};},[api]);
  useEffect(()=>{onDepthChange(Boolean(module));},[module,onDepthChange]);
+ // 0.3.250 (computador): nome do app aberto no caminho da barra de cima
+ useEffect(()=>{if(Platform.OS==='web')appModuleTitle.set(module?(modules.find(m=>m.id===module)?.title||''):'');},[module]);
  useEffect(()=>()=>onDepthChange(false),[onDepthChange]);
  useEffect(()=>{if(!active)return;const sub=BackHandler.addEventListener('hardwareBackPress',()=>{if(editing){setEditing(null);return true;}if(module){setModule('');setKind('');setEditing(null);setFiltersOpen(false);setCreatePicker(false);setAreaEditing(null);setCustomEditing(null);return true;}return false;});return()=>sub.remove();},[active,module,editing]);
  const [propertyFilter,setPropertyFilter]=useState(''),[themeFilter,setThemeFilter]=useState('');

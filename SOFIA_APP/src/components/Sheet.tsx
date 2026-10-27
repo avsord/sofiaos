@@ -3,6 +3,8 @@ import React,{useEffect,useRef,useState} from 'react';
 import {Animated,Keyboard,KeyboardAvoidingView,LayoutAnimation,Modal,Platform,Pressable,StyleSheet,useWindowDimensions,View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTheme} from '../lib/theme';
+import {isDesktopWidth} from '../lib/desktop';
+// 0.3.250: no computador a folha de baixo vira uma janela no centro (dialogo), como no Notion.
 // 0.3.227: troca de janela sem piscar. Quando uma janela fecha para abrir outra (menu -> "Editar aportes"), a de
 // baixo segura o fundo escuro ate a nova aparecer por cima, e a nova entra com o fundo ja escuro. Antes o fundo
 // clareava e escurecia de novo entre as duas (o "pisca") e havia uma pausa de 230 ms.
@@ -10,7 +12,7 @@ let handoffUntil=0;const holders=new Set<()=>void>();
 export function markSheetHandoff(ms=800){handoffUntil=Date.now()+ms;}
 function releaseHolders(){const fns=[...holders];holders.clear();fns.forEach(f=>f());}
 export function Sheet({visible,onClose,children,label='Fechar painel'}:{visible:boolean;onClose:()=>void;children:React.ReactNode;label?:string}){
- const c=useTheme(),insets=useSafeAreaInsets(),{height:windowHeight}=useWindowDimensions(),[shown,setShown]=useState(false),[height,setHeight]=useState(0);
+ const c=useTheme(),insets=useSafeAreaInsets(),{height:windowHeight,width:windowWidth}=useWindowDimensions(),desktop=isDesktopWidth(windowWidth),[shown,setShown]=useState(false),[height,setHeight]=useState(0);
  // 0.3.167: no Android o teclado cobria os campos das folhas (o Modal translucido nao redimensiona
  // a janela, entao o KeyboardAvoidingView nao tinha efeito). Medimos o teclado e afastamos o painel.
  // 0.3.187: alguns aparelhos ja encolhem a janela quando o teclado abre, outros nao. Em vez de
@@ -42,6 +44,6 @@ export function Sheet({visible,onClose,children,label='Fechar painel'}:{visible:
  if(visible)last.current=children;
  return <Modal visible={mounted||hold} onShow={()=>{setShown(true);if(darkFromStart){handoffUntil=0;setTimeout(releaseHolders,40);}}} transparent statusBarTranslucent navigationBarTranslucent animationType="none" onRequestClose={()=>{if(visible)onClose();}}><KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
  <Animated.View testID="sheet-backdrop" style={[StyleSheet.absoluteFill,{backgroundColor:'#00000066',opacity:hold||darkFromStart?1:progress}]}><Pressable accessibilityLabel={label} style={{flex:1}} onPress={onClose}/></Animated.View>
- <View ref={rootRef} onLayout={e=>{setRootH(e.nativeEvent.layout.height);if(kbTop.current)measure();}} pointerEvents={visible?'box-none':'none'} style={{flex:1,justifyContent:'flex-end',paddingTop:insets.top+16}}><Animated.View testID="sheet-panel" onLayout={event=>setHeight(event.nativeEvent.layout.height)} accessibilityViewIsModal style={{maxHeight:Math.max(220,(rootH||windowHeight)-keyboard-insets.top-24),backgroundColor:c.surface,borderTopLeftRadius:24,borderTopRightRadius:24,padding:20,marginBottom:keyboard,paddingBottom:kbOpen?16:Math.max(28,insets.bottom+24),opacity:progress,transform:[{translateY:progress.interpolate({inputRange:[0,1],outputRange:[reduced?0:height+insets.bottom,0]})}]}}>{visible?children:last.current}</Animated.View></View>
+ <View ref={rootRef} onLayout={e=>{setRootH(e.nativeEvent.layout.height);if(kbTop.current)measure();}} pointerEvents={visible?'box-none':'none'} style={desktop?{flex:1,justifyContent:'center',alignItems:'center',padding:32}:{flex:1,justifyContent:'flex-end',paddingTop:insets.top+16}}><Animated.View testID="sheet-panel" onLayout={event=>setHeight(event.nativeEvent.layout.height)} accessibilityViewIsModal style={desktop?{width:'100%',maxWidth:560,maxHeight:Math.round((rootH||windowHeight)*0.86),backgroundColor:c.surface,borderRadius:16,borderWidth:1,borderColor:c.line,padding:24,overflow:'scroll' as any,opacity:progress,transform:[{scale:progress.interpolate({inputRange:[0,1],outputRange:[reduced?1:0.97,1]})}],shadowColor:'#000',shadowOpacity:0.3,shadowRadius:28,shadowOffset:{width:0,height:10}}:{maxHeight:Math.max(220,(rootH||windowHeight)-keyboard-insets.top-24),backgroundColor:c.surface,borderTopLeftRadius:24,borderTopRightRadius:24,padding:20,marginBottom:keyboard,paddingBottom:kbOpen?16:Math.max(28,insets.bottom+24),opacity:progress,transform:[{translateY:progress.interpolate({inputRange:[0,1],outputRange:[reduced?0:height+insets.bottom,0]})}]}}>{visible?children:last.current}</Animated.View></View>
  </KeyboardAvoidingView></Modal>;
 }
