@@ -29,9 +29,11 @@ import {LegacyMdAdapter} from './legacy-md';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Auth, Bootstrap, Conversation, MessagePage, ChatResult, HomeData, Task, AgendaItem, Notice, Profile, Prefs, Catalog, Entity, ChatSnapshot } from './types';
-const rawBase = (process.env.EXPO_PUBLIC_API_URL || 'https://sofiaos.up.railway.app').replace(/\/+$/, '');
+// 0.3.247: no navegador o site fala com o servidor que o serviu (mesma origem); no celular, o endereco publico
+const inBrowser = typeof document !== 'undefined' && typeof location !== 'undefined' && /^https?:/.test(location.origin);
+const rawBase = (inBrowser ? location.origin : (process.env.EXPO_PUBLIC_API_URL || 'https://sofiaos.up.railway.app')).replace(/\/+$/, '');
 const parsedBase = new URL(rawBase);
-if (parsedBase.protocol !== 'https:' || parsedBase.username || parsedBase.password || parsedBase.search || parsedBase.hash || parsedBase.pathname !== '/') throw new Error('Configure a raiz HTTPS do servidor Sofia.');
+if ((parsedBase.protocol !== 'https:' && !(inBrowser && parsedBase.protocol === 'http:')) || parsedBase.username || parsedBase.password || parsedBase.search || parsedBase.hash || parsedBase.pathname !== '/') throw new Error('Configure a raiz HTTPS do servidor Sofia.');
 export const SITE = rawBase;
 const AUTH_KEY = AUTH_STORAGE_KEY, PREFS_KEY = PREFS_STORAGE_KEY;
 const secureOptions = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };

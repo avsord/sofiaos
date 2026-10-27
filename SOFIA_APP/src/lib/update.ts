@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.3.246';
+export const APP_VERSION = '0.3.247';
 const RELEASE_PREFIX = 'sofia-android-v';
 const RELEASES_API = 'https://api.github.com/repos/avsord/sofiaos/releases';
 const DOWNLOAD_ROOT = 'https://github.com/avsord/sofiaos/releases/download/';
@@ -53,6 +53,8 @@ export function newestPublishedUpdate(releases: readonly unknown[], currentVersi
   return compareVersions(newest.version, currentVersion) > 0 ? newest : null;
 }
 export async function checkForUpdate(options: CheckOptions = {}): Promise<UpdateInfo | null> {
+  // 0.3.247: no site nao ha APK para baixar - o navegador recebe a versao nova a cada publicacao
+  if (typeof document !== 'undefined') return null;
   const fetcher = options.fetcher || fetch;
   const currentVersion = options.currentVersion || APP_VERSION;
   const timeoutMs = options.timeoutMs ?? 12000;

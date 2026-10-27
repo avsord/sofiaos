@@ -51,6 +51,6 @@ test('v133: proprietário pode alterar a senha dentro da conta e todas as sessõ
   r=await fetch(base+'/api/bootstrap',{headers:{Cookie:cookie}});const bootstrap=await r.json();assert.equal(r.status,200);assert.equal(bootstrap.auth.login_email,'owner@example.com');
   r=await fetch(base+'/api/auth/change-password',{method:'POST',headers:{Cookie:cookie,'X-Sofia-Token':bootstrap.token,'Content-Type':'application/json'},body:JSON.stringify({currentPassword:'senha-inicial-segura-133',newPassword:'senha-alterada-segura-133',confirmPassword:'senha-alterada-segura-133'})});
   assert.equal(r.status,200);assert.equal((await r.json()).redirect,'/login?changed=1');
-  r=await fetch(base+'/',{redirect:'manual',headers:{Cookie:cookie}});assert.equal(r.headers.get('location'),'/login');
+  r=await fetch(base+'/painel-antigo',{redirect:'manual',headers:{Cookie:cookie}});assert.equal(r.headers.get('location'),'/login');
   r=await login(base,'senha-alterada-segura-133');assert.equal(r.headers.get('location'),'/');
 });
