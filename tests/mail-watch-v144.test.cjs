@@ -153,3 +153,22 @@ test('Gmail: se uma mensagem falha, a conta inteira falha com o motivo (como ant
  w.save({kind:'mail_rule',title:'Ana',area:'Pessoal',data:{field:'from',contains:'ana@empresa.com',notify:true}});
  const r=await mw.checkAll();assert.equal(r.errors.length,1);assert.match(r.errors[0].error,/Gmail 500/);assert.equal(w.list({kind:'mail_hit'}).length,0);
 });
+
+// 0.3.248: conta "Conta Google" com e-mail diferente da Conta Google conectada lia a caixa da outra conta.
+test('Conta Google: conta com outro e-mail NAO le a caixa conectada, mostra o motivo e tira o que entrou por engano',async t=>{
+ const {core,config}=fixture(t);const w=core.workspace;
+ const msgs=[{id:'m1',internalDate:String(Date.parse('2026-10-26T10:00:00Z')),snippet:'boleto',payload:{headers:[{name:'From',value:'boleto@llz.com.br'},{name:'Subject',value:'BOLETO'}]}}];
+ let gets=0;const google={link:()=>({refresh:'x',email:'01.pedro@gmail.com',scopes:'https://www.googleapis.com/auth/gmail.readonly'}),call:async(m,url)=>{const u=new URL(url);if(u.pathname.endsWith('/messages'))return {messages:msgs.map(x=>({id:x.id}))};gets++;return msgs[0];}};
+ const mw=new MailWatcher(w,config,{client:()=>{throw Error('x');}});mw.google=google;
+ const certa=w.save({kind:'mail_account',title:'Gmail',area:'Pessoal',data:{provider:'gmail_google',address:'01.pedro@gmail.com'}});
+ const outra=w.save({kind:'mail_account',title:'Jota',area:'Pessoal',data:{provider:'gmail_google',address:'Silva.Pedro@jota.ag'}});
+ w.save({kind:'mail_rule',title:'Cobranças',area:'Pessoal',data:{field:'from',contains:'boleto',notify:true}});
+ // simula o que ja tinha entrado por engano na conta errada
+ w.save({kind:'mail_hit',title:'BOLETO antigo',area:'Pessoal',state:'new',data:{account_id:outra.id,message_key:outra.id+':gmail:velho',from_addr:'boleto@llz.com.br'}});
+ const r=await mw.checkAll();
+ const err=r.errors.find(e=>e.account_id===outra.id||/jota\.ag/.test(e.error||''));
+ assert.ok(err,'a conta errada falha com motivo: '+JSON.stringify(r.errors));assert.match(err.error,/01\.pedro@gmail\.com/);assert.match(err.error,/senha de app/);
+ const hits=w.list({kind:'mail_hit'});
+ assert.equal(hits.filter(h=>h.data.account_id===outra.id).length,0,'o que entrou por engano saiu');
+ assert.equal(hits.filter(h=>h.data.account_id===certa.id).length,1,'a conta certa continua lendo a propria caixa');
+});

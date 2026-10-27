@@ -277,7 +277,13 @@ function AccountSheet({api, account, onClose, onDone, groups = []}: {api: SofiaA
             <Text style={{color: c.text, fontSize: 13, lineHeight: 19}}>{p.help}</Text>
             {p.link ? <Pressable onPress={() => void Linking.openURL(p.link!)}><Text style={{color: c.accent, fontWeight: '700'}}>Abrir página da senha de app →</Text></Pressable> : null}
           </View>
-          {viaGoogle ? (
+          {/* 0.3.248: este modo le SO a caixa da Conta Google conectada no Perfil - avisa se o e-mail digitado for outro */}
+          {viaGoogle && google?.email && address.trim() && address.trim().toLowerCase() !== String(google.email).toLowerCase() ? (
+            <View style={{padding: 12, borderRadius: 12, backgroundColor: c.danger + '1a', gap: 4}}>
+              <Text style={{color: c.danger, fontWeight: '800'}}>Este modo não lê {address.trim()}</Text>
+              <Text style={{color: c.text, fontSize: 13, lineHeight: 19}}>"Conta Google" lê só a caixa da Conta Google conectada no Perfil ({google.email}). Para {address.trim()}, escolha "Gmail (senha de app)" ou "Outro (IMAP)".</Text>
+            </View>
+          ) : viaGoogle ? (
             <Text style={{fontSize: 13, color: google?.gmail ? '#2fc58b' : c.muted}}>{google === null ? 'Conferindo a Conta Google…' : google.gmail ? '✓ Conta Google conectada com acesso ao Gmail' + (google.email ? ' (' + google.email + ')' : '') + '.' : google.connected ? 'A Conta Google está conectada, mas sem o Gmail. Em Perfil → Conta Google, desconecte e conecte de novo.' : 'Conecte a Conta Google em Perfil → Conta Google (a mesma da Agenda e do Drive).'}</Text>
           ) : <Field label={account?.data.secret_set ? 'Nova senha de app (deixe vazio para manter)' : 'Senha de app'} value={password} onChange={setPassword} placeholder="xxxx xxxx xxxx xxxx" secure />}
           {error ? <Text style={{color: c.danger}}>{error}</Text> : null}

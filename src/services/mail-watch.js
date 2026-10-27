@@ -151,6 +151,14 @@ class MailWatcher {
     const link = g && g.link && g.link();
     if (!link || !link.refresh) throw new AppError('GOOGLE_NOT_CONNECTED', 'Conecte a Conta Google em Perfil → Conta Google.');
     if (!/gmail\.readonly/.test(link.scopes || '')) throw new AppError('GMAIL_SCOPE', 'Desconecte e conecte a Conta Google de novo para liberar a leitura do Gmail.');
+    // 0.3.248: o modo "Conta Google" le a caixa da UNICA Conta Google conectada no Perfil. Uma conta com outro e-mail
+    // lia essa mesma caixa (e-mails da outra conta, testes enviados ao endereco certo nunca apareciam). Agora recusa,
+    // diz por que, e tira os encontrados que entraram por engano (vinham da outra caixa).
+    const linked = String(link.email || '').trim().toLowerCase(), own = String(account.data.address || '').trim().toLowerCase();
+    if (linked && own && linked !== own) {
+      for (const h of this.w.list({kind: 'mail_hit', limit: 500}).filter(x => x.data && x.data.account_id === account.id)) { try { this.w.deleteEntity(h.id); } catch { /* segue */ } }
+      throw new AppError('GMAIL_OTHER_ACCOUNT', 'A Conta Google conectada no Perfil é ' + linked + ', e o modo "Conta Google" só lê essa caixa. Para ler ' + own + ', escolha "Gmail (senha de app)" ou "Outro (IMAP)" nesta conta.');
+    }
     const API = 'https://gmail.googleapis.com/gmail/v1/users/me/messages';
     // last_uid guarda, para o Gmail, o horário (em SEGUNDOS) da última mensagem lida: o limite de número do servidor é 1e10.
     const since = rescanDays ? 0 : (Number(account.data.last_uid) || 0) * 1000;
