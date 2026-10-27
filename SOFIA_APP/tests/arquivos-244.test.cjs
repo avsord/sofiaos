@@ -6,7 +6,7 @@ const load=require('./load-ts.cjs');
 const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 const D=load('src/lib/drive-files.ts');
 test('tamanhos em pt-BR e datas curtas',()=>{
- assert.equal(D.fileSize(0),'0 B');assert.equal(D.fileSize(1536),'1,5 KB');assert.equal(D.fileSize(5*1048576),'5,0 MB');assert.equal(D.fileSize(214748364800),'200,0 GB');
+ assert.equal(D.fileSize(0),'0 B');assert.equal(D.fileSize(1536),'1,5 KB');assert.equal(D.fileSize(5*1048576),'5 MB');assert.equal(D.fileSize(214748364800),'200 GB');assert.equal(D.fileSize(4.26*1073741824),'4,3 GB');assert.equal(D.fileSize(150*1048576),'150 MB');
  assert.equal(D.shortDate(''),'');assert.match(D.shortDate('2026-10-26T15:00:00Z'),/^\d{2}\/10\/2026$/);
 });
 test('aviso do topo: reconectar, migração, o que ficou e área apagada (nessa ordem)',()=>{
@@ -41,4 +41,22 @@ test('tela: apagar pede confirmação e cópia de página não tem lixeira; comp
  assert.ok(s.includes('<Skeleton rows={6}/>')&&s.includes('ShimmerGroup'),'nunca tela cinza: esqueleto com brilho');
  assert.ok(s.includes('Sharing.shareAsync(file.uri'),'abrir = tela do Android para abrir/salvar/compartilhar');
  assert.ok(s.includes("BackHandler.addEventListener('hardwareBackPress',back)"),'voltar do Android volta da lista para os tipos');
+});
+
+test('0.3.245 Armazenamento: usado, livre e total como o Drive, com a Sofia separada do resto',()=>{
+ const GB=1073741824,v=D.storageParts({limit:200*GB,usage:10*GB,usage_in_drive:7*GB,usage_in_trash:1*GB},2*GB);
+ assert.equal(JSON.stringify(v.parts.map(p=>[p.key,p.bytes/GB])),JSON.stringify([['sofia',2],['drive',4],['mail',3],['trash',1]]));
+ assert.equal(v.used,10*GB);assert.equal(v.total,200*GB);assert.equal(v.free,190*GB);assert.equal(v.percent,5);
+ assert.equal(v.parts.reduce((n,p)=>n+p.bytes,0),v.used,'as fatias somam o usado');
+ const ilimitado=D.storageParts({limit:0,usage:3*GB,usage_in_drive:3*GB,usage_in_trash:0},GB);assert.equal(ilimitado.free,null);assert.equal(ilimitado.percent,0);
+ const estranho=D.storageParts({limit:GB,usage:2*GB,usage_in_drive:5*GB,usage_in_trash:9*GB},9*GB);assert.ok(estranho.parts.every(p=>p.bytes>=0));assert.equal(estranho.free,0);assert.equal(estranho.percent,100);
+ assert.ok(read('src/lib/api.ts').includes("'/md/drive/storage'"));
+});
+test('0.3.245 Armazenamento fica nas configurações, acima da Conta Google, carrega quando aparece e abre os arquivos',()=>{
+ const p=read('src/screens/Profile.tsx');assert.ok(p.includes('<StorageCard api={api}/><GoogleCalendarSettings api={api}/>'));
+ const s=read('src/components/StorageCard.tsx');
+ assert.ok(s.includes('useVisibleLoad(')&&s.includes('ShimmerGroup'),'carrega depois de aparecer, com esqueleto');
+ assert.ok(s.includes("state==='off'")&&s.includes('Conecte a Conta Google'),'sem conta: explica, sem erro vermelho');
+ assert.ok(s.includes('<DeferredScreen load={loadSofiaFiles}')&&s.includes('Ver arquivos da Sofia'));
+ assert.ok(s.includes(' livres · ')&&s.includes(' usados'));
 });

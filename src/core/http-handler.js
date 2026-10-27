@@ -185,6 +185,7 @@ function createHandler(runtime) {
       if(m==='GET' && p==='/api/usage-status')return json(res,200,{ok:true,usage:await usageService.status()});
       if(m==='GET' && STATIC[p]) {const [f,type]=STATIC[p];res.setHeader('Content-Type',type);res.end(fs.readFileSync(path.join(config.root,'public',f)));return;}
       // 0.3.244: Arquivos da Sofia no site (mesmas regras do app; só com a sessão de dono).
+      if(m==='GET'&&p==='/api/drive/storage'&&runtime.google)return json(res,200,await runtime.google.driveStorage());
       if(m==='GET'&&p==='/api/drive/files'&&runtime.google){const cat=url.searchParams.get('cat');return json(res,200,cat?await runtime.google.driveList(cat,String(url.searchParams.get('page')||'')):await runtime.google.driveSummary());}
       {const fm=p.match(/^\/api\/drive\/files\/([A-Za-z0-9_-]+)\/content$/);if(m==='GET'&&fm&&runtime.google){await GoogleService.sendFile(res,await runtime.google.driveContent(fm[1]),{inline:url.searchParams.get('inline')==='1'});return;}}
       {const dm=p.match(/^\/api\/drive\/files\/([A-Za-z0-9_-]+)$/);if(m==='DELETE'&&dm&&runtime.google){await bodyJson(req,256).catch(()=>({}));return json(res,200,await runtime.google.driveDelete(dm[1]));}}

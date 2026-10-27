@@ -252,6 +252,7 @@ function makeMobileApi(runtime, deps) {
       rate(session, 'drive-files', 60); const cat = url.searchParams.get('cat');
       return send(cat ? await runtime.google.driveList(cat, String(url.searchParams.get('page') || '')) : await runtime.google.driveSummary());
     }
+    if (p === '/api/mobile/md/drive/storage' && m === 'GET') { rate(session, 'drive-files', 60); return send(await runtime.google.driveStorage()); }
     const driveFile = p.match(/^\/api\/mobile\/md\/drive\/files\/([A-Za-z0-9_-]+)\/content$/);
     if (driveFile && m === 'GET') { rate(session, 'drive-files', 60); await GoogleService.sendFile(res, await runtime.google.driveContent(driveFile[1])); return true; }
     const driveDel = p.match(/^\/api\/mobile\/md\/drive\/files\/([A-Za-z0-9_-]+)$/);

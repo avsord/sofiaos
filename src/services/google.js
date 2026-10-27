@@ -690,8 +690,27 @@ class GoogleService {
     }
     if (this.legacyPending(l)) for (const node of await this.legacyTree()) for (const f of await this.legacyFiles(node, 1000)) add(node.cat, f.size);
     let quota = null;
-    try { const a = await this.call('GET', DRIVE + '/about?fields=storageQuota'); const s = a.storageQuota || {}; quota = {limit: Number(s.limit) || 0, usage: Number(s.usage) || 0}; } catch { /* sem cota: segue sem */ }
-    return {...this.driveState(this.link()), categories: GoogleService.CATS.map(c => ({...c, ...counts[c.key], deletable: GoogleService.deletable(c.key)})), quota, receipts_cleanup: this.receiptsCleanup()};
+    quota = await this.driveQuota();
+    const out = {...this.driveState(this.link()), categories: GoogleService.CATS.map(c => ({...c, ...counts[c.key], deletable: GoogleService.deletable(c.key)})), quota, receipts_cleanup: this.receiptsCleanup()};
+    this.summaryCache = {at: Date.now(), value: out};
+    return out;
+  }
+  /** Espaço da conta Google como o Drive mostra: total, usado (no Drive, na lixeira do Drive, e o resto em
+   * Gmail e Fotos) e livre. Plano sem limite vem com limit 0. */
+  async driveQuota() {
+    try {
+      const a = await this.call('GET', DRIVE + '/about?fields=storageQuota'), q = a.storageQuota || {};
+      return {limit: Number(q.limit) || 0, usage: Number(q.usage) || 0, usage_in_drive: Number(q.usageInDrive) || 0, usage_in_trash: Number(q.usageInDriveTrash) || 0};
+    } catch { return null; }
+  }
+  /** Para o cartão "Armazenamento" das configurações: cota ao vivo (uma chamada leve) e o espaço da Sofia
+   * por tipo, reaproveitando o último resumo por até 10 min (contar os arquivos é a parte cara). */
+  async driveStorage() {
+    const l = this.link(); if (!this.driveOn(l)) throw this.notConnected();
+    const cached = this.summaryCache && Date.now() - this.summaryCache.at < 10 * 60000 ? this.summaryCache.value : null;
+    if (!cached) { const s = await this.driveSummary(); return {quota: s.quota, categories: s.categories.map(c => ({key: c.key, label: c.label, count: c.count, bytes: c.bytes})), sofia_bytes: s.categories.reduce((n, c) => n + c.bytes, 0), mode: s.mode}; }
+    const quota = await this.driveQuota();
+    return {quota, categories: cached.categories.map(c => ({key: c.key, label: c.label, count: c.count, bytes: c.bytes})), sofia_bytes: cached.categories.reduce((n, c) => n + c.bytes, 0), mode: cached.mode};
   }
   /** Arquivos de uma categoria, do mais novo para o mais antigo (100 por página). */
   async driveList(cat, pageToken = '') {
@@ -810,7 +829,7 @@ class GoogleService {
     const props = meta.appProperties || {};
     if (!GoogleService.deletable(props.sofia_cat, props)) throw new AppError('PAGE_COPY', 'Essa é a cópia em texto de uma página e volta sozinha enquanto a página existir. Para apagar, apague a página em Páginas.', 409);
     await this.call('DELETE', DRIVE + '/files/' + fileId).catch(e => { if (e.googleStatus !== 404) throw e; });
-    this.forgetDriveFile(fileId);
+    this.forgetDriveFile(fileId); this.summaryCache = null;
     return {ok: true, name: meta.name || ''};
   }
   static RECEIPT_DAYS = 7;
@@ -846,6 +865,7 @@ class GoogleService {
         this.forgetDriveFile(f.id, when); removed++;
       }
       const cur = this.kvGet('drive_receipts_cleanup') || {}; this.kvSet('drive_receipts_cleanup', {...cur, last_at: when, last_removed: removed});
+      if (removed) this.summaryCache = null;
       return {removed};
     } finally { this.cleaningReceipts = false; }
   }

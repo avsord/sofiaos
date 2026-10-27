@@ -14,7 +14,7 @@ const SC_BOTH=SC_VISIBLE+' https://www.googleapis.com/auth/drive.appdata';
 // Drive falso que segue as regras do de verdade que importam aqui: dois espaços (meu Drive e área oculta do app),
 // consultas por pasta, nome, tipo, appProperties e lixeira; lixeira de pasta leva o que está dentro.
 function fakeDrive(){
- const g={files:[],seq:1,calls:[],fail:null,trashFails:new Set(),quota:{limit:'214748364800',usage:'1073741824'}};
+ const g={files:[],seq:1,calls:[],fail:null,trashFails:new Set(),quota:{limit:'214748364800',usage:'1073741824',usageInDrive:'805306368',usageInDriveTrash:'52428800'}};
  const res=(status,body)=>({ok:status<300,status,json:async()=>body});
  const pub=f=>({id:f.id,name:f.name,mimeType:f.mimeType,size:f.mimeType===FOLDER?undefined:String(f.bytes.length),createdTime:f.createdTime,modifiedTime:f.modifiedTime,appProperties:f.appProperties,description:f.description,parents:f.parents,trashed:f.trashed,webViewLink:'https://drive.google.com/drive/folders/'+f.id});
  const trashedDeep=f=>f.trashed||(f.parents||[]).some(p=>{const par=g.files.find(x=>x.id===p);return par?trashedDeep(par):false;});
@@ -310,4 +310,20 @@ test('limpeza semanal dos comprovantes: foto da conversa com mais de 7 dias sai;
  assert.deepEqual(await svc.cleanReceipts(),{skipped:true},'no máximo a cada 6 h');
  svc.setReceiptsCleanup(false);assert.equal(svc.receiptsCleanup().enabled,false);assert.deepEqual(await svc.cleanReceipts(true),{skipped:true},'desligada não apaga');
  const s=await svc.driveSummary();assert.equal(s.receipts_cleanup.enabled,false);assert.equal(s.receipts_cleanup.days,7);assert.equal(s.receipts_cleanup.last_removed,2);
+});
+
+test('Armazenamento (0.3.245): total, usado no Drive, lixeira, Gmail e Fotos e o espaço da Sofia; plano sem limite; reaproveita a contagem',async t=>{
+ const g=fakeDrive(),f=service(t,g,SC_BOTH),{svc,w}=f;
+ svc.saveDrive({migration:{state:'done'}});
+ const page=w.save({kind:'user_page',title:'Casa',area:'Pessoal',data:{}});w.attach(page.id,{name:'a.png',mime:'image/png',base64:Buffer.from('12345').toString('base64')});
+ await svc.offloadAttachments();
+ const st=await svc.driveStorage();
+ assert.deepEqual(st.quota,{limit:214748364800,usage:1073741824,usage_in_drive:805306368,usage_in_trash:52428800});
+ assert.equal(st.sofia_bytes,5);assert.equal(st.categories.find(c=>c.key==='Anexos').bytes,5);
+ const lists=()=>g.calls.filter(c=>c.startsWith('GET /drive/v3/files?')).length,before=lists();
+ await svc.driveStorage();assert.equal(lists(),before,'segunda vez em 10 min: só a cota, sem listar tudo de novo');
+ const id=(await svc.driveList('Anexos')).items[0].id;await svc.driveDelete(id);
+ assert.equal((await svc.driveStorage()).sofia_bytes,0,'apagar refaz a conta');
+ g.quota={usage:'10',usageInDrive:'10'};svc.summaryCache=null;assert.equal((await svc.driveStorage()).quota.limit,0,'sem limite = 0');
+ const off=service(t,fakeDrive(),SC_BOTH);off.svc.saveLink({});await assert.rejects(off.svc.driveStorage(),/Conecte a Conta Google/);
 });
