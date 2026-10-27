@@ -214,6 +214,8 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 
 ## 9. Pendências (atualizar a cada rodada)
 
+- **Site no computador (após 0.3.251):** seguir docs/WEB_DIAGNOSTICO.md — Finanças em 2 colunas e tabelas, Price Tracker e Tarefas em tabela, E-mails em 3 colunas, arrastar páginas com mouse, clique direito no lugar de segurar.
+
 - **Site 0.3.250 (computador):** dono conferir no navegador depois do deploy. Próxima fase pedida: listas virando tabelas com colunas/ordenação/filtros (Tarefas, Finanças, Price Tracker, E-mails, Encomendas), detalhes em side peek, menus de clique direito.
 
 - **0.3.244 Arquivos da Sofia:** depois do deploy, tocar em Reconectar (Perfil → Conta Google) para a permissão `drive.appdata`; conferir no celular a migração (pasta "Sofia OS" na lixeira do Drive e aviso no sino), abrir/apagar um arquivo, Exportar cópia e a limpeza dos comprovantes. Se o Google recusar o escopo novo, incluir `drive.appdata` em Google Cloud → Acesso a dados.
@@ -253,6 +255,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
    12 h, filtro privado preservado em updates.
 
 ## 10. Diário de rodadas (só acrescentar; uma linha por rodada)
+- 27/10/2026 · 0.3.251 (code 252) · candidato manual: site sem cara de app no computador — telas cheias viram painel lateral, botões/ícones/cabeçalho de computador, textos de toque viram de mouse (35), Páginas com capa larga e texto em coluna, pastas em cartões fixos, Apps com largura máxima. Diagnóstico por código em docs/WEB_DIAGNOSTICO.md. Celular sem mudança; suíte 100%.
 - 27/10/2026 · 0.3.250 (code 251) · candidato manual: site com layout de computador estilo Notion (≥1024 px, só na web): barra lateral recolhível com menus, apps e árvore de Páginas; barra de cima com caminho, busca, sino e perfil; Ctrl+K, Alt+1…6, Ctrl+\; Início em colunas com botão Organizar; folhas viram janela central; grade de Apps com mais colunas. Celular sem mudança. Testado no navegador local (1440 e 420 px). Pendente: tabelas/visões de banco nas listas, side peek e menu de clique direito por tela.
 - 26/10/2026 · 0.3.246 (code 247) · candidato manual: áudios da conversa na limpeza automática de 7 dias (chave própria, ligada por padrão), aviso "Áudio apagado" na conversa, rota genérica /md/drive/cleanup. Celular pendente.
 - 26/10/2026 · 0.3.245 (code 246) · candidato manual: cartão Armazenamento nas configurações (usado/livre/total como o Drive; fatias Sofia, resto do Drive, Gmail e Fotos, lixeira) e o mesmo quadro em /arquivos; rota /md/drive/storage com contagem reaproveitada por 10 min. Servidor 385/385, app 871 + verificações Python, tsc 0. Celular pendente.

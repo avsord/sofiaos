@@ -1,4 +1,5 @@
 import {MotionModal} from './MotionModal';
+import {tap,useDesktop} from '../lib/desktop';
 import {applyLeafPatch} from '../lib/leaf-document';
 import {KeyboardViewport} from './KeyboardViewport';
 import {LeafEditor} from './LeafEditor';
@@ -101,11 +102,13 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange}:{data
  function removeBook(id:string){const b=books.find(x=>x.id===id);if(!b)return;setFolderMenu(null);
   appAlert('Excluir pasta?',b.pages.length?`“${b.name||'Sem título'}” e as ${b.pages.length} nota(s) dentro dela serão removidas.`:`“${b.name||'Sem título'}” será removida.`,[{text:'Cancelar',style:'cancel'},{text:'Excluir',style:'destructive',onPress:()=>{const up=parentOf(b);update(next=>{for(const k of next)if(k.parent===id){if(up)k.parent=up;else delete k.parent;}const i=next.findIndex(x=>x.id===id);if(i>=0)next.splice(i,1);});if(openBook===id)setOpenBook(up||null);}}]);}
  const commitTitle=()=>{const t=title.trim()||'Notas';setTitle(t);if(t!==String(data.title||'Notas'))onChange({...data,mode:'notebooks',title:t,notebooks:books},'notebook-title');};
+ // 0.3.251 (computador): pastas em cartoes de tamanho fixo, quantos couberem na linha (no celular, 2 por linha)
+ const desktop=useDesktop();
  const results=useMemo(()=>query.trim()?books.flatMap(b=>b.pages.map(p=>({b,p,score:fuzzyScore((p.title||'')+' '+leafPreview(p),query)}))).filter(x=>x.score>0).sort((a,b)=>b.score-a.score):[],[books,query]);
  const open=(b:Book,p:Leaf)=>{setBookId(b.id);setLeafId(p.id);};
 
  const folderTile=(b:Book)=>{const last=lastEdited(b),subs=foldersIn(b.id).length,over=hover===b.id,lifted=drag?.kind==='folder'&&drag.id===b.id;
-  return <View key={b.id} ref={r=>{targets.current[b.id]=r;}} collapsable={false} style={{width:'48%'}}>
+  return <View key={b.id} ref={r=>{targets.current[b.id]=r;}} collapsable={false} style={{width:desktop?224:'48%'}}>
    <Pressable accessibilityRole="button" accessibilityLabel={'Abrir pasta '+(b.name||'Sem título')} accessibilityHint="Segure e arraste para mover" onPress={()=>{if(!dragRef.current)setOpenBook(b.id);}} delayLongPress={300}
     onLongPress={e=>startDrag({kind:'folder',id:b.id,from:parentOf(b),label:(b.emoji||'📁')+' '+(b.name||'Sem título')},e)} onPressOut={()=>pressOut()}
     style={({pressed})=>({minHeight:118,backgroundColor:over?c.accentSoft:c.surface,borderRadius:18,borderWidth:over?2:1,borderColor:over?c.accent:c.line,padding:14,gap:6,opacity:lifted?0.35:pressed?0.75:1})}>
@@ -150,13 +153,13 @@ export function NotebookBlock({data,onChange,onDelete,onInteractionChange}:{data
    </View>:null}
    {foldersIn(opened.id).length?<View style={{flexDirection:'row',flexWrap:'wrap',gap:10}}>{foldersIn(opened.id).map(folderTile)}</View>:null}
    {opened.pages.length?[...opened.pages].sort((x,y)=>stampOf(y).localeCompare(stampOf(x))).map(p=>noteCard(opened,p)):
-    <Pressable onPress={()=>addLeaf(opened.id)} style={{borderRadius:16,borderWidth:1,borderStyle:'dashed',borderColor:c.line,padding:22,alignItems:'center',gap:4}}><Text style={{fontSize:24}}>📝</Text><Text style={{color:c.muted,fontSize:13}}>Pasta vazia. Toque para criar a primeira nota.</Text></Pressable>}
+    <Pressable onPress={()=>addLeaf(opened.id)} style={{borderRadius:16,borderWidth:1,borderStyle:'dashed',borderColor:c.line,padding:22,alignItems:'center',gap:4}}><Text style={{fontSize:24}}>📝</Text><Text style={{color:c.muted,fontSize:13}}>{tap('Pasta vazia. Toque para criar a primeira nota.')}</Text></Pressable>}
   </View>:<View style={{flexDirection:'row',flexWrap:'wrap',gap:10}}>
    {foldersIn('').map(folderTile)}
    {rootNotes.length?<View style={{width:'100%',gap:10,marginTop:4}}><Text style={{color:c.muted,fontSize:12,fontWeight:'700'}}>Fora de pastas</Text>{rootNotes.map(p=>noteCard(books.find(b=>b.id===ROOT_BOOK)!,p))}</View>:null}
    {!books.length?<Pressable onPress={()=>{setEditingBook(null);setNewName('');setCreate(true);}} style={{flex:1,borderRadius:18,borderWidth:1,borderStyle:'dashed',borderColor:c.line,padding:22,alignItems:'center',gap:4}}><Text style={{fontSize:26}}>📁</Text><Text style={{color:c.muted,fontSize:13,textAlign:'center'}}>Crie a primeira pasta para organizar suas notas.</Text></Pressable>:null}
   </View>}
-  {total>0&&!query.trim()?<Text style={{color:c.muted,fontSize:11}}>Segure uma nota ou pasta e arraste para dentro de outra pasta.</Text>:null}
+  {total>0&&!query.trim()?<Text style={{color:c.muted,fontSize:11}}>{tap('Segure uma nota ou pasta e arraste para dentro de outra pasta.')}</Text>:null}
   {drag?<Animated.View pointerEvents="none" style={{position:'absolute',left:0,top:0,zIndex:50,elevation:8,transform:ghost.getTranslateTransform(),backgroundColor:c.surface,borderRadius:14,borderWidth:1,borderColor:c.accent,paddingHorizontal:14,paddingVertical:10,maxWidth:240}}>
    <Text numberOfLines={1} style={{color:c.text,fontWeight:'700'}}>{drag.label}</Text>
   </Animated.View>:null}

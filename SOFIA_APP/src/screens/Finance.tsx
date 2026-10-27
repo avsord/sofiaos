@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {tap} from '../lib/desktop';
 import {GoalProgressCard} from '../components/GoalProgress';
 import type {GoalNumbers} from '../components/GoalProgress';
 import {keepIfSame, useCachedGoal, writeGoalWidget} from '../lib/goal-widget';
@@ -488,7 +489,7 @@ function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi
         <Text style={{color: c.text, fontWeight: '700'}}>{money(money0(b.amount))}</Text>
         <IconButton name="trash" label={'Remover ' + b.title} onPress={() => { setBills(list => list.filter((_, n) => n !== i)); if (billEditing === i) { setBillEditing(null); setBillTitle(''); setBillAmount(''); setBillDay(''); setBillParcels(''); setBillAt(''); } }} />
       </Pressable>)}
-      {bills.length ? <Text style={{color: c.muted, fontSize: 11}}>Toque em uma conta para corrigir os dados dela.</Text> : null}
+      {bills.length ? <Text style={{color: c.muted, fontSize: 11}}>{tap('Toque em uma conta para corrigir os dados dela.')}</Text> : null}
       <Field label="Conta" value={billTitle} onChange={setBillTitle} placeholder="Ex.: Aluguel" />
       <View style={{flexDirection: 'row', gap: 10}}>
         <View style={{flex: 1}}><Field label="Valor (R$)" value={billAmount} onChange={setBillAmount} placeholder="0,00" numeric /></View>
@@ -543,7 +544,7 @@ function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi
       </View>
       {current.body}
       {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
-      {last && existing ? <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Nada foi alterado ainda. Só ao tocar em “Substituir configuração” estes dados passam a valer; se sair agora, tudo continua como estava.</Text> : null}
+      {last && existing ? <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>{tap('Nada foi alterado ainda. Só ao tocar em “Substituir configuração” estes dados passam a valer; se sair agora, tudo continua como estava.')}</Text> : null}
       <Button title={last ? (existing ? 'Substituir configuração' : 'Começar a usar') : 'Continuar'} loading={busy} disabled={step === 0 && !name.trim()}
         onPress={() => last ? confirmFinish() : setStep(s => s + 1)} />
       <View style={{flexDirection: 'row', justifyContent: 'center', gap: 18}}>
@@ -620,7 +621,7 @@ function ReserveHistorySheet({api, reserve, moves, show, onClose, reload, startE
   return <Sheet visible onClose={onClose} label="Fechar histórico da reserva">
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 16, paddingBottom: 18}}>
       <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Histórico da reserva</Text>
-      <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Toque em um movimento para corrigir o valor, a data ou apagá-lo.</Text>
+      <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>{tap('Toque em um movimento para corrigir o valor, a data ou apagá-lo.')}</Text>
       {months.length ? months.map(m => <View key={m.month} style={{gap: 8}}>
         <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8}}>
           <Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 15}}>{monthLabel(m.month)}</Text>
@@ -849,7 +850,7 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
         <Text style={{color:c.text,fontWeight:'700',fontSize:14}}>{money(t.amount)}</Text>
         <Text style={{color:c.muted,fontSize:16}}>›</Text>
       </Pressable>;})}
-      <Text style={{color:c.muted,fontSize:11}}>Toque numa conta para mudar nome, valor, dia, parcelas ou avisos. Vale para todos os meses.</Text>
+      <Text style={{color:c.muted,fontSize:11}}>{tap('Toque numa conta para mudar nome, valor, dia, parcelas ou avisos. Vale para todos os meses.')}</Text>
       <View style={{borderTopWidth:1,borderColor:c.line,paddingTop:12,gap:6}}>
         <View style={{flexDirection:'row'}}><Text style={{flex:1,color:c.text,fontWeight:'700'}}>Total do mês</Text><Text style={{color:c.text,fontWeight:'800'}}>{money(fx.total)}</Text></View>
         <View style={{flexDirection:'row'}}><Text style={{flex:1,color:c.muted,fontSize:12}}>{side==='pagar'?'Pagas':'Recebidas'}</Text><Text style={{color:c.muted,fontSize:12}}>{money(fx.paid)}{fx.card?' · no cartão '+money(fx.card):''} · faltam {money(fx.open)}</Text></View>
@@ -1017,7 +1018,7 @@ function BillEditor({api,tx,accountId,onClose,onSaved,onOptimistic,scope='series
       {flow==='income'&&hasReserve?<View style={{gap:6}}>
         <Text style={{fontSize:12,color:c.muted}}>Desta receita, quanto vai para o guardado{repeat==='monthly'?' todo mês':''}? (R$)</Text>
         <TextInput accessibilityLabel="Quanto vai para o guardado todo mês" value={toReserve} onChangeText={v=>setToReserve(old=>formatMoneyInput(v,old))} keyboardType="decimal-pad" placeholder="0,00" placeholderTextColor={c.muted} style={{fontSize:16,color:c.text,borderWidth:1,borderColor:c.line,borderRadius:12,padding:12,backgroundColor:c.input}} />
-        <Text style={{fontSize:11,color:c.muted,lineHeight:16}}>O resto fica no saldo. Ao tocar em Recebi, esse valor vai sozinho para o guardado; para mudar, é só editar aqui.</Text>
+        <Text style={{fontSize:11,color:c.muted,lineHeight:16}}>{tap('O resto fica no saldo. Ao tocar em Recebi, esse valor vai sozinho para o guardado; para mudar, é só editar aqui.')}</Text>
       </View>:null}
       {flow==='expense'&&cardsList.length?<View style={{gap:6}}>
         <Text style={{fontSize:12,color:c.muted}}>Feita no cartão</Text>
@@ -1254,7 +1255,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
         <View style={{height: 10, borderRadius: 5, backgroundColor: c.line, overflow: 'hidden'}}>
           <View style={{width: `${Math.round(pct * 100)}%` as `${number}%`, height: 10, borderRadius: 5, backgroundColor: over ? BAD : pct <= 0.25 ? WARN : GOOD}} />
         </View>
-        {future ? <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>{monthLabel(month).split(' ')[0]} ainda não começou. Os números passam a contar quando o mês chegar.</Text> : <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Você começou {monthLabel(month).split(' ')[0].toLowerCase()} com {show(b.start)}{b.extra > 0 ? ', somou ' + show(b.extra) + ' de receita avulsa' : ''} e agora tem {show(b.left)}.{b.manual ? '' : ' Para informar o saldo do início do mês, toque no Saldo → Ajustar saldo.'}</Text>}
+        {future ? <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>{monthLabel(month).split(' ')[0]} ainda não começou. Os números passam a contar quando o mês chegar.</Text> : <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Você começou {monthLabel(month).split(' ')[0].toLowerCase()} com {show(b.start)}{b.extra > 0 ? ', somou ' + show(b.extra) + ' de receita avulsa' : ''} e agora tem {show(b.left)}.{b.manual ? '' : tap(' Para informar o saldo do início do mês, toque no Saldo → Ajustar saldo.')}</Text>}
       </Pressable>; })()}
 
       {dups.slice(0, 2).map(g => <Pressable key={g.key} accessibilityRole="button" onPress={() => setDupOpen(g.key)} style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: BAD + '14', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: BAD}}>
@@ -1640,7 +1641,7 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
       {source === 'months' ? null : <>
       {isClosedMonth(month) ? <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 12, backgroundColor: c.input}}><Text>🔒</Text><Text style={{flex: 1, color: c.text, fontSize: 13}}>{monthLabel(month)} já fechou — só consulta. Nada entra nem muda neste mês.</Text></View> : null}
       {list.length ? <Text style={{color: c.muted, fontSize: 12}}>{list.length} movimentações no mês · resultado {money(sum)}</Text> : null}
-      {!days.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>{activeCat || kind !== 'all' || status !== 'all' ? 'Nenhum lançamento com esses filtros.' : (isClosedMonth(month) ? 'Nenhum lançamento neste mês.' : 'Nenhum lançamento neste mês. Toque em ＋ para registrar.')}</Text> : days.map(([date, items]) => (
+      {!days.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>{activeCat || kind !== 'all' || status !== 'all' ? 'Nenhum lançamento com esses filtros.' : (isClosedMonth(month) ? 'Nenhum lançamento neste mês.' : tap('Nenhum lançamento neste mês. Toque em ＋ para registrar.'))}</Text> : days.map(([date, items]) => (
         <View key={date} style={{gap: 8}}>
           <Text style={{color: c.muted, fontSize: 12, fontWeight: '700', paddingLeft: 4}}>{weekday(date)}</Text>
           <Card_ style={{padding: 10, gap: 0}}>{items.map((t, i) => <TxRow key={t.id} t={t} d={d} first={i === 0} onPress={() => onTx(t)} api={api} reload={reload} />)}</Card_>
@@ -1850,7 +1851,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
             <View style={{gap: 10}}>
               <Text style={{fontSize: 12, color: c.muted}}>Repetir</Text>
               <Chips value={repeat} onChange={setRepeat} options={[{value: 'none' as const, label: 'Não'}, {value: 'monthly' as const, label: 'Todo mês'}, ...(kind === 'expense' ? [{value: 'installments' as const, label: 'Parcelado'}] : [])]} />
-              {repeat === 'monthly' ? <Text style={{fontSize: 12, color: c.muted}}>Aparece todo mês como previsto (aluguel, assinatura, salário). Você confirma com um toque quando pagar.</Text> : null}
+              {repeat === 'monthly' ? <Text style={{fontSize: 12, color: c.muted}}>{tap('Aparece todo mês como previsto (aluguel, assinatura, salário). Você confirma com um toque quando pagar.')}</Text> : null}
               {repeat === 'installments' ? (
                 <View style={{gap: 8}}>
                   <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
@@ -2296,9 +2297,9 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountI
             <Text style={{color: r.delta >= 0 ? GOOD : BAD, fontSize: 12, fontWeight: '700'}}>{r.delta >= 0 ? '+' : '−'}{show(Math.abs(r.delta))}</Text>
             <Text style={{color: r.run < 0 ? BAD : c.text, fontSize: 11, width: 76, textAlign: 'right'}}>{show(r.run)}</Text>
           </Pressable>)}
-          <Text style={{color: c.muted, fontSize: 11, lineHeight: 16, marginTop: 6}}>Funciona como o extrato do banco: o que já passou não muda. Ajustes e alterações entram como uma linha nova, na hora em que aconteceram, com quanto mudou e quanto ficou. A última coluna é o saldo depois de cada linha. Toque num item para corrigir ou apagar.</Text>
+          <Text style={{color: c.muted, fontSize: 11, lineHeight: 16, marginTop: 6}}>{tap('Funciona como o extrato do banco: o que já passou não muda. Ajustes e alterações entram como uma linha nova, na hora em que aconteceram, com quanto mudou e quanto ficou. A última coluna é o saldo depois de cada linha. Toque num item para corrigir ou apagar.')}</Text>
         </View> : null}
-        <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Soma de tudo o que já foi pago ou recebido nas contas (não só deste mês). Se algum valor parecer errado, toque em Receitas ou Despesas para ver os lançamentos, ou confira o saldo inicial da conta em Contas e cartões.</Text>
+        <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>{tap('Soma de tudo o que já foi pago ou recebido nas contas (não só deste mês). Se algum valor parecer errado, toque em Receitas ou Despesas para ver os lançamentos, ou confira o saldo inicial da conta em Contas e cartões.')}</Text>
       </> : <View style={{backgroundColor: c.surface, paddingBottom: 10, gap: 2, borderBottomWidth: 1, borderColor: c.line}}>
         <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>{kind === 'income' ? 'Receitas' : 'Despesas'} de {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
         <Text style={{color: kind === 'income' ? GOOD : BAD, fontWeight: '800', fontSize: 22}}>{show(total)}</Text>

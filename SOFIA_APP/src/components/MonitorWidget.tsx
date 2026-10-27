@@ -1,4 +1,5 @@
 import React from 'react';
+import {tap} from '../lib/desktop';
 import {Pressable,Text,View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import type {MonitorWidgetRow} from '../lib/monitoring';
@@ -27,7 +28,7 @@ export function MonitorWidget({rows,failed=false,onOpen}:{rows:MonitorWidgetRow[
  const top=list.slice(0,5);
  return <Pressable accessibilityRole="button" accessibilityLabel="Abrir Price Tracker" onPress={onOpen} style={{backgroundColor:c.surface,padding:16,borderRadius:22,borderWidth:1,borderColor:c.line,gap:12}}>
   <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={{fontSize:19,fontWeight:'700',color:c.text}}>Price Tracker</Text><Text style={{fontSize:11,color:c.muted}}>{list.length?`${list.length} ${list.length===1?'produto':'produtos'}`:''}</Text></View>
-  {rows===null?(failed?<Text style={{fontSize:13,lineHeight:19,color:c.muted}}>Não consegui carregar os preços agora. Toque para abrir o Price Tracker.</Text>:<SkeletonRows/>):!list.length?<Text style={{fontSize:13,lineHeight:19,color:c.muted}}>Acompanhe o preço do que você quer comprar. Toque para colar o link de um produto.</Text>:<>
+  {rows===null?(failed?<Text style={{fontSize:13,lineHeight:19,color:c.muted}}>{tap('Não consegui carregar os preços agora. Toque para abrir o Price Tracker.')}</Text>:<SkeletonRows/>):!list.length?<Text style={{fontSize:13,lineHeight:19,color:c.muted}}>{tap('Acompanhe o preço do que você quer comprar. Toque para colar o link de um produto.')}</Text>:<>
    <View style={{gap:9}}>{top.map(p=><View key={p.id} style={{flexDirection:'row',alignItems:'center',gap:10}}>
     <View style={{width:4,height:28,borderRadius:2,backgroundColor:p.color}}/>
     <View style={{flex:1}}><Text numberOfLines={1} style={{fontSize:13,color:c.text}}>{p.title}</Text>{p.atLow?<Text style={{fontSize:11,color:'#2fc58b',fontWeight:'700'}}>Menor preço já visto</Text>:p.store?<Text style={{fontSize:11,color:c.muted}}>na {p.store}</Text>:<Text style={{fontSize:11,color:c.muted}}>aguardando leitura</Text>}</View>

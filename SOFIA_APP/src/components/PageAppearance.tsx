@@ -1,4 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
+import {tap} from '../lib/desktop';
 import {View,Text,Pressable,Modal,ScrollView,TextInput,Image,StyleSheet,ActivityIndicator} from 'react-native';
 import Svg,{Defs,LinearGradient,Stop,Rect} from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
@@ -37,7 +38,7 @@ export function PageCover({data,api}:{data:Record<string,any>;api:SofiaApi}){
   return()=>{live=false;retry.current=()=>{};};
  },[attachment,preview,api]);
  if(data.cover_type==='attachment'&&attachment){
-  if(failed)return <View style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center',backgroundColor:c.input,padding:16}]}><Text style={{fontSize:12,color:c.muted,textAlign:'center'}}>Não foi possível abrir esta capa. Toque na capa para escolher novamente.</Text></View>;
+  if(failed)return <View style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center',backgroundColor:c.input,padding:16}]}><Text style={{fontSize:12,color:c.muted,textAlign:'center'}}>{tap('Não foi possível abrir esta capa. Toque na capa para escolher novamente.')}</Text></View>;
   if(!uri)return <View style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center',backgroundColor:c.input}]}><Spinner size={20}/></View>;
   return <Image key={attachment+':'+attempt+':'+uri} source={{uri}} resizeMode="cover" style={StyleSheet.absoluteFill} onError={()=>{if(attempt<3){setUri('');retry.current();}else setFailed(true);}}/>;
  }

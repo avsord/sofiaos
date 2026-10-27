@@ -1,13 +1,15 @@
-import React from 'react';
-import {useDesktop} from '../lib/desktop';
+import React,{useContext} from 'react';
+import {DialogContext,useDesktop} from '../lib/desktop';
 import { View, Text, Pressable, ActivityIndicator, StyleSheet, Image } from 'react-native';
 import { useTheme } from '../lib/theme';
 import { Icon, IconName } from './Icon';
 export function IconButton({name,label,onPress,disabled=false,filled=false,size=44}:{name:IconName;label:string;onPress:()=>void;disabled?:boolean;filled?:boolean;size?:number}) {
- const c=useTheme(); return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress} style={({pressed})=>({height:size,width:size,borderRadius:size/2,alignItems:'center',justifyContent:'center',backgroundColor:filled?c.accent:'transparent',opacity:disabled?0.35:pressed?0.6:1})}><Icon name={name} color={filled?(c.accent==='#7258E8'?'#FFFFFF':'#21172F'):c.text}/></Pressable>;
+ // 0.3.251 (computador): botao de icone menor, com fundo ao passar o mouse
+ const c=useTheme(),desktop=useDesktop(),box=desktop&&size>=40?36:size; return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress} style={({pressed,hovered}:any)=>({height:box,width:box,borderRadius:desktop?9:box/2,alignItems:'center',justifyContent:'center',backgroundColor:filled?c.accent:desktop&&hovered&&!disabled?c.line:'transparent',opacity:disabled?0.35:pressed?0.6:1})}><Icon name={name} size={desktop?19:22} color={filled?(c.accent==='#7258E8'?'#FFFFFF':'#21172F'):c.text}/></Pressable>;
 }
 export function Button({title,onPress,loading=false,disabled=false,secondary=false}:{title:string;onPress:()=>void;loading?:boolean;disabled?:boolean;secondary?:boolean}) {
- const c=useTheme(); return <Pressable accessibilityRole="button" disabled={disabled||loading} onPress={onPress} style={({pressed})=>({minHeight:50,borderRadius:16,paddingHorizontal:18,alignItems:'center',justifyContent:'center',backgroundColor:secondary?c.accentSoft:c.accent,opacity:disabled?0.4:pressed?0.7:1})}>{loading?<ActivityIndicator color={secondary?c.accent:c.onAccent}/>:<Text style={{fontSize:15,fontWeight:'700',color:secondary?c.accent:c.onAccent}}>{title}</Text>}</Pressable>;
+ // 0.3.251 (computador): altura e cantos de botao de computador; fora de janela, largura do texto
+ const c=useTheme(),desktop=useDesktop(),inDialog=useContext(DialogContext); return <Pressable accessibilityRole="button" disabled={disabled||loading} onPress={onPress} style={({pressed})=>({minHeight:desktop?40:50,borderRadius:desktop?10:16,paddingHorizontal:desktop?20:18,alignItems:'center',justifyContent:'center',alignSelf:desktop&&!inDialog?'flex-start':undefined,minWidth:desktop&&!inDialog?160:undefined,backgroundColor:secondary?c.accentSoft:c.accent,opacity:disabled?0.4:pressed?0.7:1})}>{loading?<ActivityIndicator color={secondary?c.accent:c.onAccent}/>:<Text style={{fontSize:desktop?14:15,fontWeight:'700',color:secondary?c.accent:c.onAccent}}>{title}</Text>}</Pressable>;
 }
 // 0.3.139: logo oficial da Sofia (esfera). Brand continua para iniciais de perfil.
 const SOFIA_LOGO=require('../../assets/sofia-logo-app.png');
@@ -20,4 +22,4 @@ export const forms=StyleSheet.create({input:{minHeight:52,borderWidth:1,borderRa
 
 /** Cabeçalho dos apps internos (Finanças, Price Tracker, E-mails, Listas, Biblioteca, Estudos):
  * voltar à esquerda, legenda discreta, título e ações à direita. */
-export function ModuleHeader({title,caption,onBack,right}:{title:string;caption?:string;onBack:()=>void;right?:React.ReactNode}) {const c=useTheme();return <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:12,paddingTop:14,paddingBottom:10}}><IconButton name="back" label="Voltar aos apps" onPress={onBack}/><View style={{flex:1,paddingHorizontal:4}}>{caption?<Text style={{fontSize:11,letterSpacing:1.2,color:c.muted,fontWeight:'600'}}>{caption.toUpperCase()}</Text>:null}<Text style={{fontSize:24,fontWeight:'800',color:c.text}} numberOfLines={1}>{title}</Text></View>{right}</View>;}
+export function ModuleHeader({title,caption,onBack,right}:{title:string;caption?:string;onBack:()=>void;right?:React.ReactNode}) {const c=useTheme(),desktop=useDesktop();return <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:desktop?24:12,paddingTop:desktop?22:14,paddingBottom:desktop?14:10,gap:desktop?6:0}}><IconButton name="back" label="Voltar aos apps" onPress={onBack}/><View style={{flex:1,paddingHorizontal:4}}>{caption?<Text style={{fontSize:11,letterSpacing:1.2,color:c.muted,fontWeight:'600'}}>{caption.toUpperCase()}</Text>:null}<Text style={{fontSize:desktop?28:24,fontWeight:'800',color:c.text}} numberOfLines={1}>{title}</Text></View>{right}</View>;}

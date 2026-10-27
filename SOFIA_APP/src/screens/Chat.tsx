@@ -1,4 +1,5 @@
 import {noteFluencyMovement,userIsIdle} from '../lib/fluency';
+import {tap} from '../lib/desktop';
 import {useRenderCost} from '../lib/render-cost';
 import {useVisibleLoad} from '../lib/visible-load';
 import type {Task,MessagePage} from '../lib/types';
@@ -35,7 +36,7 @@ function PhotoThumb({api,id}:{api:SofiaApi;id:string}){
  const c=useTheme(),[failed,setFailed]=useState(false);
  return <View style={{width:220,height:160,borderRadius:12,overflow:'hidden',marginBottom:6,backgroundColor:c.input,alignItems:'center',justifyContent:'center'}}>
   {failed?null:<Image source={api.attachmentThumb(id)} blurRadius={6} resizeMode="cover" onError={()=>setFailed(true)} style={{position:'absolute',top:0,left:0,right:0,bottom:0}}/>}
-  <View style={{backgroundColor:'#00000066',paddingHorizontal:12,paddingVertical:6,borderRadius:99}}><Text style={{color:'#fff',fontWeight:'700',fontSize:12}}>🧾 Toque para ver</Text></View>
+  <View style={{backgroundColor:'#00000066',paddingHorizontal:12,paddingVertical:6,borderRadius:99}}><Text style={{color:'#fff',fontWeight:'700',fontSize:12}}>{tap('🧾 Toque para ver')}</Text></View>
  </View>;
 }
 function PhotoViewer({api,id,name,onSave,onClose}:{api:SofiaApi;id:string;name:string;onSave:()=>void;onClose:()=>void}){
@@ -85,7 +86,7 @@ function Bubble({message,previous,api,onRetry,selecting,selected,onSelect}:{mess
  {selecting?<View style={{width:24,height:24,borderRadius:12,alignItems:'center',justifyContent:'center',alignSelf:'center',borderWidth:1,borderColor:selected?c.accent:c.line,backgroundColor:selected?c.accent:'transparent'}}>{selected?<Icon name="check" color="#FFFFFF" size={16}/>:null}</View>:!mine?<Brand size={25}/>:null}
  <Pressable onLongPress={()=>onSelect(message)} onPress={()=>{if(selecting)onSelect(message);}} delayLongPress={350}
   accessibilityRole={selecting?'checkbox':'button'} accessibilityState={{checked:selected}} accessibilityLabel={(mine?'Você: ':'Sofia: ')+(message.content||'Mensagem de voz')}
-  accessibilityHint={selecting?'Toque para alternar a seleção':'Segure para selecionar mensagens'}
+  accessibilityHint={selecting?tap('Toque para alternar a seleção'):tap('Segure para selecionar mensagens')}
   style={{maxWidth:'85%',minWidth:90,backgroundColor:mine?c.bubble:c.surface,borderWidth:mine?0:1,borderColor:selected?c.accent:c.line,borderRadius:19,borderBottomRightRadius:mine?5:19,borderBottomLeftRadius:mine?19:5,paddingHorizontal:14,paddingTop:12,paddingBottom:9,gap:8}}>
  <View pointerEvents={selecting?'none':'auto'}>{message.voice&&message.voice.removed?<View accessibilityLabel="Áudio apagado. A transcrição continua na mensagem." style={{flexDirection:'row',alignItems:'center',gap:8,paddingVertical:8,paddingHorizontal:12,borderRadius:14,backgroundColor:c.card,alignSelf:'flex-start'}}><Icon name="mic" size={15} color={c.muted}/><Text style={{color:c.muted,fontSize:12}}>Áudio apagado · a transcrição continua</Text></View>:message.voice?<VoicePlayer source={api.audioSource(message.voice.audio_url)} duration={message.voice.duration_ms}/>:message.localVoice?<VoicePlayer source={{uri:message.localVoice.uri}} duration={message.localVoice.duration}/>:null}</View>
  {viewing?<PhotoViewer api={api} id={viewing.id} name={viewing.name} onSave={()=>void openFile(viewing.id,viewing.name)} onClose={()=>setViewing(null)}/>:null}{parsed.attachments.map(a=><Pressable key={a.id} accessibilityLabel={'Abrir anexo '+a.name} onPress={()=>{if(selecting)onSelect(message);else if(a.image)setViewing(a);else void openFile(a.id,a.name);}} onLongPress={()=>onSelect(message)}>{a.image?<PhotoThumb api={api} id={a.id}/>:null}{a.image?null:<Text style={{color:c.accent,fontSize:14}}>📎 {a.name}</Text>}</Pressable>)}{message.localAttachments?.length&&!parsed.attachments.length?message.localAttachments.map((a,i)=><Text key={i} style={{color:c.muted}}>📎 {a.name}</Text>):null}

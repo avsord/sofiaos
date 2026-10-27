@@ -1,8 +1,8 @@
 // 0.3.250: layout de computador (estilo Notion). No navegador com tela larga o app troca a barra de abas de baixo
 // por uma barra lateral fixa + barra de cima, e o conteudo ocupa a largura da tela. No celular nada muda:
 // tudo aqui so liga com Platform.OS==='web' e largura >= DESKTOP_MIN.
-import {useEffect,useState,useSyncExternalStore} from 'react';
-import {Platform,useWindowDimensions} from 'react-native';
+import {createContext,useEffect,useState,useSyncExternalStore} from 'react';
+import {Dimensions,Platform,useWindowDimensions} from 'react-native';
 import type {Entity,Tab} from './types';
 import type {IconName} from '../components/Icon';
 
@@ -13,9 +13,11 @@ export function useDesktop():boolean{const {width}=useWindowDimensions();return 
 
 /** Largura maxima do conteudo por aba: so onde a leitura pede (texto de Paginas, Conversa). O resto e fluido. */
 export function contentMaxWidth(tab:Tab):number|undefined{
- if(tab==='pages')return 980;
+ // 0.3.251: Paginas ocupa a tela (capa e barra na largura toda; o texto se centraliza no proprio editor).
+ // Apps: formularios e listas dos apps nao se esticam por 1900 px.
  if(tab==='chat')return 900;
  if(tab==='profile')return 860;
+ if(tab==='apps')return 1240;
  return undefined;
 }
 /** Colunas do painel do Inicio pela largura disponivel do conteudo. */
@@ -107,3 +109,21 @@ export function useDesktopKeys(on:boolean,keys:DesktopKeys){
   return()=>document.removeEventListener('keydown',handler);
  },[on,keys]);
 }
+
+/** 0.3.251: textos de ajuda escritos para o dedo viram textos de mouse no computador (Toque -> Clique).
+ * Segurar com o mouse funciona (o clique longo dispara o mesmo gesto), entao "Segure" vira "Clique e segure". */
+export function tap(text:string):string{
+ let w=0;try{w=Dimensions.get('window').width;}catch{return text;}
+ if(!isDesktopWidth(w))return text;
+ return text
+  .replace(/\bToque e segure\b/g,'Clique e segure').replace(/\btoque e segure\b/g,'clique e segure')
+  .replace(/\bcom um toque\b/g,'com um clique')
+  .replace(/\bToque\b/g,'Clique').replace(/\btoque\b/g,'clique')
+  .replace(/\bao tocar\b/g,'ao clicar')
+  .replace(/(?<![Cc]lique e )\bSegure\b/g,'Clique e segure').replace(/(?<![Cc]lique e )\bsegure\b/g,'clique e segure')
+  .replace(/fuso do celular/g,'fuso deste aparelho');
+}
+
+/** 0.3.251: dentro de uma janela (Sheet) os botoes continuam na largura da janela; fora dela, no computador,
+ * o botao tem o tamanho do texto (botao de largura total e coisa de celular). */
+export const DialogContext=createContext(false);

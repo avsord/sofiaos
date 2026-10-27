@@ -1,4 +1,5 @@
 import React,{useEffect,useMemo,useState} from 'react';
+import {tap} from '../lib/desktop';
 import {Alert,Linking,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
 import type {SofiaApi} from '../lib/api';
 import type {Entity} from '../lib/types';
@@ -86,7 +87,7 @@ export function Packages({api,active,onBack}:{api:SofiaApi;active:boolean;onBack
     {viewing.data?.ok_at?<Text style={{color:c.muted,fontSize:11}}>Última atualização com sucesso: {whenLabel(String(viewing.data.ok_at))}</Text>:<Text style={{color:c.muted,fontSize:11}}>Ainda sem nenhuma atualização com sucesso.</Text>}
     {viewing.data?.checked_at?<Text style={{color:c.muted,fontSize:11}}>Última tentativa: {whenLabel(String(viewing.data.checked_at))}</Text>:null}
     <ScrollView keyboardShouldPersistTaps="handled" style={{maxHeight:360}} contentContainerStyle={{gap:10}}>
-     {events.length?events.map((e,i)=><View key={i} style={{flexDirection:'row',gap:12}}><View style={{alignItems:'center'}}><View style={{width:12,height:12,borderRadius:6,backgroundColor:i===0?c.accent:c.line,marginTop:4}}/>{i<events.length-1?<View style={{width:2,flex:1,backgroundColor:c.line,marginTop:2}}/>:null}</View><View style={{flex:1,paddingBottom:8}}><Text style={{color:i===0?c.text:c.muted,fontWeight:i===0?'700':'500',fontSize:14}}>{e.status}</Text><Text style={{color:c.muted,fontSize:11}}>{whenLabel(e.at)}{e.local?' · '+e.local:''}</Text></View></View>):<Text style={{color:c.muted,fontSize:13}}>Ainda sem eventos. Toque em Atualizar agora ou abra o rastreio oficial.</Text>}
+     {events.length?events.map((e,i)=><View key={i} style={{flexDirection:'row',gap:12}}><View style={{alignItems:'center'}}><View style={{width:12,height:12,borderRadius:6,backgroundColor:i===0?c.accent:c.line,marginTop:4}}/>{i<events.length-1?<View style={{width:2,flex:1,backgroundColor:c.line,marginTop:2}}/>:null}</View><View style={{flex:1,paddingBottom:8}}><Text style={{color:i===0?c.text:c.muted,fontWeight:i===0?'700':'500',fontSize:14}}>{e.status}</Text><Text style={{color:c.muted,fontSize:11}}>{whenLabel(e.at)}{e.local?' · '+e.local:''}</Text></View></View>):<Text style={{color:c.muted,fontSize:13}}>{tap('Ainda sem eventos. Toque em Atualizar agora ou abra o rastreio oficial.')}</Text>}
     </ScrollView>
     <Button title="Atualizar agora" loading={busy} onPress={()=>void refresh(viewing)}/>
     <Button title="Abrir rastreio oficial" secondary onPress={()=>void Linking.openURL(officialUrl(String(viewing.data?.carrier||'outro'),String(viewing.data?.code||'')))}/>

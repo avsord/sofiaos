@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {tap} from '../lib/desktop';
 import {ActivityIndicator, Alert, AppState, KeyboardAvoidingView, Linking, Platform, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
@@ -151,7 +152,7 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
                     );
                   })}
                 </View>
-                <Text style={{fontSize: 11, color: c.muted}}>Cada linha é a evolução do próprio produto (o melhor preço entre as lojas dele). Toque num nome para esconder ou mostrar a linha.</Text>
+                <Text style={{fontSize: 11, color: c.muted}}>{tap('Cada linha é a evolução do próprio produto (o melhor preço entre as lojas dele). Toque num nome para esconder ou mostrar a linha.')}</Text>
               </View>
 
               {products.map(p => {
@@ -269,7 +270,7 @@ function AddProduct({api, used, existing, onClose, onCreated}: {api: SofiaApi; u
           {step === 'link' ? (
             <>
               <Text style={{fontSize: 22, fontWeight: '800', color: c.text}}>Qual produto?</Text>
-              <Text style={{fontSize: 14, color: c.muted, lineHeight: 20}}>Abra o produto no app ou site da loja, toque em compartilhar → copiar link, e cole aqui. Só isso.</Text>
+              <Text style={{fontSize: 14, color: c.muted, lineHeight: 20}}>{tap('Abra o produto no app ou site da loja, toque em compartilhar → copiar link, e cole aqui. Só isso.')}</Text>
               <View style={{flexDirection: 'row', gap: 8, alignItems: 'center'}}>
                 <TextInput accessibilityLabel="Link do produto" value={url} onChangeText={setUrl} placeholder="https://…" placeholderTextColor={c.muted} autoCapitalize="none" autoCorrect={false} keyboardType="url"
                   onSubmitEditing={() => void read()} style={{flex: 1, borderWidth: 1, borderColor: c.line, borderRadius: 14, padding: 14, color: c.text, backgroundColor: c.input, fontSize: 15}} />
@@ -295,7 +296,7 @@ function AddProduct({api, used, existing, onClose, onCreated}: {api: SofiaApi; u
                   style={{fontSize: 18, fontWeight: '700', color: c.text, padding: 0}} />
                 <Text style={{fontSize: 30, fontWeight: '800', color: c.text}}>{picked ? money(picked.amount) : '—'}</Text>
                 {mlReading ? <Text style={{fontSize: 13, color: c.muted}}>Vendedor: {mlReading.seller.name} · {mlReading.itemId}. Preço do produto, sem frete. Ao salvar, você confirma esta oferta.</Text> : null}
-                {!picked && candidates.length ? <Text style={{fontSize: 13, color: '#d9962b'}}>A página mostra mais de um valor. Toque no preço certo:</Text> : null}
+                {!picked && candidates.length ? <Text style={{fontSize: 13, color: '#d9962b'}}>{tap('A página mostra mais de um valor. Toque no preço certo:')}</Text> : null}
                 {!picked && !candidates.length ? <Text style={{fontSize: 13, color: c.muted}}>Preço não encontrado agora. A Sofia tenta de novo nas próximas leituras.</Text> : null}
                 {candidates.length > 1 || (!picked && candidates.length) ? (
                   <View style={{gap: 8}}>
@@ -422,7 +423,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
               <Text style={{fontSize: 15, fontWeight: '600', color: c.text}}>{s.name}</Text>
               {s.primary ? <Text style={{fontSize: 10, color: c.muted, borderWidth: 1, borderColor: c.line, borderRadius: 6, paddingHorizontal: 4}}>PRINCIPAL</Text> : null}
             </View>
-            {iss?.kind === 'confirm' ? <Pressable onPress={() => setConfirm({store: s, issue: iss})}><Text style={{fontSize: 12, color: '#d9962b', fontWeight: '600'}}>Toque para confirmar o preço</Text></Pressable>
+            {iss?.kind === 'confirm' ? <Pressable onPress={() => setConfirm({store: s, issue: iss})}><Text style={{fontSize: 12, color: '#d9962b', fontWeight: '600'}}>{tap('Toque para confirmar o preço')}</Text></Pressable>
               : iss?.kind === 'failed' ? <Pressable onPress={() => setViewer(s)}><Text style={{fontSize: 12, color: BAD}} numberOfLines={3}>Não consegui ler: {iss.error}</Text><Text style={{fontSize: 12, color: c.accent, fontWeight: '700'}}>{isMercadoLivreUrl(s.url) ? 'Consultar no servidor →' : 'Ver a página e ler daqui →'}</Text></Pressable>
               : <Text style={{fontSize: 12, color: c.muted}}>{s.last ? 'lido ' + since(s.last.at) : 'ainda não lido'}{st && st.cheapestShare !== null && stores.length > 1 ? ' · mais barata ' + Math.round(st.cheapestShare * 100) + '% do tempo' : ''}</Text>}
           </View>
@@ -554,7 +555,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
                   <PriceChart lines={product.stores.map(s => ({id: s.url, color: colorOfStore(s), points: s.points}))} height={190} window={win} currency={product.currency} />
                   <View style={{flexDirection: 'row', gap: 14, flexWrap: 'wrap'}}>{product.stores.map(s => <Legend key={s.url} color={colorOfStore(s)} text={s.name} />)}</View>
                 </View>
-                <Section title="Lojas" hint="Toque numa loja para ver a análise dela. Segure para mais opções.">
+                <Section title="Lojas" hint={tap("Toque numa loja para ver a análise dela. Segure para mais opções.")}>
                   {/* 0.3.146: a oferta principal (escolhida por voce) e a que aparece no Inicio; as outras
                       ficam recolhidas aqui e continuam sendo acompanhadas normalmente. */}
                   {stores.filter(s => s.primary).map((s, i) => storeRow(s, i, true))}
@@ -990,7 +991,7 @@ function StorePageViewer({api, monitor, store, onClose, onSaved}: {api: SofiaApi
     const r = parsePriceMessage(raw);
     if (!r.ok) { setStatus('Não consegui ler: ' + r.error); return; }
     if (!r.result.candidates.length) { setStatus('Esta página não mostra preço que a Sofia reconheça' + (r.title ? ' (título: "' + r.title.slice(0, 60) + '")' : '') + '. Se for o produto certo, role até o preço e tente de novo.'); return; }
-    setCands(r.result.candidates); setStatus(r.result.needsConfirmation ? 'Toque no preço certo:' : 'Encontrei o preço. Confirme:');
+    setCands(r.result.candidates); setStatus(r.result.needsConfirmation ? tap('Toque no preço certo:') : 'Encontrei o preço. Confirme:');
   }
   return (
     <MotionModal visible animationType="slide" onRequestClose={onClose}>

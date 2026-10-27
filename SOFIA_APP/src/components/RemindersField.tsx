@@ -1,4 +1,5 @@
 import React,{useState} from 'react';
+import {tap} from '../lib/desktop';
 import {Pressable,Text,TextInput,View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {REMINDER_PRESETS,REMINDER_UNITS,reminderFields,reminderLabel,reminderOffsets} from '../lib/agenda-reminders';
@@ -36,7 +37,7 @@ export function RemindersField({data,onChange}:{data:Record<string,unknown>;onCh
 export const ALARM_MODES=[
  {value:'none',label:'Notificação normal',hint:'Aviso comum, com o som de notificação.'},
  {value:'once',label:'Som de alarme',hint:'Toca o som de alarme uma vez, mesmo no "Não perturbe".'},
- {value:'ring',label:'Alarme até desligar',hint:'Toca de novo a cada minuto, por até 10 minutos, até você tocar em Desligar ou Adiar.'},
+ {value:'ring',label:'Alarme até desligar',hint:tap('Toca de novo a cada minuto, por até 10 minutos, até você tocar em Desligar ou Adiar.')},
 ] as const;
 export function AlarmModeField({value,onChange}:{value:string;onChange:(v:string)=>void}){
  const c=useTheme(),current=ALARM_MODES.find(m=>m.value===value)||ALARM_MODES[0];

@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ShimmerBlock,ShimmerGroup} from './Loading';
 import {useTheme} from '../lib/theme';
-import {gridColumns} from '../lib/desktop';
+import {gridColumns,tap} from '../lib/desktop';
 import {AccessibilityActionEvent,Animated,Easing,PanResponder,Vibration,View} from 'react-native';
 
 /** 0.3.221: grade de apps como no iPhone - segura o app, ele cresce e segue o dedo; os outros deslizam para abrir
@@ -57,7 +57,7 @@ export function AppGrid<T extends {id:string;title:string}>({items,renderCard,on
  return <View onLayout={e=>{const width=e.nativeEvent.layout.width;if(width>0)setW(width);}} style={{height:rows?rows*H+(rows-1)*GAP:0}}>
   {!w?<AppGridSkeleton count={ids.length} bare/>:null}
   {w?ids.map(id=>{const item=items.find(i=>i.id===id);if(!item)return null;const lifted=active===id;
-   return <Animated.View key={id} {...responder(id).panHandlers} accessible accessibilityRole="button" accessibilityLabel={'Abrir '+item.title+'. Segure e arraste para mudar de lugar.'}
+   return <Animated.View key={id} {...responder(id).panHandlers} accessible accessibilityRole="button" accessibilityLabel={'Abrir '+item.title+tap('. Segure e arraste para mudar de lugar.')}
     accessibilityActions={[{name:'activate'},{name:'moveBefore',label:'Mover para antes'},{name:'moveAfter',label:'Mover para depois'}]}
     onAccessibilityAction={(e:AccessibilityActionEvent)=>{const n=e.nativeEvent.actionName;if(n==='activate')cb.current.onOpen(id);else if(n==='moveBefore')move(id,-1);else if(n==='moveAfter')move(id,1);}}
     style={{position:'absolute',left:0,top:0,width:cellW,height:H,zIndex:lifted?20:1,opacity:pressed===id?0.85:1,
