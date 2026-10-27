@@ -12,7 +12,9 @@ Contagem inicial (0.3.250): folhas de baixo / botões de largura total / textos 
 | Pages.tsx | capa e barra presas numa coluna de 980 px | Feito na 0.3.251 |
 | NotebookBlock.tsx | pastas em 2 cartões de 48% | Feito na 0.3.251: cartões fixos |
 | Workspace.tsx (editor de tarefa) | Modal cru de tela cheia | Feito na 0.3.251: painel lateral |
-| Finance.tsx | 20 folhas, 24 botões, abas no topo, Resumo em 1 coluna | Pendente: Resumo em 2 colunas, Contas/Lançamentos/Cartões em tabela |
+| Finance.tsx | 20 folhas, 24 botões, abas no topo, Resumo em 1 coluna, botão flutuante | Resumo em 2 colunas e + no topo feitos na 0.3.252; pendente: Contas/Lançamentos/Cartões em tabela |
+| Chat.tsx (web) | mensagens de cabeça para baixo | Corrigido na 0.3.252 |
+| Profile.tsx | abas grandes e coluna única | Menu lateral na 0.3.252 |
 | Monitoring.tsx | lista de produtos em cartões; ações por segurar | Pendente: tabela de produtos (preço atual, menor, variação), clique direito |
 | Mail.tsx | caixa em lista única | Pendente: 3 colunas (contas, lista, e-mail aberto) |
 | Workspace.tsx (Tarefas) | lista de toque | Pendente: tabela com colunas, ordenação e filtros |

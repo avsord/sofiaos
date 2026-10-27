@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {tap} from '../lib/desktop';
+import {tap,useDesktop} from '../lib/desktop';
 import {GoalProgressCard} from '../components/GoalProgress';
 import type {GoalNumbers} from '../components/GoalProgress';
 import {keepIfSame, useCachedGoal, writeGoalWidget} from '../lib/goal-widget';
@@ -165,6 +165,7 @@ function Dot({color, icon, size = 36}: {color: string; icon: string; size?: numb
 
 // ============================ TELA ============================
 export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler: (() => boolean) | null) => void; api: SofiaApi; active: boolean; onBack: () => void}) {
+  const desktop = useDesktop(); // 0.3.252 (computador)
   useRenderCost('apps:finance');
   const c = useTheme(), insets = useSafeAreaInsets();
   const [data, setData] = useState<Data | null>(null), [error, setError] = useState(''), [loading, setLoading] = useState(false);
@@ -291,6 +292,7 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
             <Text style={{color: c.muted, fontSize: 11}}>▾</Text>
           </Pressable> : <View style={{flex: 1}} />}
           <View style={{flex: 1}} />
+          {desktop && d?.accounts.length ? <Pressable accessibilityRole="button" accessibilityLabel="Novo lançamento" onPress={() => setNewMenu(true)} style={{flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: c.accent, marginRight: 10}}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 13}}>＋ Novo lançamento</Text></Pressable> : null}
           <IconButton name="back" label="Mês anterior" size={32} onPress={() => setMonth(m => addMonths(m, -1))} />
           <Pressable accessibilityLabel="Voltar ao mês atual" onPress={() => setMonth(monthOf(todayISO()))}><Text style={{fontSize: 14, fontWeight: '700', color: c.text, minWidth: 104, textAlign: 'center'}}>{monthLabel(month)}</Text></Pressable>
           <Pressable accessibilityLabel="Próximo mês" onPress={() => setMonth(m => addMonths(m, 1))} style={{width: 32, height: 32, alignItems: 'center', justifyContent: 'center', transform: [{rotate: '180deg'}]}}><Icon name="back" size={18} color={c.text} /></Pressable>
@@ -313,10 +315,11 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
 
         {d && d.accounts.length ? <>
           {/* 0.3.152: um unico botao + (antes eram dois botoes grandes sobre o extrato) */}
-          <Pressable accessibilityRole="button" accessibilityLabel="Novo lançamento" onPress={() => setNewMenu(true)}
+          {/* 0.3.252: botao flutuante e coisa de celular; no computador o + fica no topo, ao lado do mes */}
+          {!desktop ? <Pressable accessibilityRole="button" accessibilityLabel="Novo lançamento" onPress={() => setNewMenu(true)}
             style={{position: 'absolute', right: 18, bottom: 16, width: 56, height: 56, borderRadius: 28, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', elevation: 6}}>
             <Text style={{color: c.onAccent, fontSize: 28, fontWeight: '400', marginTop: -2}}>＋</Text>
-          </Pressable>
+          </Pressable> : null}
           <Sheet visible={newMenu} onClose={() => setNewMenu(false)} label="Fechar novo lançamento">
             <View style={{gap: 4, paddingBottom: 12}}>
               <Text style={{fontSize: 18, fontWeight: '800', color: c.text, marginBottom: 6}}>Novo lançamento</Text>
@@ -1046,6 +1049,7 @@ function planReminder(d: Data, today: string) {
 }
 
 function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBill, aporteKey = 0, fresh = true, failed = false, onPatchTx, onRemoveTx}: {onPatchTx?: (id: string, ch: Partial<Tx>) => void; onRemoveTx?: (id: string) => void; failed?: boolean; fresh?: boolean; aporteKey?: number; d: Data; month: string; api: SofiaApi; reload: () => Promise<void>; onTx: (t: Partial<Tx>) => void; onTab: (t: Tab) => void; accountId: string; isPrimary: boolean; onBill: (t?: Tx) => void}) {
+  const desktop = useDesktop(); // 0.3.252 (computador)
   const c = useTheme(), today = todayISO();
   // Contas pesadas só quando os dados ou o mês mudam (não a cada toque, como esconder valores).
   const {s, total: accountsTotal, forecast: accountsForecast, dues} = useMemo(() => ({s: monthSummary(d.txs, month), total: totalBalance(d.accounts, d.txs), forecast: forecastBalance(d.accounts, d.txs, month, d.cards),
@@ -1125,7 +1129,8 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
   useEffect(() => { if (aporteKey === lastAporteKey.current) return; lastAporteKey.current = aporteKey; setReserveSheet(reserve ? 'in' : 'setup'); }, [aporteKey, reserve]);
   // aporte em aberto no mes atual: aparece 3 dias antes do dia do aporte (ou do aviso, se for antes) ate ser feito
   const aporteDue = !!split && split.planned > 0 && split.missing > 0 && month === monthOf(today) && Number(today.slice(8, 10)) >= Math.max(1, (split.planDay || 1) - Math.max(3, split.remindBefore || 0));
-  return (
+  // 0.3.252 (computador): Resumo em duas colunas - saldo, guardado, controle e avisos a esquerda; lancamentos a direita
+  const summary = (
     <>
       {breakdown ? <MonthBreakdown kind={breakdown} d={d} month={month} show={show} net={net} api={api} accountId={accountId} reload={reload} onPatch={onPatchTx} onRemove={onRemoveTx} onTx={(t: Tx) => { setBreakdown(null); afterSheet(() => onTx(t)); }} onClose={() => setBreakdown(null)} /> : null}
       {forecastOpen ? <Sheet visible onClose={() => setForecastOpen(false)} label="Fechar previsão">
@@ -1297,10 +1302,19 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
         <Text style={{color: c.text, fontWeight: '700', fontSize: 13}}>{show(dues.reduce((sum, x) => sum + x.amount, 0))}</Text><Text style={{color: c.muted}}>›</Text>
       </Pressable> : null}
 
-      <View style={{gap: 12, paddingTop: 6}}>
+    </>
+  );
+  const history = <View style={{gap: 12, paddingTop: desktop ? 0 : 6}}>
         <TxTab d={d} month={month} accountFilter="" setAccountFilter={() => undefined} onTx={onTx} api={api} reload={reload} />
-      </View>
-
+      </View>;
+  if (desktop) return <View testID="finance-home-split" style={{flexDirection: 'row', gap: 24, alignItems: 'flex-start'}}>
+    <View style={{flex: 1, minWidth: 0, maxWidth: 560, gap: 14}}>{summary}</View>
+    <View style={{flex: 1.3, minWidth: 0}}>{history}</View>
+  </View>;
+  return (
+    <>
+      {summary}
+      {history}
     </>
   );
 }

@@ -16,7 +16,7 @@ export function contentMaxWidth(tab:Tab):number|undefined{
  // 0.3.251: Paginas ocupa a tela (capa e barra na largura toda; o texto se centraliza no proprio editor).
  // Apps: formularios e listas dos apps nao se esticam por 1900 px.
  if(tab==='chat')return 900;
- if(tab==='profile')return 860;
+ if(tab==='profile')return 1120;
  if(tab==='apps')return 1240;
  return undefined;
 }
