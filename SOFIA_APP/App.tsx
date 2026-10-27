@@ -28,7 +28,7 @@ import {Button,ErrorBanner} from './src/components/UI';
 import {StartupHome} from './src/components/StartupHome';
 import {TabPager as NativeTabPager} from './src/components/TabPager';
 // 0.3.250: na web o pager troca direto no computador; no celular e o mesmo TabPager de sempre.
-const TabPager:typeof NativeTabPager=Platform.OS==='web'?require('./src/components/DesktopPages').makeResponsivePager(NativeTabPager):NativeTabPager;
+const TabPager:typeof NativeTabPager=Platform.OS==='web'?require('./src/desktop/DesktopPages').makeResponsivePager(NativeTabPager):NativeTabPager;
 import {MenuTab} from './src/components/MenuTab';
 import {NotificationProvider,noticeArea} from './src/components/NotificationCenter';
 import {Spinner,FadeSwap} from './src/components/Loading';
@@ -43,7 +43,7 @@ import {finishLaunchHandoff} from './src/lib/launch-handoff';
 import {appAlert,AppAlertHost} from './src/lib/app-alert';
 
 // 0.3.250: no navegador com tela larga, a moldura de computador (barra lateral + barra de cima). So carrega na web.
-const DesktopFrame:React.ComponentType<any>|null=Platform.OS==='web'?require('./src/components/DesktopShell').DesktopFrame:null;
+const DesktopFrame:React.ComponentType<any>|null=Platform.OS==='web'?require('./src/desktop/DesktopShell').DesktopFrame:null;
 function DesktopGate({on,children,...props}:{on:boolean;children:React.ReactNode;[key:string]:any}){return on&&DesktopFrame?<DesktopFrame {...props}>{children}</DesktopFrame>:<>{children}</>;}
 const tabs:{id:Tab;label:string;icon:IconName}[]=[{id:'home',label:'Início',icon:'home'},{id:'chat',label:'Conversa',icon:'chat'},{id:'pages',label:'Páginas',icon:'book'},{id:'agenda',label:'Agenda',icon:'calendar'},{id:'apps',label:'Apps',icon:'grid'},{id:'profile',label:'Perfil',icon:'user'}];
 function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');

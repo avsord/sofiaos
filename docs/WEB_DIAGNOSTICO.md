@@ -23,3 +23,10 @@ Contagem inicial (0.3.250): folhas de baixo / botões de largura total / textos 
 | Agenda.tsx | criar no dia por segurar | Pendente: duplo clique no dia; visão de semana |
 | Composer.tsx | cancelar gravação deslizando | Pendente: botão Cancelar no computador |
 | Clique direito (geral) | não existe | Pendente: menu de contexto nos itens que hoje usam segurar |
+
+## Fundação (0.3.253)
+| Causa raiz | Situação |
+|---|---|
+| Tamanhos de celular fixos no código (texto, controles, espaços, cantos) | Feito: camada de escala de computador (src/web), sem mudar as telas |
+| Rolagem presa numa coluna (barra no meio da tela) | Feito: rolagem na largura toda, conteúdo centralizado (ContentWidth) |
+| Telas em uma coluna só | Em andamento: Início, Finanças, Agenda e Perfil já em colunas; faltam E-mails (3 colunas), Tarefas/Price Tracker/Contas em tabela |

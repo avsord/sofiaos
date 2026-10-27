@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {tap,useDesktop} from '../lib/desktop';
+import {tap,useColumnPad,useDesktop} from '../lib/desktop';
 import {GoalProgressCard} from '../components/GoalProgress';
 import type {GoalNumbers} from '../components/GoalProgress';
 import {keepIfSame, useCachedGoal, writeGoalWidget} from '../lib/goal-widget';
@@ -165,6 +165,7 @@ function Dot({color, icon, size = 36}: {color: string; icon: string; size?: numb
 
 // ============================ TELA ============================
 export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler: (() => boolean) | null) => void; api: SofiaApi; active: boolean; onBack: () => void}) {
+  const pad = useColumnPad(); // 0.3.253: barras de cima alinhadas a coluna
   const desktop = useDesktop(); // 0.3.252 (computador)
   useRenderCost('apps:finance');
   const c = useTheme(), insets = useSafeAreaInsets();
@@ -276,6 +277,8 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
     <FinanceLocal.Provider value={local}>
     <InternalBackGesture enabled={active && !editing && !manage && !billEditor && !accountPicker} onBack={backFinance}>
       <View style={{flex: 1, backgroundColor: c.bg}}>
+        {/* 0.3.253: no computador o cabecalho, a linha conta/mes e as abas se alinham a coluna de leitura */}
+        <View style={pad(0)}>
         <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 12, paddingBottom: 2}}>
           <IconButton name="back" label="Voltar à tela anterior" onPress={backFinance} />
           <View style={{flex: 1, paddingHorizontal: 4}}>
@@ -299,6 +302,7 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
         </View>
         <View style={{paddingHorizontal: 20, paddingBottom: 14}}>
           <Chips scroll value={tab} onChange={navigateFinance} options={[{value: 'home' as Tab, label: 'Resumo'}, {value: 'bills' as Tab, label: 'Contas'}, {value: 'cards' as Tab, label: 'Cartões'}, {value: 'reports' as Tab, label: 'Relatórios'}]} />
+        </View>
         </View>
 
         {!d ? <View style={{flex: 1, padding: 16, gap: 14}}>{error ? <View style={{padding: 20, gap: 12}}><Text style={{color: c.danger}}>{error}</Text><Button title="Tentar de novo" secondary onPress={() => void reload()} /></View> : <View style={{gap: 6}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Spinner size={16} stroke={1.8} /><Text style={{color: c.muted, fontSize: 13}}>Carregando suas finanças</Text></View><LoadingLines rows={5} /></View>}</View> : !d.accounts.length ? (

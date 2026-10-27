@@ -4,9 +4,9 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {Modal,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
 import {useTheme} from '../lib/theme';
-import {Icon,type IconName} from './Icon';
-import {NotificationBell} from './NotificationCenter';
-import {ProfileAvatar} from './ProfileAvatar';
+import {Icon,type IconName} from '../components/Icon';
+import {NotificationBell} from '../components/NotificationCenter';
+import {ProfileAvatar} from '../components/ProfileAvatar';
 import {fuzzyFilter} from '../lib/fuzzy';
 import {comparePageOrder} from '../lib/page-order';
 import {TAB_ORDER} from '../lib/tab-navigation';

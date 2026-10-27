@@ -10,14 +10,14 @@ test('breakpoint so na web, a partir de 1024 px',()=>{
 });
 test('App: moldura e pager de computador so carregam na web; barra de baixo some no computador',()=>{
   const a=read('App.tsx');
-  assert.ok(a.includes("Platform.OS==='web'?require('./src/components/DesktopShell').DesktopFrame:null"));
-  assert.ok(a.includes("Platform.OS==='web'?require('./src/components/DesktopPages').makeResponsivePager(NativeTabPager):NativeTabPager"));
+  assert.ok(a.includes("Platform.OS==='web'?require('./src/desktop/DesktopShell').DesktopFrame:null"));
+  assert.ok(a.includes("Platform.OS==='web'?require('./src/desktop/DesktopPages').makeResponsivePager(NativeTabPager):NativeTabPager"));
   assert.ok(a.includes('maxWidth:desktop?undefined:760'));
   assert.ok(a.includes('{!keyboard&&!desktop?<View nativeID="sofia-menu-bar"'));
   assert.ok(!/from '\.\/src\/components\/DesktopShell'/.test(a),'sem import direto (nao pesa na abertura do celular)');
 });
 test('moldura: barra lateral recolhivel, arvore de paginas, caminho, busca Ctrl+K e atalhos',()=>{
-  const s=read('src/components/DesktopShell.tsx'),d=read('src/lib/desktop.ts');
+  const s=read('src/desktop/DesktopShell.tsx'),d=read('src/lib/desktop.ts');
   for(const id of ['desktop-sidebar','desktop-topbar','desktop-breadcrumb','desktop-search','desktop-sidebar-toggle','command-palette-input'])assert.ok(s.includes(id),id);
   assert.ok(s.includes('<NotificationBell onViewAll='));assert.ok(s.includes('function PageTree('));
   assert.ok(d.includes("if(mod&&k==='k')")&&d.includes("e.code==='Backslash'")&&d.includes('e.altKey&&!mod&&/^[1-6]$/'));

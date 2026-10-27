@@ -1,4 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
+import {useDesktop} from '../lib/desktop';
+import {ContentWidth,columnPadding} from '../lib/content-width';
 import {perfSync} from '../lib/fluency-metrics';
 /** 0.3.115 on-device report: creating the native AudioRecorder took 148.8 ms (composer:recorder), inside the 224 ms of the Chat
  * composer, so the first open of Chat cost 741 ms. The hooks created it on mount and polled it every 120 ms for as long as the tab
@@ -16,7 +18,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import {Sheet} from './Sheet';
 import {attachmentMime,attachmentTypes} from '../lib/chat-attachments';
 import type {AttachmentDraft} from '../lib/types';
-import React,{useEffect,useMemo,useRef,useState} from 'react';
+import React,{useContext,useEffect,useMemo,useRef,useState} from 'react';
 import {Animated,View,Text,TextInput,ActivityIndicator,AppState,Alert,Keyboard,PanResponder,Pressable,ScrollView,Image} from 'react-native';
 import {AudioModule,RecordingPresets,setAudioModeAsync} from 'expo-audio';
 import {createRecordingOptions} from 'expo-audio/build/utils/options';
@@ -97,7 +99,9 @@ export function Composer({disabled,enterToSend,autoSendVoice,onText,onVoice,onAt
    if(files.length+chosen.length>3)throw Error('Envie até 3 arquivos por mensagem.');if(chosen.some(f=>!f.size||f.size>10*1024*1024))throw Error('Cada arquivo deve ter até 10 MB.');setFiles(old=>[...old,...chosen]);
   }catch(e){appAlert('Anexo',errorText(e));}finally{setBusy(false);}
  }
- return <View testID="chat-composer" style={{padding:12,paddingTop:10,borderTopWidth:1,borderColor:c.line,backgroundColor:c.surface,gap:6}}>
+ // 0.3.253 (computador): caixa de mensagem de ponta a ponta, campo alinhado a coluna da conversa
+ const desktopOn=useDesktop(),readingWidth=useContext(ContentWidth),column=desktopOn?readingWidth:undefined;
+ return <View testID="chat-composer" style={{padding:12,...(column?{paddingLeft:columnPadding(column,12),paddingRight:columnPadding(column,12)}:null),paddingTop:10,borderTopWidth:1,borderColor:c.line,backgroundColor:c.surface,gap:6}}>
   {files.length?<ScrollView horizontal keyboardShouldPersistTaps="always" style={{maxHeight:96}}>{files.map((f,i)=><View key={f.uri+String(i)} style={{maxWidth:180,marginRight:8,padding:8,backgroundColor:c.input,borderRadius:12}}>{f.mime.startsWith('image/')?<Image source={{uri:f.uri}} style={{width:60,height:42,borderRadius:6}}/>:null}<Text numberOfLines={1} style={{color:c.text,fontSize:12}}>{f.name}</Text><Pressable accessibilityLabel={'Remover anexo '+f.name} onPress={()=>setFiles(old=>old.filter((_,n)=>n!==i))}><Text style={{color:c.muted,paddingTop:4}}>Remover</Text></Pressable></View>)}</ScrollView>:null}
   {draft?<View style={{flexDirection:'row',alignItems:'center',gap:4}}><IconButton name="trash" label="Descartar áudio" onPress={discard}/><View style={{flex:1}}><VoicePlayer source={{uri:draft.uri}} duration={draft.duration}/></View><IconButton name="send" label="Enviar mensagem de voz" filled disabled={disabled} onPress={sendVoice}/></View>:
   recording?<View {...cancelPan.panHandlers} accessibilityLabel="Gravação de áudio. Deslize para a esquerda para cancelar." style={{flexDirection:'row',alignItems:'center',gap:8,minHeight:56,overflow:'hidden'}}><IconButton name="trash" label="Cancelar gravação" onPress={()=>void stop(true,false)}/><Animated.View style={{flex:1,flexDirection:'row',alignItems:'center',gap:9,transform:[{translateX:cancelX}]}}><View style={{width:8,height:8,borderRadius:4,backgroundColor:c.danger}}/><View style={{flex:1,gap:4}}><Text style={{color:cancelReady?c.danger:c.text,fontWeight:'700'}}>{cancelReady?'Solte para cancelar':'Gravando · '+durationLabel(rs.durationMillis)}</Text><Text style={{color:cancelReady?c.danger:c.muted,fontSize:11}}>{cancelReady?'A gravação será apagada':'‹ Deslize para a esquerda para cancelar'}</Text><View style={{height:3,width:'92%',backgroundColor:c.line}}><View style={{height:3,width:`${Math.max(5,Math.min(100,((rs.metering??-60)+60)/60*100))}%`,backgroundColor:cancelReady?c.danger:c.accent}}/></View></View></Animated.View><IconButton name="stop" label={autoSendVoice?'Parar e enviar':'Parar e ouvir antes de enviar'} filled onPress={()=>void stop(false,autoSendVoice)} disabled={busy}/></View>:

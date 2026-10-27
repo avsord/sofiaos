@@ -36,6 +36,7 @@ import {Spinner,LoadingLines} from '../components/Loading';
 import type {PageTemplate} from '../lib/page-templates';
 import {appAlert} from '../lib/app-alert';
 import {pagePath,pagesDirectory,samePages,tap,useDesktop} from '../lib/desktop';
+import {ContentWidth} from '../lib/content-width';
 const safeJson=(raw:string|null,fallback:unknown)=>{try{return JSON.parse(raw||'null')??fallback;}catch{return fallback;}};
 const PAGE_LIST_KEY='/workspace/entities?limit=100&kind=user_page&q=&offset=0';
 const cachedPageRows=(api:SofiaApi)=>api.cached<{items:Entity[]}>(PAGE_LIST_KEY)?.items.filter(item=>item.state!=='archived');
@@ -233,7 +234,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   </>}/>;
  const createPicker=<PageCreateMenu visible={createParent!==undefined} parentTitle={createParent?.title} onClose={()=>setCreateParent(undefined)}
   onBlank={()=>void create(createParent||undefined)} onTemplate={template=>selectedId?applyTemplate(template):void create(undefined,template)}/>;
- if(!entry)return <View style={{flex:1}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{desktop?<View style={{flex:1,width:'100%',maxWidth:980,alignSelf:'center'}}>{listView}</View>:listView}{createPicker}</View>;
+ if(!entry)return <View style={{flex:1}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>{desktop?<ContentWidth.Provider value={980}>{listView}</ContentWidth.Provider>:listView}{createPicker}</View>;
  const draft=entry.draft,selected={...entry.base,data:{...entry.base.data,...draft.appearance}},subpages=children.get(selected.id)||[];
  const path:Entity[]=[];let cur:Entity|undefined=selected;const seen=new Set<string>();while(cur&&!seen.has(cur.id)&&path.length<40){seen.add(cur.id);path.unshift(cur);cur=byId.get(String(cur.data?.parent_id||''));}
  const status=entry.state==='saving'?'Salvando…':entry.state==='pending'?'Sincronizando…':entry.state==='error'?'Não salvo':entry.state==='conflict'?'Conflito':selected.privacy==='private'?'Particular':selected.area;

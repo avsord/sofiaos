@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useState} from 'react';
+import {useColumnPad} from '../lib/desktop';
 import {ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Platform, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTheme} from '../lib/theme';
@@ -134,15 +135,16 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
   const scopedRules = rules.filter(r => inSel.has(ruleOwner(r)));
   const newRuleAccount = selection.type === 'account' && inSel.has(selection.id) ? selection.id : ([...inSel][0] || oldestAccount);
 
+  const pad = useColumnPad(); // 0.3.253: cabecalho alinhado a coluna de leitura no computador
   return (
     <InternalBackGesture enabled={active && !open && !addAccount && !ruleSheet} onBack={onBack}>
       <View style={{flex: 1, backgroundColor: c.bg}}>
-        <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 14, paddingBottom: 6}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 14, paddingBottom: 6, ...pad(12)}}>
           <IconButton name="back" label="Voltar aos apps" onPress={onBack} />
           <View style={{flex: 1, paddingHorizontal: 4}}><Text style={{fontSize: 11, letterSpacing: 1.2, color: c.muted, fontWeight: '600'}}>A SOFIA DE OLHO NO QUE IMPORTA</Text><Pressable accessibilityRole="button" accessibilityLabel={'Mostrando: ' + selectionLabel(selection, accounts || []) + '. Trocar'} onPress={() => setPicker(true)} disabled={!accounts?.length}><Text numberOfLines={1} style={{fontSize: 24, fontWeight: '800', color: c.text}}>{accounts?.length ? selectionLabel(selection, accounts) + ' ▾' : 'E-mails'}</Text></Pressable></View>
           <IconButton name="refresh" label="Verificar agora" disabled={checking || !accounts?.length} onPress={() => void check()} />
         </View>
-        <View style={{paddingHorizontal: 16, paddingBottom: 8}}>
+        <View style={{paddingHorizontal: 16, paddingBottom: 8, ...pad(16)}}>
           <Chips value={tab} onChange={setTab} options={[{value: 'hits' as Tab, label: 'Encontrados' + (unread ? ' · ' + unread : '')}, {value: 'rules' as Tab, label: 'Regras ' + scopedRules.length}, {value: 'accounts' as Tab, label: 'Contas ' + (accounts?.length || 0)}]} />
         </View>
         {accounts === null ? <View style={{padding: 16, gap: 6}}><View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Spinner size={16} stroke={1.8} /><Text style={{color: c.muted, fontSize: 13}}>Carregando e-mails</Text></View><LoadingLines rows={4} /></View> : (

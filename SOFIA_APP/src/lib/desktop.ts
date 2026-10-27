@@ -1,7 +1,8 @@
 // 0.3.250: layout de computador (estilo Notion). No navegador com tela larga o app troca a barra de abas de baixo
 // por uma barra lateral fixa + barra de cima, e o conteudo ocupa a largura da tela. No celular nada muda:
 // tudo aqui so liga com Platform.OS==='web' e largura >= DESKTOP_MIN.
-import {createContext,useEffect,useState,useSyncExternalStore} from 'react';
+import {createContext,useContext,useEffect,useState,useSyncExternalStore} from 'react';
+import {ContentWidth,columnPadding} from './content-width';
 import {Dimensions,Platform,useWindowDimensions} from 'react-native';
 import type {Entity,Tab} from './types';
 import type {IconName} from '../components/Icon';
@@ -15,7 +16,7 @@ export function useDesktop():boolean{const {width}=useWindowDimensions();return 
 export function contentMaxWidth(tab:Tab):number|undefined{
  // 0.3.251: Paginas ocupa a tela (capa e barra na largura toda; o texto se centraliza no proprio editor).
  // Apps: formularios e listas dos apps nao se esticam por 1900 px.
- if(tab==='chat')return 900;
+ if(tab==='chat')return 860;
  if(tab==='profile')return 1120;
  if(tab==='apps')return 1240;
  return undefined;
@@ -127,3 +128,10 @@ export function tap(text:string):string{
 /** 0.3.251: dentro de uma janela (Sheet) os botoes continuam na largura da janela; fora dela, no computador,
  * o botao tem o tamanho do texto (botao de largura total e coisa de celular). */
 export const DialogContext=createContext(false);
+
+/** 0.3.253: barras proprias das telas (cabecalhos, abas) que ficam fora da rolagem: ocupam a largura toda e
+ * alinham o conteudo a coluna de leitura da regiao. No celular devolve {} (nada muda). */
+export function useColumnPad():(base:number)=>Record<string,any>{
+ const desktop=useDesktop(),max=useContext(ContentWidth);
+ return (base:number)=>desktop&&max?{paddingLeft:columnPadding(max,base),paddingRight:columnPadding(max,base)}:{};
+}

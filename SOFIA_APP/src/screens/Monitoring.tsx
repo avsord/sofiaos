@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
-import {tap} from '../lib/desktop';
+import {tap,useColumnPad} from '../lib/desktop';
 import {ActivityIndicator, Alert, AppState, KeyboardAvoidingView, Linking, Platform, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
@@ -104,10 +104,11 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
   const open = products?.find(p => p.monitor.id === openId) || null;
   const lastRead = Math.max(0, ...(products || []).map(p => p.lastAt || 0)) || null;
 
+  const pad = useColumnPad(); // 0.3.253: cabecalho alinhado a coluna de leitura no computador
   return (
     <InternalBackGesture enabled={active && !adding && !open} onBack={onBack}>
       <View style={{flex: 1, backgroundColor: c.bg}}>
-        <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 14, paddingBottom: 6}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 14, paddingBottom: 6, ...pad(12)}}>
           <IconButton name="back" label="Voltar aos apps" onPress={onBack} />
           <View style={{flex: 1, paddingHorizontal: 4}}>
             <Text style={{fontSize: 11, letterSpacing: 1.2, color: c.muted, fontWeight: '600'}}>PREÇOS QUE VOCÊ ACOMPANHA</Text>
