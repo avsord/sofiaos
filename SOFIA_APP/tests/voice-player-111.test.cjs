@@ -5,7 +5,7 @@ const React=require('react'),{act,create}=require('react-test-renderer');
 global.IS_REACT_ACT_ENVIRONMENT=true;
 const {expoAudio}=require('./helpers/expo-audio-harness.cjs');
 const root=path.join(__dirname,'..');const jsx=require('react/jsx-runtime');
-function compile(file,deps){const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;const exports={};vm.runInNewContext(code,{exports,require:n=>{assert.ok(n in deps,'Unexpected '+n);return deps[n];},console,Promise,Map,Set,Object,Error,String,Math,JSON,setTimeout,clearTimeout},{});return exports;}
+function compile(file,deps){const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;const exports={};vm.runInNewContext(code,{exports,require:n=>{if(/(^|\/)palette$/.test(n))return {PALETTE:new Proxy({},{get:()=>'#FFFFFF'})};assert.ok(n in deps,'Unexpected '+n);return deps[n];},console,Promise,Map,Set,Object,Error,String,Math,JSON,setTimeout,clearTimeout},{});return exports;}
 const rn={View:'View',Text:'Text',ActivityIndicator:'Spinner'};
 const registry=new Map();
 const focus={registerVoice:(id,pause)=>{registry.set(id,pause);return()=>registry.delete(id);},silenceVoices:async()=>{}};

@@ -1,4 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
+import {PALETTE} from '../lib/palette';
 import {ShimmerBlock,ShimmerGroup} from './Loading';
 import {useTheme} from '../lib/theme';
 import {gridColumns,tap} from '../lib/desktop';
@@ -62,7 +63,7 @@ export function AppGrid<T extends {id:string;title:string}>({items,renderCard,on
     onAccessibilityAction={(e:AccessibilityActionEvent)=>{const n=e.nativeEvent.actionName;if(n==='activate')cb.current.onOpen(id);else if(n==='moveBefore')move(id,-1);else if(n==='moveAfter')move(id,1);}}
     style={{position:'absolute',left:0,top:0,width:cellW,height:H,zIndex:lifted?20:1,opacity:pressed===id?0.85:1,
      transform:[...p(id).getTranslateTransform(),{scale:lifted?scale:1}]}}>
-    {lifted?<Animated.View pointerEvents="none" style={{position:'absolute',left:2,right:2,top:6,bottom:-4,borderRadius:24,backgroundColor:'#000',opacity:lift.interpolate({inputRange:[0,1],outputRange:[0,0.14]}),transform:[{translateY:4}]}}/>:null}
+    {lifted?<Animated.View pointerEvents="none" style={{position:'absolute',left:2,right:2,top:6,bottom:-4,borderRadius:24,backgroundColor:PALETTE.black,opacity:lift.interpolate({inputRange:[0,1],outputRange:[0,0.14]}),transform:[{translateY:4}]}}/>:null}
     {renderCard(item,false)}
     {lifted?<Animated.View pointerEvents="none" style={{position:'absolute',left:0,right:0,top:0,bottom:0,borderRadius:22,borderWidth:2,borderColor:theme.accent,opacity:lift}}/>:null}
    </Animated.View>;}):null}

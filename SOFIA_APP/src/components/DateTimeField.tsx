@@ -1,4 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
+import {PALETTE} from '../lib/palette';
 import {Keyboard,LayoutAnimation,Pressable,ScrollView,Text,View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {dateDisplay} from '../lib/date-time';
@@ -55,7 +56,7 @@ export function DateTimeField({label,value,onChange,dateOnly=false,timeOnly=fals
     <View style={{flexDirection:'row',marginTop:4}}>{['D','S','T','Q','Q','S','S'].map((d,i)=><Text key={i} style={{width:'14.2857%',textAlign:'center',color:c.muted,fontSize:12}}>{d}</Text>)}</View>
     <View style={{flexDirection:'row',flexWrap:'wrap',marginTop:6}}>{monthCells(month).map((d,i)=><View key={i} style={{width:'14.2857%',padding:2}}>{d?<Pressable accessibilityLabel={'Selecionar '+dateDisplay(localDateKey(d),true)} onPress={()=>{const next=new Date(d);next.setHours(selected.getHours(),selected.getMinutes(),0,0);setSelected(next);if(dateOnly)commit(next);}}
      style={{height:36,borderRadius:10,alignItems:'center',justifyContent:'center',backgroundColor:localDateKey(d)===localDateKey(selected)?c.accent:'transparent',borderWidth:localDateKey(d)===localDateKey(new Date())&&localDateKey(d)!==localDateKey(selected)?1:0,borderColor:c.accent}}>
-     <Text style={{color:localDateKey(d)===localDateKey(selected)?'#fff':c.text,fontWeight:localDateKey(d)===localDateKey(selected)?'700':'400'}}>{d.getDate()}</Text></Pressable>:null}</View>)}</View>
+     <Text style={{color:localDateKey(d)===localDateKey(selected)?PALETTE.white:c.text,fontWeight:localDateKey(d)===localDateKey(selected)?'700':'400'}}>{d.getDate()}</Text></Pressable>:null}</View>)}</View>
    </MonthSwipe>:null}
    {!dateOnly?<View style={{flexDirection:'row',gap:12,marginTop:timeOnly?0:10}}>{(['hours','minutes'] as const).map(part=><View key={part} style={{flex:1}}>
     <Text style={{textAlign:'center',color:c.muted,marginBottom:6,fontSize:12}}>{part==='hours'?'Hora':'Minutos'}</Text>

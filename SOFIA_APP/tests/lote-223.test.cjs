@@ -61,7 +61,7 @@ test('apps: selecao e soltura suaves; bolinha menor e redonda; 14 cores; widget 
   const g=read('src/components/AppGrid.tsx'),w=read('src/screens/Workspace.tsx');
   assert.ok(g.includes('borderColor:theme.accent,opacity:lift')&&g.includes('Easing.bezier(0.25,0.1,0.25,1)'),'contorno aparece e some em transicao');
   assert.ok(w.includes("width:7,height:7,minWidth:7,minHeight:7,aspectRatio:1,borderRadius:3.5,flexShrink:0"));
-  assert.equal((w.match(/const HIGHLIGHT_COLORS=\[([^\]]*)\]/)[1].match(/#/g)||[]).length,14);
+  assert.equal((w.match(/const HIGHLIGHT_COLORS=\[([^\]]*)\]/)[1].match(/PALETTE\./g)||[]).length,14); // 0.3.263: cores da paleta
   assert.ok(w.includes("if(['reminders','packages','finance','monitor','mail','capsules','routines','tasks'].includes(openModuleId)){setModule(openModuleId);setKind('');}else choose(openModuleId);"),'Meta abre Financas');
 });
 

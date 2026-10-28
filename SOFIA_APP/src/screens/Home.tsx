@@ -3,7 +3,7 @@ import {rightClick} from '../lib/web-page';
 import {useValuesHidden} from '../lib/values-mask';
 import {msToMidnight,overdueScheduled} from '../lib/task-rollover';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {useFinanceGoal} from './Finance';
+import {useFinanceGoal} from './finance/Goal'; // 0.3.263: so a parte da Meta (o Inicio nao carrega Financas inteira)
 import {GoalProgressCard} from '../components/GoalProgress';
 import {TaskQuickSchedule} from '../components/TaskQuickSchedule';
 import {fuzzyFilter} from '../lib/fuzzy';

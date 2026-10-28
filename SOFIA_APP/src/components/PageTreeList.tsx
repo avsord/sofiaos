@@ -1,4 +1,5 @@
 import {MOTION_EASE,useReducedMotion} from '../lib/motion';
+import {contextMenu} from './ContextMenu';
 import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Animated,FlatList,Pressable,Text,View} from 'react-native';
 import type {RefreshControlProps} from 'react-native';
@@ -88,7 +89,7 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
  const ghostRect=ghost?rects.current.find(r=>r.page.id===ghost.page.id):null,rawLine=drop?dropLineY(drop,rects.current):null;
  const line=rawLine!=null&&ghostRect&&drop?.kind!=='inside'&&ghostRect.y<rawLine?rawLine-ghostRect.height:rawLine;
  const renderRow=(row:Visible)=>{const p=row.page,target=drop?.kind==='inside'&&drop.anchorId===p.id,isSource=ghost?.page.id===p.id;return <ShiftRow key={p.id} offset={previewShift(p.id)} dragging={!!ghost}>
-   <View ref={node=>{if(node)nodes.current.set(p.id,node);else nodes.current.delete(p.id);}} collapsable={false} style={{flexDirection:'row',alignItems:'center',paddingLeft:row.depth*PAGE_INDENT,borderRadius:9,backgroundColor:target?c.accentSoft:'transparent',borderWidth:1,borderColor:target?c.accent:'transparent',opacity:isSource?0:1}}>
+   <View ref={node=>{if(node)nodes.current.set(p.id,node);else nodes.current.delete(p.id);}} collapsable={false} {...contextMenu(()=>[{label:'Abrir',icon:'book',run:()=>onOpen(p)},...(row.hasChildren?[{label:row.open?'Recolher subpáginas':'Mostrar subpáginas',icon:'list' as const,run:()=>toggle(p.id)}]:[]),...(onDelete?[{label:'Apagar',icon:'trash' as const,danger:true,run:()=>onDelete(p)}]:[])])} style={{flexDirection:'row',alignItems:'center',paddingLeft:row.depth*PAGE_INDENT,borderRadius:9,backgroundColor:target?c.accentSoft:'transparent',borderWidth:1,borderColor:target?c.accent:'transparent',opacity:isSource?0:1}}>
     {!compact?<Pressable disabled={!row.hasChildren} accessibilityLabel={(row.open?'Recolher':'Expandir')+' subpáginas de '+p.title} accessibilityState={{expanded:row.open}} onPress={()=>toggle(p.id)} style={{width:28,height:46,alignItems:'center',justifyContent:'center'}}>{row.hasChildren?<View style={{transform:[{rotate:row.open?'90deg':'0deg'}]}}><Icon name="chevron" size={14} color={c.muted}/></View>:null}</Pressable>:null}
     <PageRow page={p} compact={compact} onTouchStart={()=>latest.current.onInteractionChange?.(true)} onOpen={()=>onOpen(p)} onHold={(x,y)=>begin(row,x,y)} onMove={move} onEnd={()=>end()} onCancel={()=>end(true)}/>
    </View>

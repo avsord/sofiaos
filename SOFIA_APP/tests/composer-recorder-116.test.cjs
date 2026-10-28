@@ -25,7 +25,7 @@ function rig(source,{hooks=false}={}){
   '../lib/audio-focus':{silenceVoices:async()=>{}},'../lib/chat-model':{durationLabel:ms=>Math.round(ms/1000)+'s',errorText:e=>String(e&&e.message||e)},
   './UI':{IconButton:p=>React.createElement('Button',p)},'./VoicePlayer':{VoicePlayer:()=>null},'../lib/fluency-metrics':{perfSync:(n,f)=>{log.perf.push(n);return f();}}};
  const code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
- const exports={};vm.runInNewContext(code,{exports,require:n=>{assert.ok(n in deps,'Unexpected '+n);return deps[n];},console,Promise,Math,Date,Object,Error,String,Number,JSON,Array,Map,Set,Symbol,setTimeout,clearTimeout,setInterval:g.setInterval,clearInterval:g.clearInterval},{});
+ const exports={};vm.runInNewContext(code,{exports,require:n=>{if(/(^|\/)palette$/.test(n))return {PALETTE:new Proxy({},{get:()=>'#FFFFFF'})};assert.ok(n in deps,'Unexpected '+n);return deps[n];},console,Promise,Math,Date,Object,Error,String,Number,JSON,Array,Map,Set,Symbol,setTimeout,clearTimeout,setInterval:g.setInterval,clearInterval:g.clearInterval},{});
  const sent=[];
  const props={disabled:false,enterToSend:false,autoSendVoice:false,onText(){},onAttachments(){},onVoice:d=>sent.push(d),onActivity(){},onDraft(){}};
  const el=(mode,extra={})=>React.createElement(React.Activity,{mode},React.createElement(exports.Composer,{...props,...extra}));

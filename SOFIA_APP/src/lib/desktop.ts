@@ -83,11 +83,16 @@ export function useDesktopCss(on:boolean,colors:{line:string;muted:string;accent
   const el=document.createElement('style');el.id='sofia-desktop-css';
   el.textContent=[
    '[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="switch"],[role="tab"],[role="menuitem"]{cursor:pointer}',
-   '[role="button"],[role="link"],[role="menuitem"],[role="tab"]{transition:filter .12s ease,background-color .12s ease,opacity .12s ease}',
-   '[role="button"]:hover,[role="link"]:hover,[role="menuitem"]:hover{filter:brightness(1.12)}',
+   '[role="button"],[role="link"],[role="menuitem"],[role="tab"],[role="checkbox"],[role="radio"]{transition:box-shadow .12s ease,background-color .12s ease,opacity .12s ease,transform .12s ease}',
+   // 0.3.263: hover que aparece de verdade (o brilho antigo sumia em fundo branco): um veu na cor da marca por cima
+   '[role="button"]:hover:not([aria-disabled="true"]),[role="menuitem"]:hover,[role="tab"]:hover,[role="checkbox"]:hover,[role="radio"]:hover{box-shadow:inset 0 0 0 999px '+colors.accent+'14}',
+   '[role="button"]:active:not([aria-disabled="true"]){box-shadow:inset 0 0 0 999px '+colors.accent+'26}',
+   '[role="link"]:hover{opacity:.78;text-decoration:underline;text-underline-offset:3px}',
    'div[tabindex="0"]{cursor:pointer}',
    '[role="button"]:focus-visible,[role="menuitem"]:focus-visible,[role="link"]:focus-visible{outline:2px solid '+colors.accent+'88;outline-offset:-2px}',
-   'input:focus-visible,textarea:focus-visible,div[tabindex="0"]:not([role]):focus-visible{outline:none}',
+   'div[tabindex="0"]:not([role]):focus-visible{outline:none}',
+   // 0.3.263: campo em foco com o anel da marca (antes nao mostrava onde o teclado estava)
+   'input:focus,textarea:focus{box-shadow:0 0 0 3px '+colors.accent+'40!important;border-radius:12px}',
    '*{scrollbar-width:thin;scrollbar-color:'+colors.line+' transparent}',
    '::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:'+colors.line+';border-radius:8px;border:2px solid '+colors.bg+'}::-webkit-scrollbar-track{background:transparent}',
    'input,textarea{outline:none}',

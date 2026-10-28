@@ -1,4 +1,5 @@
 import {useVisibleLoad} from '../lib/visible-load';
+import {PALETTE} from '../lib/palette';
 import * as WebBrowser from 'expo-web-browser';
 import React,{useState} from 'react';
 import {View,Text,AppState,Alert,Pressable} from 'react-native';
@@ -9,7 +10,7 @@ import {Button,ErrorBanner,forms} from './UI';
 import type {StoreConnection,StoreConnectionsState} from '../lib/store-connections-types';
 import {appAlert} from '../lib/app-alert';
 
-const LOGOS:Record<string,{letter:string;bg:string;fg:string}>={mercadolivre:{letter:'M',bg:'#ffe600',fg:'#2d3277'},aliexpress:{letter:'A',bg:'#ff4747',fg:'#fff'}};
+const LOGOS:Record<string,{letter:string;bg:string;fg:string}>={mercadolivre:{letter:'M',bg:PALETTE.yellow,fg:PALETTE.navy},aliexpress:{letter:'A',bg:PALETTE.redBright,fg:PALETTE.white}};
 const ABOUT:Record<string,string>={
  mercadolivre:'Entre com a sua conta do Mercado Livre uma vez. A Sofia passa a ler o preco dos seus produtos pelo caminho oficial do Mercado Livre, sem abrir pagina nem pedir verificacao. Nenhuma compra ou dado da conta e alterado.',
  aliexpress:'O AliExpress e lido pelo caminho oficial com a chave do Sofia. Voce nao precisa entrar com a sua conta.',
@@ -34,7 +35,7 @@ export function StoreConnections({api}:{api:SofiaApi}){
  }
  return <View style={[forms.card,{backgroundColor:c.surface,borderWidth:1,borderColor:c.line,gap:12}]}>
   <Text style={{fontSize:18,fontWeight:'500',color:c.text}}>Lojas do Price Tracker</Text>
-  <Text style={{fontSize:12,lineHeight:19,color:c.muted}}>Conecte uma vez e a leitura de precos passa a usar o caminho oficial de cada loja: sem abrir paginas, sem "nao sou um robo".</Text>
+  <Text style={{fontSize:12,lineHeight:19,color:c.muted}}>Conecte uma vez e a leitura de precos passa a usar o caminho oficial de cada loja: sem abrir paginas, sem “nao sou um robo”.</Text>
   {error?<ErrorBanner text={error} onRetry={()=>void load()}/>:null}
   {!state?<Text style={{color:c.muted}}>Verificando conexoes…</Text>:state.stores.map(store=>{
    const logo=LOGOS[store.provider]||{letter:store.name[0],bg:c.line,fg:c.text};
@@ -45,7 +46,7 @@ export function StoreConnections({api}:{api:SofiaApi}){
     <View style={{flex:1}}>
      <Text style={{color:c.text,fontWeight:'500',fontSize:16}}>{store.name}</Text>
      <Text style={{color:good?c.good:c.muted,fontSize:12}}>{status}</Text>
-     {store.error?<Text style={{color:'#ff6b7a',fontSize:12}}>{store.error}</Text>:null}
+     {store.error?<Text style={{color:PALETTE.red,fontSize:12}}>{store.error}</Text>:null}
      {!store.configured&&store.mode==='login'?<Text style={{color:c.muted,fontSize:11,lineHeight:16}}>Falta o aplicativo da loja no servidor (ML_APP_ID / ML_APP_SECRET). Endereco de retorno: {store.redirect_uri||'—'}</Text>:null}
     </View>
     {store.mode==='login'&&store.configured?(store.connected

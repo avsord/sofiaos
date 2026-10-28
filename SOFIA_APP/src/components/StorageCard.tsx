@@ -1,4 +1,5 @@
 import React,{useState} from 'react';
+import {PALETTE} from '../lib/palette';
 import {View,Text,Pressable,AppState} from 'react-native';
 import {SofiaApi,DriveStorage} from '../lib/api';
 import {useTheme} from '../lib/theme';
@@ -11,7 +12,7 @@ import {loadSofiaFiles,DeferredScreen} from '../lib/screen-loader';
 
 // 0.3.245: espaço da Conta Google como o Drive mostra (usado, livre e total), com o que é da Sofia em destaque.
 // Cores fixas para as fatias que não são da Sofia: legíveis no tema claro e no escuro.
-const OTHER:Record<Exclude<StoragePart['key'],'sofia'>,string>={drive:'#4F8CFF',mail:'#F2A93B',trash:'#9B95AA'};
+const OTHER:Record<Exclude<StoragePart['key'],'sofia'>,string>={drive:PALETTE.blueBright,mail:PALETTE.gold,trash:PALETTE.slateLight};
 let last:DriveStorage|null=null; // a segunda abertura do Perfil já mostra o último número, sem esqueleto
 
 export function StorageCard({api}:{api:SofiaApi}){

@@ -1,4 +1,5 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
+import {PALETTE} from '../lib/palette';
 import {Animated,AppState,Easing,View} from 'react-native';
 import Svg,{G,Path} from 'react-native-svg';
 
@@ -47,11 +48,11 @@ export function LaunchSAnimation({visible}:{visible:boolean}){
  return <View pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants"
    testID="sofia-visible-logo-animation"
    style={{position:'absolute',top:0,left:0,right:0,bottom:0,alignItems:'center',justifyContent:'center',zIndex:1000,elevation:1000}}>
-  <Animated.View style={{width:116,height:116,borderRadius:58,backgroundColor:'#7258E8',alignItems:'center',justifyContent:'center',opacity,elevation:4}}>
+  <Animated.View style={{width:116,height:116,borderRadius:58,backgroundColor:PALETTE.brand,alignItems:'center',justifyContent:'center',opacity,elevation:4}}>
    <Animated.View style={{width:106,height:106,alignItems:'center',justifyContent:'center',transform:[{rotate},{scale}]}}>
     <Svg width={106} height={106} viewBox="0 0 96 96">
      <G transform="matrix(0.0256689159 0 0 -0.025675773 29.02543638 64.14633546)">
-      <Path fill="#FFFFFF" d={S_PATH}/>
+      <Path fill={PALETTE.white} d={S_PATH}/>
      </G>
     </Svg>
    </Animated.View>

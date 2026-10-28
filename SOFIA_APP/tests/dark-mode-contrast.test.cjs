@@ -50,7 +50,7 @@ test('Financas: cartao "Saldo geral", botao Nova despesa, cabecalho do lancament
   for (const t of [
     '<BigMoney text={show(future ? 0 : total)} color={c.onAccent} size={32} />', // 0.3.262: mesmo contraste (onAccent), agora com R$ e centavos menores
     "<Text style={{color: c.onAccent, fontSize: 28, fontWeight: '400', marginTop: -2}}>＋</Text>",
-    "headText = head === c.accent ? c.onAccent : '#fff'",
+    "headText = head === c.accent ? c.onAccent : PALETTE.white",
     'selectedTabText = head === c.accent ? light.accent : head',
     'color: kind === k ? selectedTabText : headText',
   ]) assert.ok(fin.includes(t), t);

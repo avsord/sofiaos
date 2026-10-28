@@ -26,5 +26,6 @@ test('telas: Paginas abre pela barra lateral; Inicio em colunas; folhas viram ja
   const p=read('src/screens/Pages.tsx');assert.ok(p.includes('openPageKey=0,openPageId=')&&p.includes('pagesDirectory.set(displayPages)')&&p.includes('pagePath.set(trail)'));
   const h=read('src/screens/Home.tsx');assert.ok(h.includes('columns={columns} openKey={organizeKey}'));
   assert.ok(read('src/components/SortableWidgets.tsx').includes('testID="home-widget-grid"'));
-  assert.ok(read('src/components/Sheet.tsx').includes("style={desktop?{flex:1,justifyContent:'center',alignItems:'center',padding:32}"));
+  // 0.3.263: no centro quando nao houve clique recente; perto do clique quando houve
+  assert.ok(read('src/components/Sheet.tsx').includes("style={desktop?(anchored?{flex:1}:{flex:1,justifyContent:'center',alignItems:'center',padding:32})"));
 });

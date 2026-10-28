@@ -22,5 +22,5 @@ test('0.3.259: icones de um conjunto profissional com dois estados; escuro desen
 test('0.3.259: categorias de Financas com icone do conjunto e cores de status vindas do tema',()=>{
   const f=read('src/lib/finance.ts');assert.ok(f.includes("{name: 'Mercado', icon: '🛒', color: '#2fc58b', glyph: 'cart'}"));
   const s=read('src/screens/Finance.tsx');assert.ok(s.includes('<Icon name={(cat.glyph || \'circle\') as IconName}')&&!/[^.\w]GOOD\b(?! =)/.test(s.replace("const GOOD = '#2fc58b'",'')));
-  assert.ok(read('src/components/NotificationCenter.tsx').includes("'Agenda':{icon:'📅',glyph:'calendar',color:'#4fa3ff'}"));
+  assert.ok(read('src/components/NotificationCenter.tsx').includes("'Agenda':{icon:'📅',glyph:'calendar',color:PALETTE.blue}"));
 });

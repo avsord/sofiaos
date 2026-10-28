@@ -4,7 +4,7 @@ const React=require('react'),{act,create}=require('react-test-renderer');
 global.IS_REACT_ACT_ENVIRONMENT=true;
 const root=path.join(__dirname,'..');const read=f=>fs.readFileSync(path.join(root,f),'utf8');
 const compile=(file,deps,globals={})=>{const code=ts.transpileModule(read(file),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;const exports={};
- vm.runInNewContext(code,{exports,require:n=>{assert.ok(n in deps,'Unexpected '+n);return deps[n];},console,setTimeout,clearTimeout,Date,Object,Set,Map,Math,String,Array,JSON,Promise,...globals},{});return exports;};
+ vm.runInNewContext(code,{exports,require:n=>{if(/(^|\/)palette$/.test(n))return {PALETTE:new Proxy({},{get:()=>'#FFFFFF'})};assert.ok(n in deps,'Unexpected '+n);return deps[n];},console,setTimeout,clearTimeout,Date,Object,Set,Map,Math,String,Array,JSON,Promise,...globals},{});return exports;};
 const rn={View:'View',Text:'Text',Pressable:'Pressable'};
 const jsx=require('react/jsx-runtime');
 const saved=[];
@@ -62,7 +62,7 @@ test('DeferredScreen: erro ao CARREGAR o módulo da tela fica contido e não che
  // Fronteira real (classe) no lugar do ScreenBoundary, para provar a CONTENÇÃO, não só a presença.
  class Boundary extends React.Component{state={failed:false};static getDerivedStateFromError(){return {failed:true};}render(){return this.state.failed?React.createElement('Text',null,'contido'):this.props.children;}}
  const deps={'react':React,'react/jsx-runtime':jsx,'./fluency-metrics':{perfSync:(_n,f)=>f()},'../components/ScreenBoundary':{ScreenBoundary:Boundary}};
- vm.runInNewContext(code,{exports,require:n=>{assert.ok(n in deps,'Unexpected '+n);return deps[n];},console,Map,Object},{});
+ vm.runInNewContext(code,{exports,require:n=>{if(/(^|\/)palette$/.test(n))return {PALETTE:new Proxy({},{get:()=>'#FFFFFF'})};assert.ok(n in deps,'Unexpected '+n);return deps[n];},console,Map,Object},{});
  const {DeferredScreen}=exports;let tree,reachedGlobal=false;
  class Global extends React.Component{state={f:false};static getDerivedStateFromError(){return {f:true};}componentDidCatch(){reachedGlobal=true;}render(){return this.state.f?React.createElement('Text',null,'GLOBAL'):this.props.children;}}
  const Ok=()=>React.createElement('Text',null,'tela ok');

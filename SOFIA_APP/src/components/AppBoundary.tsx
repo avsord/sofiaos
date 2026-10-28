@@ -1,4 +1,5 @@
 import React,{Component,type ErrorInfo} from 'react';
+import {PALETTE} from '../lib/palette';
 import {Pressable,Text,View} from 'react-native';
 import {perfError,type PerfError} from '../lib/fluency-metrics';
 import {rememberError,errorLine} from '../lib/last-error';
@@ -29,13 +30,13 @@ export class AppBoundary extends Component<Props,State>{
  render(){
   if(!this.state.failed)return <React.Fragment key={this.state.generation}>{this.props.children}</React.Fragment>;
   const line=errorLine(this.state.row);
-  return <View nativeID="sofia-launch-error" style={{flex:1,backgroundColor:'#F7F6FA',padding:30,justifyContent:'center'}}>
-   <Text style={{fontSize:24,fontWeight:'600',color:'#272334'}}>Vamos reabrir a Sofia.</Text>
-   <Text style={{marginTop:16,lineHeight:23,color:'#7F7A8D'}}>O aplicativo encontrou um problema. Feche e abra novamente. Mensagens ainda não enviadas podem precisar ser refeitas.</Text>
-   <Pressable accessibilityRole="button" accessibilityLabel="Tentar de novo" onPress={this.retry} style={{marginTop:24,alignSelf:'flex-start',paddingVertical:12,paddingHorizontal:18,borderRadius:10,backgroundColor:'#7258E8'}}>
-    <Text style={{color:'#FFFFFF',fontWeight:'500'}}>Tentar de novo</Text>
+  return <View nativeID="sofia-launch-error" style={{flex:1,backgroundColor:PALETTE.paper,padding:30,justifyContent:'center'}}>
+   <Text style={{fontSize:24,fontWeight:'600',color:PALETTE.ink}}>Vamos reabrir a Sofia.</Text>
+   <Text style={{marginTop:16,lineHeight:23,color:PALETTE.gray1}}>O aplicativo encontrou um problema. Feche e abra novamente. Mensagens ainda não enviadas podem precisar ser refeitas.</Text>
+   <Pressable accessibilityRole="button" accessibilityLabel="Tentar de novo" onPress={this.retry} style={{marginTop:24,alignSelf:'flex-start',paddingVertical:12,paddingHorizontal:18,borderRadius:10,backgroundColor:PALETTE.brand}}>
+    <Text style={{color:PALETTE.white,fontWeight:'500'}}>Tentar de novo</Text>
    </Pressable>
-   {line?<Text testID="app-error-detail" selectable style={{marginTop:26,fontSize:11,lineHeight:16,color:'#9A95A8'}}>{'Detalhe técnico: '+line}</Text>:null}
+   {line?<Text testID="app-error-detail" selectable style={{marginTop:26,fontSize:11,lineHeight:16,color:PALETTE.gray4}}>{'Detalhe técnico: '+line}</Text>:null}
   </View>;
  }
 }

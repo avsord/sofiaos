@@ -1,4 +1,5 @@
 import React,{useContext} from 'react';
+import {PALETTE} from '../lib/palette';
 import {DialogContext,useDesktop} from '../lib/desktop';
 import {ContentWidth} from '../lib/content-width';
 import { View, Text, Pressable, ActivityIndicator, StyleSheet, Image } from 'react-native';
@@ -6,11 +7,11 @@ import { useTheme } from '../lib/theme';
 import { Icon, IconName } from './Icon';
 export function IconButton({name,label,onPress,disabled=false,filled=false,size=44}:{name:IconName;label:string;onPress:()=>void;disabled?:boolean;filled?:boolean;size?:number}) {
  // 0.3.251 (computador): botao de icone menor, com fundo ao passar o mouse
- const c=useTheme(),desktop=useDesktop(),box=size; return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress} style={({pressed,hovered}:any)=>({height:box,width:box,borderRadius:desktop?Math.round(box/4):box/2,alignItems:'center',justifyContent:'center',backgroundColor:filled?c.accent:desktop&&hovered&&!disabled?c.line:'transparent',opacity:disabled?0.35:pressed?0.6:1})}><Icon name={name} size={desktop?19:22} color={filled?(c.accent==='#7258E8'?'#FFFFFF':'#21172F'):c.text}/></Pressable>;
+ const c=useTheme(),desktop=useDesktop(),box=size; return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress} style={({pressed,hovered}:any)=>({height:box,width:box,borderRadius:desktop?Math.round(box/4):box/2,alignItems:'center',justifyContent:'center',backgroundColor:filled?c.accent:desktop&&hovered&&!disabled?c.line:'transparent',opacity:disabled?0.35:pressed?0.6:1})}><Icon name={name} size={desktop?19:22} color={filled?(c.accent===PALETTE.brand?PALETTE.white:PALETTE.brandDeep):c.text}/></Pressable>;
 }
 export function Button({title,onPress,loading=false,disabled=false,secondary=false}:{title:string;onPress:()=>void;loading?:boolean;disabled?:boolean;secondary?:boolean}) {
  // 0.3.251 (computador): altura e cantos de botao de computador; fora de janela, largura do texto
- const c=useTheme(),desktop=useDesktop(),inDialog=useContext(DialogContext); return <Pressable accessibilityRole="button" disabled={disabled||loading} onPress={onPress} style={({pressed})=>({minHeight:50,borderRadius:16,paddingHorizontal:18,alignItems:'center',justifyContent:'center',alignSelf:desktop&&!inDialog?'flex-start':undefined,minWidth:desktop&&!inDialog?160:undefined,backgroundColor:secondary?c.accentSoft:c.accent,opacity:disabled?0.4:pressed?0.7:1})}>{loading?<ActivityIndicator color={secondary?c.accent:c.onAccent}/>:<Text style={{fontSize:16,fontWeight:'600',color:secondary?c.accent:c.onAccent}}>{title}</Text>}</Pressable>;
+ const c=useTheme(),desktop=useDesktop(),inDialog=useContext(DialogContext); return <Pressable accessibilityRole="button" disabled={disabled||loading} onPress={onPress} {...({dataSet:{primary:secondary?'0':'1'}} as any)} style={({pressed})=>({minHeight:50,borderRadius:16,paddingHorizontal:18,alignItems:'center',justifyContent:'center',alignSelf:desktop&&!inDialog?'flex-start':undefined,minWidth:desktop&&!inDialog?160:undefined,backgroundColor:secondary?c.accentSoft:c.accent,opacity:disabled?0.4:pressed?0.7:1})}>{loading?<ActivityIndicator color={secondary?c.accent:c.onAccent}/>:<Text style={{fontSize:16,fontWeight:'600',color:secondary?c.accent:c.onAccent}}>{title}</Text>}</Pressable>;
 }
 // 0.3.139: logo oficial da Sofia (esfera). Brand continua para iniciais de perfil.
 const SOFIA_LOGO=require('../../assets/sofia-logo-app.png');

@@ -12,9 +12,9 @@ test('real page-reader entry points refuse ML before host check, queue or WebVie
  assert.equal(module.readerDiagnostics().queue,0);assert.equal(module.readerDiagnostics().busy,null);assert.equal(module.readerDiagnostics().totals.noHost,0);
 });
 test('real PageViewer branch mounts server preview for ML, never requires native WebView or external opening',()=>{
- const file=path.join(__dirname,'../src/screens/Monitoring.tsx');let nativeWebview=0,externalOpen=0;
- const out={};const code=ts.transpileModule(fs.readFileSync(file,'utf8')+'\nexport {PageViewer as __testPageViewer};',{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
- const deps={react:React,'react/jsx-runtime':jsx,'react-native':{View:'View',Text:'Text',Platform:{OS:'android'},Linking:{openURL:()=>externalOpen++}},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},'../lib/theme':{useTheme:()=>({})},'../lib/price-direct':{...provider},'../lib/monitoring':{PRODUCT_COLORS:[],WINDOWS:[],DROP_CHOICES:[],INTERVALS:[]},'../components/MotionModal':{MotionModal:'Modal'},'../components/UI':{Button:'Button'}};
+ const file=path.join(__dirname,'../src/screens/monitoring/Stores.tsx'); let nativeWebview=0,externalOpen=0; // 0.3.263: o PageViewer mora nesta parte do Price Tracker
+ const out={};const code=ts.transpileModule(fs.readFileSync(file,'utf8').replace(/from '\.\.\/\.\.\//g,"from '../")+'\nexport {PageViewer as __testPageViewer};',{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
+ const deps={'../lib/palette':{PALETTE:new Proxy({},{get:()=>'#FFFFFF'})},react:React,'react/jsx-runtime':jsx,'react-native':{View:'View',Text:'Text',Platform:{OS:'android'},Linking:{openURL:()=>externalOpen++}},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},'../lib/theme':{useTheme:()=>({})},'../lib/price-direct':{...provider},'../lib/monitoring':{PRODUCT_COLORS:[],WINDOWS:[],DROP_CHOICES:[],INTERVALS:[]},'../components/MotionModal':{MotionModal:'Modal'},'../components/UI':{Button:'Button'}};
  vm.runInNewContext(code,{exports:out,require:n=>{if(n==='react-native-webview'){nativeWebview++;throw Error('WebView forbidden');}return deps[n]||{};},URL,Date,AbortController,setTimeout,clearTimeout});
  const props={api:{},monitor:{data:{}},store:{url:LINK},onClose:()=>{},onSaved:async()=>{}};
  const screen=out.__testPageViewer(props);assert.equal(typeof screen.type,'function');

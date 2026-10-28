@@ -1,4 +1,6 @@
 // 0.3.250: moldura do app no computador (estilo Notion). So e usada no navegador com tela larga
+import {PALETTE} from '../lib/palette';
+import type {Task} from '../lib/types';
 // (ver lib/desktop.ts). Barra lateral fixa e recolhivel, barra de cima com caminho, busca e avisos,
 // busca global (Ctrl+K) e atalhos de teclado. As telas sao as mesmas do celular.
 import React,{useEffect,useMemo,useRef,useState} from 'react';
@@ -89,8 +91,8 @@ function CommandPalette({visible,onClose,commands}:{visible:boolean;onClose:()=>
  const run=(cmd?:Command)=>{if(!cmd)return;onClose();setTimeout(cmd.run,10);};
  let lastGroup='';
  return <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-  <Pressable accessibilityLabel="Fechar busca" onPress={onClose} style={{flex:1,backgroundColor:'#0000007a',alignItems:'center',paddingTop:'12vh' as any}}>
-   <Pressable onPress={e=>e.stopPropagation()} style={{width:'92%',maxWidth:640,maxHeight:'70vh' as any,backgroundColor:c.surface,borderRadius:14,borderWidth:1,borderColor:c.line,overflow:'hidden',shadowColor:'#000',shadowOpacity:0.35,shadowRadius:30,shadowOffset:{width:0,height:12}}}>
+  <Pressable accessibilityLabel="Fechar busca" onPress={onClose} style={{flex:1,backgroundColor:PALETTE.black+'7a',alignItems:'center',paddingTop:'12vh' as any}}>
+   <Pressable onPress={e=>e.stopPropagation()} style={{width:'92%',maxWidth:640,maxHeight:'70vh' as any,backgroundColor:c.surface,borderRadius:14,borderWidth:1,borderColor:c.line,overflow:'hidden',shadowColor:PALETTE.black,shadowOpacity:0.35,shadowRadius:30,shadowOffset:{width:0,height:12}}}>
     <View style={{flexDirection:'row',alignItems:'center',gap:10,paddingHorizontal:16,borderBottomWidth:1,borderColor:c.line}}>
      <Icon name="search" size={18} color={c.muted}/>
      <TextInput ref={input} testID="command-palette-input" value={query} onChangeText={setQuery} placeholder="Buscar páginas, apps e menus…" placeholderTextColor={c.muted}
@@ -117,6 +119,9 @@ function CommandPalette({visible,onClose,commands}:{visible:boolean;onClose:()=>
 
 export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onOpenPage,onCreatePage,children}:Props){
  const c=useTheme(),[collapsed,setCollapsed]=useSidebarCollapsed(),[palette,setPalette]=useState(false);
+ // 0.3.263: tarefas tambem na busca geral (Ctrl+K) e numero de avisos no titulo da aba do navegador
+ const [paletteTasks,setPaletteTasks]=useState<Task[]>(()=>((api.cached('/tasks') as {items?:Task[]}|undefined)?.items)||[]);
+ useEffect(()=>{if(!palette)return;let live=true;api.tasks().then(r=>{if(live)setPaletteTasks(r.items||[]);}).catch(()=>{});return()=>{live=false;};},[palette,api]);
  const pages=useStore(pagesDirectory)??null;usePageDirectory(api);
  const path=useStore(pagePath),moduleTitle=useStore(appModuleTitle);
  const openPageId=tab==='pages'&&path.length?path[path.length-1].id:'';
@@ -129,8 +134,9 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
   ...APP_SHORTCUTS.map(a=>({id:'app:'+a.id,label:a.title,group:'Apps',icon:a.icon,run:()=>onOpenModule(a.id)})),
   {id:'action:new-page',label:'Nova página',group:'Ações',icon:'plus',run:onCreatePage},
   {id:'action:sidebar',label:collapsed?'Mostrar barra lateral':'Recolher barra lateral',group:'Ações',icon:'sidebar',hint:'Ctrl+\\',run:()=>setCollapsed(!collapsed)},
+  ...paletteTasks.filter(t=>!['done','cancelled'].includes(t.state)).slice(0,300).map(t=>({id:'task:'+t.id,label:t.title,group:'Tarefas',icon:(t.state==='scheduled'?'calendar':'checklist') as IconName,hint:t.state==='scheduled'?'na agenda':undefined,run:()=>{(window as any).__sofiaOpenTask=t.id;onOpenModule('tasks');try{window.dispatchEvent(new CustomEvent('sofia:open-task',{detail:t.id}));}catch{/* navegador antigo */}}})),
   ...(pages||[]).map(p=>({id:'page:'+p.id,label:p.title||'Sem título',group:'Páginas',emoji:isEmoji(p.data?.icon)?String(p.data?.icon):undefined,icon:(isEmoji(p.data?.icon)?undefined:'book') as IconName|undefined,run:()=>onOpenPage(p.id)})),
- ],[pages,collapsed,onNavigate,onOpenModule,onOpenPage,onCreatePage]);
+ ],[pages,paletteTasks,collapsed,onNavigate,onOpenModule,onOpenPage,onCreatePage]);
  const crumbs=[TAB_LABELS[tab]?.label||'Sofia',...(tab==='pages'?path.map(p=>p.title||'Sem título'):tab==='apps'&&moduleTitle?[moduleTitle]:[])];
  const width=collapsed?SIDEBAR_COLLAPSED:SIDEBAR_WIDTH;
  return <View testID="desktop-shell" style={{flex:1,flexDirection:'row',backgroundColor:c.bg}}>

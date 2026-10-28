@@ -1,4 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
+import {PALETTE} from '../lib/palette';
 import {tap} from '../lib/desktop';
 import {View,Text,Pressable,Modal,ScrollView,TextInput,Image,StyleSheet,ActivityIndicator,PanResponder} from 'react-native';
 import Svg,{Defs,LinearGradient,Stop,Rect} from 'react-native-svg';
@@ -107,7 +108,7 @@ export function PageAppearance({kind,pageId,api,onApply,onClose}:{kind:'icon'|'c
   await finishPick(result);
  }catch(e){await clearPending();if(alive.current)setError(e instanceof Error?e.message:'Não foi possível trocar a capa.');}finally{if(alive.current)setBusy(false);}}
  return <Modal visible transparent animationType="fade" onRequestClose={()=>{if(!busy)onClose();}}>
-  <Pressable onPress={()=>{if(!busy)onClose();}} style={{flex:1,backgroundColor:'#00000055',justifyContent:'flex-end'}}>
+  <Pressable onPress={()=>{if(!busy)onClose();}} style={{flex:1,backgroundColor:PALETTE.black+'55',justifyContent:'flex-end'}}>
    <Pressable onPress={()=>{}} style={{maxHeight:'82%',borderTopLeftRadius:24,borderTopRightRadius:24,backgroundColor:c.surface,padding:20,paddingBottom:30}}>
     <View style={{flexDirection:'row',alignItems:'center',marginBottom:14}}><Text style={{flex:1,fontSize:24,fontWeight:'600',color:c.text}}>{kind==='icon'?'Ícone da página':'Capa da página'}</Text><IconButton name="close" label="Fechar" disabled={busy} onPress={onClose}/></View>
     {error?<ErrorBanner text={error}/>:null}

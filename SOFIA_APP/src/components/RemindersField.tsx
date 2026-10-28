@@ -18,7 +18,7 @@ export function RemindersField({data,onChange}:{data:Record<string,unknown>;onCh
    <Pressable accessibilityRole="button" accessibilityLabel={'Remover notificação '+reminderLabel(m)} hitSlop={10} onPress={()=>set(list.filter(x=>x!==m))}><Text style={{color:c.muted,fontSize:18}}>✕</Text></Pressable>
   </View>)}
   {list.length>=5?<Text style={{color:c.muted,fontSize:12,paddingVertical:8}}>Até 5 notificações por compromisso.</Text>
-   :<Pressable accessibilityRole="button" onPress={()=>{setAdding(a=>!a);setCustom(false);}} style={row}><Text style={{fontSize:16,opacity:0}}>🔔</Text><Text style={{color:c.accent,fontSize:16,fontWeight:'500'}}>Adicionar notificação</Text></Pressable>}
+   :<Pressable accessibilityRole="button" onPress={()=>{setAdding(a=>!a);setCustom(false);}} style={row}><View style={{width:18}}/><Text style={{color:c.accent,fontSize:16,fontWeight:'500'}}>Adicionar notificação</Text></Pressable>}
   {adding?<View style={{backgroundColor:c.input,borderRadius:14,paddingHorizontal:14,paddingVertical:4}}>
    {[0,...REMINDER_PRESETS].filter(m=>!list.includes(m)).map(m=><Pressable key={m} accessibilityRole="button" onPress={()=>add(m)} style={row}>
     <View style={{width:20,height:20,borderRadius:10,borderWidth:2,borderColor:c.muted}}/><Text style={{color:c.text,fontSize:16}}>{reminderLabel(m)}</Text></Pressable>)}
@@ -45,7 +45,7 @@ export function AlarmModeField({value,onChange}:{value:string;onChange:(v:string
  return <View style={{gap:8,marginBottom:12}}>
   <Text style={{color:c.muted,fontSize:12}}>Tipo de aviso</Text>
   <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{ALARM_MODES.map(m=><Pressable key={m.value} accessibilityRole="radio" accessibilityState={{checked:current.value===m.value}} onPress={()=>onChange(m.value)} style={{paddingHorizontal:12,paddingVertical:9,borderRadius:99,backgroundColor:current.value===m.value?c.accent:c.input}}>
-   <Text style={{color:current.value===m.value?c.onAccent:c.text,fontWeight:'500',fontSize:13}}>{m.value==='none'?'🔔 ':'⏰ '}{m.label}</Text></Pressable>)}</View>
+   <Text style={{color:current.value===m.value?c.onAccent:c.text,fontWeight:'500',fontSize:13}}>{m.label}</Text></Pressable>)}</View>
   <Text style={{color:c.muted,fontSize:11,lineHeight:16}}>{current.hint}</Text>
  </View>;
 }

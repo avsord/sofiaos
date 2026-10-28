@@ -1,4 +1,5 @@
 import {capsuleStore} from '../lib/capsule-store';
+import {PALETTE} from '../lib/palette';
 import {capsuleDoseOfNotice,capsuleKey} from '../lib/capsule-model';
 import {queueOptional} from '../lib/fluency';
 import {useBellInbox} from '../lib/use-bell-inbox';
@@ -47,7 +48,7 @@ export function NotificationProvider({api,enabled,children,scope='',onOpen}:{api
  return <Context.Provider value={{localOnly:api.mdLocalOnly,items:merged,unread:totalUnread,loading,error,refresh,read,readAll,clear,clearAll,open,api}}>{children}</Context.Provider>;
 }
 export function useNotifications(){const value=useContext(Context);if(!value)throw Error('Centro de notificações não montado.');return value;}
-export const AREA_STYLE:Record<string,{icon:string;color:string;glyph?:string}>={'Agenda':{icon:'📅',glyph:'calendar',color:'#4fa3ff'},'Cápsulas':{icon:'💊',glyph:'capsule',color:'#ef7bd0'},'Rotinas':{icon:'🔁',glyph:'repeat',color:'#3fd0d4'},'Monitoramento de produtos':{icon:'📉',glyph:'trendDown',color:'#2fc58b'},'Finanças':{icon:'💳',glyph:'card',color:'#7258e8'},'E-mails':{icon:'✉️',glyph:'mail',color:'#38b6ff'},'Tarefas':{icon:'✅',glyph:'checkCircle',color:'#ffb547'},'Cursos':{icon:'🎓',glyph:'graduation',color:'#a98bff'},'Estudos':{icon:'📚',glyph:'book',color:'#a98bff'},'Outros':{icon:'🔔',glyph:'bell',color:'#8a84a0'}};
+export const AREA_STYLE:Record<string,{icon:string;color:string;glyph?:string}>={'Agenda':{icon:'📅',glyph:'calendar',color:PALETTE.blue},'Cápsulas':{icon:'💊',glyph:'capsule',color:PALETTE.pink},'Rotinas':{icon:'🔁',glyph:'repeat',color:PALETTE.teal},'Monitoramento de produtos':{icon:'📉',glyph:'trendDown',color:PALETTE.green},'Finanças':{icon:'💳',glyph:'card',color:PALETTE.brand},'E-mails':{icon:'✉️',glyph:'mail',color:PALETTE.sky},'Tarefas':{icon:'✅',glyph:'checkCircle',color:PALETTE.amber},'Cursos':{icon:'🎓',glyph:'graduation',color:PALETTE.lilac},'Estudos':{icon:'📚',glyph:'book',color:PALETTE.lilac},'Outros':{icon:'🔔',glyph:'bell',color:PALETTE.slate}};
 const AREA_SHORT:Record<string,string>={'Monitoramento de produtos':'Preços'};
 export function relativeTime(iso:string,now=Date.now()){const t=Date.parse(iso);if(!Number.isFinite(t))return '';const m=Math.round((now-t)/60000);if(m<1)return 'agora';if(m<60)return 'há '+m+' min';const h=Math.round(m/60);if(h<24)return 'há '+h+' h';const d=Math.round(h/24);return d===1?'ontem':d<7?'há '+d+' dias':new Date(t).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}).replace('.','');}
 const SWIPE_OUT=90;
@@ -75,8 +76,8 @@ function Swipeable({children,onDismiss,onRead,readLabel='✓ Lida',readAction='M
  return <Animated.View onLayout={e=>{width.current=e.nativeEvent.layout.width;if(!closing)height.current=e.nativeEvent.layout.height;}}
   style={closing?{height:collapse.interpolate({inputRange:[0,1],outputRange:[0,height.current||64]}),opacity:collapse,marginBottom:collapse.interpolate({inputRange:[0,1],outputRange:[0,4]}),overflow:'hidden'}:{marginBottom:4}}
   accessibilityActions={onRead?[{name:'delete',label:'Apagar '+label},{name:'read',label:readAction}]:[{name:'delete',label:'Apagar '+label}]} onAccessibilityAction={e=>{if(e.nativeEvent.actionName==='delete')dismiss();if(e.nativeEvent.actionName==='read')onRead?.();}}>
-  <Animated.View style={{position:'absolute',top:0,bottom:0,left:0,right:0,borderRadius:16,backgroundColor:'#ff6b7a',alignItems:'flex-end',justifyContent:'center',paddingRight:18,opacity:x.interpolate({inputRange:[-1,0],outputRange:[1,0],extrapolate:'clamp'})}}><Text style={{color:'#fff',fontWeight:'600',fontSize:12}}>Apagar</Text></Animated.View>
-  {onRead?<Animated.View style={{position:'absolute',top:0,bottom:0,left:0,right:0,borderRadius:16,backgroundColor:'#2fc58b',alignItems:'flex-start',justifyContent:'center',paddingLeft:18,opacity:x.interpolate({inputRange:[0,1],outputRange:[0,1],extrapolate:'clamp'})}}><Text style={{color:'#fff',fontWeight:'600',fontSize:12}}>{readLabel}</Text></Animated.View>:null}
+  <Animated.View style={{position:'absolute',top:0,bottom:0,left:0,right:0,borderRadius:16,backgroundColor:PALETTE.red,alignItems:'flex-end',justifyContent:'center',paddingRight:18,opacity:x.interpolate({inputRange:[-1,0],outputRange:[1,0],extrapolate:'clamp'})}}><Text style={{color:PALETTE.white,fontWeight:'600',fontSize:12}}>Apagar</Text></Animated.View>
+  {onRead?<Animated.View style={{position:'absolute',top:0,bottom:0,left:0,right:0,borderRadius:16,backgroundColor:PALETTE.green,alignItems:'flex-start',justifyContent:'center',paddingLeft:18,opacity:x.interpolate({inputRange:[0,1],outputRange:[0,1],extrapolate:'clamp'})}}><Text style={{color:PALETTE.white,fontWeight:'600',fontSize:12}}>{readLabel}</Text></Animated.View>:null}
   <Animated.View {...pan.panHandlers} style={{transform:[{translateX:x}],backgroundColor:c.bg,borderRadius:16}}>{typeof children==='function'?children(dismiss):children}</Animated.View>
  </Animated.View>;
 }
@@ -122,14 +123,14 @@ async function buildDigest(api:SofiaApi):Promise<Digest[]>{
   const [txs,cards]=await Promise.all([list('fin_tx'),list('fin_card')]);
   if(txs.length||cards.length){const dues=fin.upcoming(txs.filter((e:any)=>e.state!=='archived').map(fin.toTx),cards.map(fin.toCard),fin.todayISO(),3);
    const late=dues.filter(d=>d.late&&d.kind!=='receber'),soon=dues.filter(d=>!d.late&&d.kind!=='receber');
-   if(late.length)out.push({id:'digest:fin-late',icon:'⚠️',glyph:'warning',color:'#ff6b7a',title:late.length===1?late[0].title+' está atrasada':late.length+' contas atrasadas',text:money(late.reduce((s,d)=>s+d.amount,0))+' em aberto',category:'finance'});
-   if(soon.length)out.push({id:'digest:fin-soon',icon:'💳',glyph:'card',color:'#7258e8',title:soon.length===1?soon[0].title+' vence '+(soon[0].date===fin.todayISO()?'hoje':'em breve'):soon.length+' contas vencem em 3 dias',text:money(soon.reduce((s,d)=>s+d.amount,0))+' no total',category:'finance'});}
+   if(late.length)out.push({id:'digest:fin-late',icon:'⚠️',glyph:'warning',color:PALETTE.red,title:late.length===1?late[0].title+' está atrasada':late.length+' contas atrasadas',text:money(late.reduce((s,d)=>s+d.amount,0))+' em aberto',category:'finance'});
+   if(soon.length)out.push({id:'digest:fin-soon',icon:'💳',glyph:'card',color:PALETTE.brand,title:soon.length===1?soon[0].title+' vence '+(soon[0].date===fin.todayISO()?'hoje':'em breve'):soon.length+' contas vencem em 3 dias',text:money(soon.reduce((s,d)=>s+d.amount,0))+' no total',category:'finance'});}
  }catch{/* Finanças é opcional no resumo */}
  try{
   const {productsFrom}=require('../lib/monitor-collector') as typeof import('../lib/monitor-collector');const {money}=require('../lib/monitoring') as typeof import('../lib/monitoring');
   const mons:any[]=[];for(let o=0;;o+=100){const r=await api.entities('monitor','',o);mons.push(...r.items);if(r.items.length<100)break;}
   if(mons.length){const low=(await productsFrom(api,mons)).filter(p=>p.atLow&&p.now);
-   for(const p of low.slice(0,2))out.push({id:'digest:low-'+p.monitor.id,icon:'🏆',glyph:'star',color:'#2fc58b',title:p.monitor.title,text:'No menor preço já visto: '+money(p.now!.price,p.currency)+' na '+p.now!.store.name,category:'price',entity_id:p.monitor.id});}
+   for(const p of low.slice(0,2))out.push({id:'digest:low-'+p.monitor.id,icon:'🏆',glyph:'star',color:PALETTE.green,title:p.monitor.title,text:'No menor preço já visto: '+money(p.now!.price,p.currency)+' na '+p.now!.store.name,category:'price',entity_id:p.monitor.id});}
  }catch{/* Monitoramento é opcional no resumo */}
  return out;
 }
@@ -167,7 +168,7 @@ export function NotificationList({grouped=false,firstPaint=false}:{grouped?:bool
  const areas=useMemo(()=>{const m=new Map<string,number>();for(const i of n.items){const a=noticeArea(i);m.set(a,(m.get(a)||0)+1);}return [...m.entries()].sort((a,b)=>b[1]-a[1]);},[n.items]);
  const shown=useMemo(()=>n.items.filter(i=>filter==='all'||(filter==='unread'?i.state==='unread':noticeArea(i)===filter)),[n.items,filter]);
  const groups=useMemo(()=>{const result=new Map<string,Notice[]>();for(const item of shown){const key=noticeDateGroup(item.created_at);if(!result.has(key))result.set(key,[]);result.get(key)!.push(item);}return result;},[shown]);
- const chip=(value:string,label:string,count?:number)=><Pressable key={value} accessibilityRole="button" accessibilityState={{selected:filter===value}} onPress={()=>setFilter(value)} style={{flexDirection:'row',alignItems:'center',gap:5,paddingHorizontal:11,paddingVertical:6,borderRadius:99,backgroundColor:filter===value?c.accent:c.input}}><Text style={{color:filter===value?c.onAccent:c.text,fontSize:12,fontWeight:'500'}}>{label}</Text>{count?<Text style={{color:filter===value?'#ffffffcc':c.muted,fontSize:11}}>{count}</Text>:null}</Pressable>;
+ const chip=(value:string,label:string,count?:number)=><Pressable key={value} accessibilityRole="button" accessibilityState={{selected:filter===value}} onPress={()=>setFilter(value)} style={{flexDirection:'row',alignItems:'center',gap:5,paddingHorizontal:11,paddingVertical:6,borderRadius:99,backgroundColor:filter===value?c.accent:c.input}}><Text style={{color:filter===value?c.onAccent:c.text,fontSize:12,fontWeight:'500'}}>{label}</Text>{count?<Text style={{color:filter===value?PALETTE.white+'cc':c.muted,fontSize:11}}>{count}</Text>:null}</Pressable>;
  return <View style={{gap:10}}>
   <BellDigest/>
 
@@ -206,8 +207,8 @@ export function NotificationBell({onViewAll}:{onViewAll:()=>void}){
  </View><Modal visible={open} transparent hardwareAccelerated statusBarTranslucent navigationBarTranslucent animationType="none" onShow={animateShown} onRequestClose={()=>close()}>
   <View style={{flex:1}}>
    {/* Keep one stable dim layer for the whole native window lifetime. Only the card animates. */}
-   <Animated.View testID="notification-backdrop" style={{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:'#00000044',opacity:motion}}><Pressable accessibilityLabel="Fechar notificações" onPress={()=>close()} style={{flex:1}}/></Animated.View>
-   <Animated.View testID="notification-popover" accessibilityViewIsModal style={{position:'absolute',...layout,backgroundColor:c.bg,borderWidth:1,borderColor:c.line,borderRadius:20,padding:14,gap:10,elevation:14,shadowColor:'#000',shadowOffset:{width:0,height:5},shadowOpacity:.18,shadowRadius:16,opacity:motion,transform:[{translateX:motion.interpolate({inputRange:[0,1],outputRange:[(anchor.x+anchor.width/2-(layout.left+layout.width/2))*.14,0]})},{translateY:motion.interpolate({inputRange:[0,1],outputRange:[-(layout.height/2)*.14,0]})},{scale:motion.interpolate({inputRange:[0,1],outputRange:[.86,1]})}]}}>
+   <Animated.View testID="notification-backdrop" style={{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:PALETTE.black+'44',opacity:motion}}><Pressable accessibilityLabel="Fechar notificações" onPress={()=>close()} style={{flex:1}}/></Animated.View>
+   <Animated.View testID="notification-popover" accessibilityViewIsModal style={{position:'absolute',...layout,backgroundColor:c.bg,borderWidth:1,borderColor:c.line,borderRadius:20,padding:14,gap:10,elevation:14,shadowColor:PALETTE.black,shadowOffset:{width:0,height:5},shadowOpacity:.18,shadowRadius:16,opacity:motion,transform:[{translateX:motion.interpolate({inputRange:[0,1],outputRange:[(anchor.x+anchor.width/2-(layout.left+layout.width/2))*.14,0]})},{translateY:motion.interpolate({inputRange:[0,1],outputRange:[-(layout.height/2)*.14,0]})},{scale:motion.interpolate({inputRange:[0,1],outputRange:[.86,1]})}]}}>
     <View style={{flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,fontSize:20,fontWeight:'600',color:c.text}}>Notificações</Text><IconButton name="close" label="Fechar notificações" onPress={()=>close()}/></View>
     <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled decelerationRate="fast" style={{flex:1}} contentContainerStyle={{paddingBottom:10}}><NotificationList/></ScrollView>
     {n.items.length?<View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:4}}>

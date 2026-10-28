@@ -24,6 +24,26 @@ export function installWebPage() {
     if (e.key in keys) { const s = sc(e.key); if (!s) return; e.preventDefault(); s.scrollBy({top: s.clientHeight * keys[e.key], behavior: 'smooth'}); }
     else if (e.key === 'Home' || e.key === 'End') { const s = sc(e.key); if (!s) return; e.preventDefault(); s.scrollTo({top: e.key === 'Home' ? 0 : s.scrollHeight, behavior: 'smooth'}); }
   });
+  // 0.3.263: onde foi o ultimo clique (as janelas pequenas abrem perto dele, como menu)
+  document.addEventListener('pointerdown', e => { (window as any).__sofiaPointer = {x: e.clientX, y: e.clientY, t: Date.now()}; }, true);
+  // 0.3.263: Enter num campo de uma linha confirma a janela/formulario (o botao principal mais proximo)
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented || e.isComposing) return;
+    const el = document.activeElement as HTMLElement | null;
+    if (!el || el.tagName !== 'INPUT') return;
+    const scope = (el.closest('[aria-modal="true"]') || el.closest('[data-testid="side-peek"]') || document.body) as HTMLElement;
+    const buttons = [...scope.querySelectorAll('[data-primary="1"]')].filter(b => { const r = (b as HTMLElement).getBoundingClientRect(); return r.width > 0 && r.height > 0 && (b as HTMLElement).getAttribute('aria-disabled') !== 'true'; }) as HTMLElement[];
+    if (!buttons.length) return;
+    const after = buttons.filter(b => el.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    e.preventDefault(); (after[0] || buttons[buttons.length - 1]).click();
+  });
+  // 0.3.263: a rodinha rola a area principal de qualquer lugar (antes, fora da caixa que rola, nada acontecia)
+  document.addEventListener('wheel', e => {
+    let el = e.target as HTMLElement | null;
+    while (el && el !== document.body) { const st = getComputedStyle(el); if (/(auto|scroll)/.test(st.overflowY) && el.scrollHeight > el.clientHeight + 2) return; el = el.parentElement; }
+    if (document.querySelector('[aria-modal="true"]')) return;
+    const s = mainScroller(); if (s) s.scrollBy({top: e.deltaY});
+  }, {passive: true});
   const st = document.createElement('style'); st.id = 'sofia-print';
   st.textContent = '@media print{html,body,#root{height:auto!important;overflow:visible!important}*{overflow:visible!important;max-height:none!important}[data-print-hide],[aria-label="Menu"],[aria-label="Barra lateral"],nav{display:none!important}}';
   document.head.appendChild(st);

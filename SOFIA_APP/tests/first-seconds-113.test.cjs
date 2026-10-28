@@ -72,7 +72,7 @@ function mountsRig(){
  const exports={};
  const code=ts.transpileModule(read('src/lib/startup-mounts.ts'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
  const deps={react:wrapped,'./types':{},'./fluency':{queueOptional:(name,run)=>{const j={name,run,live:true};jobs.push(j);return()=>{j.live=false;};}},'./startup-mounts-legacy':{useLegacyStartupMounts:()=>new Set(['home'])}};
- vm.runInNewContext(code,{exports,require:n=>{assert.ok(n in deps,'Unexpected '+n);return deps[n];},Set,Array,setTimeout:(fn,ms)=>{const x={fn,ms,live:true};timers.push(x);return x;},clearTimeout:x=>{if(x)x.live=false;}},{});
+ vm.runInNewContext(code,{exports,require:n=>{if(/(^|\/)palette$/.test(n))return {PALETTE:new Proxy({},{get:()=>'#FFFFFF'})};assert.ok(n in deps,'Unexpected '+n);return deps[n];},Set,Array,setTimeout:(fn,ms)=>{const x={fn,ms,live:true};timers.push(x);return x;},clearTimeout:x=>{if(x)x.live=false;}},{});
  const Probe=({active,seen})=>{const w=exports.useStartupMounts(true,active,true,'new',[]);seen.current=w;return null;};
  return {exports,jobs,transitions,timers,Probe,live:()=>jobs.filter(j=>j.live),fire:()=>{for(const x of timers.splice(0))if(x.live)x.fn();}};
 }

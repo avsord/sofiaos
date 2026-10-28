@@ -1,4 +1,5 @@
 import React from 'react';
+import {PALETTE} from '../lib/palette';
 import {Pressable,Text,View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {Icon} from './Icon';
@@ -22,7 +23,7 @@ export function goalStats(g:GoalNumbers){
  return {pct,missing,next,nextValue,nextMissing:Math.max(0,nextValue-g.saved),reach,deadlineYm,monthsLeft,needed,diff,message};
 }
 export function GoalProgressCard({g,compact=false,onPress,flat=false,masked=false,onToggleMask}:{g:GoalNumbers;compact?:boolean;onPress?:()=>void;flat?:boolean;masked?:boolean;onToggleMask?:()=>void}){
- const c=useTheme(),st=goalStats(g),GOOD='#2FB37E',GUARD='#2FB37E';
+ const c=useTheme(),st=goalStats(g),GOOD=PALETTE.greenDeep,GUARD=PALETTE.greenDeep;
  // 0.3.255: olho dos valores (o mesmo de Financas)
  const brl=(v:number)=>masked?'R$ •••••':brlRaw(v);
  // flat: dentro de uma secao dos Relatorios (sem a moldura de cartao, para nao ficar caixa dentro de caixa)
@@ -40,7 +41,7 @@ export function GoalProgressCard({g,compact=false,onPress,flat=false,masked=fals
   </View>
   <View style={{height:12,borderRadius:6,backgroundColor:c.line,overflow:'hidden',justifyContent:'center'}}>
    <View style={{position:'absolute',left:0,top:0,bottom:0,width:`${Math.round(st.pct*100)}%` as `${number}%`,borderRadius:6,backgroundColor:GUARD}}/>
-   {[0.25,0.5,0.75].map(m=><View key={m} style={{position:'absolute',left:`${m*100}%` as `${number}%`,top:2,bottom:2,width:2,borderRadius:1,backgroundColor:st.pct>=m?'#ffffffaa':c.muted+'66'}}/>)}
+   {[0.25,0.5,0.75].map(m=><View key={m} style={{position:'absolute',left:`${m*100}%` as `${number}%`,top:2,bottom:2,width:2,borderRadius:1,backgroundColor:st.pct>=m?PALETTE.white+'aa':c.muted+'66'}}/>)}
   </View>
   <View style={{flexDirection:'row',justifyContent:'space-between'}}><Text style={{color:c.muted,fontSize:10}}>R$ 0</Text><Text style={{color:c.muted,fontSize:10}}>{brl(g.target)}</Text></View>
   {st.pct<1?<Text style={{color:c.text,fontSize:13,fontWeight:'500'}}>Faltam {brl(st.missing)}{st.next&&st.next<1?' · próximo marco: '+Math.round(st.next*100)+'% (faltam '+brl(st.nextMissing)+')':''}</Text>:null}

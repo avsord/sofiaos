@@ -2,7 +2,7 @@
 // Coleta + diagnóstico de ponta a ponta, com leitor e API falsos.
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),ts=require('typescript'),fs=require('node:fs'),path=require('node:path');
 const tr=f=>ts.transpileModule(fs.readFileSync(path.join(__dirname,'..',f),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-function load(file,mocks){const module={exports:{}};vm.runInNewContext(tr(file),{module,exports:module.exports,require:n=>{if(n in mocks)return mocks[n];throw Error('Unexpected '+n);},URL,Date,Math,JSON,Number,String,Set,Map,Array,Object,Promise,Infinity,encodeURIComponent,setTimeout,clearTimeout,AbortController});return module.exports;}
+function load(file,mocks){const module={exports:{}};vm.runInNewContext(tr(file),{module,exports:module.exports,require:n=>{if(/(^|\/)palette$/.test(n))return {PALETTE:new Proxy({},{get:()=>'#FFFFFF'})};if(n in mocks)return mocks[n];throw Error('Unexpected '+n);},URL,Date,Math,JSON,Number,String,Set,Map,Array,Object,Promise,Infinity,encodeURIComponent,setTimeout,clearTimeout,AbortController});return module.exports;}
 const monitoring=load('src/lib/monitoring.ts',{});
 const K='https://www.kabum.com.br/produto/123/placa-secreta',P='https://www.pichau.com.br/p/456-placa-secreta';
 const pages={[K]:{ok:true,title:'Placa Secreta',result:{found:true,needsConfirmation:false,best:{amount:2499.9,currency:'BRL',origins:['json-ld:offer'],confidence:1},candidates:[{amount:2499.9,currency:'BRL',origins:['json-ld:offer'],confidence:1}]}},

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import {PALETTE} from '../lib/palette';
 import { View, Text, TextInput, ScrollView, KeyboardAvoidingView, Platform, Pressable, Linking } from 'react-native';
 import { SofiaApi, SITE } from '../lib/api';
 import { useTheme } from '../lib/theme';
@@ -23,12 +24,12 @@ export function Login({ onLogin }: { onLogin: (a: Auth) => Promise<void> }) {
  </>;
  const legal=<View style={{flexDirection:'row',justifyContent:'center',gap:24}}>{[['Privacidade','privacy'],['Termos','terms']].map(([label,path])=><Pressable key={path} accessibilityRole="link" onPress={()=>void Linking.openURL(SITE+'/'+path)} style={{minHeight:40,justifyContent:'center'}}><Text style={{fontSize:12,color:c.muted}}>{label}</Text></Pressable>)}</View>;
  if(desktop)return <View testID="login-desktop" style={{flex:1,flexDirection:'row',backgroundColor:c.bg}}>
-  <View style={{flex:1.15,backgroundColor:'#16112A',padding:56,justifyContent:'space-between',overflow:'hidden'}}>
-   <View pointerEvents="none" style={{position:'absolute',width:620,height:620,borderRadius:310,backgroundColor:'#7258E8',opacity:0.28,right:-180,top:-160}}/>
-   <View pointerEvents="none" style={{position:'absolute',width:420,height:420,borderRadius:210,backgroundColor:'#B5A2FF',opacity:0.12,left:-140,bottom:-120}}/>
-   <View style={{flexDirection:'row',gap:12,alignItems:'center'}}><Brand size={40}/><Text style={{color:'#F2EEFA',fontWeight:'600',fontSize:18}}>Sofia OS</Text></View>
-   <View style={{maxWidth:560,gap:18}}><Text style={{fontSize:56,lineHeight:64,letterSpacing:-2,fontWeight:'700',color:'#F2EEFA'}}>Seu dia.{'\n'}Sua Sofia.</Text><Text style={{color:'#C9C2DA',lineHeight:28,fontSize:18}}>Um lugar para conversar, lembrar e organizar o que importa.</Text></View>
-   <Text style={{color:'#8F88A3',fontSize:12}}>Agenda, finanças, páginas e e-mails no mesmo lugar, no celular e no computador.</Text>
+  <View style={{flex:1.15,backgroundColor:PALETTE.violetDark1,padding:56,justifyContent:'space-between',overflow:'hidden'}}>
+   <View pointerEvents="none" style={{position:'absolute',width:620,height:620,borderRadius:310,backgroundColor:PALETTE.brand,opacity:0.28,right:-180,top:-160}}/>
+   <View pointerEvents="none" style={{position:'absolute',width:420,height:420,borderRadius:210,backgroundColor:PALETTE.violetLight3,opacity:0.12,left:-140,bottom:-120}}/>
+   <View style={{flexDirection:'row',gap:12,alignItems:'center'}}><Brand size={40}/><Text style={{color:PALETTE.lavender,fontWeight:'600',fontSize:18}}>Sofia OS</Text></View>
+   <View style={{maxWidth:560,gap:18}}><Text style={{fontSize:56,lineHeight:64,letterSpacing:-2,fontWeight:'700',color:PALETTE.lavender}}>Seu dia.{'\n'}Sua Sofia.</Text><Text style={{color:PALETTE.violetLight4,lineHeight:28,fontSize:18}}>Um lugar para conversar, lembrar e organizar o que importa.</Text></View>
+   <Text style={{color:PALETTE.gray3,fontSize:12}}>Agenda, finanças, páginas e e-mails no mesmo lugar, no celular e no computador.</Text>
   </View>
   <ScrollView nativeID="sofia-login-ready" keyboardShouldPersistTaps="handled" style={{flex:1,maxWidth:560}} contentContainerStyle={{flexGrow:1,justifyContent:'center',paddingHorizontal:64,paddingVertical:48}}>
    <DialogContext.Provider value={true}><View style={{width:'100%',maxWidth:400,alignSelf:'center',gap:18}}>

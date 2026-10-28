@@ -111,6 +111,7 @@ import * as PX from 'phosphor-react-native/src/icons/X';
 const ICONS = {
  capsule: PPill.PillIcon,
  sofia: PSparkle.SparkleIcon,
+ guardado: PPiggyBank.PiggyBankIcon,
  filter: PFunnelSimple.FunnelSimpleIcon,
  box: PPackage.PackageIcon,
  checklist: PListChecks.ListChecksIcon,
@@ -234,7 +235,16 @@ function CapsuleGlyph({size, color, fill}: {size: number; color: string; fill: b
     <Path d="M8.1 8.7l6.5 6.5" stroke={fill ? '#FFFFFF' : color} strokeWidth={1.6} strokeLinecap="round" />
   </Svg>;
 }
-const CUSTOM: Record<string, (p: {size: number; color: string; fill: boolean}) => React.ReactElement> = {sofia: SofiaGlyph, capsule: CapsuleGlyph};
+/** "guardado": o cofrinho da Sofia - um pote com tampa e uma moeda entrando (reserva que vai enchendo). */
+function GuardadoGlyph({size, color, fill}: {size: number; color: string; fill: boolean}) {
+  return <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect x="5" y="8.5" width="14" height="12" rx="4" stroke={color} strokeWidth={1.6} fill={fill ? color : 'none'} />
+    <Path d="M7.5 8.5V7a1.5 1.5 0 0 1 1.5-1.5h6A1.5 1.5 0 0 1 16.5 7v1.5" stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+    <Path d="M5 15.5h14" stroke={fill ? '#FFFFFF' : color} strokeWidth={1.6} opacity={fill ? 0.9 : 0.35} />
+    <Rect x="10" y="2" width="4" height="4" rx="2" fill={color} />
+  </Svg>;
+}
+const CUSTOM: Record<string, (p: {size: number; color: string; fill: boolean}) => React.ReactElement> = {sofia: SofiaGlyph, capsule: CapsuleGlyph, guardado: GuardadoGlyph};
 export function Icon({ name, size = 22, color = '#7258E8', active = false, weight }: { name: IconName; size?: number; color?: string; active?: boolean; weight?: 'thin' | 'light' | 'regular' | 'bold' | 'fill' | 'duotone' }) {
   const Own = CUSTOM[name];
   if (Own) return <Own size={size} color={color} fill={active || weight === 'fill'} />;

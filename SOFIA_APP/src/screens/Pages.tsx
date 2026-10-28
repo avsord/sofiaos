@@ -1,4 +1,5 @@
 import {noteFluencyMovement} from '../lib/fluency';
+import {PALETTE} from '../lib/palette';
 import {useRenderCost} from '../lib/render-cost';
 import {pageStoreSession} from '../lib/page-store-session';
 import {afterVisible} from '../lib/fluency';
@@ -219,10 +220,10 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
      {hasCover?<PageCover data={draft.appearance} api={api}/>:<View style={{alignSelf:'flex-end',padding:12,opacity:.55}}><Icon name="image" size={20} color={c.muted}/></View>}
     </Pressable>}
     {/* 0.3.255: botao de reposicionar a capa */}
-    {!preview&&imageCover&&!coverMove?<Pressable testID="page-cover-reposition" accessibilityRole="button" accessibilityLabel="Reposicionar capa" onPress={startCoverMove} style={{position:'absolute',right:12,bottom:12,flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:11,paddingVertical:7,borderRadius:10,backgroundColor:'#0000007a'}}><Icon name="move" size={14} color="#FFFFFF"/><Text style={{color:'#FFFFFF',fontSize:12,fontWeight:'500'}}>Reposicionar</Text></Pressable>:null}
-    {!preview&&imageCover&&coverMove?<><View pointerEvents="none" style={{position:'absolute',top:12,left:0,right:0,alignItems:'center'}}><View style={{paddingHorizontal:12,paddingVertical:6,borderRadius:10,backgroundColor:'#000000a0'}}><Text style={{color:'#FFFFFF',fontSize:12}}>Arraste a imagem para reposicionar</Text></View></View>
+    {!preview&&imageCover&&!coverMove?<Pressable testID="page-cover-reposition" accessibilityRole="button" accessibilityLabel="Reposicionar capa" onPress={startCoverMove} style={{position:'absolute',right:12,bottom:12,flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:11,paddingVertical:7,borderRadius:10,backgroundColor:PALETTE.black+'7a'}}><Icon name="move" size={14} color={PALETTE.white}/><Text style={{color:PALETTE.white,fontSize:12,fontWeight:'500'}}>Reposicionar</Text></Pressable>:null}
+    {!preview&&imageCover&&coverMove?<><View pointerEvents="none" style={{position:'absolute',top:12,left:0,right:0,alignItems:'center'}}><View style={{paddingHorizontal:12,paddingVertical:6,borderRadius:10,backgroundColor:PALETTE.black+'a0'}}><Text style={{color:PALETTE.white,fontSize:12}}>Arraste a imagem para reposicionar</Text></View></View>
      <View style={{position:'absolute',right:12,bottom:12,flexDirection:'row',gap:8}}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Cancelar reposicionamento" onPress={()=>setCoverMove(false)} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:10,backgroundColor:'#000000a0'}}><Text style={{color:'#FFFFFF',fontSize:12,fontWeight:'500'}}>Cancelar</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Cancelar reposicionamento" onPress={()=>setCoverMove(false)} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:10,backgroundColor:PALETTE.black+'a0'}}><Text style={{color:PALETTE.white,fontSize:12,fontWeight:'500'}}>Cancelar</Text></Pressable>
       <Pressable testID="page-cover-save-position" accessibilityRole="button" accessibilityLabel="Salvar posição da capa" onPress={saveCoverMove} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:10,backgroundColor:c.accent}}><Text style={{color:c.onAccent,fontSize:12,fontWeight:'600'}}>Salvar posição</Text></Pressable>
      </View></>:null}
    </View>
@@ -269,9 +270,11 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  const status=entry.state==='saving'?'Salvando…':entry.state==='pending'?'Sincronizando…':entry.state==='error'?'Não salvo':entry.state==='conflict'?'Conflito':selected.privacy==='private'?'Particular':selected.area;
  const hasCover=!!draft.appearance.cover_type;
  const editor=<View style={{flex:1,backgroundColor:c.bg,overflow:'hidden'}}>
-  <View style={{zIndex:20,elevation:5,minHeight:54,flexDirection:'row',alignItems:'center',paddingHorizontal:4,borderBottomWidth:1,borderColor:c.line,backgroundColor:c.surface}}>
-   <IconButton name="back" label="Voltar" size={34} onPress={back}/>
-   <View style={{flex:1,minWidth:0,paddingHorizontal:5}}><Text numberOfLines={1} style={{color:c.text,fontSize:16,fontWeight:'600'}}>{selected.title}</Text><Text accessibilityLiveRegion="polite" style={{color:entry.state==='error'||entry.state==='conflict'?c.danger:c.muted,fontSize:10,marginTop:3}}>{status}</Text></View>
+  {/* 0.3.263 (fase 3 — Paginas no computador): o caminho e o titulo ja estao na barra de cima; aqui fica uma faixa fina so com o
+      estado (salvo, salvando) e as ferramentas, sem fundo de cartao - o documento ocupa a cena, como no Notion. */}
+  <View style={desktop?{zIndex:20,minHeight:40,flexDirection:'row',alignItems:'center',paddingHorizontal:16}:{zIndex:20,elevation:5,minHeight:54,flexDirection:'row',alignItems:'center',paddingHorizontal:4,borderBottomWidth:1,borderColor:c.line,backgroundColor:c.surface}}>
+   {desktop?null:<IconButton name="back" label="Voltar" size={34} onPress={back}/>}
+   <View style={{flex:1,minWidth:0,paddingHorizontal:5}}>{desktop?null:<Text numberOfLines={1} style={{color:c.text,fontSize:16,fontWeight:'600'}}>{selected.title}</Text>}<Text accessibilityLiveRegion="polite" style={{color:entry.state==='error'||entry.state==='conflict'?c.danger:c.muted,fontSize:desktop?12:10,marginTop:desktop?0:3}}>{status}</Text></View>
    <View testID="page-tools-right" style={{flexDirection:'row',alignItems:'center',flexShrink:0}}>
     <IconButton name="undo" label="Desfazer" size={34} disabled={!entry.past.length} onPress={()=>store.undo(selected.id)}/>
     <IconButton name="redo" label="Refazer" size={34} disabled={!entry.future.length} onPress={()=>store.redo(selected.id)}/>

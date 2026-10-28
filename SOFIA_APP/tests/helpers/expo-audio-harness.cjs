@@ -9,7 +9,7 @@ const root=path.join(__dirname,'..','..');
 const nm=p=>path.join(root,'node_modules',p);
 function transpile(file,deps){
  const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{fileName:file,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
- const exports={};vm.runInNewContext(code,{exports,require:n=>{if(!(n in deps))throw Error('Unexpected '+n+' in '+path.basename(file));return deps[n];},console,Promise,Map,Set,Object,Error},{filename:file});return exports;
+ const exports={};vm.runInNewContext(code,{exports,require:n=>{if(/(^|\/)palette$/.test(n))return {PALETTE:new Proxy({},{get:()=>'#FFFFFF'})};if(!(n in deps))throw Error('Unexpected '+n+' in '+path.basename(file));return deps[n];},console,Promise,Map,Set,Object,Error},{filename:file});return exports;
 }
 const lifecycle=transpile(nm('expo-modules-core/src/hooks/useReleasingSharedObjectWithLifecycle.ts'),{react:React});
 const releasing=transpile(nm('expo-modules-core/src/hooks/useReleasingSharedObject.ts'),{react:React,'./useReleasingSharedObjectWithLifecycle':lifecycle});

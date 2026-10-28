@@ -32,7 +32,7 @@ test('proteção por tela: erro numa tela mostra "Recarregar esta tela" e recarr
  const code=ts.transpileModule(read('src/components/ScreenBoundary.tsx'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
  const errors=[];const exports={};
  const deps={'react':React,'react/jsx-runtime':require('react/jsx-runtime'),'react-native':{View:'View',Text:'Text',Pressable:'Pressable'},'../lib/theme':{useTheme:()=>({bg:'#fff',text:'#000',muted:'#777',accent:'#70f'})},'../lib/fluency-metrics':{perfError:(scope,e)=>{errors.push([scope,e.name]);return {scope,name:e.name,detail:'',components:[],atMs:0};}},'../lib/last-error':{rememberError(){},errorLine:r=>r?r.name:''}};
- vm.runInNewContext(code,{exports,require:n=>{assert.ok(n in deps,'Unexpected '+n);return deps[n];},console});
+ vm.runInNewContext(code,{exports,require:n=>{if(/(^|\/)palette$/.test(n))return {PALETTE:new Proxy({},{get:()=>'#FFFFFF'})};assert.ok(n in deps,'Unexpected '+n);return deps[n];},console});
  let explode=true,mounts=0;
  function Pages(){React.useEffect(()=>{mounts++;},[]);if(explode)throw new TypeError('boom');return React.createElement('Text',null,'ok');}
  const quiet=console.error;console.error=()=>{};let tree;
@@ -50,8 +50,8 @@ test('árvore principal delega 600 linhas à janela virtual, sem montá-las por 
  class Value{constructor(v){this.v=v;}setValue(v){this.v=v;}stopAnimation(){}getTranslateTransform(){return [];}}
  function List(props){return React.createElement('Window',props,props.data.slice(offset,offset+props.initialNumToRender).map((item,index)=>React.createElement(React.Fragment,{key:props.keyExtractor(item)},props.renderItem({item,index}))));}
  const native={View:'View',Text:'Text',Pressable:'Pressable',FlatList:List,Animated:{Value,ValueXY:class extends Value{},View:'AnimatedView',timing:()=>({start(){},stop(){}})}};
- const deps={'react':React,'react/jsx-runtime':require('react/jsx-runtime'),'react-native':native,'../lib/theme':{useTheme:()=>({text:'t',muted:'m',accent:'a',accentSoft:'s',surface:'f',input:'i',danger:'d'})},'./Icon':{Icon:'Icon'},'../lib/motion':{MOTION_EASE:null,useReducedMotion:()=>false},'../lib/page-order':{PAGE_INDENT:18,dropLineY:()=>null,projectPageDrop:()=>null},'../lib/fluency':{noteFluencyMovement(){}}};
- vm.runInNewContext(code,{exports,require:n=>{assert.ok(n in deps,'Unexpected '+n);return deps[n];},requestAnimationFrame:fn=>{frames.push(fn);return frames.length;},cancelAnimationFrame:()=>{},setTimeout,clearTimeout,Map,Set,Math,console});
+ const deps={'react':React,'react/jsx-runtime':require('react/jsx-runtime'),'react-native':native,'../lib/theme':{useTheme:()=>({text:'t',muted:'m',accent:'a',accentSoft:'s',surface:'f',input:'i',danger:'d'})},'./Icon':{Icon:'Icon'},'./ContextMenu':{contextMenu:()=>({})},'../lib/motion':{MOTION_EASE:null,useReducedMotion:()=>false},'../lib/page-order':{PAGE_INDENT:18,dropLineY:()=>null,projectPageDrop:()=>null},'../lib/fluency':{noteFluencyMovement(){}}};
+ vm.runInNewContext(code,{exports,require:n=>{if(/(^|\/)palette$/.test(n))return {PALETTE:new Proxy({},{get:()=>'#FFFFFF'})};assert.ok(n in deps,'Unexpected '+n);return deps[n];},requestAnimationFrame:fn=>{frames.push(fn);return frames.length;},cancelAnimationFrame:()=>{},setTimeout,clearTimeout,Map,Set,Math,console});
  const roots=Array.from({length:600},(_,i)=>({id:'p'+i,title:'Página QA '+String(i).padStart(4,'0'),data:{}}));
  const props={roots,children:new Map(),expanded:new Set(),toggle(){},onOpen(){},onMove(){},canParent:()=>true};
  const rows=t=>t.root.findAll(n=>n.type==='View'&&n.props?.accessibilityLabel?.startsWith('Abrir página principal'));

@@ -7,5 +7,5 @@ test('a tela diz que todas as transportadoras sao acompanhadas (nao mais "so Cor
   assert.ok(!s.includes('Correios são consultados automaticamente'));
 });
 test('detalhe: etapa em portugues, destaque de taxa a pagar e previsao de entrega',()=>{
-  assert.ok(s.includes('viewing.data?.milestone_label?')&&s.includes('💰 Taxa a pagar')&&s.includes('Previsão de entrega:'));
+  assert.ok(s.includes('viewing.data?.milestone_label?')&&s.includes('<Icon name="coins" size={16} color={c.danger}/><Text style={{color:c.danger,fontWeight:\'600\'}}>Taxa a pagar</Text>')&&s.includes('Previsão de entrega:'));
 });

@@ -58,3 +58,11 @@ fica em `docs/PEDIDOS.md` (Fase 3).
 ## Perfil
 - Intenção: ajustes, raramente.
 - Solução: menu de seções à esquerda (já existe) e conteúdo em coluna de ~640 px; botões perigosos separados no fim.
+
+## Entregue na 0.3.263
+- Conversa: lista de conversas numa coluna à esquerda (≥1180 px), busca e "+ Nova conversa"; leitura centralizada à direita.
+- Tarefas backlog, Biblioteca, Notas e Listas: cartões em duas colunas no computador largo (≥1200 px) e menu do botão direito.
+- Páginas (documento): sem cabeçalho repetido no computador — o caminho e o título já estão na barra de cima; fica uma faixa fina com o estado e as ferramentas.
+- Cápsulas: seletor Hoje/Todas/Histórico com largura limitada. Perfil: rótulos sem caixa alta. E-mails: ícone no lugar do emoji.
+- Finanças: decisão de manter as duas colunas (saldo/controle à esquerda, histórico à direita), que já atendem a intenção; ganhou números fixos, saldo com centavos menores, gráfico com detalhe no mouse e menu do botão direito nos lançamentos.
+- Apps, Lembretes e Encomendas: decisão de manter (grade/lista já na largura certa).
