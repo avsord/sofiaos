@@ -24,7 +24,7 @@ Nada é apagado (o corte de funções depende dele). Decisões de design ficam r
 ### Fase 1 — fundação visual (app e site)
 | # | Pedido | Estado |
 |---|---|---|
-| 1.1 | Fonte própria: Plus Jakarta Sans embutida no app e no site | entregue (0.3.259) |
+| 1.1 | Fonte própria: Plus Jakarta Sans embutida no app e no site | entregue (0.3.259; no site só passou a valer de verdade na 0.3.261 — o react-native-web escrevia a fonte do sistema por classe) |
 | 1.2 | Escala curta de tamanhos de letra (hoje 29) e pesos com hierarquia (hoje quase tudo negrito) | entregue (0.3.259): 13 tamanhos, pesos um degrau abaixo (`tools/type-scale-259.py`) |
 | 1.3 | Cores no tema (hoje 80 cores soltas no código), funcionando no claro e no escuro | entregue em parte (0.3.259): tokens good/warn/info/elevated; Finanças, notificações e status vêm do tema; texto branco sobre o destaque virou onAccent. As cores das categorias viram paleta própria na 4.1 |
 | 1.4 | Poucos arredondamentos (hoje 30) e espaçamentos (hoje 27), usados com intenção | movido para a Fase 3: muitos raios são metade do tamanho de círculos; trocar no automático deformaria. Entra tela a tela |
@@ -47,8 +47,8 @@ Nada é apagado (o corte de funções depende dele). Decisões de design ficam r
 ### Fase 3 — diagramação tela por tela (sem moldes: cada tela com a sua intenção)
 | # | Pedido | Estado |
 |---|---|---|
-| 3.1 | Login: marca à esquerda, coluna estreita do formulário à direita, um eixo só, botão com contraste, rodapé certo para o site | anotado |
-| 3.2 | Início, Conversa, Páginas, Agenda, Apps, Perfil, Finanças, Tarefas backlog, E-mails, Biblioteca, Notas, Listas, Cápsulas, Price Tracker/Monitoramento, Rotinas, Lembretes, Encomendas — cada uma com diagnóstico (intenção, problemas, proposta) em `docs/DESIGN.md` | anotado |
+| 3.1 | Login: marca à esquerda, coluna estreita do formulário à direita, um eixo só, botão com contraste, rodapé certo para o site | entregue (0.3.261) |
+| 3.2 | Início, Conversa, Páginas, Agenda, Apps, Perfil, Finanças, Tarefas backlog, E-mails, Biblioteca, Notas, Listas, Cápsulas, Price Tracker/Monitoramento, Rotinas, Lembretes, Encomendas — cada uma com diagnóstico (intenção, problemas, proposta) em `docs/DESIGN.md` | em andamento: diagnóstico de todas as telas escrito em `docs/DESIGN.md` (0.3.261); implementação tela a tela |
 | 3.3 | Dividir as telas gigantes (Finanças, Apps, Páginas) em partes menores, sem mudar o que fazem | anotado |
 | 3.4 | Trocar testes que conferem linhas de código por testes do que a pessoa vê e faz, nas telas mexidas | anotado |
 

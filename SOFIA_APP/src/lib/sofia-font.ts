@@ -12,9 +12,14 @@ export function nativeFamily(weight: TextStyle['fontWeight'], italic = false): s
   const n = Math.min(800, Math.max(400, Math.round(Number(w) / 100) * 100 || 400));
   return 'SofiaSans-' + FILES[String(n)];
 }
+/** O react-native-web escreve em cada texto a lista de fontes do sistema (-apple-system, BlinkMacSystemFont, Segoe UI,
+ * Roboto, Helvetica, Arial) por classe, que ganha de qualquer regra geral. Por isso cada um desses NOMES passa a apontar
+ * para os arquivos da Sofia (@font-face com o mesmo nome vale antes da fonte instalada). Monospace continua monospace.
+ * (0.3.261: na 0.3.259 a regra geral perdia para a classe e o site continuava na fonte do sistema.) */
+const WEB_ALIASES = [SOFIA_FONT, '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'Helvetica Neue'];
 export function webFontCss(base = '/assets/fonts/'): string {
-  const face = (w: string, file: string, style = 'normal') => `@font-face{font-family:'${SOFIA_FONT}';src:url('${base}SofiaSans-${file}.woff2') format('woff2');font-weight:${w};font-style:${style};font-display:swap}`;
-  return [face('400', 'Regular'), face('500', 'Medium'), face('600', 'SemiBold'), face('700', 'Bold'), face('800', 'ExtraBold'), face('400', 'Italic', 'italic'),
+  const face = (w: string, file: string, style = 'normal') => WEB_ALIASES.map(name => `@font-face{font-family:'${name}';src:url('${base}SofiaSans-${file}.woff2') format('woff2');font-weight:${w};font-style:${style};font-display:swap}`).join('\n');
+  return [face('100 450', 'Regular'), face('451 550', 'Medium'), face('551 650', 'SemiBold'), face('651 750', 'Bold'), face('751 900', 'ExtraBold'), face('100 900', 'Italic', 'italic'),
     `html,body,#root,input,textarea,button,select,div,span{font-family:'${SOFIA_FONT}',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}`,
     `code,pre,kbd,samp,[data-mono]{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}`,
     `body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;font-feature-settings:'cv11' 1}`].join('\n');
