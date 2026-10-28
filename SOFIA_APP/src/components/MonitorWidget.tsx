@@ -26,7 +26,7 @@ export function MonitorWidget({rows,failed=false,onOpen}:{rows:MonitorWidgetRow[
  // Cada produto só se compara consigo mesmo: sobe quem está no próprio menor
  // preço e, depois, quem teve leitura mais recente (ordem já vem de widgetRows).
  const top=list.slice(0,5);
- return <Pressable accessibilityRole="button" accessibilityLabel="Abrir Price Tracker" onPress={onOpen} style={{backgroundColor:c.surface,padding:16,borderRadius:22,borderWidth:1,borderColor:c.line,gap:12}}>
+ return <Pressable accessibilityRole="button" accessibilityLabel="Abrir Price Tracker" onPress={onOpen} style={{backgroundColor:c.surface,padding:16,borderRadius:22,borderWidth:1,borderColor:c.line,gap:12,boxShadow:'0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
   <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={{fontSize:20,fontWeight:'600',color:c.text}}>Price Tracker</Text><Text style={{fontSize:11,color:c.muted}}>{list.length?`${list.length} ${list.length===1?'produto':'produtos'}`:''}</Text></View>
   {rows===null?(failed?<Text style={{fontSize:13,lineHeight:19,color:c.muted}}>{tap('Não consegui carregar os preços agora. Toque para abrir o Price Tracker.')}</Text>:<SkeletonRows/>):!list.length?<Text style={{fontSize:13,lineHeight:19,color:c.muted}}>{tap('Acompanhe o preço do que você quer comprar. Toque para colar o link de um produto.')}</Text>:<>
    <View style={{gap:9}}>{top.map(p=><View key={p.id} style={{flexDirection:'row',alignItems:'center',gap:10}}>

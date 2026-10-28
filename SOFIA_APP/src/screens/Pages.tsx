@@ -238,6 +238,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    </View>
   </PageDocumentScroll>;
  }
+  const recentPages=useMemo(()=>desktop?[...displayPages].filter(p=>p.kind==='user_page'&&p.state!=='archived').sort((a,b)=>String(b.updated_at||'').localeCompare(String(a.updated_at||''))).slice(0,6):[],[desktop,displayPages]);
  const listView=<PageTreeList roots={orderReady?children.get('')||[]:[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={changePageInteraction} onDragChange={setPageDragging}
   virtualized scrollEnabled={!pageDragging}
   refreshControl={<RefreshControl enabled={!pageInteraction&&!selectedId} refreshing={refreshing} onRefresh={refreshPages} tintColor={c.accent}/>}
@@ -245,10 +246,20 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   <ScreenTitle title="Páginas" eyebrow="IDEIAS · NOTAS · SEUS ESPAÇOS" right={<IconButton name="plus" label="Criar página" filled disabled={!ready} onPress={()=>setCreateParent(null)}/>}/>
   {api.mdLocalOnly?<Text style={{paddingHorizontal:20,paddingBottom:8,color:c.muted,fontSize:10}}>Ordem salva neste aparelho. A hierarquia e o conteúdo continuam sincronizados.</Text>:null}
   {error?<ErrorBanner text={error} onRetry={()=>void load()}/>:null}
+  {/* 0.3.262 (fase 3 — Paginas): no computador, as paginas mexidas por ultimo em cartoes no topo (voltar ao que se estava
+      fazendo e um clique); a arvore completa continua logo abaixo, com titulo de secao. */}
+  {desktop&&orderReady&&recentPages.length?<View testID="pages-recent" style={{paddingHorizontal:20,paddingBottom:18,gap:12}}>
+   <Text style={{color:c.muted,fontSize:12,fontWeight:'600'}}>Recentes</Text>
+   <View style={{flexDirection:'row',flexWrap:'wrap',gap:12}}>{recentPages.map(p=><Pressable key={p.id} accessibilityRole="button" accessibilityLabel={'Abrir '+p.title} onPress={()=>open(p)} style={({hovered}:any)=>({width:216,minHeight:112,padding:14,borderRadius:14,borderWidth:1,borderColor:hovered?c.accent:c.line,backgroundColor:c.surface,gap:8,justifyContent:'space-between'})}>
+    {p.data?.icon&&p.data?.icon_mode!=='image'?<Text style={{fontSize:24}}>{String(p.data.icon)}</Text>:<Icon name="note" size={22} color={c.accent} weight="duotone"/>}
+    <View style={{gap:2}}><Text numberOfLines={2} style={{color:c.text,fontWeight:'600',fontSize:14,lineHeight:19}}>{p.title||'Sem título'}</Text><Text style={{color:c.muted,fontSize:11}}>{p.updated_at?'Editada '+new Date(p.updated_at).toLocaleDateString('pt-BR',{day:'numeric',month:'short'}):''}</Text></View>
+   </Pressable>)}</View>
+   <Text style={{color:c.muted,fontSize:12,fontWeight:'600',marginTop:10}}>Todas as páginas</Text>
+  </View>:null}
   </>}
   footer={<>
   {/* Também antes do 'ready' (enquanto as páginas guardadas no aparelho são lidas): antes ficava em branco. */}{((!ready||!loaded)&&!error&&!pages.length)||(!orderReady&&pages.length>0)?<View testID="pages-loading-placeholder" accessibilityLabel="Carregando páginas" style={{minHeight:80,paddingHorizontal:4,gap:4}}><View style={{flexDirection:'row',alignItems:'center',gap:10,paddingTop:6}}><Spinner size={16} stroke={1.8}/><Text style={{color:c.muted,fontSize:13}}>Carregando páginas</Text></View><LoadingLines rows={4}/></View>:null}
-  {ready&&loaded&&!pages.length&&!error?<Empty icon="book" title="Sua primeira página" body={tap("Toque em + para criar uma página.")}/>:null}
+  {ready&&loaded&&!pages.length&&!error?<Empty icon="book" title="Sua primeira página" body={tap("Um lugar para ideias, roteiros e anotações. Toque em + para começar.")}/>:null}
   </>}/>;
  const createPicker=<PageCreateMenu visible={createParent!==undefined} parentTitle={createParent?.title} onClose={()=>setCreateParent(undefined)}
   onBlank={()=>void create(createParent||undefined)} onTemplate={template=>selectedId?applyTemplate(template):void create(undefined,template)}/>;

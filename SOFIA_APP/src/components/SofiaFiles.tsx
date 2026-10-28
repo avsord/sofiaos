@@ -15,7 +15,7 @@ import {fileSize,filesNotice,shortDate as when} from '../lib/drive-files';
 // 0.3.244: os arquivos da Sofia moram numa área oculta do Drive (ninguém apaga sem querer).
 // Esta tela é a porta de entrada: vê por tipo, abre/compartilha cada arquivo e faz uma cópia visível.
 const ICONS:Record<string,IconName>={'Páginas':'book','Anexos':'clip','Comprovantes':'image','Áudios':'volume','Backup com senha':'shield','Backups':'history'};
-function Skeleton({rows=5}:{rows?:number}){const c=useTheme();return <ShimmerGroup><View style={{gap:10}}>{Array.from({length:rows},(_,i)=><View key={i} style={{backgroundColor:c.surface,borderRadius:18,borderWidth:1,borderColor:c.line,padding:16,flexDirection:'row',gap:14,alignItems:'center'}}><ShimmerBlock width={36} height={36} radius={12}/><View style={{flex:1,gap:8}}><ShimmerBlock width="55%" height={13}/><ShimmerBlock width="80%" height={10}/></View></View>)}</View></ShimmerGroup>;}
+function Skeleton({rows=5}:{rows?:number}){const c=useTheme();return <ShimmerGroup><View style={{gap:10}}>{Array.from({length:rows},(_,i)=><View key={i} style={{backgroundColor:c.surface,borderRadius:18,borderWidth:1,borderColor:c.line,padding:16,flexDirection:'row',gap:14,alignItems:'center',boxShadow:'0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}><ShimmerBlock width={36} height={36} radius={12}/><View style={{flex:1,gap:8}}><ShimmerBlock width="55%" height={13}/><ShimmerBlock width="80%" height={10}/></View></View>)}</View></ShimmerGroup>;}
 
 export function SofiaFiles({api,visible=true,onClose}:{api:SofiaApi;visible?:boolean;onClose:()=>void}){
  const c=useTheme();
@@ -81,7 +81,7 @@ export function SofiaFiles({api,visible=true,onClose}:{api:SofiaApi;visible?:boo
    {notice?<View style={{backgroundColor:notice.tone==='danger'?c.dangerBg:c.accentSoft,borderRadius:16,padding:14}}><Text style={{color:notice.tone==='danger'?c.danger:c.text,fontSize:13,lineHeight:19}}>{notice.text}</Text></View>:null}
    {!summary&&!error?<Skeleton rows={6}/>:null}
    {summary?<>
-    <View style={{backgroundColor:c.surface,borderRadius:18,borderWidth:1,borderColor:c.line,padding:16,gap:10}}>
+    <View style={{backgroundColor:c.surface,borderRadius:18,borderWidth:1,borderColor:c.line,padding:16,gap:10,boxShadow:'0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
      <View style={{flexDirection:'row',justifyContent:'space-between',gap:10}}><Text style={{color:c.text,fontSize:14,fontWeight:'500'}}>{summary.quota&&summary.quota.limit?'Drive: '+fileSize(summary.quota.usage)+' de '+fileSize(summary.quota.limit):'Espaço do Drive'}</Text><Text style={{color:c.muted,fontSize:13}}>Sofia: {fileSize(total)}</Text></View>
      {summary.quota&&summary.quota.limit?<View style={{height:8,borderRadius:8,backgroundColor:c.line,overflow:'hidden'}}><View style={{width:`${Math.min(100,Math.round(summary.quota.usage/summary.quota.limit*100))}%`,height:8,backgroundColor:c.accent,borderRadius:8}}/></View>:null}
     </View>
@@ -90,7 +90,7 @@ export function SofiaFiles({api,visible=true,onClose}:{api:SofiaApi;visible?:boo
      <View style={{flex:1,gap:3}}><Text style={{color:c.text,fontSize:16,fontWeight:'500'}}>{k.label}</Text><Text style={{color:c.muted,fontSize:12,lineHeight:17}}>{k.hint}</Text></View>
      <View style={{alignItems:'flex-end',gap:2}}><Text style={{color:c.text,fontSize:14,fontWeight:'500'}}>{k.count}</Text><Text style={{color:c.muted,fontSize:11}}>{fileSize(k.bytes)}</Text></View>
      <Icon name="chevron" color={c.muted} size={16}/></Pressable>)}
-    <View style={{backgroundColor:c.surface,borderRadius:18,borderWidth:1,borderColor:c.line,padding:16,gap:12,marginTop:4}}>
+    <View style={{backgroundColor:c.surface,borderRadius:18,borderWidth:1,borderColor:c.line,padding:16,gap:12,marginTop:4,boxShadow:'0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
      <Text style={{color:c.text,fontSize:18,fontWeight:'500'}}>Cópia visível no Drive</Text>
      <Text style={{color:c.muted,fontSize:13,lineHeight:19}}>Cria uma pasta normal no seu Drive com uma cópia dos tipos marcados. Ela aparece também nos computadores com o Google Drive instalado.</Text>
      <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{summary.categories.map(k=>{const on=!!picked?.includes(k.key);return <Pressable key={k.key} accessibilityRole="checkbox" accessibilityState={{checked:on}} onPress={()=>setPicked(p=>{const cur=p||[];return on?cur.filter(x=>x!==k.key):[...cur,k.key];})} style={{flexDirection:'row',alignItems:'center',gap:6,paddingVertical:8,paddingHorizontal:12,borderRadius:99,borderWidth:1,borderColor:on?c.accent:c.line,backgroundColor:on?c.accentSoft:'transparent'}}>{on?<Icon name="check" color={c.accent} size={14}/>:null}<Text style={{color:on?c.text:c.muted,fontSize:13}}>{k.label}</Text></Pressable>;})}</View>

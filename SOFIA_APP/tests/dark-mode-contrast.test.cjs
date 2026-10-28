@@ -48,7 +48,7 @@ test('botao principal, logo, recarregar tela, sino, e-mails, foto de perfil e mi
 test('Financas: cartao "Saldo geral", botao Nova despesa, cabecalho do lancamento e a aba selecionada usam cor que funciona nos dois modos', () => {
   const fin = fs.readFileSync(path.join(__dirname, '../src/screens/Finance.tsx'), 'utf8');
   for (const t of [
-    'color: c.onAccent, fontSize: 32',
+    '<BigMoney text={show(future ? 0 : total)} color={c.onAccent} size={32} />', // 0.3.262: mesmo contraste (onAccent), agora com R$ e centavos menores
     "<Text style={{color: c.onAccent, fontSize: 28, fontWeight: '400', marginTop: -2}}>＋</Text>",
     "headText = head === c.accent ? c.onAccent : '#fff'",
     'selectedTabText = head === c.accent ? light.accent : head',

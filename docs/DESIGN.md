@@ -12,7 +12,8 @@ fica em `docs/PEDIDOS.md` (Fase 3).
   coluna de 400 px centralizada na vertical — "Entrar", e-mail, senha, "Esqueceu a senha?" logo abaixo da senha,
   botão na largura do formulário, Privacidade/Termos no pé. Rótulos em caixa normal (também no celular).
 
-## Início
+## Início — entregue na 0.3.262 (primeira parte)
+- Feito: no computador, o dia (Agenda do Início) na coluna principal (≈2/3) e os widgets empilhados ao lado (≈1/3).
 - Intenção: o painel do dia — o que tenho hoje, o que está pendente, como estão as coisas. Olhar rápido, não trabalhar.
 - Problema: grade de widgets do celular; a Agenda ocupa uma faixa larga com metade vazia; widgets com alturas
   desencontradas; texto de erro longo solto no fim.
@@ -20,7 +21,8 @@ fica em `docs/PEDIDOS.md` (Fase 3).
   com horário à esquerda) e Tarefas backlog. Coluna lateral: mini calendário do mês, Meta, Price Tracker. Avisos de
   erro viram uma faixa discreta no topo, não um parágrafo no fim.
 
-## Agenda
+## Agenda — entregue na 0.3.262
+- Feito: no computador cada dia do mês é uma célula alta com até 3 compromissos (horário + título, cor da prioridade), "+N mais", hoje marcado no número; datas com só a primeira letra maiúscula ("Outubro de 2026").
 - Intenção: planejar — ver o mês e cuidar do dia escolhido.
 - Problema: o mês ocupa ~1/3 e o painel do dia fica vazio e estreito; o "+" grande isolado no canto.
 - Solução: mês grande à esquerda (células com os títulos dos compromissos, não só pontos), painel do dia à direita com

@@ -21,6 +21,17 @@ function webAppFile(root,p){const base=path.join(root,'public',WEB_DIR);if(!fs.e
  if(!full.startsWith(base+path.sep))return null;if(fs.existsSync(full)&&fs.statSync(full).isFile())return full;return null;}
 // 0.3.260: cada tela do site tem endereco proprio (F5 mantem a tela, voltar do navegador volta, da para favoritar)
 const SPA_ROUTE=/^\/(inicio|conversa|paginas|agenda|apps|avisos|perfil)(\/[a-z0-9-]{1,60})?\/?$/;
+// 0.3.262 (fase 4 — velocidade): o site vai comprimido (brotli ou gzip) - o arquivo principal de ~2,1 MB chega com uma
+// fracao disso. Comprime uma vez por arquivo e guarda na memoria (os arquivos do site mudam so a cada deploy).
+const zlib=require('node:zlib');const WEB_ZIP=new Map();const ZIPPABLE=/\.(js|css|html|json|svg|webmanifest|map|txt)$/;
+function compressedWeb(req,res,full){
+ const raw=fs.readFileSync(full);if(!ZIPPABLE.test(full)||raw.length<1024)return raw;
+ const accept=String(req.headers['accept-encoding']||'');res.setHeader('Vary','Accept-Encoding');
+ const kind=/\bbr\b/.test(accept)?'br':/\bgzip\b/.test(accept)?'gzip':'';if(!kind)return raw;
+ const st=fs.statSync(full),key=full+'|'+kind+'|'+st.mtimeMs+'|'+st.size;let out=WEB_ZIP.get(key);
+ if(!out){out=kind==='br'?zlib.brotliCompressSync(raw,{params:{[zlib.constants.BROTLI_PARAM_QUALITY]:9}}):zlib.gzipSync(raw,{level:9});if(WEB_ZIP.size>60)WEB_ZIP.clear();WEB_ZIP.set(key,out);}
+ res.setHeader('Content-Encoding',kind);return out;
+}
 function webAppPath(p){return SPA_ROUTE.test(p)||p==='/manifest.webmanifest'||p==='/'||p==='/index.html'||p==='/favicon.ico'||p==='/metadata.json'||p.startsWith('/_expo/')||p.startsWith('/assets/');}
 const PUBLIC_STATIC={'/sofia-logo.png':['sofia-logo.png','image/png'],'/login.js':['login.js','text/javascript; charset=utf-8'],'/whatsapp/connect':['whatsapp-connect.html','text/html; charset=utf-8'],'/whatsapp-connect.js':['whatsapp-connect.js','text/javascript; charset=utf-8'],'/whatsapp-connect.css':['whatsapp-connect.css','text/css; charset=utf-8'],'/site':['site.html','text/html; charset=utf-8'],'/terms':['terms.html','text/html; charset=utf-8'],'/data-deletion':['data-deletion.html','text/html; charset=utf-8']};
 function bodyJson(req,limitBytes=65536) {
@@ -184,7 +195,7 @@ function createHandler(runtime) {
       if(m==='GET'&&p==='/stores/mercadolivre/oauth/callback'&&runtime.stores){publicHeaders(res,p);const r=await runtime.stores.callbackResponse(url.searchParams);if(r.redirect){res.statusCode=302;res.setHeader('Location',r.redirect);res.end();return;}return plain(res,200,r.html,'text/html; charset=utf-8');}
       if(m==='GET'&&p==='/health')return json(res,200,{ok:true,name:'Sofia OS',version:VERSION,storage:'sqlite-local',task_description_format:true,selected_task_context:true,agenda_priority:true,persistent_sessions:true,unrestricted_chat_text:true,unrestricted_audio_duration:true});
       if(m==='GET'&&p==='/privacy')return plain(res,200,privacyPage(),'text/html; charset=utf-8');
-      if(m==='GET'&&webAppPath(p)){const full=webAppFile(config.root,p);if(full){res.setHeader('Content-Type',WEB_TYPES[path.extname(full)]||'application/octet-stream');if(p.startsWith('/_expo/')||p.startsWith('/assets/'))res.setHeader('Cache-Control','public, max-age=31536000, immutable');else res.setHeader('Cache-Control','no-cache');res.end(fs.readFileSync(full));return;}
+      if(m==='GET'&&webAppPath(p)){const full=webAppFile(config.root,p);if(full){res.setHeader('Content-Type',WEB_TYPES[path.extname(full)]||'application/octet-stream');if(p.startsWith('/_expo/')||p.startsWith('/assets/'))res.setHeader('Cache-Control','public, max-age=31536000, immutable');else res.setHeader('Cache-Control','no-cache');res.end(compressedWeb(req,res,full));return;}
         if(p==='/favicon.ico'||p==='/metadata.json'||p.startsWith('/_expo/')||p.startsWith('/assets/'))throw new AppError('NOT_FOUND','Arquivo do site não encontrado.',404);}
       if(m==='GET'&&PUBLIC_STATIC[p]){const [file,type]=PUBLIC_STATIC[p];res.setHeader('Content-Type',type);res.end(fs.readFileSync(path.join(config.root,'public',file)));return;}
       if(m==='GET'&&p==='/whatsapp/onboarding-config'){if(!config.metaAppId||!config.metaLoginConfigId)throw new AppError('META_CONFIG_MISSING','Configure META_APP_ID e META_LOGIN_CONFIG_ID no servidor.',503);return json(res,200,{ok:true,appId:config.metaAppId,configId:config.metaLoginConfigId,graphVersion:config.metaGraphVersion,featureType:'whatsapp_business_app_onboarding',sessionInfoVersion:'3'});}

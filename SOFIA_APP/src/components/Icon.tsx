@@ -1,4 +1,5 @@
 import React from 'react';
+import Svg, {Path, Rect} from 'react-native-svg';
 import * as PAirplane from 'phosphor-react-native/src/icons/Airplane';
 import * as PAlarm from 'phosphor-react-native/src/icons/Alarm';
 import * as PArrowClockwise from 'phosphor-react-native/src/icons/ArrowClockwise';
@@ -109,6 +110,7 @@ import * as PX from 'phosphor-react-native/src/icons/X';
  * premium. Os nomes antigos continuam valendo; os novos substituem os emojis que faziam papel de icone. */
 const ICONS = {
  capsule: PPill.PillIcon,
+ sofia: PSparkle.SparkleIcon,
  filter: PFunnelSimple.FunnelSimpleIcon,
  box: PPackage.PackageIcon,
  checklist: PListChecks.ListChecksIcon,
@@ -216,7 +218,26 @@ const ICONS = {
 } as const;
 export type IconName = keyof typeof ICONS;
 export const ICON_NAMES = Object.keys(ICONS) as IconName[];
+/** 0.3.262 (fase 4 — icones proprios): desenhados no mesmo grid (24) e traco (1,6) do conjunto. "sofia" (a marca: um
+ * quadro com a centelha da Sofia) e "capsule" (capsula na diagonal, metade preenchida). Contorno e preenchido. */
+function SofiaGlyph({size, color, fill}: {size: number; color: string; fill: boolean}) {
+  const spark = 'M12 6.6c.5 2.6 2.2 4.3 4.8 4.8-2.6.5-4.3 2.2-4.8 4.8-.5-2.6-2.2-4.3-4.8-4.8 2.6-.5 4.3-2.2 4.8-4.8z';
+  return <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    {fill ? <Rect x="3" y="3" width="18" height="18" rx="6" fill={color} /> : <Rect x="3.8" y="3.8" width="16.4" height="16.4" rx="5.6" stroke={color} strokeWidth={1.6} />}
+    <Path d={spark} fill={fill ? '#FFFFFF' : color} />
+  </Svg>;
+}
+function CapsuleGlyph({size, color, fill}: {size: number; color: string; fill: boolean}) {
+  return <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M8.2 19.6a4.6 4.6 0 0 1-3.8-7.2l7.4-7.4a4.6 4.6 0 0 1 6.5 6.5l-7.4 7.4a4.6 4.6 0 0 1-2.7 0.7z" stroke={color} strokeWidth={1.6} strokeLinejoin="round" fill={fill ? color : 'none'} />
+    <Path d="M8.2 19.6a4.6 4.6 0 0 1-3.8-7.2l3.7-3.7 6.5 6.5-3.7 3.7a4.6 4.6 0 0 1-2.7 0.7z" fill={color} opacity={fill ? 1 : 0.28} />
+    <Path d="M8.1 8.7l6.5 6.5" stroke={fill ? '#FFFFFF' : color} strokeWidth={1.6} strokeLinecap="round" />
+  </Svg>;
+}
+const CUSTOM: Record<string, (p: {size: number; color: string; fill: boolean}) => React.ReactElement> = {sofia: SofiaGlyph, capsule: CapsuleGlyph};
 export function Icon({ name, size = 22, color = '#7258E8', active = false, weight }: { name: IconName; size?: number; color?: string; active?: boolean; weight?: 'thin' | 'light' | 'regular' | 'bold' | 'fill' | 'duotone' }) {
+  const Own = CUSTOM[name];
+  if (Own) return <Own size={size} color={color} fill={active || weight === 'fill'} />;
   const Glyph = ICONS[name] || ICONS.circle;
   return <Glyph size={size} color={color} weight={weight || (active ? 'fill' : 'regular')} />;
 }

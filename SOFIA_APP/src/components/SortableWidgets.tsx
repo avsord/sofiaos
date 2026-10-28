@@ -39,7 +39,7 @@ export function SortableWidgets({items,order,onSave,onLock,fixed=[],noHold=[],co
     <ReorderList rows={visible.map(id=>({id,title:items.find(i=>i.id===id)!.title,removable:!fixed.includes(id)}))} onChange={save} onRemove={id=>save(visible.filter(x=>x!==id))}/>
     {hidden.length?<View style={{gap:6}}>
      <Text style={{color:c.muted,fontSize:12,fontWeight:'600'}}>Adicionar</Text>
-     {hidden.map(item=><Pressable key={item.id} accessibilityRole="button" accessibilityLabel={'Adicionar '+item.title} onPress={()=>save([...visible,item.id])} style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:12,paddingHorizontal:14,borderRadius:14,borderWidth:1,borderColor:c.line,backgroundColor:c.surface}}>
+     {hidden.map(item=><Pressable key={item.id} accessibilityRole="button" accessibilityLabel={'Adicionar '+item.title} onPress={()=>save([...visible,item.id])} style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:12,paddingHorizontal:14,borderRadius:14,borderWidth:1,borderColor:c.line,backgroundColor:c.surface,boxShadow:'0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
       <View style={{width:22,height:22,borderRadius:11,backgroundColor:c.accent,alignItems:'center',justifyContent:'center'}}><Text style={{color:c.onAccent,fontWeight:'700',fontSize:16,lineHeight:20}}>+</Text></View>
       <Text style={{color:c.text,fontSize:16,fontWeight:'500'}}>{item.title}</Text>
      </Pressable>)}

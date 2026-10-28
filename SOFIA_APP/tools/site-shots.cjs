@@ -13,7 +13,7 @@ async function clickText(p,text,{exact=true}={}){return p.evaluate((text,exact)=
  await p.goto(BASE+'/',{waitUntil:'networkidle0',timeout:60000});await sleep(1500);
  await p.screenshot({path:out+'/00-login.png'});
  const inputs=await p.$$('input');if(inputs.length>=2){await inputs[0].type('teste@sofia.dev');await inputs[1].type('senha-de-teste-123');}
- await clickText(p,'Entrar');await sleep(5000);
+ await p.evaluate(()=>{const b=[...document.querySelectorAll('[role=button]')].find(e=>(e.innerText||'').trim()==='Entrar');b&&b.click();});await sleep(5000);
  const shots=[['01-inicio','Início'],['02-conversa','Conversa'],['03-paginas','Páginas'],['04-agenda','Agenda'],['05-apps','Apps'],['06-perfil','Perfil']];
  for(const [name,label] of shots){const ok=await clickText(p,label);await sleep(2500);await p.screenshot({path:out+'/'+name+'.png'});if(!ok)errors.push('nao achei '+label);}
  const apps=[['10-financas','Finanças'],['11-tarefas','Tarefas backlog'],['12-emails','E-mails'],['13-biblioteca','Biblioteca'],['14-notas','Notas'],['15-listas','Listas'],['16-capsulas','Cápsulas'],['17-monitoramento','Monitoramento'],['18-rotinas','Rotinas'],['19-lembretes','Lembretes']];

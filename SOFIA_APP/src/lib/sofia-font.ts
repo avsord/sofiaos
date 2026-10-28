@@ -22,7 +22,9 @@ export function webFontCss(base = '/assets/fonts/'): string {
   return [face('100 450', 'Regular'), face('451 550', 'Medium'), face('551 650', 'SemiBold'), face('651 750', 'Bold'), face('751 900', 'ExtraBold'), face('100 900', 'Italic', 'italic'),
     `html,body,#root,input,textarea,button,select,div,span{font-family:'${SOFIA_FONT}',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}`,
     `code,pre,kbd,samp,[data-mono]{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}`,
-    `body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;font-feature-settings:'cv11' 1}`].join('\n');
+    `body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}`,
+    // 0.3.262: numeros de largura fixa (valores, horas e datas alinham e nao "dancam" ao mudar)
+    `div,span,input,textarea{font-variant-numeric:tabular-nums}`].join('\n');
 }
 let installed = false;
 export function installSofiaFont() {
@@ -40,7 +42,7 @@ export function installSofiaFont() {
         const flat = (StyleSheet.flatten(props.style) || {}) as TextStyle;
         if (flat.fontFamily) return React.createElement(Base, props);
         const family = nativeFamily(flat.fontWeight, flat.fontStyle === 'italic');
-        return React.createElement(Base, {...props, style: [props.style, {fontFamily: family, fontWeight: 'normal', fontStyle: 'normal'}]});
+        return React.createElement(Base, {...props, style: [{fontVariant: ['tabular-nums']}, props.style, {fontFamily: family, fontWeight: 'normal', fontStyle: 'normal'}]});
       };
       Wrapped.displayName = 'Sofia' + name;
       Object.assign(Wrapped, Base);

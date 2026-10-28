@@ -6,7 +6,7 @@ import type {GoalNumbers} from '../components/GoalProgress';
 import {keepIfSame, useCachedGoal, writeGoalWidget} from '../lib/goal-widget';
 import {scheduleIdleTask} from '../lib/idle-task';
 import * as SecureStore from 'expo-secure-store';
-import {ActivityIndicator, Alert, BackHandler, Keyboard, KeyboardAvoidingView, Platform, Pressable, RefreshControl, Switch, Text, TextInput, View, Dimensions, PanResponder, Animated} from 'react-native';
+import {ActivityIndicator, Alert, BackHandler, Keyboard, KeyboardAvoidingView, Platform, Pressable, RefreshControl, Switch, Text, TextInput, View, Dimensions, PanResponder, Animated, Easing} from 'react-native';
 // 0.3.255: ScrollView que rola sozinho ate o calendario aberto caber na tela (ver RevealScroll)
 import {RevealScrollView as ScrollView} from '../components/RevealScroll';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -165,6 +165,20 @@ function Title({text, action, onAction}: {text: string; action?: string; onActio
 function Bar({pct, color}: {pct: number; color: string}) {
   const c = useTheme();
   return <View style={{height: 8, borderRadius: 4, backgroundColor: c.input, overflow: 'hidden'}}><View style={{width: `${Math.min(100, Math.max(0, pct * 100))}%`, height: 8, borderRadius: 4, backgroundColor: color}} /></View>;
+}
+/** 0.3.262 (fase 4 — numeros): valor grande com "R$" e centavos menores, numeros de largura fixa (nao "dancam"
+ * quando mudam) e uma entrada suave quando o valor muda. Valores escondidos (olho) aparecem como estao. */
+function BigMoney({text, color, size = 32}: {text: string; color: string; size?: number}) {
+  const m = /^(-?\s*R\$\s?)([\d.]+)(,\d{2})?$/.exec(String(text).replace(/\u00a0/g, ' ').trim());
+  const rise = useRef(new Animated.Value(0)).current, first = useRef(true);
+  useEffect(() => { if (first.current) { first.current = false; return; } rise.setValue(6); Animated.timing(rise, {toValue: 0, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web'}).start(); }, [text, rise]);
+  const base = {color, fontWeight: '700' as const, fontVariant: ['tabular-nums' as const]};
+  if (!m) return <Animated.Text style={[base, {fontSize: size, transform: [{translateY: rise}]}]}>{text}</Animated.Text>;
+  return <Animated.View style={{flexDirection: 'row', alignItems: 'baseline', transform: [{translateY: rise}]}}>
+    <Text style={[base, {fontSize: Math.round(size * 0.55), opacity: 0.85, marginRight: 4}]}>{m[1].replace(/\s+$/, '')}</Text>
+    <Text style={[base, {fontSize: size, letterSpacing: -0.5}]}>{m[2]}</Text>
+    {m[3] ? <Text style={[base, {fontSize: Math.round(size * 0.55), opacity: 0.85}]}>{m[3]}</Text> : null}
+  </Animated.View>;
 }
 /** 0.3.259: icone da categoria (conjunto da Sofia) no lugar do emoji. */
 function CatIcon({cat, size = 18, color}: {cat: {glyph?: string; color: string}; size?: number; color?: string}) {
@@ -1192,7 +1206,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
           <Text style={{flex: 1, color: c.onAccent + 'cc', fontSize: 13}}>Saldo</Text>
           <Pressable accessibilityLabel={hide ? 'Mostrar valores' : 'Esconder valores'} onPress={() => setHide(h => !h)} hitSlop={8}><Icon name={hide ? 'eyeOff' : 'eye'} size={18} color={c.onAccent + 'cc'} /></Pressable>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Ver como o saldo é calculado" onPress={() => setBreakdown('saldo')}><Text style={{color: c.onAccent, fontSize: 32, fontWeight: '700'}}>{show(future ? 0 : total)}</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Ver como o saldo é calculado" onPress={() => setBreakdown('saldo')}><BigMoney text={show(future ? 0 : total)} color={c.onAccent} size={32} /></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Ver a previsão" onPress={() => setForecastOpen(true)}><Text style={{color: c.onAccent + 'cc', fontSize: 12}}>{future ? monthLabel(month).split(' ')[0] + ' ainda não começou · previsto' : 'Previsto até ' + forecastEnd}: <Text style={{color: c.onAccent, fontWeight: '600'}}>{show(future ? 0 : forecastP.left)}</Text> ›</Text></Pressable>
         <View style={{flexDirection: 'row', gap: 12}}>
           <Pressable accessibilityRole="button" accessibilityLabel="Ver receitas do mês" onPress={() => setBreakdown('income')} style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 16, padding: 12, gap: 2}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↑ Receitas</Text><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 16}}>{show(future ? 0 : s.income)}</Text></Pressable>
@@ -1258,13 +1272,13 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
 
 
       {/* 0.3.161: quanto ainda da para gastar neste ciclo, depois das contas fixas e do aporte */}
-      {!fresh && !future && !failed ? <ShimmerGroup><View accessibilityRole="progressbar" accessibilityLabel="Atualizando o controle de gastos" style={{backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 12, borderWidth: 1, borderColor: c.line}}>
+      {!fresh && !future && !failed ? <ShimmerGroup><View accessibilityRole="progressbar" accessibilityLabel="Atualizando o controle de gastos" style={{backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 12, borderWidth: 1, borderColor: c.line, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
         <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8}}><Text style={{flex: 1, color: c.text, fontWeight: '700', fontSize: 16}}>Controle de gastos</Text><Text style={{color: c.muted, fontSize: 11}}>{monthLabel(month).split(' ')[0]}</Text></View>
         <ShimmerBlock width={'52%'} height={24} radius={8} /><ShimmerBlock width={'100%'} height={10} radius={5} /><ShimmerBlock width={'78%'} height={10} />
       </View></ShimmerGroup> :
       (() => { const b = future ? {...spend, start: 0, available: 0, left: 0, extra: 0, spent: 0, pct: 0} : spend, over = b.left < 0, pct = Math.min(1, b.pct);
         return <Pressable accessibilityRole="button" accessibilityLabel="Ver as despesas do mês" onPress={() => setBreakdown('expense')}
-        style={{backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 10, borderWidth: 1, borderColor: over ? c.danger : c.line}}>
+        style={{backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 10, borderWidth: 1, borderColor: over ? c.danger : c.line, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
         <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8}}>
           <Text style={{flex: 1, color: c.text, fontWeight: '700', fontSize: 16}}>Controle de gastos</Text>
           <Text style={{color: c.muted, fontSize: 11}}>{monthLabel(month).split(' ')[0]}</Text>
@@ -1314,7 +1328,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
 
       {/* 0.3.152: vencimentos proximos viram uma linha so (o detalhe fica em Pendentes); cartoes ficam na aba Cartoes */}
       {dues.length ? <Pressable accessibilityRole="button" accessibilityLabel="Ver pendentes" onPress={() => onTab('bills')}
-        style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.surface, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: dues.some(x => x.late) ? c.danger : c.line}}>
+        style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.surface, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: dues.some(x => x.late) ? c.danger : c.line, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
         <Text style={{fontSize: 16}}>⏰</Text>
         <Text style={{flex: 1, color: c.text, fontSize: 13}}>{dues.some(x => x.late) ? 'Há conta atrasada' : dues.length === 1 ? '1 vencimento nos próximos 3 dias' : dues.length + ' vencimentos nos próximos 3 dias'}</Text>
         <Text style={{color: c.text, fontWeight: '600', fontSize: 13}}>{show(dues.reduce((sum, x) => sum + x.amount, 0))}</Text><Text style={{color: c.muted}}>›</Text>
@@ -1586,7 +1600,7 @@ function BankStatements({d, api, reload, onImport}: {d: Data; api: SofiaApi; rel
     setBusy(st.id);
     try { await api.financeStatementDelete(st.id); await reload(); } catch (e) { appAlert('Finanças', errorText(e)); } finally { setBusy(''); }
   }
-  if (!d.statements.length) return <View style={{backgroundColor: c.surface, borderRadius: 18, padding: 16, gap: 8, borderWidth: 1, borderColor: c.line}}>
+  if (!d.statements.length) return <View style={{backgroundColor: c.surface, borderRadius: 18, padding: 16, gap: 8, borderWidth: 1, borderColor: c.line, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
     <Text style={{color: c.text, fontWeight: '600'}}>Nenhum extrato ainda</Text>
     <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>O extrato do banco fica guardado só aqui, para você conferir com o app. Ele não mexe na conta.</Text>
     <Button title="Importar extrato (OFX ou CSV)" secondary onPress={onImport} />
@@ -1594,7 +1608,7 @@ function BankStatements({d, api, reload, onImport}: {d: Data; api: SofiaApi; rel
   return <View style={{gap: 12}}>
     {d.statements.map(st => { const acc = account(st.accountId), start = String(acc?.entity?.data?.balance_set_at || ''); const rows = st.lines.map(l => ({l, m: matchOf(l, acc), before: !!start && l.date < start})); const missing = rows.filter(r => !r.m && !r.before).length;
       return <SwipeToDelete key={st.id} busy={busy === st.id} label="Apagar extrato" onDelete={() => appAlert('Apagar este extrato?', 'O extrato sai daqui' + (st.lines.some(l => d.txs.some(x => String(x.entity?.data?.import_id || '') === l.import_id)) ? ' e o que foi lançado a partir dele também, e a conta volta a como era.' : '.'), [{text: 'Cancelar', style: 'cancel'}, {text: 'Apagar', style: 'destructive', onPress: () => void remove(st)}])}>
-      <View style={{backgroundColor: c.surface, borderRadius: 18, borderWidth: 1, borderColor: c.line, overflow: 'hidden'}}>
+      <View style={{backgroundColor: c.surface, borderRadius: 18, borderWidth: 1, borderColor: c.line, overflow: 'hidden', boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
         <Pressable accessibilityRole="button" onPress={() => setOpen(o => o === st.id ? '' : st.id)} style={{padding: 14, gap: 4}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}><Text style={{flex: 1, color: c.text, fontWeight: '700', fontSize: 14}}>{st.from.split('-').reverse().slice(0, 2).join('/')} a {st.to.split('-').reverse().slice(0, 2).join('/')}{acc ? ' · ' + acc.name : ''}</Text><Chevron open={open === st.id} /></View>
           <Text style={{color: c.muted, fontSize: 12}}>{st.lines.length} linhas · {missing ? missing + (missing === 1 ? ' falta no app' : ' faltam no app') : 'tudo confere'}{st.closing !== null ? ' · saldo no banco ' + money(st.closing) : ''}</Text>
@@ -1732,13 +1746,13 @@ function RefundsTab({d, api, reload, accountId}: {d: Data; api: SofiaApi; reload
     }}]);
   }
   return <View style={{gap: 14}}>
-    <View style={{backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 6, borderWidth: 1, borderColor: c.line}}>
+    <View style={{backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 6, borderWidth: 1, borderColor: c.line, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
       <Text style={{color: c.muted, fontSize: 12}}>A receber de devoluções</Text>
       <Text testID="refunds-total" style={{color: c.text, fontSize: 28, fontWeight: '700'}}>{money(total)}</Text>
       <Text style={{color: c.muted, fontSize: 12, lineHeight: 17}}>{tap('Não entra no Saldo nem no previsto. Quando o dinheiro cair, toque em “Recebi”: ele vai para o Saldo e para o Histórico.')}</Text>
     </View>
     <Button title="+ Nova devolução a receber" secondary onPress={() => setEditing('new')} />
-    {pending.length ? pending.map(r => <Pressable key={r.id} accessibilityRole="button" accessibilityLabel={'Editar ' + r.title} onPress={() => setEditing(r)} style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.surface, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: c.line}}>
+    {pending.length ? pending.map(r => <Pressable key={r.id} accessibilityRole="button" accessibilityLabel={'Editar ' + r.title} onPress={() => setEditing(r)} style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.surface, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: c.line, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
       <Text style={{fontSize: 20}}>↩️</Text>
       <View style={{flex: 1, gap: 2}}>
         <Text style={{color: c.text, fontWeight: '600'}} numberOfLines={2}>{r.title}</Text>
@@ -2032,7 +2046,7 @@ function CardsTab({d, month, api, reload, onTx, onManage, onNewBill}: {month: st
               <Text style={{color: c.text, fontWeight: '600'}}>Fatura de {monthLabel(i.month).toLowerCase()}</Text>
               <View style={{paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99, backgroundColor: statusColor[i.status] + '22', marginTop: 4}}><Text style={{color: statusColor[i.status], fontWeight: '600', fontSize: 11}}>{i.status.toUpperCase()}</Text></View>
           </View>
-          <Text style={{color: c.text, fontSize: 32, fontWeight: '700', textAlign: 'center'}}>{money(i.total)}</Text>
+          <View style={{alignItems: 'center'}}><BigMoney text={money(i.total)} color={c.text} size={32} /></View>
           <Text style={{color: c.muted, fontSize: 12, textAlign: 'center'}}>{i.status === 'fechada' || i.status === 'paga' ? 'Fechou' : 'Fecha'} {dateBR(i.close)} · {i.status !== 'paga' && todayISO() > i.due ? <Text style={{color: c.danger, fontWeight: '600'}}>venceu {dateBR(i.due)}</Text> : 'vence ' + dateBR(i.due)}{i.paid ? ' · pago ' + money(i.paid) : ''}</Text>
           {i.total > i.paid && i.status !== 'futura' && i.status !== 'paga' ? <Button title={busy ? 'Pagando…' : 'Pagar fatura · ' + money(i.total - i.paid)} loading={busy} onPress={() => d.accounts.filter(a => !a.archived).length > 1 ? setPick(true) : void pay(card.accountId || d.accounts[0].id)} /> : null}
           {i.items.length ? i.items.map((t, k) => <TxRow key={t.id} t={t} d={d} first={k === 0} onPress={() => onTx(t)} api={api} reload={reload} inInvoice />) : <Text style={{color: c.muted, textAlign: 'center'}}>Nenhuma compra nesta fatura.</Text>}
@@ -2478,7 +2492,7 @@ function ManageSheet({api, d, onClose, reload, onFinished}: {api: SofiaApi; d: D
             salary: d.txs.filter(t => !t.virtual && t.kind === 'income' && t.recurrence === 'monthly' && !t.seriesId && t.entity?.state !== 'archived').sort((a, b) => b.amount - a.amount)[0] || null}} /> :
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 18, gap: 14}}>
           {/* 0.3.223: Redefinir Financas - apaga tudo e abre o passo a passo do zero */}
-          <View style={{backgroundColor: c.surface, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: c.line, gap: 10}}>
+          <View style={{backgroundColor: c.surface, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: c.line, gap: 10, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
             <View style={{gap: 2}}><Text style={{color: c.text, fontWeight: '600', fontSize: 14}}>Redefinir Finanças</Text><Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Apaga contas, cartões, lançamentos, reserva e metas. Você recomeça do zero, pelo passo a passo ou mandando seus prints para a Sofia.</Text></View>
             {resetting ? <View style={{gap: 8}}>
               <TextInput accessibilityLabel="Confirmação para zerar" value={resetWord} onChangeText={setResetWord} autoCapitalize="characters" placeholder="Digite REDEFINIR" placeholderTextColor={c.muted} style={{color: c.text, backgroundColor: c.input, borderRadius: 12, padding: 12, fontSize: 16, letterSpacing: 2}} />
@@ -2488,7 +2502,7 @@ function ManageSheet({api, d, onClose, reload, onFinished}: {api: SofiaApi; d: D
               </View>
             </View> : <Pressable accessibilityRole="button" onPress={() => { setResetWord(''); setResetting(true); }} style={{paddingVertical: 10, borderRadius: 12, backgroundColor: c.danger + '1f', alignItems: 'center'}}><Text style={{color: c.danger, fontWeight: '600', fontSize: 13}}>Redefinir Finanças</Text></Pressable>}
           </View>
-          <Pressable accessibilityRole="button" onPress={() => setSetup(true)} style={{backgroundColor: c.surface, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: c.line, flexDirection: 'row', alignItems: 'center', gap: 10}}>
+          <Pressable accessibilityRole="button" onPress={() => setSetup(true)} style={{backgroundColor: c.surface, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: c.line, flexDirection: 'row', alignItems: 'center', gap: 10, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
             <View style={{flex: 1, gap: 2}}>
               <Text style={{color: c.text, fontWeight: '600', fontSize: 14}}>Refazer a configuração</Text>
               <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Passo a passo com o que você já tem: conta, dia do recebimento, contas fixas, guardado, aporte e meta. Nada é apagado.</Text>

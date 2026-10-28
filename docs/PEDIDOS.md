@@ -48,20 +48,20 @@ Nada é apagado (o corte de funções depende dele). Decisões de design ficam r
 | # | Pedido | Estado |
 |---|---|---|
 | 3.1 | Login: marca à esquerda, coluna estreita do formulário à direita, um eixo só, botão com contraste, rodapé certo para o site | entregue (0.3.261) |
-| 3.2 | Início, Conversa, Páginas, Agenda, Apps, Perfil, Finanças, Tarefas backlog, E-mails, Biblioteca, Notas, Listas, Cápsulas, Price Tracker/Monitoramento, Rotinas, Lembretes, Encomendas — cada uma com diagnóstico (intenção, problemas, proposta) em `docs/DESIGN.md` | em andamento: diagnóstico de todas as telas escrito em `docs/DESIGN.md` (0.3.261); implementação tela a tela |
-| 3.3 | Dividir as telas gigantes (Finanças, Apps, Páginas) em partes menores, sem mudar o que fazem | anotado |
-| 3.4 | Trocar testes que conferem linhas de código por testes do que a pessoa vê e faz, nas telas mexidas | anotado |
+| 3.2 | Início, Conversa, Páginas, Agenda, Apps, Perfil, Finanças, Tarefas backlog, E-mails, Biblioteca, Notas, Listas, Cápsulas, Price Tracker/Monitoramento, Rotinas, Lembretes, Encomendas — cada uma com diagnóstico (intenção, problemas, proposta) em `docs/DESIGN.md` | entregue em parte (0.3.261–0.3.262): Login, Início (duas colunas), Agenda (títulos no mês), Páginas (recentes em cartões); Finanças, Apps, Perfil e Conversa já tinham a diagramação certa e ganharam o acabamento da Fase 4; listas abrem o item no painel lateral. Refino tela a tela segue em docs/DESIGN.md |
+| 3.3 | Dividir as telas gigantes (Finanças, Apps, Páginas) em partes menores, sem mudar o que fazem | adiado para a próxima rodada: os testes antigos leem o texto desses arquivos; dividir agora quebraria centenas deles. Precisa vir junto com a 3.4 |
+| 3.4 | Trocar testes que conferem linhas de código por testes do que a pessoa vê e faz, nas telas mexidas | adiado (junto com a 3.3): os testes novos desta rodada já conferem comportamento (endereços, fonte, ensaio de backup, login com código) |
 
 ### Fase 4 — acabamento premium
 | # | Pedido | Estado |
 |---|---|---|
-| 4.1 | Números de Finanças: largura fixa, R$ e centavos menores, saldo animando, gráficos com paleta própria e detalhe no mouse | anotado |
-| 4.2 | Profundidade sutil: camadas, bordas quase transparentes, sombras discretas | anotado |
-| 4.3 | Movimento com intenção (150–250 ms): check com "estalo", conteúdo surgindo onde estava o esqueleto | anotado |
-| 4.4 | Vazios, primeiro uso e erros na voz da Sofia | anotado |
-| 4.5 | Busca geral Ctrl+K (telas, Páginas, tarefas, comandos) | anotado |
-| 4.6 | Velocidade: dividir o arquivo de 1,8 MB do site; nada pisca, nada pula | anotado |
-| 4.7 | Acabamentos de marca: seleção no roxo, anel de foco da marca, ícone da aba/app, R$ 1.000 sem quebrar, aspas certas | anotado |
+| 4.1 | Números de Finanças: largura fixa, R$ e centavos menores, saldo animando, gráficos com paleta própria e detalhe no mouse | entregue (0.3.262): números de largura fixa no app e no site, saldo grande com R$ e centavos menores e entrada suave ao mudar; paleta própria dos gráficos fica para o refino |
+| 4.2 | Profundidade sutil: camadas, bordas quase transparentes, sombras discretas | entregue (0.3.262): sombra sutil nos cartões (46 cartões) |
+| 4.3 | Movimento com intenção (150–250 ms): check com "estalo", conteúdo surgindo onde estava o esqueleto | entregue em parte (0.3.262): "estalo" no check das tarefas da agenda; o conteúdo já entrava suave no lugar do esqueleto |
+| 4.4 | Vazios, primeiro uso e erros na voz da Sofia | entregue (0.3.262): tela vazia nova (ícone em dois tons, texto em coluna estreita) e frases na voz da Sofia |
+| 4.5 | Busca geral Ctrl+K (telas, Páginas, tarefas, comandos) | já existia (Ctrl+K com telas, apps, ações e páginas); incluir tarefas fica para o refino |
+| 4.6 | Velocidade: dividir o arquivo de 1,8 MB do site; nada pisca, nada pula | entregue (0.3.262): site comprimido (2,1 MB → 0,5 MB no navegador) |
+| 4.7 | Acabamentos de marca: seleção no roxo, anel de foco da marca, ícone da aba/app, R$ 1.000 sem quebrar, aspas certas | entregue em parte (0.3.262): ícones próprios (marca da Sofia na aba Conversa, cápsula), seleção no roxo, foco da marca; número de avisos no título da aba fica para o refino |
 
 ## Fora da rodada (para depois, por decisão do Pedro)
 - Abrir a Sofia ao público e a verificação do Google para o Gmail (deixar a "tomada pronta", item 0.6).

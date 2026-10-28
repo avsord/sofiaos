@@ -138,7 +138,7 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
             </View>
           ) : (
             <>
-              <View style={{backgroundColor: c.surface, borderRadius: 24, borderWidth: 1, borderColor: c.line, padding: 16, gap: 14}}>
+              <View style={{backgroundColor: c.surface, borderRadius: 24, borderWidth: 1, borderColor: c.line, padding: 16, gap: 14, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
                 <View style={{alignSelf: 'flex-start'}}><Chips value={win} onChange={setWin} options={WINDOWS.map(w => ({value: w.value, label: w.label}))} /></View>
                 <PriceChart lines={lines} height={210} window={win} mode="price" currency={visible[0]?.currency || 'BRL'} />
                 <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
@@ -161,7 +161,7 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
                 const iss = issuesFor(p, col.issues), alerts = alertsOf(p.monitor);
                 return (
                   <Pressable key={p.monitor.id} accessibilityRole="button" accessibilityLabel={'Abrir ' + p.monitor.title} onPress={() => setOpenId(p.monitor.id)}
-                    style={{flexDirection: 'row', backgroundColor: c.surface, borderRadius: 20, borderWidth: 1, borderColor: p.atLow ? GOOD + '88' : c.line, overflow: 'hidden', opacity: p.monitor.state === 'paused' ? 0.6 : 1}}>
+                    style={{flexDirection: 'row', backgroundColor: c.surface, borderRadius: 20, borderWidth: 1, borderColor: p.atLow ? GOOD + '88' : c.line, overflow: 'hidden', opacity: p.monitor.state === 'paused' ? 0.6 : 1, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
                     <View style={{width: 5, backgroundColor: p.color}} />
                     <View style={{flex: 1, padding: 14, gap: 6}}>
                       <Text numberOfLines={2} style={{fontSize: 16, fontWeight: '500', color: c.text}}>{p.monitor.title}</Text>
@@ -505,7 +505,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
                   ) : null}
                 </View>
 
-                <View style={{backgroundColor: c.surface, borderRadius: 22, borderWidth: 1, borderColor: c.line, padding: 14, gap: 10}}>
+                <View style={{backgroundColor: c.surface, borderRadius: 22, borderWidth: 1, borderColor: c.line, padding: 14, gap: 10, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
                   <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
                     <Text style={{fontWeight: '600', color: c.text}}>Melhor preço ao longo do tempo</Text>
                   </View>
@@ -534,7 +534,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
                 </View>
 
                 {a.saving || a.spread ? (
-                  <View style={{backgroundColor: c.surface, borderRadius: 22, borderWidth: 1, borderColor: c.line, padding: 16, gap: 10}}>
+                  <View style={{backgroundColor: c.surface, borderRadius: 22, borderWidth: 1, borderColor: c.line, padding: 16, gap: 10, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
                     <Text style={{fontWeight: '600', color: c.text}}>Quanto vale a pena</Text>
                     {a.spread && a.spread.diff > 0 ? <Insight icon="🏪" text={`Hoje a ${a.spread.cheap} está ${money(a.spread.diff, product.currency)} mais barata que a ${a.spread.expensive}.`} /> : null}
                     {a.saving ? <Insight icon="💰" text={`Comprando agora você paga ${money(a.saving, product.currency)} a menos que no pico do período (${a.max ? dateShort(a.max.t) : ''}).`} /> : null}
@@ -542,7 +542,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
                   </View>
                 ) : null}
 
-                <View style={{backgroundColor: c.surface, borderRadius: 22, borderWidth: 1, borderColor: c.line, padding: 16, gap: 4}}>
+                <View style={{backgroundColor: c.surface, borderRadius: 22, borderWidth: 1, borderColor: c.line, padding: 16, gap: 4, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
                   <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
                     <Text style={{fontWeight: '600', color: c.text}}>Onde comprar</Text>
                     <Pressable onPress={() => setTab('stores')}><Text style={{color: c.accent, fontSize: 13, fontWeight: '500'}}>Ver lojas</Text></Pressable>
@@ -552,7 +552,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
               </>
             ) : tab === 'stores' ? (
               <>
-                <View style={{backgroundColor: c.surface, borderRadius: 22, borderWidth: 1, borderColor: c.line, padding: 14, gap: 10}}>
+                <View style={{backgroundColor: c.surface, borderRadius: 22, borderWidth: 1, borderColor: c.line, padding: 14, gap: 10, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
                   <Text style={{fontWeight: '600', color: c.text}}>Cada loja no tempo</Text>
                   <PriceChart lines={product.stores.map(s => ({id: s.url, color: colorOfStore(s), points: s.points}))} height={190} window={win} currency={product.currency} />
                   <View style={{flexDirection: 'row', gap: 14, flexWrap: 'wrap'}}>{product.stores.map(s => <Legend key={s.url} color={colorOfStore(s)} text={s.name} />)}</View>
@@ -806,7 +806,7 @@ function DropSimulator({drop, stores, currency, onChange}: {drop: number; stores
 function Stat({label, value, sub, color, wide}: {label: string; value: string; sub?: string; color?: string; wide?: boolean}) {
   const c = useTheme();
   return (
-    <View style={{flexGrow: 1, flexBasis: wide ? '100%' : '46%', backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.line, padding: 12, gap: 2}}>
+    <View style={{flexGrow: 1, flexBasis: wide ? '100%' : '46%', backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.line, padding: 12, gap: 2, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
       <Text style={{fontSize: 11, color: c.muted}}>{label}</Text>
       <Text numberOfLines={1} adjustsFontSizeToFit style={{fontSize: 16, fontWeight: '700', color: color || c.text}}>{value}</Text>
       {sub ? <Text style={{fontSize: 10, color: c.muted}}>{sub}</Text> : null}
@@ -816,7 +816,7 @@ function Stat({label, value, sub, color, wide}: {label: string; value: string; s
 function Section({title, hint, children}: {title: string; hint?: string; children: React.ReactNode}) {
   const c = useTheme();
   return (
-    <View style={{backgroundColor: c.surface, borderRadius: 22, borderWidth: 1, borderColor: c.line, padding: 16, gap: 12}}>
+    <View style={{backgroundColor: c.surface, borderRadius: 22, borderWidth: 1, borderColor: c.line, padding: 16, gap: 12, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
       <View style={{gap: 2}}><Text style={{fontSize: 18, fontWeight: '600', color: c.text}}>{title}</Text>{hint ? <Text style={{fontSize: 12, color: c.muted}}>{hint}</Text> : null}</View>
       {children}
     </View>
@@ -888,7 +888,7 @@ function AddStores({api, monitor, onClose, onAdded}: {api: SofiaApi; monitor: En
                 const f = found[t.key];
                 if (!f) return null;
                 return (
-                  <View key={t.key} style={{backgroundColor: c.surface, borderRadius: 18, borderWidth: 1, borderColor: c.line, padding: 14, gap: 8}}>
+                  <View key={t.key} style={{backgroundColor: c.surface, borderRadius: 18, borderWidth: 1, borderColor: c.line, padding: 14, gap: 8, boxShadow: '0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
                     <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
                       <Text style={{flex: 1, fontWeight: '600', color: c.text}}>{t.name}</Text>
                       {f.status === 'searching' ? <ActivityIndicator size="small" color={c.accent} /> : f.status === 'idle' ? <Text style={{fontSize: 12, color: c.muted}}>na fila</Text> : null}

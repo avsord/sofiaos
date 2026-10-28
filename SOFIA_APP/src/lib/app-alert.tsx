@@ -24,7 +24,7 @@ export function AppAlertHost(){
   return <Pressable key={'a'+i} accessibilityRole="button" onPress={()=>close(b)} style={({pressed})=>({flex:grow?1:undefined,minHeight:48,paddingHorizontal:14,borderRadius:14,alignItems:'center',justifyContent:'center',backgroundColor:fill?(danger?c.danger:c.accent):c.accentSoft,opacity:pressed?0.8:1})}>{label(b,fill?'#fff':danger?c.danger:c.accent)}</Pressable>;};
  return <Modal visible={!!current} transparent animationType="fade" statusBarTranslucent onRequestClose={()=>close(cancel)}>
   <Pressable accessibilityLabel="Fechar" onPress={()=>close(cancel)} style={{flex:1,backgroundColor:'#0008',alignItems:'center',justifyContent:'center',padding:24}}>
-   <Pressable accessibilityRole="alert" onPress={()=>undefined} style={{width:'100%',maxWidth:400,backgroundColor:c.surface,borderRadius:26,paddingHorizontal:22,paddingTop:22,paddingBottom:18,gap:8,borderWidth:1,borderColor:c.line}}>
+   <Pressable accessibilityRole="alert" onPress={()=>undefined} style={{width:'100%',maxWidth:400,backgroundColor:c.surface,borderRadius:26,paddingHorizontal:22,paddingTop:22,paddingBottom:18,gap:8,borderWidth:1,borderColor:c.line,boxShadow:'0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
     <Text style={{color:c.text,fontSize:20,fontWeight:'700'}}>{current?.title}</Text>
     {current?.message?<Text style={{color:c.muted,fontSize:14,lineHeight:21}}>{current.message}</Text>:null}
     {stacked

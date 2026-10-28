@@ -24,7 +24,7 @@ export function ReorderList({rows,onChange,onRemove}:{rows:ReorderRow[];onChange
   onPanResponderGrant:()=>{const from=idsRef.current.indexOf(id);drag.current={id,from,to:from};dy.setValue(0);setActive(id);try{Vibration.vibrate(10);}catch{/* sem vibracao */}},
   onPanResponderMove:(_e,g)=>{const d=drag.current;if(!d)return;const max=idsRef.current.length-1,pos=Math.max(-d.from*ROW,Math.min((max-d.from)*ROW,g.dy));dy.setValue(pos);const to=Math.max(0,Math.min(max,Math.round(d.from+pos/ROW)));if(to!==d.to){d.to=to;shift(d.from,to,d.id);}},
   onPanResponderRelease:finish,onPanResponderTerminate:finish});responders.set(id,r);return r;};
- return <View style={{height:ids.length*ROW,borderRadius:14,borderWidth:1,borderColor:c.line,backgroundColor:c.surface}}>
+ return <View style={{height:ids.length*ROW,borderRadius:14,borderWidth:1,borderColor:c.line,backgroundColor:c.surface,boxShadow:'0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
   {ids.map((id,k)=>{const row=rows.find(r=>r.id===id);if(!row)return null;const on=active===id;
    return <Animated.View key={id} style={{height:ROW,flexDirection:'row',alignItems:'center',borderTopWidth:k?1:0,borderColor:c.line,backgroundColor:c.surface,zIndex:on?10:1,elevation:on?6:0,shadowColor:'#000',shadowOpacity:on?0.18:0,shadowRadius:8,shadowOffset:{width:0,height:3},borderRadius:on?12:0,transform:[{translateY:on?dy:val(id)},{scale:on?1.02:1}]}}>
     <View {...handle(id).panHandlers} accessibilityLabel={'Arrastar '+row.title} style={{width:52,height:ROW,alignItems:'center',justifyContent:'center'}}>

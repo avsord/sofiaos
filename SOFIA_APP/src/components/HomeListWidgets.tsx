@@ -22,12 +22,12 @@ export function RemindersWidget({api,active,onOpen}:{api:SofiaApi;active:boolean
  return <View style={{gap:16}}>
   <Header title="Lembretes" count={g.late.length+g.upcoming.length} icon="bell" label="Abrir app Lembretes" onOpen={onOpen}/>
   {records.error?<ErrorBanner text={records.error} onRetry={()=>void records.load()}/>:null}
-  {!records.loaded&&!records.error?<Text style={{color:c.muted}}>Carregando lembretes…</Text>:list.length?<View style={{backgroundColor:c.surface,borderRadius:18,paddingHorizontal:14,borderWidth:1,borderColor:c.line}}>
+  {!records.loaded&&!records.error?<Text style={{color:c.muted}}>Carregando lembretes…</Text>:list.length?<View style={{backgroundColor:c.surface,borderRadius:18,paddingHorizontal:14,borderWidth:1,borderColor:c.line,boxShadow:'0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
    {list.map((item,i)=><Pressable key={item.id} accessibilityRole="button" accessibilityLabel={'Lembrete '+item.title} onPress={onOpen} style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:13,borderBottomWidth:i<list.length-1?1:0,borderColor:c.line}}>
     <Icon name="bell" size={18} color={lateIds.has(item.id)?c.danger:c.accent}/>
     <View style={{flex:1,minWidth:0}}><Text numberOfLines={1} style={{color:c.text,fontSize:16}}>{item.title}</Text><Text style={{color:lateIds.has(item.id)?c.danger:c.muted,fontSize:12}}>{remindLabel(item.data?.remind_at)}</Text></View>
    </Pressable>)}
-  </View>:<Empty icon="bell" title="Nenhum lembrete pendente" body="Os próximos lembretes aparecem aqui."/>}
+  </View>:<Empty icon="bell" title="Nada para lembrar agora" body="Quando você me pedir um lembrete, ele aparece aqui."/>}
  </View>;
 }
 
@@ -38,7 +38,7 @@ export function PackagesWidget({api,active,onOpen}:{api:SofiaApi;active:boolean;
  return <View style={{gap:16}}>
   <Header title="Encomendas" count={g.active.length} icon="box" label="Abrir app Encomendas" onOpen={onOpen}/>
   {records.error?<ErrorBanner text={records.error} onRetry={()=>void records.load()}/>:null}
-  {!records.loaded&&!records.error?<Text style={{color:c.muted}}>Carregando encomendas…</Text>:list.length?<View style={{backgroundColor:c.surface,borderRadius:18,paddingHorizontal:14,borderWidth:1,borderColor:c.line}}>
+  {!records.loaded&&!records.error?<Text style={{color:c.muted}}>Carregando encomendas…</Text>:list.length?<View style={{backgroundColor:c.surface,borderRadius:18,paddingHorizontal:14,borderWidth:1,borderColor:c.line,boxShadow:'0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
    {list.map((item,i)=><Pressable key={item.id} accessibilityRole="button" accessibilityLabel={'Encomenda '+item.title} onPress={onOpen} style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:13,borderBottomWidth:i<list.length-1?1:0,borderColor:c.line}}>
     <Text style={{fontSize:18}}>📦</Text>
     <View style={{flex:1,minWidth:0}}><Text numberOfLines={1} style={{color:c.text,fontSize:16}}>{item.title}</Text><Text numberOfLines={1} style={{color:c.muted,fontSize:12}}>{String(item.data?.status||'Aguardando a primeira consulta')}</Text><Text style={{color:c.muted,fontSize:10}}>{CARRIER_LABEL[String(item.data?.carrier)]||'Transportadora'}{item.data?.last_event_at?' · '+whenLabel(String(item.data.last_event_at)):''}</Text></View>

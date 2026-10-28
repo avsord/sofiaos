@@ -74,7 +74,7 @@ export function AppGridSkeleton({count,bare=false}:{count:number;bare?:boolean})
  const c=useTheme(),rows=Math.ceil(Math.max(1,count)/COLS);
  return <ShimmerGroup><View accessibilityRole="progressbar" accessibilityLabel="Carregando apps" style={bare?{position:'absolute',left:0,right:0,top:0,gap:GAP}:{gap:GAP}}>
   {Array.from({length:rows},(_,r)=><View key={r} style={{flexDirection:'row',gap:GAP}}>
-   {Array.from({length:COLS},(_,k)=>r*COLS+k<count?<View key={k} style={{flex:1,height:H,padding:18,gap:12,borderRadius:22,borderWidth:1,borderColor:c.line,backgroundColor:c.surface}}>
+   {Array.from({length:COLS},(_,k)=>r*COLS+k<count?<View key={k} style={{flex:1,height:H,padding:18,gap:12,borderRadius:22,borderWidth:1,borderColor:c.line,backgroundColor:c.surface,boxShadow:'0 1px 2px rgba(24,18,48,0.04), 0 6px 20px rgba(24,18,48,0.05)'}}>
     <ShimmerBlock width={26} height={26} radius={8}/><ShimmerBlock width={'62%'} height={14}/><ShimmerBlock width={'88%'} height={10}/><ShimmerBlock width={'54%'} height={10}/>
    </View>:<View key={k} style={{flex:1}}/>)}
   </View>)}
