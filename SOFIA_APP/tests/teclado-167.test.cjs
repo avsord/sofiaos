@@ -35,7 +35,7 @@ test('0.3.190: com o teclado aberto, o calendario espera o teclado fechar; a fol
 test('0.3.191: calendario dentro do formulario (sem janela por cima) e uma janela espera a outra sair',()=>{
   const dt=read('src/components/DateTimeField.tsx'),fin=read('src/screens/Finance.tsx');
   assert.ok(!dt.includes("from './Sheet'")&&!dt.includes('<Sheet'),'sem segunda janela');
-  assert.ok(dt.includes('{open?<View style={{marginTop:8,backgroundColor:c.input'),'abre logo abaixo do campo');
+  assert.ok(dt.includes('{open?<View ref={panel} collapsable={false} style={{marginTop:8,backgroundColor:c.input'),'abre logo abaixo do campo');
   assert.ok(dt.includes('if(dateOnly)commit(next);'),'so data: tocar no dia ja escolhe');
   assert.ok(fin.includes('function afterSheet(run: () => void) { markSheetHandoff(); setTimeout(run, 120); }'));
   assert.ok(fin.includes("setNewMenu(false); setBillScope('series'); setBillFlow(flow); afterSheet(() => setBillEditor('new'));"));

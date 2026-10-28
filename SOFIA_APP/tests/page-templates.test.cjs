@@ -71,7 +71,7 @@ test('Kanban owns measured drag, supports reordering and cannot navigate out of 
  assert.ok(board.includes('measureInWindow'));assert.ok(board.includes('columnAt('));assert.ok(board.includes('edgeSpeed('));
  assert.ok(collection.includes('moveKanbanRow(next.rows,id,group.key,column,before)'));
  assert.ok(collection.includes('onInteractionChange={onInteractionChange}'));
- assert.ok(!pages.includes('pageBackResponder'));assert.ok(pages.includes('enabled={!pageDragging&&!kanbanInteractionRef.current}'));
+ assert.ok(!pages.includes('pageBackResponder'));assert.ok(pages.includes('enabled={!pageDragging&&!kanbanInteractionRef.current&&!coverMove}'));
 });
 test('page cover uses local preview and an authenticated downloaded file instead of a header-bound Image request',()=>{
  const appearance=fs.readFileSync(path.join(__dirname,'../src/components/PageAppearance.tsx'),'utf8');

@@ -2,7 +2,9 @@ import {DateTimeField} from './DateTimeField';
 import {KeyboardToolbar} from './KeyboardToolbar';
 import {useKeyboardVisible} from '../lib/motion';
 import React,{useRef,useState} from 'react';
-import {Keyboard,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
+import {Keyboard,Pressable,Text,TextInput,View} from 'react-native';
+// 0.3.255: ScrollView que rola sozinho ate o calendario aberto caber na tela (ver RevealScroll)
+import {RevealScrollView as ScrollView} from './RevealScroll';
 import {useTheme} from '../lib/theme';
 import {editBlockText,formatRange,leafBlocks,leafId,textRuns} from '../lib/leaf-document';
 import type {Leaf,LeafBlock,Mark} from '../lib/leaf-document';

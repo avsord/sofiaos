@@ -931,6 +931,7 @@ const CATALOG={
       {"key":"cover_type","label":"Tipo de capa","type":"select","options":["preset","attachment","color","gradient"]},
       {"key":"cover_value","label":"Valor da capa","type":"text"},
       {"key":"cover_attachment_id","label":"Anexo da capa","type":"text"},
+      {"key":"cover_position","label":"Posição da capa (0 a 100)","type":"number"},
       {"key":"purpose","label":"Finalidade","type":"textarea"},
       {"key":"layout","label":"Modelo visual","type":"select","options":["list","board","gallery","notes"]},
       {"key":"suggested","label":"Criado a partir de sugestão da Sofia","type":"checkbox"},
@@ -1819,6 +1820,19 @@ const CATALOG={
       }
     ],
     "description": "Limite mensal de gastos por categoria."
+  },
+  "fin_refund": {
+    "label": "Devolução a receber",
+    "group": "finance",
+    "defaultPrivacy": "private",
+    "states": ["pending", "received", "archived"],
+    "fields": [
+      {"key": "amount", "label": "Valor", "type": "number"},
+      {"key": "expected_date", "label": "Previsão", "type": "date"},
+      {"key": "account_id", "label": "Conta", "type": "text", "max": 80},
+      {"key": "received_at", "label": "Recebida em", "type": "date"},
+      {"key": "tx_id", "label": "Lançamento da devolução", "type": "text", "max": 80}
+    ]
   },
   "fin_goal": {
     "label": "Objetivo",

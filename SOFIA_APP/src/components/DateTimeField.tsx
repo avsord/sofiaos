@@ -1,4 +1,4 @@
-import React,{useRef,useState} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 import {Keyboard,LayoutAnimation,Pressable,ScrollView,Text,View} from 'react-native';
 import {useTheme} from '../lib/theme';
 import {dateDisplay} from '../lib/date-time';
@@ -6,6 +6,7 @@ import {monthCells,localDateKey} from '../lib/dashboard';
 import {Button,IconButton,forms} from './UI';
 import {Icon} from './Icon';
 import {MonthSwipe} from './MonthSwipe';
+import {useReveal} from './RevealScroll';
 
 // 0.3.191: o calendario abre DENTRO do formulario, logo abaixo do campo, em vez de uma segunda janela por
 // cima (que deixava o formulario de tras cortado, preso no tamanho que tinha com o teclado aberto).
@@ -22,7 +23,9 @@ const pad=(n:number)=>String(n).padStart(2,'0');
 
 export function DateTimeField({label,value,onChange,dateOnly=false,timeOnly=false,compact=false,allowClear=true,emptyLabel='Selecionar…'}:{label:string;value:string;onChange:(value:string)=>void;dateOnly?:boolean;timeOnly?:boolean;compact?:boolean;allowClear?:boolean;emptyLabel?:string}){
  const c=useTheme(),[open,setOpen]=useState(false),[selected,setSelected]=useState(new Date()),[month,setMonth]=useState(new Date());
- const busy=useRef(false);
+ const busy=useRef(false),panel=useRef<View>(null),reveal=useReveal();
+ // 0.3.255: ao abrir, a tela rola sozinha ate o calendario caber inteiro
+ useEffect(()=>{if(!open||!reveal)return;const t=setTimeout(()=>reveal(panel.current),260);return()=>clearTimeout(t);},[open,reveal]);
  function parse(){const d=timeOnly?new Date():value?new Date(value.length===10?value+'T12:00:00':value):new Date();if(timeOnly){const parts=/^([01]\d|2[0-3]):([0-5]\d)$/.exec(value||'09:00');if(parts)d.setHours(Number(parts[1]),Number(parts[2]),0,0);}return Number.isFinite(d.getTime())?d:new Date();}
  function toggle(){
   if(busy.current)return;
@@ -42,7 +45,7 @@ export function DateTimeField({label,value,onChange,dateOnly=false,timeOnly=fals
     <Icon name="calendar" size={18} color={open?c.accent:c.muted}/>
    </Pressable>
   </View>
-  {open?<View style={{marginTop:8,backgroundColor:c.input,borderRadius:16,padding:12,borderWidth:1,borderColor:c.line}}>
+  {open?<View ref={panel} collapsable={false} style={{marginTop:8,backgroundColor:c.input,borderRadius:16,padding:12,borderWidth:1,borderColor:c.line}}>
    {!timeOnly?<MonthSwipe onMonth={delta=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()+delta,1))}>
     <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
      <IconButton name="back" label="Mês anterior do seletor" onPress={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()-1,1))}/>

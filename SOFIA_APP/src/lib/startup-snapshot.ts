@@ -16,6 +16,8 @@ export const MONITOR_WIDGET_PATH='/local/monitor-widget';
 /** 0.3.240: ultimo estado da Meta da Início (numeros + se o dono a escondeu). Pequeno e fixo, no mesmo pacote de abertura,
  * para a Meta ja vir desenhada no PRIMEIRO quadro (antes nascia vazia e entrava no topo empurrando a tela). */
 export const GOAL_WIDGET_PATH='/local/goal-widget';
+/** 0.3.255: olho dos valores (Inicio e Financas) - o ultimo estado ja no primeiro quadro, sem mostrar valor escondido. */
+export const VALUES_MASK_PATH='/local/values-mask';
 export const chatRead=(path:string)=>path==='/chat-sync/current'||path==='/conversations?offset=0'||/^\/conversations\/[\w-]+$/.test(path);
 // Keep the next launch independent of recently opened history/detail pages.
 // MONITOR_WIDGET_PATH is intentionally NOT in this tier-1 group: it only needs
@@ -31,11 +33,11 @@ const fresh=(path:string,at:number,now:number)=>at<=now+60000&&(chatRead(path)||
 // history from being decrypted, transferred and parsed before Home can mount.
 export function launchRead(path:string,now=Date.now()){
  const date=new Date(now),month=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
- return ['/tasks','/home','/md/dashboard','/workspace/catalog','/chat-sync/current','/agenda?month='+month,MONITOR_WIDGET_PATH,GOAL_WIDGET_PATH].includes(path);
+ return ['/tasks','/home','/md/dashboard','/workspace/catalog','/chat-sync/current','/agenda?month='+month,MONITOR_WIDGET_PATH,GOAL_WIDGET_PATH,VALUES_MASK_PATH].includes(path);
 }
 export function cacheableRead(path:string){
  if(chatRead(path))return true;
- if(['/bootstrap','/home','/tasks','/workspace/catalog','/workspace/integrations','/md/dashboard','/agenda','/chat-sync/current',MONITOR_WIDGET_PATH,GOAL_WIDGET_PATH].includes(path))return true;
+ if(['/bootstrap','/home','/tasks','/workspace/catalog','/workspace/integrations','/md/dashboard','/agenda','/chat-sync/current',MONITOR_WIDGET_PATH,GOAL_WIDGET_PATH,VALUES_MASK_PATH].includes(path))return true;
  if(/^\/agenda\?month=\d{4}-\d{2}$/.test(path))return true;
  return path.startsWith('/workspace/entities?')&&/(?:\?|&)offset=0(?:&|$)/.test(path)&&!/[?&]q=[^&]+/.test(path);
 }

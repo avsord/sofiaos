@@ -1,5 +1,7 @@
 import React,{useEffect,useMemo,useState} from 'react';
-import {Alert,Pressable,ScrollView,Switch,Text,TextInput,View} from 'react-native';
+import {Alert,Pressable,Switch,Text,TextInput,View} from 'react-native';
+// 0.3.255: ScrollView que rola sozinho ate o calendario aberto caber na tela (ver RevealScroll)
+import {RevealScrollView as ScrollView} from '../components/RevealScroll';
 import type {SofiaApi} from '../lib/api';
 import type {Entity} from '../lib/types';
 import {useWorkspaceRecords} from '../lib/workspace-records';

@@ -32,7 +32,10 @@ const paths = {
  monitor:'M3 4h18v13H3V4zm5 17h8m-4-4v4M6 13l4-4 4 2 4-5',
  wallet:'M3 7h15a3 3 0 0 1 3 3v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7zm0 0V6a2 2 0 0 1 2-2h11v3M16 14h2',
  search:'M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14zm9 16l-4-4',
- sidebar:'M4 4h16v16H4V4zm5 0v16'
+ sidebar:'M4 4h16v16H4V4zm5 0v16',
+ move:'M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4',
+ backlog:'M4 5h16M4 10h10M4 15h7M17 13v8m-4-4h8',
+ toAgenda:'M4 6h16v14H4V6zm0 4h16M8 4v4m8-4v4M12 18v-5m-2.5 2.5L12 13l2.5 2.5'
 } as const;
 export type IconName = keyof typeof paths;
 export function Icon({ name, size=22, color='#7258E8' }: { name: IconName; size?: number; color?: string }) {

@@ -2,7 +2,9 @@ import {KanbanBoard} from './KanbanBoard';
 import {moveKanbanRow} from '../lib/kanban';
 import {Choice} from './Choice';
 import React,{useMemo,useRef,useState} from 'react';
-import {Alert,Switch,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
+import {Alert,Switch,Pressable,Text,TextInput,View} from 'react-native';
+// 0.3.255: ScrollView que rola sozinho ate o calendario aberto caber na tela (ver RevealScroll)
+import {RevealScrollView as ScrollView} from './RevealScroll';
 import type {PageBlock} from '../lib/page-editor';
 import {STATUS_COLORS,statusColorHex} from '../lib/page-templates';
 import {useTheme} from '../lib/theme';

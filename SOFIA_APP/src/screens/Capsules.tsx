@@ -1,6 +1,8 @@
 import {useVisibleLoad} from '../lib/visible-load';
 import React,{useEffect,useState} from 'react';
-import {Alert,AppState,Pressable,ScrollView,Switch,Text,TextInput,View} from 'react-native';
+import {Alert,AppState,Pressable,Switch,Text,TextInput,View} from 'react-native';
+// 0.3.255: ScrollView que rola sozinho ate o calendario aberto caber na tela (ver RevealScroll)
+import {RevealScrollView as ScrollView} from '../components/RevealScroll';
 import {useTheme} from '../lib/theme';
 import type {SofiaApi} from '../lib/api';
 import type {Entity} from '../lib/types';

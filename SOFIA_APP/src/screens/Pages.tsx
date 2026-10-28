@@ -8,7 +8,7 @@ import {KeyboardToolbar} from '../components/KeyboardToolbar';
 import {useKeyboardVisible} from '../lib/motion';
 import {legacyMovePlan} from '../lib/legacy-md';
 import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
-import {View,Text,ScrollView,TextInput,Pressable,Switch,Alert,RefreshControl,BackHandler,AppState,Keyboard,Image,Platform} from 'react-native';
+import {View,Text,ScrollView,TextInput,Pressable,Switch,Alert,RefreshControl,BackHandler,AppState,Keyboard,Image,Platform,StyleSheet} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {SofiaApi,SITE} from '../lib/api';
 import type {Entity} from '../lib/types';
@@ -23,7 +23,7 @@ import {PageRefreshGuard} from '../lib/page-gesture';
 import {mergeRemotePages} from '../lib/page-sync';
 import {entryBackTarget} from '../lib/page-navigation';
 import {Icon} from '../components/Icon';
-import {PageCover,PageAppearance,PAGE_COVERS} from '../components/PageAppearance';
+import {PageCover,PageAppearance,PAGE_COVERS,coverPosition} from '../components/PageAppearance';
 import {PageTreeList} from '../components/PageTreeList';
 import {canReparentPage,reparentPatch,reparentedPage} from '../lib/page-hierarchy';
 import {comparePageOrder} from '../lib/page-order';
@@ -47,6 +47,8 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  const desktop=useDesktop();
  const c=useTheme(),[pages,setPages]=useState<Entity[]>(()=>cachedPageRows(api)||[]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>()),[pageInteraction,setPageInteraction]=useState(false),[pageDragging,setPageDragging]=useState(false),[pageMenu,setPageMenu]=useState(false);
  const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[loaded,setLoaded]=useState(()=>cachedPageRows(api)!==undefined),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null),[createParent,setCreateParent]=useState<Entity|null|undefined>(undefined);
+ // 0.3.255: reposicionar a capa (arrastar a imagem, como no Notion)
+ const [coverMove,setCoverMove]=useState(false),coverLive=useRef(50);
  const refreshFlight=useRef(false),mutationEpoch=useRef(0),moveBusy=useRef(false),pendingPosition=useRef(new Map<string,Record<string,any>>());
  const restoredStore=useRef<PageEditorStore|null>(null);
  const history=useRef<string[]>([]),mounted=useRef(true),expandDisk=useRef(Promise.resolve()),inputRefs=useRef(new Map<string,TextInput>());
@@ -161,10 +163,12 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   }catch(e){if(mounted.current){setPages(before);setError(errorText(e));}}
   finally{pendingPosition.current.clear();moveBusy.current=false;mutationEpoch.current++;if(mounted.current)setMovingId(null);}
  }
- function open(page:Entity,push=true){if(selectedId){void store.flush(selectedId);if(push&&selectedId!==page.id)history.current.push(selectedId);}store.open(pages.find(p=>p.id===page.id)||page);setSelectedId(page.id);setFocus(null);setAppearance(null);setError('');}
- function back(){if(selectedId)void store.flush(selectedId);setFocus(null);setAppearance(null);const parent=entryBackTarget(byId,selectedId,history.current);if(parent)history.current.splice(history.current.lastIndexOf(parent));else history.current=[];if(parent&&parent!==selectedId&&byId.has(parent))open(byId.get(parent)!,false);else setSelectedId(null);} backAction.current=back;
+ function open(page:Entity,push=true){if(selectedId){void store.flush(selectedId);if(push&&selectedId!==page.id)history.current.push(selectedId);}store.open(pages.find(p=>p.id===page.id)||page);setSelectedId(page.id);setFocus(null);setAppearance(null);setCoverMove(false);setError('');}
+ function back(){if(selectedId)void store.flush(selectedId);setFocus(null);setAppearance(null);setCoverMove(false);const parent=entryBackTarget(byId,selectedId,history.current);if(parent)history.current.splice(history.current.lastIndexOf(parent));else history.current=[];if(parent&&parent!==selectedId&&byId.has(parent))open(byId.get(parent)!,false);else setSelectedId(null);} backAction.current=back;
  useEffect(()=>{if(!active)return;const sub=BackHandler.addEventListener('hardwareBackPress',()=>{if(pageInteractionRef.current)return true;if(!selectedId)return false;back();return true;});return()=>sub.remove();},[active,selectedId,byId,store]);
  function edit(change:(draft:PageDraft)=>PageDraft,group=''){if(selectedId)store.edit(selectedId,change,group);}
+ function startCoverMove(){if(!selectedId)return;coverLive.current=coverPosition(store.get(selectedId)?.draft.appearance||{});setCoverMove(true);}
+ function saveCoverMove(){const id=selectedId;setCoverMove(false);if(!id)return;const value=Math.round(coverLive.current*10)/10;store.edit(id,d=>({...d,appearance:{...d.appearance,cover_position:value}}));void store.flush(id);}
  async function create(parent?:Entity,template?:PageTemplate){mutationEpoch.current++;try{
   const preset=template?freshTemplate(template):null;
   const saved=await api.saveEntity({kind:'user_page',title:'Sem título',content:'',area:parent?.area||'Pessoal',privacy:'private',state:'active',tags:[],data:{
@@ -203,11 +207,21 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  }
  function documentContent(selected:Entity,draft:PageDraft,preview=false){
   const hasCover=!!draft.appearance.cover_type,subpages=children.get(selected.id)||[];
+  const imageCover=draft.appearance.cover_type==='attachment'&&!!draft.appearance.cover_attachment_id;
   const emptyBody=pageBodyIsEmpty(draft.blocks),hasSubpageContent=!!subpages.length;
-  return <PageDocumentScroll key={selected.id} pageId={selected.id} preview={preview} enabled={!pageDragging&&!kanbanInteractionRef.current} initialY={scrollPositions.current.get(selected.id)||0} onScrollY={y=>scrollPositions.current.set(selected.id,y)}>
-   <Pressable accessibilityRole="button" accessibilityLabel={hasCover?'Alterar capa':'Adicionar capa'} onPress={()=>setAppearance('cover')} style={{height:hasCover?190:28,minHeight:desktop&&hasCover?250:undefined,overflow:'hidden',backgroundColor:hasCover?c.accentSoft:'transparent'}}>
-    {hasCover?<PageCover data={draft.appearance} api={api}/>:<View style={{alignSelf:'flex-end',padding:12,opacity:.55}}><Icon name="image" size={20} color={c.muted}/></View>}
-   </Pressable>
+  return <PageDocumentScroll key={selected.id} pageId={selected.id} preview={preview} enabled={!pageDragging&&!kanbanInteractionRef.current&&!coverMove} initialY={scrollPositions.current.get(selected.id)||0} onScrollY={y=>scrollPositions.current.set(selected.id,y)}>
+   <View style={{height:hasCover?190:28,minHeight:desktop&&hasCover?250:undefined,overflow:'hidden',backgroundColor:hasCover?c.accentSoft:'transparent'}}>
+    {!preview&&coverMove&&imageCover?<PageCover data={draft.appearance} api={api} repositioning onPosition={n=>{coverLive.current=n;}}/>:<Pressable accessibilityRole="button" accessibilityLabel={hasCover?'Alterar capa':'Adicionar capa'} onPress={()=>setAppearance('cover')} style={StyleSheet.absoluteFill}>
+     {hasCover?<PageCover data={draft.appearance} api={api}/>:<View style={{alignSelf:'flex-end',padding:12,opacity:.55}}><Icon name="image" size={20} color={c.muted}/></View>}
+    </Pressable>}
+    {/* 0.3.255: botao de reposicionar a capa */}
+    {!preview&&imageCover&&!coverMove?<Pressable testID="page-cover-reposition" accessibilityRole="button" accessibilityLabel="Reposicionar capa" onPress={startCoverMove} style={{position:'absolute',right:12,bottom:12,flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:11,paddingVertical:7,borderRadius:10,backgroundColor:'#0000007a'}}><Icon name="move" size={14} color="#FFFFFF"/><Text style={{color:'#FFFFFF',fontSize:12,fontWeight:'600'}}>Reposicionar</Text></Pressable>:null}
+    {!preview&&imageCover&&coverMove?<><View pointerEvents="none" style={{position:'absolute',top:12,left:0,right:0,alignItems:'center'}}><View style={{paddingHorizontal:12,paddingVertical:6,borderRadius:10,backgroundColor:'#000000a0'}}><Text style={{color:'#FFFFFF',fontSize:12}}>Arraste a imagem para reposicionar</Text></View></View>
+     <View style={{position:'absolute',right:12,bottom:12,flexDirection:'row',gap:8}}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Cancelar reposicionamento" onPress={()=>setCoverMove(false)} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:10,backgroundColor:'#000000a0'}}><Text style={{color:'#FFFFFF',fontSize:12,fontWeight:'600'}}>Cancelar</Text></Pressable>
+      <Pressable testID="page-cover-save-position" accessibilityRole="button" accessibilityLabel="Salvar posição da capa" onPress={saveCoverMove} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:10,backgroundColor:c.accent}}><Text style={{color:'#FFFFFF',fontSize:12,fontWeight:'700'}}>Salvar posição</Text></Pressable>
+     </View></>:null}
+   </View>
    <View style={desktop?{paddingHorizontal:48,marginTop:hasCover?-44:0,width:'100%',maxWidth:960,alignSelf:'center'}:{paddingHorizontal:30,marginTop:hasCover?-44:0}}>
     <Pressable accessibilityRole="button" accessibilityLabel="Alterar ícone da página" onPress={()=>setAppearance('icon')} style={{width:78,height:78,alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:58,color:c.text}}>{String(draft.appearance.icon||'📄')}</Text></Pressable>
     <TextInput scrollEnabled={false} editable={!preview} accessibilityLabel="Título da página" value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>{if(!preview)void store.flush(selected.id);}} multiline placeholder={pageTitleHint(emptyBody,hasSubpageContent,!preview&&focus==='title')} placeholderTextColor={placeholderColor} style={{minHeight:60,fontSize:38,lineHeight:44,fontWeight:'800',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}/>
@@ -255,6 +269,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    <Button title="Nova subpágina ou template" secondary onPress={()=>{setPageMenu(false);setTimeout(()=>setCreateParent(selected),120);}}/><View style={{height:8}}/>
    <Button title="Ícone" secondary onPress={()=>{setPageMenu(false);setTimeout(()=>setAppearance('icon'),120);}}/><View style={{height:8}}/>
    <Button title={hasCover?'Alterar capa':'Adicionar capa'} secondary onPress={()=>{setPageMenu(false);setTimeout(()=>setAppearance('cover'),120);}}/>
+   {draft.appearance.cover_type==='attachment'&&draft.appearance.cover_attachment_id?<><View style={{height:8}}/><Button title="Reposicionar capa" secondary onPress={()=>{setPageMenu(false);setTimeout(startCoverMove,120);}}/></>:null}
    {focus&&draft.blocks.some(x=>x.id===focus)?<><View style={{height:8}}/><Button title="Remover bloco selecionado" secondary onPress={()=>{const blk=draft.blocks.find(x=>x.id===focus);setPageMenu(false);if(blk)setTimeout(()=>confirmRemoveBlock(blk),120);}}/></>:null}
    <Pressable accessibilityRole="button" onPress={()=>{setPageMenu(false);setTimeout(removePage,120);}} style={{paddingVertical:18}}><Text style={{color:c.danger,fontWeight:'700'}}>Excluir página</Text></Pressable>
   </Sheet>
@@ -266,7 +281,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
      <IconButton name="trash" label="Remover bloco selecionado" size={34} onPress={()=>{const b=entry.draft.blocks.find(b=>b.id===focus);if(b)confirmRemoveBlock(b);}}/>
     </View>
 </ScrollView></View></KeyboardToolbar>
-  {appearance?<PageAppearance key={selected.id+appearance} api={api} pageId={selected.id} kind={appearance} onClose={()=>setAppearance(null)} onApply={patch=>{store.edit(selected.id,d=>({...d,appearance:{...d.appearance,...patch}}));void store.flush(selected.id);}}/>:null}
+  {appearance?<PageAppearance key={selected.id+appearance} api={api} pageId={selected.id} kind={appearance} onClose={()=>setAppearance(null)} onApply={patch=>{const reset='cover_type' in patch||'cover_attachment_id' in patch?{cover_position:''}:{};store.edit(selected.id,d=>({...d,appearance:{...d.appearance,...reset,...patch}}));void store.flush(selected.id);}}/>:null}
  </View>;
  return <View style={{flex:1,backgroundColor:c.bg}} onTouchEnd={e=>{if(e.nativeEvent.touches.length===0)endPageTouch();}} onTouchCancel={endPageTouch} onLayout={e=>{paneWidth.current=e.nativeEvent.layout.width;}}>
   <KeyboardViewport>{editor}</KeyboardViewport>

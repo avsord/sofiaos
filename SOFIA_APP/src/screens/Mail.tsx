@@ -1,6 +1,8 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {useColumnPad} from '../lib/desktop';
-import {ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Platform, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View} from 'react-native';
+import {ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Platform, Pressable, RefreshControl, Switch, Text, TextInput, View} from 'react-native';
+// 0.3.255: ScrollView que rola sozinho ate o calendario aberto caber na tela (ver RevealScroll)
+import {RevealScrollView as ScrollView} from '../components/RevealScroll';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTheme} from '../lib/theme';
 import {rescanAfterRule, type RuleAction} from '../lib/mail-rules';

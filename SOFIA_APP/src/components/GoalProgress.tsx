@@ -1,10 +1,12 @@
 import React from 'react';
 import {Pressable,Text,View} from 'react-native';
 import {useTheme} from '../lib/theme';
+import {Icon} from './Icon';
 
 /** 0.3.208: progresso da meta do guardado - de 0 ate a meta, com marcos, quanto falta e quando chega. */
 export type GoalNumbers={name:string;saved:number;target:number;monthly:number;deadline:string;today:string};
-const brl=(v:number)=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const brlRaw=(v:number)=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const brl=brlRaw;
 const monthName=(ym:string)=>{const [y,m]=ym.split('-').map(Number);return new Date(y,m-1,1).toLocaleDateString('pt-BR',{month:'short',year:'numeric'}).replace('.','').replace(' de ','/');};
 const monthsBetween=(a:string,b:string)=>(Number(b.slice(0,4))-Number(a.slice(0,4)))*12+(Number(b.slice(5,7))-Number(a.slice(5,7)));
 const addMonthsYm=(ym:string,n:number)=>{const [y,m]=ym.split('-').map(Number);const d=new Date(Date.UTC(y,m-1+n,1));return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0');};
@@ -19,13 +21,16 @@ export function goalStats(g:GoalNumbers){
  const message=pct>=1?'Meta batida! 🎉 Hora de comemorar e, quem sabe, sonhar a próxima.':pct>=0.75?'Reta final: falta pouco para chegar lá.':pct>=0.5?'Mais da metade do caminho. Continue no ritmo!':pct>=0.25?'Um quarto do caminho já foi. Cada aporte conta.':'Começo firme: o mais difícil é começar, e você já começou.';
  return {pct,missing,next,nextValue,nextMissing:Math.max(0,nextValue-g.saved),reach,deadlineYm,monthsLeft,needed,diff,message};
 }
-export function GoalProgressCard({g,compact=false,onPress,flat=false}:{g:GoalNumbers;compact?:boolean;onPress?:()=>void;flat?:boolean}){
+export function GoalProgressCard({g,compact=false,onPress,flat=false,masked=false,onToggleMask}:{g:GoalNumbers;compact?:boolean;onPress?:()=>void;flat?:boolean;masked?:boolean;onToggleMask?:()=>void}){
  const c=useTheme(),st=goalStats(g),GOOD='#2FB37E',GUARD='#2FB37E';
+ // 0.3.255: olho dos valores (o mesmo de Financas)
+ const brl=(v:number)=>masked?'R$ •••••':brlRaw(v);
  // flat: dentro de uma secao dos Relatorios (sem a moldura de cartao, para nao ficar caixa dentro de caixa)
  const body=<View style={flat?{gap:10}:{backgroundColor:c.surface,borderRadius:20,padding:16,gap:10,borderWidth:1,borderColor:c.line}}>
   <View style={{flexDirection:'row',alignItems:'baseline',gap:8}}>
    <Text numberOfLines={1} style={{flex:1,color:c.text,fontWeight:'800',fontSize:15}}>🎯 {g.name||'Sua meta'}</Text>
    {st.deadlineYm?<Text style={{color:c.muted,fontSize:11}}>até {monthName(st.deadlineYm)}</Text>:null}
+   {onToggleMask?<Pressable testID="goal-values-eye" accessibilityRole="button" accessibilityLabel={masked?'Mostrar valores':'Esconder valores'} hitSlop={10} onPress={onToggleMask} style={{paddingLeft:6}}><Icon name={masked?'eyeOff':'eye'} size={17} color={c.muted}/></Pressable>:null}
   </View>
   <View style={{flexDirection:'row',alignItems:'baseline',gap:6}}>
    <Text style={{color:c.text,fontWeight:'800',fontSize:26}}>{brl(g.saved)}</Text>

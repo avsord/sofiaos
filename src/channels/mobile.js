@@ -175,7 +175,7 @@ function makeMobileApi(runtime, deps) {
     if (p === '/api/mobile/md/finance' && m === 'GET') {
       try { workspace.repairFinanceDuplicates(); } catch { /* reparo e best-effort */ }
       const out = {};
-      for (const kind of ['fin_account', 'fin_card', 'fin_tx', 'fin_budget', 'fin_goal', 'fin_reserve_move', 'fin_statement']) {
+      for (const kind of ['fin_account', 'fin_card', 'fin_tx', 'fin_budget', 'fin_goal', 'fin_reserve_move', 'fin_statement', 'fin_refund']) {
         const list = [];
         for (let offset = 0; offset < 50000; offset += 500) { const page = workspace.list({ kind, limit: 500, offset }); list.push(...page); if (page.length < 500) break; }
         out[kind] = list;
@@ -211,7 +211,7 @@ function makeMobileApi(runtime, deps) {
     // 0.3.212: zerar Financas - apaga TUDO do modulo (contas, cartoes, lancamentos, reserva, metas) para comecar do zero
     if (p === '/api/mobile/md/finance/reset' && m === 'POST') {
       const b = await bodyJson(req, 4096); if (String(b.confirm || '') !== 'ZERAR') fail('CONFIRM', 'Confirme com a palavra ZERAR.', 400);
-      let removed = 0; const kinds = ['fin_tx', 'fin_reserve_move', 'fin_budget', 'fin_goal', 'fin_statement', 'fin_card', 'fin_account'];
+      let removed = 0; const kinds = ['fin_tx', 'fin_reserve_move', 'fin_budget', 'fin_goal', 'fin_statement', 'fin_refund', 'fin_card', 'fin_account'];
       for (const kind of kinds) for (let round = 0; round < 50; round++) { const page = workspace.list({ kind, limit: 500, offset: 0 }); if (!page.length) break; for (const e of page) { try { workspace.deleteEntity(e.id); removed++; } catch { /* segue */ } } }
       return send({ ok: true, removed });
     }
@@ -419,7 +419,8 @@ function makeMobileApi(runtime, deps) {
     if (match && m === 'DELETE') { rate(session, 'write', 40); return send(store.deleteTask(validId(match[1]))); }
     // Sem teto de 500: com o Google conectado a agenda passa fácil disso.
     if (p === '/api/mobile/agenda' && m === 'GET') { const all = kind => { const out = []; for (let offset = 0; offset < 50000; offset += 500) { const page = workspace.list({ kind, limit: 500, offset }); out.push(...page); if (page.length < 500) break; } return out; }; const from = new Date(Date.now() - 120 * 864e5).toISOString(), to = new Date(Date.now() + 400 * 864e5).toISOString(); const keep = e => e.data?.calendar_provider !== 'google' || (e.state !== 'cancelled' && (!e.data.start_at || (e.data.start_at >= from && e.data.start_at <= to))); // 0.3.201: tarefa programada (com data) aparece na Agenda; avisa so se a pessoa escolheu um lembrete
-      const taskItems = store.tasks().filter(t => t.due_at && !['done', 'cancelled'].includes(t.state)).map(t => { const n = (Array.isArray(t.notifications) ? t.notifications : []).map(Number).filter(x => Number.isFinite(x) && x >= 0);
+      const doneFrom = Date.now() - 62 * 864e5; // 0.3.255: tarefa concluida fica no dia dela, riscada (ultimos 2 meses)
+      const taskItems = store.tasks().filter(t => t.due_at && t.state !== 'cancelled' && (t.state !== 'done' || Date.parse(t.due_at) >= doneFrom)).map(t => { const n = (Array.isArray(t.notifications) ? t.notifications : []).map(Number).filter(x => Number.isFinite(x) && x >= 0);
         return { id: 'task:' + t.id, kind: 'task', title: t.title, state: t.state, area: t.area, tags: n.length ? [] : ['sofia-notify-v1:off'], revision: t.revision,
           data: { start_at: t.due_at, end_at: t.end_at || '', priority_level: t.priority_level || 'none', reminders_json: JSON.stringify(n), remind_minutes: n.length ? Math.min(...n) : '', task_id: t.id } }; });
       return send({ items: [...all('commitment').filter(keep), ...all('reminder'), ...taskItems], provider: runtime.google?.link()?.refresh ? 'google' : 'sofia' }); }

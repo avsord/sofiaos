@@ -37,7 +37,8 @@ function zoned(y:number,m:number,d:number,h:number,i:number,s:number,zone:string
 }
 /** Recurrence stays on one server record. Versioned tags are supported by the existing API. */
 export function occurrences(item:AgendaItem,from:Date,to:Date):AgendaItem[]{
- if(['done','cancelled','completed','archived'].includes(item.state))return [];
+ // 0.3.255: tarefa concluida continua no dia dela, riscada (as outras concluidas saem da agenda)
+ if(['done','cancelled','completed','archived'].includes(item.state)&&!(item.kind==='task'&&item.state==='done'))return [];
  const start=eventStart(item),base=new Date(start.length===10?start+'T09:00:00':start);if(!start||!Number.isFinite(base.getTime()))return [];
  const rule=readRepeat(item);if(rule.frequency==='none')return base>=from&&base<to?[item]:[];
  const a=item.data.calendar_all_day?{y:Number(start.slice(0,4)),m:Number(start.slice(5,7)),d:Number(start.slice(8,10)),h:9,i:0,s:0}:parts(base,rule.timeZone);

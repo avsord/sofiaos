@@ -252,6 +252,8 @@ export class SofiaApi {
   calendarSelect(id:string) { return this.request<{ok:boolean}>('/md/calendar/select',{id}); }
   async feature(name:string):Promise<boolean>{try{const c=await this.request<Record<string,unknown>>('/md/capabilities');return c[name]===true;}catch(e){if((e as ApiError).status===404)return false;throw e;}}
   tasks() { return this.request<{items: Task[]}>('/tasks'); }
+  /** 0.3.255: qualquer estado valido (ex.: "scheduled" = tarefa que esta na agenda) */
+  taskSetState(task: Pick<Task,'id'|'revision'>, state: 'done' | 'todo' | 'scheduled') { return this.request<{item: Task}>('/tasks/' + encodeURIComponent(task.id), { state, revision: task.revision }, 'PATCH'); }
   taskState(task: Task, state: 'done' | 'todo') { return this.request<{item: Task}>('/tasks/' + encodeURIComponent(task.id), { state, revision: task.revision }, 'PATCH'); }
   async saveTask(task: Partial<Task>) { const saved=await this.request<{item: Task}>('/tasks' + (task.id ? '/' + encodeURIComponent(task.id) : ''), task, task.id ? 'PATCH' : 'POST');systemChanged(this);return saved; }
   deleteTask(id: string) { return this.request<{ok: boolean}>('/tasks/' + encodeURIComponent(id), undefined, 'DELETE'); }
@@ -266,7 +268,11 @@ export class SofiaApi {
   markRead(id: string) { return this.request<{ok: boolean}>('/notifications/' + encodeURIComponent(id) + '/read', {}); }
   profile(name: string) { return this.request<{profile: Profile}>('/profile', {name}, 'PATCH'); }
   catalog() { return this.request<Catalog>('/workspace/catalog'); }
-  async entities(kind: string, q = '', offset = 0) { const result=await this.request<{items:Entity[]}>('/workspace/entities?limit=100&kind='+encodeURIComponent(kind)+'&q='+encodeURIComponent(q)+'&offset='+offset);return kind==='user_page'?{...result,items:await this.md.decorate(result.items)}:result; }
+  async entities(kind: string, q = '', offset = 0) { const path='/workspace/entities?limit=100&kind='+encodeURIComponent(kind)+'&q='+encodeURIComponent(q)+'&offset='+offset,generation=this.cacheGeneration;const result=await this.request<{items:Entity[]}>(path);if(kind!=='user_page')return result;const decorated={...result,items:await this.md.decorate(result.items)};
+    // 0.3.255: a copia guardada para abrir rapido ja vai na ordem que a pessoa escolheu neste aparelho. Antes ela ficava
+    // na ordem do servidor e a lista abria assim, trocando de lugar (piscada) quando a ordem do aparelho chegava.
+    if(generation===this.cacheGeneration&&decorated.items!==result.items)this.snapshots.remember(path,decorated);
+    return decorated; }
   library(q = '', offset = 0) { return this.request<{items:Entity[]}>('/workspace/entities?limit=100&group=library&q='+encodeURIComponent(q)+'&offset='+offset); }
   async entity(id: string) { const item=await this.request<Entity>('/workspace/entities/'+encodeURIComponent(id));return item.kind==='user_page'?(await this.md.decorate([item]))[0]:item; }
   async saveEntity(input: Partial<Entity>) { let body=input.data?await this.md.clean(input):input;let saved: Entity;

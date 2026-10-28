@@ -1,6 +1,6 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {tap} from '../lib/desktop';
-import {View,Text,Pressable,Modal,ScrollView,TextInput,Image,StyleSheet,ActivityIndicator} from 'react-native';
+import {View,Text,Pressable,Modal,ScrollView,TextInput,Image,StyleSheet,ActivityIndicator,PanResponder} from 'react-native';
 import Svg,{Defs,LinearGradient,Stop,Rect} from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -21,7 +21,31 @@ export const PAGE_COVERS=[
 const EMOJIS='😀 😊 😎 🤔 🤖 ❤️ 💜 💙 💚 💡 🔥 ✨ ⭐ 🌙 🌈 🌱 🌿 🌊 🧪 🧠 🎯 🧭 🚀 🚲 🏠 💼 🛠️ ⚙️ 💻 📱 📷 🎥 🎬 🎨 ✏️ 📝 📌 📅 ⏰ 📚 📖 📁 📂 📦 📊 💰 🛒 🎁 💊 ☕ 🎵 🎧 🎮 🏋️ 🧘 🏆 🎓 🔗 🔎 🔐 ✅ ⚠️ 💬 🧩 💎'.split(' ');
 const SYMBOLS='♡ ♥ ☆ ★ ○ ● ◉ ◇ ◆ □ ■ △ ▲ ✓ ✔ ✕ × + − ≡ ∞ ⌂ ⌘ ⏱ ⚑ ⚙ ⚡ ☀ ☾ ☁ ☰ ▦ ⊞ ⊕ ↖ ↑ ↗ ← → ↙ ↓ ↘ ↔ ↕ ↳ ↪ ⇄ ✎ ✦ ✧ ❖ ☑ ☐ ♫ ♪ ✉ ☎ ⌚ ⚖ ◐ ◑'.split(' ');
 const PENDING_COVER_KEY='sofia.native.pending-page-cover.v1';
-export function PageCover({data,api}:{data:Record<string,any>;api:SofiaApi}){
+/** 0.3.255: posicao vertical da capa (0 = topo da imagem, 100 = base). Sem valor = centro, como antes. */
+export function coverPosition(data:Record<string,any>):number{const raw=data?.cover_position,n=Number(raw);return raw!==''&&raw!=null&&Number.isFinite(n)?Math.max(0,Math.min(100,n)):50;}
+/** Desenha a imagem cobrindo a capa e deslocada pela posicao. No modo reposicionar, arrastar move a imagem. */
+function CoverImage({uri,position,repositioning=false,onPosition,onError}:{uri:string;position:number;repositioning?:boolean;onPosition?:(n:number)=>void;onError:()=>void}){
+ const [box,setBox]=useState({w:0,h:0}),[img,setImg]=useState<{w:number;h:number}|null>(null),[pos,setPos]=useState(position);
+ const live=useRef({pos:position,start:position,extra:0,editing:repositioning,onPosition});
+ useEffect(()=>{if(!repositioning)setPos(position);live.current.pos=position;},[position,repositioning]);
+ useEffect(()=>{let alive=true;setImg(null);Image.getSize(uri,(w,h)=>{if(alive&&w>0&&h>0)setImg({w,h});},()=>{});return()=>{alive=false;};},[uri]);
+ const scale=img&&box.w>0&&box.h>0?Math.max(box.w/img.w,box.h/img.h):0;
+ const width=img?img.w*scale:0,height=img?img.h*scale:0,extra=Math.max(0,height-box.h);
+ live.current.extra=extra;live.current.editing=repositioning;live.current.onPosition=onPosition;
+ const pan=useRef(PanResponder.create({
+  onStartShouldSetPanResponder:()=>live.current.editing,onStartShouldSetPanResponderCapture:()=>live.current.editing,
+  onMoveShouldSetPanResponder:()=>live.current.editing,onMoveShouldSetPanResponderCapture:()=>live.current.editing,
+  onPanResponderTerminationRequest:()=>false,
+  onPanResponderGrant:()=>{live.current.start=live.current.pos;},
+  onPanResponderMove:(_e,g)=>{const e=live.current.extra;if(!e)return;const next=Math.max(0,Math.min(100,live.current.start-g.dy/e*100));live.current.pos=next;setPos(next);},
+  onPanResponderRelease:()=>{live.current.onPosition?.(Math.round(live.current.pos*10)/10);},
+  onPanResponderTerminate:()=>{live.current.onPosition?.(Math.round(live.current.pos*10)/10);},
+ })).current;
+ return <View testID="page-cover-image" style={StyleSheet.absoluteFill} {...(repositioning?pan.panHandlers:{})} onLayout={e=>{const {width:w,height:h}=e.nativeEvent.layout;if(Math.abs(w-box.w)>.5||Math.abs(h-box.h)>.5)setBox({w,h});}}>
+  {scale?<Image source={{uri}} onError={onError} style={{position:'absolute',width,height,left:-(width-box.w)/2,top:-extra*(repositioning?pos:position)/100}}/>:<Image source={{uri}} resizeMode="cover" style={StyleSheet.absoluteFill} onError={onError}/>}
+ </View>;
+}
+export function PageCover({data,api,repositioning=false,onPosition}:{data:Record<string,any>;api:SofiaApi;repositioning?:boolean;onPosition?:(n:number)=>void}){
  const c=useTheme(),attachment=String(data.cover_attachment_id||''),preview=String(data.cover_local_uri||'');
  const [uri,setUri]=useState(preview),[failed,setFailed]=useState(false),[attempt,setAttempt]=useState(0);
  const retry=useRef<()=>void>(()=>{});
@@ -40,7 +64,7 @@ export function PageCover({data,api}:{data:Record<string,any>;api:SofiaApi}){
  if(data.cover_type==='attachment'&&attachment){
   if(failed)return <View style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center',backgroundColor:c.input,padding:16}]}><Text style={{fontSize:12,color:c.muted,textAlign:'center'}}>{tap('Não foi possível abrir esta capa. Toque na capa para escolher novamente.')}</Text></View>;
   if(!uri)return <View style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center',backgroundColor:c.input}]}><Spinner size={20}/></View>;
-  return <Image key={attachment+':'+attempt+':'+uri} source={{uri}} resizeMode="cover" style={StyleSheet.absoluteFill} onError={()=>{if(attempt<3){setUri('');retry.current();}else setFailed(true);}}/>;
+  return <CoverImage key={attachment+':'+attempt+':'+uri} uri={uri} position={coverPosition(data)} repositioning={repositioning} onPosition={onPosition} onError={()=>{if(attempt<3){setUri('');retry.current();}else setFailed(true);}}/>;
  }
  const colors=String(data.cover_value||'').match(/#[0-9a-fA-F]{6}\b/g)||[c.accentSoft,c.accentSoft];
  return <Svg width="100%" height="100%"><Defs><LinearGradient id="cover" x1="0" y1="0" x2="1" y2="1">{colors.map((color,i)=><Stop key={i} offset={colors.length===1?0:i/(colors.length-1)} stopColor={color}/>)}</LinearGradient></Defs><Rect width="100%" height="100%" fill="url(#cover)"/></Svg>;

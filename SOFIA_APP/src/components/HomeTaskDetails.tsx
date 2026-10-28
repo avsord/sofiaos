@@ -1,6 +1,8 @@
 import {TaskDescription,TaskDescriptionEditor} from './TaskDescription';
 import React,{useState} from 'react';
-import {ScrollView,Text,TextInput,View} from 'react-native';
+import {Text,TextInput,View} from 'react-native';
+// 0.3.255: ScrollView que rola sozinho ate o calendario aberto caber na tela (ver RevealScroll)
+import {RevealScrollView as ScrollView} from './RevealScroll';
 import {Sheet} from './Sheet';
 import {Button,ErrorBanner,IconButton,forms} from './UI';
 import {Choice} from './Choice';
