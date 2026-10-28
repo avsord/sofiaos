@@ -1,4 +1,5 @@
 import React,{useState} from 'react';
+import {EmojiIcon} from './Icon';
 import {tap} from '../lib/desktop';
 import {Pressable,Text,TextInput,View} from 'react-native';
 import {useTheme} from '../lib/theme';
@@ -13,21 +14,21 @@ export function RemindersField({data,onChange}:{data:Record<string,unknown>;onCh
  return <View style={{gap:4,marginBottom:12}}>
   <Text style={{color:c.muted,fontSize:12}}>Notificações</Text>
   {list.map(m=><View key={m} style={[row,{borderBottomWidth:1,borderColor:c.line}]}>
-   <Text style={{fontSize:16}}>🔔</Text><Text style={{flex:1,color:c.text,fontSize:15}}>{reminderLabel(m)}</Text>
+   <EmojiIcon e="🔔" size={18} color={c.accent}/><Text style={{flex:1,color:c.text,fontSize:16}}>{reminderLabel(m)}</Text>
    <Pressable accessibilityRole="button" accessibilityLabel={'Remover notificação '+reminderLabel(m)} hitSlop={10} onPress={()=>set(list.filter(x=>x!==m))}><Text style={{color:c.muted,fontSize:18}}>✕</Text></Pressable>
   </View>)}
   {list.length>=5?<Text style={{color:c.muted,fontSize:12,paddingVertical:8}}>Até 5 notificações por compromisso.</Text>
-   :<Pressable accessibilityRole="button" onPress={()=>{setAdding(a=>!a);setCustom(false);}} style={row}><Text style={{fontSize:16,opacity:0}}>🔔</Text><Text style={{color:c.accent,fontSize:15,fontWeight:'600'}}>Adicionar notificação</Text></Pressable>}
+   :<Pressable accessibilityRole="button" onPress={()=>{setAdding(a=>!a);setCustom(false);}} style={row}><Text style={{fontSize:16,opacity:0}}>🔔</Text><Text style={{color:c.accent,fontSize:16,fontWeight:'500'}}>Adicionar notificação</Text></Pressable>}
   {adding?<View style={{backgroundColor:c.input,borderRadius:14,paddingHorizontal:14,paddingVertical:4}}>
    {[0,...REMINDER_PRESETS].filter(m=>!list.includes(m)).map(m=><Pressable key={m} accessibilityRole="button" onPress={()=>add(m)} style={row}>
-    <View style={{width:20,height:20,borderRadius:10,borderWidth:2,borderColor:c.muted}}/><Text style={{color:c.text,fontSize:15}}>{reminderLabel(m)}</Text></Pressable>)}
-   <Pressable accessibilityRole="button" onPress={()=>setCustom(v=>!v)} style={row}><View style={{width:20,height:20,borderRadius:10,borderWidth:2,borderColor:custom?c.accent:c.muted,backgroundColor:custom?c.accent:'transparent'}}/><Text style={{color:c.text,fontSize:15}}>Personalizado…</Text></Pressable>
+    <View style={{width:20,height:20,borderRadius:10,borderWidth:2,borderColor:c.muted}}/><Text style={{color:c.text,fontSize:16}}>{reminderLabel(m)}</Text></Pressable>)}
+   <Pressable accessibilityRole="button" onPress={()=>setCustom(v=>!v)} style={row}><View style={{width:20,height:20,borderRadius:10,borderWidth:2,borderColor:custom?c.accent:c.muted,backgroundColor:custom?c.accent:'transparent'}}/><Text style={{color:c.text,fontSize:16}}>Personalizado…</Text></Pressable>
    {custom?<View style={{gap:10,paddingBottom:12}}>
     <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
      <TextInput accessibilityLabel="Quanto antes" value={amount} onChangeText={t=>setAmount(t.replace(/\D/g,'').slice(0,3))} keyboardType="number-pad" style={{width:70,color:c.text,backgroundColor:c.surface,borderRadius:10,paddingHorizontal:12,paddingVertical:8,fontSize:16,textAlign:'center'}}/>
-     <View style={{flexDirection:'row',flexWrap:'wrap',gap:6,flex:1}}>{REMINDER_UNITS.map(u=><Pressable key={u.value} onPress={()=>setUnit(u.value)} style={{paddingHorizontal:10,paddingVertical:7,borderRadius:99,backgroundColor:unit===u.value?c.accent:c.surface}}><Text style={{color:unit===u.value?c.onAccent:c.text,fontSize:12,fontWeight:'600'}}>{u.label}</Text></Pressable>)}</View>
+     <View style={{flexDirection:'row',flexWrap:'wrap',gap:6,flex:1}}>{REMINDER_UNITS.map(u=><Pressable key={u.value} onPress={()=>setUnit(u.value)} style={{paddingHorizontal:10,paddingVertical:7,borderRadius:99,backgroundColor:unit===u.value?c.accent:c.surface}}><Text style={{color:unit===u.value?c.onAccent:c.text,fontSize:12,fontWeight:'500'}}>{u.label}</Text></Pressable>)}</View>
     </View>
-    <Pressable accessibilityRole="button" disabled={!(Number(amount)>0)} onPress={()=>add(Number(amount)*unit)} style={{alignSelf:'flex-start',paddingHorizontal:16,paddingVertical:10,borderRadius:12,backgroundColor:Number(amount)>0?c.accent:c.line}}><Text style={{color:c.onAccent,fontWeight:'700'}}>Adicionar {Number(amount)>0?reminderLabel(Number(amount)*unit).toLowerCase():''}</Text></Pressable>
+    <Pressable accessibilityRole="button" disabled={!(Number(amount)>0)} onPress={()=>add(Number(amount)*unit)} style={{alignSelf:'flex-start',paddingHorizontal:16,paddingVertical:10,borderRadius:12,backgroundColor:Number(amount)>0?c.accent:c.line}}><Text style={{color:c.onAccent,fontWeight:'600'}}>Adicionar {Number(amount)>0?reminderLabel(Number(amount)*unit).toLowerCase():''}</Text></Pressable>
    </View>:null}
   </View>:null}
  </View>;
@@ -44,7 +45,7 @@ export function AlarmModeField({value,onChange}:{value:string;onChange:(v:string
  return <View style={{gap:8,marginBottom:12}}>
   <Text style={{color:c.muted,fontSize:12}}>Tipo de aviso</Text>
   <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{ALARM_MODES.map(m=><Pressable key={m.value} accessibilityRole="radio" accessibilityState={{checked:current.value===m.value}} onPress={()=>onChange(m.value)} style={{paddingHorizontal:12,paddingVertical:9,borderRadius:99,backgroundColor:current.value===m.value?c.accent:c.input}}>
-   <Text style={{color:current.value===m.value?c.onAccent:c.text,fontWeight:'600',fontSize:13}}>{m.value==='none'?'🔔 ':'⏰ '}{m.label}</Text></Pressable>)}</View>
+   <Text style={{color:current.value===m.value?c.onAccent:c.text,fontWeight:'500',fontSize:13}}>{m.value==='none'?'🔔 ':'⏰ '}{m.label}</Text></Pressable>)}</View>
   <Text style={{color:c.muted,fontSize:11,lineHeight:16}}>{current.hint}</Text>
  </View>;
 }

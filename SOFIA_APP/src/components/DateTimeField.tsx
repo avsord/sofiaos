@@ -49,7 +49,7 @@ export function DateTimeField({label,value,onChange,dateOnly=false,timeOnly=fals
    {!timeOnly?<MonthSwipe onMonth={delta=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()+delta,1))}>
     <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
      <IconButton name="back" label="Mês anterior do seletor" onPress={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()-1,1))}/>
-     <Text style={{color:c.text,fontSize:15,fontWeight:'600'}}>{month.toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}</Text>
+     <Text style={{color:c.text,fontSize:16,fontWeight:'500'}}>{month.toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}</Text>
      <IconButton name="chevron" label="Próximo mês do seletor" onPress={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()+1,1))}/>
     </View>
     <View style={{flexDirection:'row',marginTop:4}}>{['D','S','T','Q','Q','S','S'].map((d,i)=><Text key={i} style={{width:'14.2857%',textAlign:'center',color:c.muted,fontSize:12}}>{d}</Text>)}</View>
@@ -60,12 +60,12 @@ export function DateTimeField({label,value,onChange,dateOnly=false,timeOnly=fals
    {!dateOnly?<View style={{flexDirection:'row',gap:12,marginTop:timeOnly?0:10}}>{(['hours','minutes'] as const).map(part=><View key={part} style={{flex:1}}>
     <Text style={{textAlign:'center',color:c.muted,marginBottom:6,fontSize:12}}>{part==='hours'?'Hora':'Minutos'}</Text>
     <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={{height:126,backgroundColor:c.surface,borderRadius:12}} nestedScrollEnabled contentOffset={{x:0,y:Math.max(0,(part==='hours'?selected.getHours():selected.getMinutes())*42-42)}}>
-     {Array.from({length:part==='hours'?24:60},(_,i)=><Pressable key={i} accessibilityLabel={(part==='hours'?'Hora ':'Minuto ')+i} onPress={()=>change(part,i)} style={{height:42,alignItems:'center',justifyContent:'center',backgroundColor:(part==='hours'?selected.getHours():selected.getMinutes())===i?c.accentSoft:'transparent'}}><Text style={{color:c.text,fontSize:20,fontWeight:'600'}}>{pad(i)}</Text></Pressable>)}
+     {Array.from({length:part==='hours'?24:60},(_,i)=><Pressable key={i} accessibilityLabel={(part==='hours'?'Hora ':'Minuto ')+i} onPress={()=>change(part,i)} style={{height:42,alignItems:'center',justifyContent:'center',backgroundColor:(part==='hours'?selected.getHours():selected.getMinutes())===i?c.accentSoft:'transparent'}}><Text style={{color:c.text,fontSize:20,fontWeight:'500'}}>{pad(i)}</Text></Pressable>)}
     </ScrollView></View>)}</View>:null}
    {!dateOnly?<View style={{marginTop:12}}><Button title={'Confirmar '+(timeOnly?pad(selected.getHours())+':'+pad(selected.getMinutes()):dateDisplay(selected.toISOString(),false))} onPress={()=>commit(selected)}/></View>:null}
    <View style={{flexDirection:'row',justifyContent:allowClear&&value?'space-between':'flex-end',marginTop:8}}>
-    {allowClear&&value?<Pressable accessibilityRole="button" onPress={()=>{onChange('');smooth();setOpen(false);}} style={{padding:8}}><Text style={{color:c.muted,fontWeight:'600'}}>Limpar</Text></Pressable>:null}
-    <Pressable accessibilityRole="button" onPress={()=>{smooth();setOpen(false);}} style={{padding:8}}><Text style={{color:c.accent,fontWeight:'700'}}>Fechar</Text></Pressable>
+    {allowClear&&value?<Pressable accessibilityRole="button" onPress={()=>{onChange('');smooth();setOpen(false);}} style={{padding:8}}><Text style={{color:c.muted,fontWeight:'500'}}>Limpar</Text></Pressable>:null}
+    <Pressable accessibilityRole="button" onPress={()=>{smooth();setOpen(false);}} style={{padding:8}}><Text style={{color:c.accent,fontWeight:'600'}}>Fechar</Text></Pressable>
    </View>
   </View>:null}
  </View>;

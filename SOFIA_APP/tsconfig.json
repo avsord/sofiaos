@@ -1,5 +1,16 @@
 {
   "extends": "expo/tsconfig.base",
-  "compilerOptions": { "strict": true, "noEmit": true },
-  "include": ["**/*.ts", "**/*.tsx"]
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "paths": {
+      "phosphor-react-native/src/icons/*": [
+        "./types/phosphor-icon.d.ts"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ]
 }

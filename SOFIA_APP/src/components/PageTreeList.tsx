@@ -109,7 +109,7 @@ export function PageTreeList({roots,children,expanded,toggle,onOpen,onMove,canPa
     ListFooterComponent={footer?<View style={{marginHorizontal:-10}}>{footer}</View>:null}
    />:<>{header}{visible.slice(0,limit).map(renderRow)}{footer}</>}
   {line!=null&&drop?<View pointerEvents="none" accessibilityLabel={'Soltar '+(drop.kind==='before'?'antes':'depois')+' no nível '+drop.depth} style={{position:'absolute',top:line-origin.current.y-1.5,left:drop.depth*PAGE_INDENT+(compact?0:28),right:6,height:3,borderRadius:2,backgroundColor:c.accent,zIndex:99}}/>:null}
-  {ghost&&ghostRect?<Animated.View pointerEvents="none" style={{position:'absolute',top:ghostRect.y-origin.current.y,left:ghost.depth*PAGE_INDENT+(compact?0:28),right:4,backgroundColor:c.surface,borderRadius:9,paddingHorizontal:8,elevation:10,zIndex:100,transform:pan.getTranslateTransform()}}><View style={{flexDirection:'row',alignItems:'center',minHeight:compact?40:46,gap:8}}><Text style={{fontSize:22}}>{String(ghost.page.data?.icon||'📄')}</Text><Text numberOfLines={1} style={{flex:1,fontSize:16,fontWeight:'600',color:c.text}}>{ghost.page.title}</Text></View></Animated.View>:null}
+  {ghost&&ghostRect?<Animated.View pointerEvents="none" style={{position:'absolute',top:ghostRect.y-origin.current.y,left:ghost.depth*PAGE_INDENT+(compact?0:28),right:4,backgroundColor:c.surface,borderRadius:9,paddingHorizontal:8,elevation:10,zIndex:100,transform:pan.getTranslateTransform()}}><View style={{flexDirection:'row',alignItems:'center',minHeight:compact?40:46,gap:8}}><Text style={{fontSize:24}}>{String(ghost.page.data?.icon||'📄')}</Text><Text numberOfLines={1} style={{flex:1,fontSize:16,fontWeight:'500',color:c.text}}>{ghost.page.title}</Text></View></Animated.View>:null}
  </View>;
 }
 function PageRow({page,compact,onOpen,onHold,onMove,onEnd,onCancel,onTouchStart}:{page:Entity;compact:boolean;onTouchStart:()=>void;onOpen:()=>void;onHold:(x:number,y:number)=>void;onMove:(x:number,y:number)=>void;onEnd:()=>void;onCancel:()=>void}){
@@ -125,7 +125,7 @@ function PageRow({page,compact,onOpen,onHold,onMove,onEnd,onCancel,onTouchStart}
   onResponderRelease={e=>{stopTimer();if(held.current){latest.current.onMove(e.nativeEvent.pageX,e.nativeEvent.pageY);latest.current.onEnd();}else if(!moved.current)latest.current.onOpen();held.current=false;}}
   onResponderTerminationRequest={()=>!held.current}
   onResponderTerminate={()=>{stopTimer();if(held.current)latest.current.onCancel();held.current=false;}}>
-  <Text style={{fontSize:22,color:c.text,width:30,textAlign:'center'}}>{String(page.data?.icon||'').trim()||'📄'}</Text><Text numberOfLines={1} style={{flex:1,fontSize:16,color:c.text,fontWeight:compact?'500':'600'}}>{page.title}</Text>
+  <Text style={{fontSize:24,color:c.text,width:30,textAlign:'center'}}>{String(page.data?.icon||'').trim()||'📄'}</Text><Text numberOfLines={1} style={{flex:1,fontSize:16,color:c.text,fontWeight:compact?'500':'600'}}>{page.title}</Text>
  </View>;
 }
 

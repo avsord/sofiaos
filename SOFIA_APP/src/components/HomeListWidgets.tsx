@@ -12,7 +12,7 @@ import {CARRIER_LABEL,splitPackages,whenLabel} from '../screens/Packages';
 // Carregam so quando o Inicio esta visivel e o widget foi adicionado (nao pesam na abertura).
 function Header({title,count,icon,label,onOpen}:{title:string;count:number;icon:any;label:string;onOpen:()=>void}){
  const c=useTheme();
- return <View style={{flexDirection:'row',alignItems:'center',gap:12}}><Text style={{flex:1,color:c.text,fontSize:20,fontWeight:'600'}}>{title}</Text><Text accessibilityLabel={'Total de '+title.toLowerCase()} style={{color:c.muted}}>{count}</Text><Pressable accessibilityLabel={label} onPress={onOpen} style={{padding:8}}><Icon name={icon} color={c.accent}/></Pressable></View>;
+ return <View style={{flexDirection:'row',alignItems:'center',gap:12}}><Text style={{flex:1,color:c.text,fontSize:20,fontWeight:'500'}}>{title}</Text><Text accessibilityLabel={'Total de '+title.toLowerCase()} style={{color:c.muted}}>{count}</Text><Pressable accessibilityLabel={label} onPress={onOpen} style={{padding:8}}><Icon name={icon} color={c.accent}/></Pressable></View>;
 }
 
 export function RemindersWidget({api,active,onOpen}:{api:SofiaApi;active:boolean;onOpen:()=>void}){
@@ -25,7 +25,7 @@ export function RemindersWidget({api,active,onOpen}:{api:SofiaApi;active:boolean
   {!records.loaded&&!records.error?<Text style={{color:c.muted}}>Carregando lembretes…</Text>:list.length?<View style={{backgroundColor:c.surface,borderRadius:18,paddingHorizontal:14,borderWidth:1,borderColor:c.line}}>
    {list.map((item,i)=><Pressable key={item.id} accessibilityRole="button" accessibilityLabel={'Lembrete '+item.title} onPress={onOpen} style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:13,borderBottomWidth:i<list.length-1?1:0,borderColor:c.line}}>
     <Icon name="bell" size={18} color={lateIds.has(item.id)?c.danger:c.accent}/>
-    <View style={{flex:1,minWidth:0}}><Text numberOfLines={1} style={{color:c.text,fontSize:15}}>{item.title}</Text><Text style={{color:lateIds.has(item.id)?c.danger:c.muted,fontSize:12}}>{remindLabel(item.data?.remind_at)}</Text></View>
+    <View style={{flex:1,minWidth:0}}><Text numberOfLines={1} style={{color:c.text,fontSize:16}}>{item.title}</Text><Text style={{color:lateIds.has(item.id)?c.danger:c.muted,fontSize:12}}>{remindLabel(item.data?.remind_at)}</Text></View>
    </Pressable>)}
   </View>:<Empty icon="bell" title="Nenhum lembrete pendente" body="Os próximos lembretes aparecem aqui."/>}
  </View>;
@@ -41,7 +41,7 @@ export function PackagesWidget({api,active,onOpen}:{api:SofiaApi;active:boolean;
   {!records.loaded&&!records.error?<Text style={{color:c.muted}}>Carregando encomendas…</Text>:list.length?<View style={{backgroundColor:c.surface,borderRadius:18,paddingHorizontal:14,borderWidth:1,borderColor:c.line}}>
    {list.map((item,i)=><Pressable key={item.id} accessibilityRole="button" accessibilityLabel={'Encomenda '+item.title} onPress={onOpen} style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:13,borderBottomWidth:i<list.length-1?1:0,borderColor:c.line}}>
     <Text style={{fontSize:18}}>📦</Text>
-    <View style={{flex:1,minWidth:0}}><Text numberOfLines={1} style={{color:c.text,fontSize:15}}>{item.title}</Text><Text numberOfLines={1} style={{color:c.muted,fontSize:12}}>{String(item.data?.status||'Aguardando a primeira consulta')}</Text><Text style={{color:c.muted,fontSize:10}}>{CARRIER_LABEL[String(item.data?.carrier)]||'Transportadora'}{item.data?.last_event_at?' · '+whenLabel(String(item.data.last_event_at)):''}</Text></View>
+    <View style={{flex:1,minWidth:0}}><Text numberOfLines={1} style={{color:c.text,fontSize:16}}>{item.title}</Text><Text numberOfLines={1} style={{color:c.muted,fontSize:12}}>{String(item.data?.status||'Aguardando a primeira consulta')}</Text><Text style={{color:c.muted,fontSize:10}}>{CARRIER_LABEL[String(item.data?.carrier)]||'Transportadora'}{item.data?.last_event_at?' · '+whenLabel(String(item.data.last_event_at)):''}</Text></View>
    </Pressable>)}
   </View>:<Empty icon="list" title={g.delivered.length?'Tudo entregue':'Nenhuma encomenda a caminho'} body="As encomendas a caminho aparecem aqui."/>}
  </View>;

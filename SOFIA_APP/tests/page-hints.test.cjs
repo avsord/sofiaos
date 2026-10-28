@@ -39,7 +39,7 @@ test('page canvas stays compact and subpages render as inline page rows',()=>{
  assert.ok(source.includes("height:hasCover?190:28"));
  assert.ok(source.includes("marginTop:hasCover?-44:0"));
  assert.ok(source.includes("style={{minHeight:18}}"));
- assert.ok(source.includes('fontSize:58'));
+ assert.ok(source.includes('fontSize:56'));
  assert.ok(source.includes("<PageTreeList roots={subpages}"));
  assert.ok(!source.includes("Subpáginas ·"));
  assert.ok(!tree.includes("Solte aqui para página principal"));

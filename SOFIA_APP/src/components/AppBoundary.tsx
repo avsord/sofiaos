@@ -30,10 +30,10 @@ export class AppBoundary extends Component<Props,State>{
   if(!this.state.failed)return <React.Fragment key={this.state.generation}>{this.props.children}</React.Fragment>;
   const line=errorLine(this.state.row);
   return <View nativeID="sofia-launch-error" style={{flex:1,backgroundColor:'#F7F6FA',padding:30,justifyContent:'center'}}>
-   <Text style={{fontSize:25,fontWeight:'700',color:'#272334'}}>Vamos reabrir a Sofia.</Text>
+   <Text style={{fontSize:24,fontWeight:'600',color:'#272334'}}>Vamos reabrir a Sofia.</Text>
    <Text style={{marginTop:16,lineHeight:23,color:'#7F7A8D'}}>O aplicativo encontrou um problema. Feche e abra novamente. Mensagens ainda não enviadas podem precisar ser refeitas.</Text>
    <Pressable accessibilityRole="button" accessibilityLabel="Tentar de novo" onPress={this.retry} style={{marginTop:24,alignSelf:'flex-start',paddingVertical:12,paddingHorizontal:18,borderRadius:10,backgroundColor:'#7258E8'}}>
-    <Text style={{color:'#FFFFFF',fontWeight:'600'}}>Tentar de novo</Text>
+    <Text style={{color:'#FFFFFF',fontWeight:'500'}}>Tentar de novo</Text>
    </Pressable>
    {line?<Text testID="app-error-detail" selectable style={{marginTop:26,fontSize:11,lineHeight:16,color:'#9A95A8'}}>{'Detalhe técnico: '+line}</Text>:null}
   </View>;

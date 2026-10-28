@@ -32,16 +32,16 @@ export function SortableWidgets({items,order,onSave,onLock,fixed=[],noHold=[],co
   <Sheet visible={open} onClose={()=>setOpen(false)} label="Fechar organizar a tela inicial">
    <View style={{gap:14,paddingBottom:12}}>
     <View style={{flexDirection:'row',alignItems:'center'}}>
-     <Text style={{flex:1,fontSize:20,fontWeight:'800',color:c.text}}>Organizar Início</Text>
-     <Pressable accessibilityRole="button" onPress={()=>setOpen(false)} style={{paddingHorizontal:14,paddingVertical:8,borderRadius:99,backgroundColor:c.accent}}><Text style={{color:c.onAccent,fontWeight:'700',fontSize:13}}>Pronto</Text></Pressable>
+     <Text style={{flex:1,fontSize:20,fontWeight:'700',color:c.text}}>Organizar Início</Text>
+     <Pressable accessibilityRole="button" onPress={()=>setOpen(false)} style={{paddingHorizontal:14,paddingVertical:8,borderRadius:99,backgroundColor:c.accent}}><Text style={{color:c.onAccent,fontWeight:'600',fontSize:13}}>Pronto</Text></Pressable>
     </View>
     <Text style={{color:c.muted,fontSize:12}}>Arraste pelo ≡ para mudar a ordem.</Text>
     <ReorderList rows={visible.map(id=>({id,title:items.find(i=>i.id===id)!.title,removable:!fixed.includes(id)}))} onChange={save} onRemove={id=>save(visible.filter(x=>x!==id))}/>
     {hidden.length?<View style={{gap:6}}>
-     <Text style={{color:c.muted,fontSize:12,fontWeight:'700'}}>Adicionar</Text>
+     <Text style={{color:c.muted,fontSize:12,fontWeight:'600'}}>Adicionar</Text>
      {hidden.map(item=><Pressable key={item.id} accessibilityRole="button" accessibilityLabel={'Adicionar '+item.title} onPress={()=>save([...visible,item.id])} style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:12,paddingHorizontal:14,borderRadius:14,borderWidth:1,borderColor:c.line,backgroundColor:c.surface}}>
-      <View style={{width:22,height:22,borderRadius:11,backgroundColor:c.accent,alignItems:'center',justifyContent:'center'}}><Text style={{color:c.onAccent,fontWeight:'800',fontSize:15,lineHeight:17}}>+</Text></View>
-      <Text style={{color:c.text,fontSize:15,fontWeight:'600'}}>{item.title}</Text>
+      <View style={{width:22,height:22,borderRadius:11,backgroundColor:c.accent,alignItems:'center',justifyContent:'center'}}><Text style={{color:c.onAccent,fontWeight:'700',fontSize:16,lineHeight:20}}>+</Text></View>
+      <Text style={{color:c.text,fontSize:16,fontWeight:'500'}}>{item.title}</Text>
      </Pressable>)}
     </View>:null}
    </View>

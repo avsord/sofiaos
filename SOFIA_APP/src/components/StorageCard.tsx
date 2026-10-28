@@ -25,14 +25,14 @@ export function StorageCard({api}:{api:SofiaApi}){
  const view=data?.quota?storageParts(data.quota,data.sofia_bytes):null;
  return <View style={[forms.card,{backgroundColor:c.surface,borderWidth:1,borderColor:c.line}]}>
   {filesOpen?<DeferredScreen load={loadSofiaFiles} screenProps={{api,visible:true,onClose:()=>{setFilesOpen(false);void load();}}}/>:null}
-  <Text style={{fontSize:18,fontWeight:'600',color:c.text}}>Armazenamento</Text>
+  <Text style={{fontSize:18,fontWeight:'500',color:c.text}}>Armazenamento</Text>
   {state==='loading'?<ShimmerGroup><View style={{gap:12}}><ShimmerBlock width="62%" height={20}/><ShimmerBlock width="100%" height={10} radius={5}/><ShimmerBlock width="45%" height={12}/><ShimmerBlock width="55%" height={12}/></View></ShimmerGroup>:null}
   {state==='off'?<Text style={{color:c.muted,fontSize:13,lineHeight:19}}>Conecte a Conta Google (logo abaixo) para ver o espaço do seu Drive e o que a Sofia está usando.</Text>:null}
   {state==='error'?<><Text style={{color:c.danger,fontSize:13,lineHeight:19}}>Não consegui ler o espaço do Drive: {error}</Text><Button title="Tentar de novo" secondary onPress={()=>{setState('loading');void load();}}/></>:null}
   {state==='ready'&&data&&!view?<Text style={{color:c.muted,fontSize:13,lineHeight:19}}>A Sofia está usando {fileSize(data.sofia_bytes)} no seu Drive. O Google não informou o espaço total desta conta agora.</Text>:null}
   {state==='ready'&&data&&view?<>
    <View style={{gap:2}}>
-    <Text accessibilityRole="header" style={{color:c.text,fontSize:22,fontWeight:'700',letterSpacing:-0.3}}>{fileSize(view.used)}{view.total?<Text style={{color:c.muted,fontSize:15,fontWeight:'500'}}> de {fileSize(view.total)} usados</Text>:<Text style={{color:c.muted,fontSize:15,fontWeight:'500'}}> usados · plano sem limite</Text>}</Text>
+    <Text accessibilityRole="header" style={{color:c.text,fontSize:24,fontWeight:'600',letterSpacing:-0.3}}>{fileSize(view.used)}{view.total?<Text style={{color:c.muted,fontSize:16,fontWeight:'500'}}> de {fileSize(view.total)} usados</Text>:<Text style={{color:c.muted,fontSize:16,fontWeight:'500'}}> usados · plano sem limite</Text>}</Text>
     {view.free!==null?<Text style={{color:c.muted,fontSize:13}}>{fileSize(view.free)} livres · {Math.round(view.percent)}% ocupado</Text>:null}
    </View>
    <View accessibilityRole="progressbar" accessibilityLabel={view.total?Math.round(view.percent)+'% do espaço ocupado':'Espaço usado'} style={{flexDirection:'row',height:10,borderRadius:5,backgroundColor:c.line,overflow:'hidden'}}>
@@ -44,7 +44,7 @@ export function StorageCard({api}:{api:SofiaApi}){
    </View>
    {data.categories.some(k=>k.bytes>0)?<Text style={{color:c.muted,fontSize:12,lineHeight:18}}>Na Sofia: {data.categories.filter(k=>k.bytes>0).sort((a,b)=>b.bytes-a.bytes).map(k=>k.label+' '+fileSize(k.bytes)).join(' · ')}</Text>:null}
    {error?<Text style={{color:c.muted,fontSize:11}}>Mostrando a última leitura. {error}</Text>:null}
-   <Pressable accessibilityRole="button" onPress={()=>setFilesOpen(true)} style={{minHeight:44,justifyContent:'center'}}><Text style={{color:c.accent,fontWeight:'700',fontSize:14}}>Ver arquivos da Sofia</Text></Pressable>
+   <Pressable accessibilityRole="button" onPress={()=>setFilesOpen(true)} style={{minHeight:44,justifyContent:'center'}}><Text style={{color:c.accent,fontWeight:'600',fontSize:14}}>Ver arquivos da Sofia</Text></Pressable>
   </>:null}
  </View>;
 }

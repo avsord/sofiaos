@@ -33,11 +33,11 @@ export const MenuTab=memo(function MenuTab({item,selected,onSelect,motion,locked
    <Animated.View testID={'menu-pill-'+item.id} style={[styles.pill,{backgroundColor:c.accentSoft,
     opacity:visual.opacity,transform:[{scaleX:visual.pillX},{scaleY:visual.pillY}]}]}/>
    <Animated.View testID={'menu-inactive-symbol-'+item.id} style={[styles.icon,{opacity:visual.inactive,transform:[{scale:visual.icon}]}]}><Icon name={item.icon} color={c.muted}/></Animated.View>
-   <Animated.View testID={'menu-symbol-'+item.id} style={[styles.icon,{opacity:visual.opacity,transform:[{scale:visual.icon}]}]}><Icon name={item.icon} color={c.accent}/></Animated.View>
+   <Animated.View testID={'menu-symbol-'+item.id} style={[styles.icon,{opacity:visual.opacity,transform:[{scale:visual.icon}]}]}><Icon name={item.icon} color={c.accent} active/></Animated.View>
   </View>
   <Animated.View style={[styles.caption,{transform:[{scale:visual.caption}]}]} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
    <Animated.Text testID={'menu-inactive-caption-'+item.id} numberOfLines={1} style={[styles.text,{fontWeight:'500',color:c.muted,opacity:visual.inactive}]}>{item.label}</Animated.Text>
-   <Animated.Text testID={'menu-active-caption-'+item.id} numberOfLines={1} style={[styles.text,styles.overlay,{fontWeight:'700',color:c.accent,opacity:visual.opacity}]}>{item.label}</Animated.Text>
+   <Animated.Text testID={'menu-active-caption-'+item.id} numberOfLines={1} style={[styles.text,styles.overlay,{fontWeight:'600',color:c.accent,opacity:visual.opacity}]}>{item.label}</Animated.Text>
   </Animated.View>
  </Pressable>;
 });
@@ -47,6 +47,6 @@ const styles=StyleSheet.create({
  pill:{position:'absolute',top:0,left:0,right:0,bottom:0,borderRadius:999},
  icon:{position:'absolute',top:0,left:0,right:0,bottom:0,alignItems:'center',justifyContent:'center'},
  caption:{width:'100%',alignItems:'center',justifyContent:'center'},
- text:{fontSize:9.5,textAlign:'center',width:'100%'},
+ text:{fontSize:10,textAlign:'center',width:'100%'},
  overlay:{position:'absolute',top:0,left:0,right:0,bottom:0}
 });

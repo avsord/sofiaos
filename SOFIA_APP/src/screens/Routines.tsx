@@ -57,10 +57,10 @@ export function Routines({api,active,onBack}:{api:SofiaApi;active:boolean;onBack
   {error||records.error?<ErrorBanner text={error||records.error} onRetry={()=>void records.load()}/>:null}
   <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:22,paddingTop:4,gap:12}}>
    {groups.map(([group,list])=><View key={group} style={{gap:12}}>
-    <View style={{flexDirection:'row',alignItems:'center',gap:10,paddingHorizontal:6,paddingTop:6}}><View style={{width:30,height:30,borderRadius:10,alignItems:'center',justifyContent:'center',backgroundColor:c.accentSoft}}><Icon name="grid" color={c.accent}/></View><Text style={{flex:1,color:c.text,fontSize:13,fontWeight:'700',letterSpacing:0.3}}>{group}</Text><Text style={{color:c.muted,fontSize:11}}>{list.length}</Text></View>
+    <View style={{flexDirection:'row',alignItems:'center',gap:10,paddingHorizontal:6,paddingTop:6}}><View style={{width:30,height:30,borderRadius:10,alignItems:'center',justifyContent:'center',backgroundColor:c.accentSoft}}><Icon name="grid" color={c.accent}/></View><Text style={{flex:1,color:c.text,fontSize:13,fontWeight:'600',letterSpacing:0.3}}>{group}</Text><Text style={{color:c.muted,fontSize:11}}>{list.length}</Text></View>
    {list.map(item=><Pressable key={item.id} accessibilityRole="button" accessibilityLabel={'Editar rotina '+item.title} onPress={()=>open(item)} style={({pressed})=>({minHeight:82,borderRadius:34,paddingHorizontal:16,paddingVertical:13,flexDirection:'row',alignItems:'center',gap:12,backgroundColor:item.state==='active'?c.accentSoft:c.surface,borderWidth:1,borderColor:item.state==='active'?c.accent:c.line,opacity:pressed?0.82:1})}>
     <View style={{width:44,height:44,borderRadius:22,alignItems:'center',justifyContent:'center',backgroundColor:c.surface}}><Icon name="refresh" color={item.state==='active'?c.accent:c.muted}/></View>
-    <View style={{flex:1,minWidth:0,gap:4}}><Text numberOfLines={1} style={{fontSize:15,fontWeight:'700',color:c.text}}>{item.title}</Text><Text style={{fontSize:11,color:c.muted}}>{schedule(item)}</Text>{item.data?.instruction?<Text numberOfLines={1} style={{fontSize:10,color:c.muted}}>{String(item.data.instruction)}</Text>:null}</View>
+    <View style={{flex:1,minWidth:0,gap:4}}><Text numberOfLines={1} style={{fontSize:16,fontWeight:'600',color:c.text}}>{item.title}</Text><Text style={{fontSize:11,color:c.muted}}>{schedule(item)}</Text>{item.data?.instruction?<Text numberOfLines={1} style={{fontSize:10,color:c.muted}}>{String(item.data.instruction)}</Text>:null}</View>
     <Pressable accessibilityRole="switch" accessibilityState={{checked:item.state==='active'}} accessibilityLabel={(item.state==='active'?'Pausar ':'Ativar ')+item.title} onPress={e=>{e.stopPropagation();void toggle(item);}} style={{padding:8}}><View style={{width:40,height:24,borderRadius:13,padding:3,backgroundColor:item.state==='active'?c.accent:c.line,alignItems:item.state==='active'?'flex-end':'flex-start'}}><View style={{width:18,height:18,borderRadius:9,backgroundColor:c.surface}}/></View></Pressable>
    </Pressable>)}
    </View>)}
@@ -69,7 +69,7 @@ export function Routines({api,active,onBack}:{api:SofiaApi;active:boolean;onBack
    <Text style={{color:c.muted,fontSize:11,lineHeight:18,paddingHorizontal:4}}>Cada ocorrência ativa vira uma tarefa no horário definido. A configuração da rotina permanece separada para você pausar ou editar sem recriar tudo.</Text>
   </ScrollView>
   <Sheet visible={!!editing} onClose={()=>{if(!busy)setEditing(null);}} label="Fechar rotina">
-   <View style={{flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,color:c.text,fontSize:22,fontWeight:'700'}}>{editing?.id?'Editar rotina':'Nova rotina'}</Text><IconButton name="close" label="Fechar rotina" disabled={busy} onPress={()=>setEditing(null)}/></View>
+   <View style={{flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,color:c.text,fontSize:24,fontWeight:'600'}}>{editing?.id?'Editar rotina':'Nova rotina'}</Text><IconButton name="close" label="Fechar rotina" disabled={busy} onPress={()=>setEditing(null)}/></View>
    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{gap:16,paddingBottom:18}}>
     {error?<ErrorBanner text={error}/>:null}
     {field(c,'Nome',editing?.title||'',title=>setEditing(old=>old?{...old,title}:old))}
@@ -84,7 +84,7 @@ export function Routines({api,active,onBack}:{api:SofiaApi;active:boolean;onBack
     <DateTimeField dateOnly allowClear={false} label="Primeiro dia" value={String(editing?.data?.starts_on||today())} onChange={starts_on=>patchData({starts_on})}/>
     <DateTimeField dateOnly label="Último dia (opcional)" value={String(editing?.data?.ends_on||'')} onChange={ends_on=>patchData({ends_on})}/>
     {field(c,'Lembrete / instrução',String(editing?.data?.instruction||''),instruction=>patchData({instruction}),true)}
-    <View style={{flexDirection:'row',alignItems:'center',gap:12}}><View style={{flex:1}}><Text style={{color:c.text,fontWeight:'600'}}>Rotina ativa</Text><Text style={{color:c.muted,fontSize:11,marginTop:3}}>Pausar mantém a configuração sem gerar novas ocorrências.</Text></View><Switch accessibilityLabel="Rotina ativa" value={editing?.state!=='paused'} onValueChange={enabled=>setEditing(old=>old?{...old,state:enabled?'active':'paused'}:old)}/></View>
+    <View style={{flexDirection:'row',alignItems:'center',gap:12}}><View style={{flex:1}}><Text style={{color:c.text,fontWeight:'500'}}>Rotina ativa</Text><Text style={{color:c.muted,fontSize:11,marginTop:3}}>Pausar mantém a configuração sem gerar novas ocorrências.</Text></View><Switch accessibilityLabel="Rotina ativa" value={editing?.state!=='paused'} onValueChange={enabled=>setEditing(old=>old?{...old,state:enabled?'active':'paused'}:old)}/></View>
     <Button title="Salvar rotina" loading={busy} disabled={!editing?.title?.trim()} onPress={()=>void save()}/>
     {editing?.id?<Button title="Arquivar rotina" secondary disabled={busy} onPress={()=>archive(editing as Entity)}/>:null}
    </ScrollView>

@@ -8,7 +8,7 @@ const TITLES:Record<string,string>={home:'Início',chat:'Conversa',pages:'Págin
 export function ScreenSkeleton({tab}:{tab:string}){
  const c=useTheme();
  return <View testID={'screen-skeleton-'+tab} style={{flex:1,backgroundColor:c.bg,paddingHorizontal:20,paddingTop:48,gap:14}}>
-  <Text style={{color:c.text,fontSize:26,fontWeight:'700'}}>{TITLES[tab]||''}</Text>
+  <Text style={{color:c.text,fontSize:28,fontWeight:'600'}}>{TITLES[tab]||''}</Text>
   <View style={{flexDirection:'row',alignItems:'center',gap:10}}><Spinner size={16} stroke={1.8}/><Text style={{color:c.muted,fontSize:13}}>Carregando</Text></View>
   <LoadingLines rows={4}/>
  </View>;

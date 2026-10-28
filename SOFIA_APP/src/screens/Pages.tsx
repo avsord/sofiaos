@@ -219,16 +219,16 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
      {hasCover?<PageCover data={draft.appearance} api={api}/>:<View style={{alignSelf:'flex-end',padding:12,opacity:.55}}><Icon name="image" size={20} color={c.muted}/></View>}
     </Pressable>}
     {/* 0.3.255: botao de reposicionar a capa */}
-    {!preview&&imageCover&&!coverMove?<Pressable testID="page-cover-reposition" accessibilityRole="button" accessibilityLabel="Reposicionar capa" onPress={startCoverMove} style={{position:'absolute',right:12,bottom:12,flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:11,paddingVertical:7,borderRadius:10,backgroundColor:'#0000007a'}}><Icon name="move" size={14} color="#FFFFFF"/><Text style={{color:'#FFFFFF',fontSize:12,fontWeight:'600'}}>Reposicionar</Text></Pressable>:null}
+    {!preview&&imageCover&&!coverMove?<Pressable testID="page-cover-reposition" accessibilityRole="button" accessibilityLabel="Reposicionar capa" onPress={startCoverMove} style={{position:'absolute',right:12,bottom:12,flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:11,paddingVertical:7,borderRadius:10,backgroundColor:'#0000007a'}}><Icon name="move" size={14} color="#FFFFFF"/><Text style={{color:'#FFFFFF',fontSize:12,fontWeight:'500'}}>Reposicionar</Text></Pressable>:null}
     {!preview&&imageCover&&coverMove?<><View pointerEvents="none" style={{position:'absolute',top:12,left:0,right:0,alignItems:'center'}}><View style={{paddingHorizontal:12,paddingVertical:6,borderRadius:10,backgroundColor:'#000000a0'}}><Text style={{color:'#FFFFFF',fontSize:12}}>Arraste a imagem para reposicionar</Text></View></View>
      <View style={{position:'absolute',right:12,bottom:12,flexDirection:'row',gap:8}}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Cancelar reposicionamento" onPress={()=>setCoverMove(false)} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:10,backgroundColor:'#000000a0'}}><Text style={{color:'#FFFFFF',fontSize:12,fontWeight:'600'}}>Cancelar</Text></Pressable>
-      <Pressable testID="page-cover-save-position" accessibilityRole="button" accessibilityLabel="Salvar posição da capa" onPress={saveCoverMove} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:10,backgroundColor:c.accent}}><Text style={{color:'#FFFFFF',fontSize:12,fontWeight:'700'}}>Salvar posição</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Cancelar reposicionamento" onPress={()=>setCoverMove(false)} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:10,backgroundColor:'#000000a0'}}><Text style={{color:'#FFFFFF',fontSize:12,fontWeight:'500'}}>Cancelar</Text></Pressable>
+      <Pressable testID="page-cover-save-position" accessibilityRole="button" accessibilityLabel="Salvar posição da capa" onPress={saveCoverMove} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:10,backgroundColor:c.accent}}><Text style={{color:c.onAccent,fontSize:12,fontWeight:'600'}}>Salvar posição</Text></Pressable>
      </View></>:null}
    </View>
    <View style={desktop?{paddingHorizontal:48,marginTop:hasCover?-44:0,width:'100%',maxWidth:960,alignSelf:'center'}:{paddingHorizontal:30,marginTop:hasCover?-44:0}}>
-    <Pressable accessibilityRole="button" accessibilityLabel="Alterar ícone da página" onPress={()=>setAppearance('icon')} style={{width:78,height:78,alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:58,color:c.text}}>{String(draft.appearance.icon||'📄')}</Text></Pressable>
-    <TextInput scrollEnabled={false} editable={!preview} accessibilityLabel="Título da página" value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>{if(!preview)void store.flush(selected.id);}} multiline placeholder={pageTitleHint(emptyBody,hasSubpageContent,!preview&&focus==='title')} placeholderTextColor={placeholderColor} style={{minHeight:60,fontSize:38,lineHeight:44,fontWeight:'800',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}/>
+    <Pressable accessibilityRole="button" accessibilityLabel="Alterar ícone da página" onPress={()=>setAppearance('icon')} style={{width:78,height:78,alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:56,color:c.text}}>{String(draft.appearance.icon||'📄')}</Text></Pressable>
+    <TextInput scrollEnabled={false} editable={!preview} accessibilityLabel="Título da página" value={draft.title==='Sem título'?'':draft.title} onChangeText={title=>edit(d=>({...d,title}),'title')} onFocus={()=>setFocus('title')} onBlur={()=>{if(!preview)void store.flush(selected.id);}} multiline placeholder={pageTitleHint(emptyBody,hasSubpageContent,!preview&&focus==='title')} placeholderTextColor={placeholderColor} style={{minHeight:60,fontSize:40,lineHeight:48,fontWeight:'700',letterSpacing:-1.2,color:c.text,paddingTop:8,paddingBottom:6}}/>
     {String(selected.data.purpose||'').trim()?<Text style={{fontSize:13,lineHeight:20,color:c.muted,marginBottom:12}}>{String(selected.data.purpose)}</Text>:null}
     <View style={{gap:2}}>{draft.blocks.map((block,index)=>blockView(block,index,preview,emptyBody&&!hasSubpageContent,preview?null:focus))}</View>
     <Pressable accessibilityLabel="Continuar escrevendo" onPress={()=>{const last=draft.blocks.at(-1);if(last&&['text','heading1','heading2','heading3','bullet','todo','number','quote','code','callout'].includes(last.type)){setFocus(last.id);inputRefs.current.get(last.id)?.focus();}else addBlock();}} style={{minHeight:18}}/>
@@ -260,7 +260,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  const editor=<View style={{flex:1,backgroundColor:c.bg,overflow:'hidden'}}>
   <View style={{zIndex:20,elevation:5,minHeight:54,flexDirection:'row',alignItems:'center',paddingHorizontal:4,borderBottomWidth:1,borderColor:c.line,backgroundColor:c.surface}}>
    <IconButton name="back" label="Voltar" size={34} onPress={back}/>
-   <View style={{flex:1,minWidth:0,paddingHorizontal:5}}><Text numberOfLines={1} style={{color:c.text,fontSize:15,fontWeight:'700'}}>{selected.title}</Text><Text accessibilityLiveRegion="polite" style={{color:entry.state==='error'||entry.state==='conflict'?c.danger:c.muted,fontSize:9,marginTop:3}}>{status}</Text></View>
+   <View style={{flex:1,minWidth:0,paddingHorizontal:5}}><Text numberOfLines={1} style={{color:c.text,fontSize:16,fontWeight:'600'}}>{selected.title}</Text><Text accessibilityLiveRegion="polite" style={{color:entry.state==='error'||entry.state==='conflict'?c.danger:c.muted,fontSize:10,marginTop:3}}>{status}</Text></View>
    <View testID="page-tools-right" style={{flexDirection:'row',alignItems:'center',flexShrink:0}}>
     <IconButton name="undo" label="Desfazer" size={34} disabled={!entry.past.length} onPress={()=>store.undo(selected.id)}/>
     <IconButton name="redo" label="Refazer" size={34} disabled={!entry.future.length} onPress={()=>store.redo(selected.id)}/>
@@ -269,13 +269,13 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   </View>
   {/* 0.3.230: opcoes da pagina no ⋯ do topo, como no Notion (antes: icones soltos e "segure para excluir" nos blocos) */}
   <Sheet visible={pageMenu} onClose={()=>setPageMenu(false)} label="Fechar opções da página">
-   <Text style={{fontSize:20,fontWeight:'700',color:c.text,marginBottom:12}}>{selected.title||'Página'}</Text>
+   <Text style={{fontSize:20,fontWeight:'600',color:c.text,marginBottom:12}}>{selected.title||'Página'}</Text>
    <Button title="Nova subpágina ou template" secondary onPress={()=>{setPageMenu(false);setTimeout(()=>setCreateParent(selected),120);}}/><View style={{height:8}}/>
    <Button title="Ícone" secondary onPress={()=>{setPageMenu(false);setTimeout(()=>setAppearance('icon'),120);}}/><View style={{height:8}}/>
    <Button title={hasCover?'Alterar capa':'Adicionar capa'} secondary onPress={()=>{setPageMenu(false);setTimeout(()=>setAppearance('cover'),120);}}/>
    {draft.appearance.cover_type==='attachment'&&draft.appearance.cover_attachment_id?<><View style={{height:8}}/><Button title="Reposicionar capa" secondary onPress={()=>{setPageMenu(false);setTimeout(startCoverMove,120);}}/></>:null}
    {focus&&draft.blocks.some(x=>x.id===focus)?<><View style={{height:8}}/><Button title="Remover bloco selecionado" secondary onPress={()=>{const blk=draft.blocks.find(x=>x.id===focus);setPageMenu(false);if(blk)setTimeout(()=>confirmRemoveBlock(blk),120);}}/></>:null}
-   <Pressable accessibilityRole="button" onPress={()=>{setPageMenu(false);setTimeout(removePage,120);}} style={{paddingVertical:18}}><Text style={{color:c.danger,fontWeight:'700'}}>Excluir página</Text></Pressable>
+   <Pressable accessibilityRole="button" onPress={()=>{setPageMenu(false);setTimeout(removePage,120);}} style={{paddingVertical:18}}><Text style={{color:c.danger,fontWeight:'600'}}>Excluir página</Text></Pressable>
   </Sheet>
   {error?<ErrorBanner text={error}/>:null}{entry.error?<ErrorBanner text={entry.error} onRetry={entry.state==='conflict'?resolveConflict:()=>void store.flush(selected.id)}/>:null}
   {documentContent(selected,draft)}

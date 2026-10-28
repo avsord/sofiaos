@@ -26,7 +26,7 @@ export function TaskQuickSchedule({api,task,onClose,onSaved,onDetails,detailsLab
  const [reminder,setReminder]=useState<number>(task.notifications?.length?Number(task.notifications[0]):-1),[priority,setPriority]=useState<string>(taskPriority(task).value),[saving,setSaving]=useState(false),[error,setError]=useState('');
  const today=new Date(),tomorrow=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1);
  const chip=(on:boolean)=>({paddingHorizontal:14,paddingVertical:9,borderRadius:99,backgroundColor:on?c.accent:c.input});
- const chipText=(on:boolean)=>({color:on?c.onAccent:c.text,fontWeight:'600' as const,fontSize:13});
+ const chipText=(on:boolean)=>({color:on?c.onAccent:c.text,fontWeight:'500' as const,fontSize:13});
  async function save(clear=false){
   if(saving)return;setSaving(true);setError('');
   try{
@@ -39,7 +39,7 @@ export function TaskQuickSchedule({api,task,onClose,onSaved,onDetails,detailsLab
  }
  return <Sheet visible onClose={onClose} label="Fechar programação da tarefa">
   <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap:14,paddingBottom:18}}>
-   <Text numberOfLines={2} style={{fontSize:20,fontWeight:'800',color:c.text}}>{task.title}</Text>
+   <Text numberOfLines={2} style={{fontSize:20,fontWeight:'700',color:c.text}}>{task.title}</Text>
    <Text style={{color:c.muted,fontSize:12}}>Quando fazer</Text>
    <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
     <Pressable onPress={()=>setDate(dayKey(today))} style={chip(date===dayKey(today))}><Text style={chipText(date===dayKey(today))}>Hoje</Text></Pressable>
@@ -60,14 +60,14 @@ export function TaskQuickSchedule({api,task,onClose,onSaved,onDetails,detailsLab
    {error?<Text style={{color:c.danger,fontSize:13}}>{error}</Text>:null}
    <Button title={date?'Programar':'Salvar'} loading={saving} onPress={()=>void save()}/>
    <View style={{flexDirection:'row',justifyContent:'space-between'}}>
-    {onDetails?<Pressable accessibilityRole="button" onPress={onDetails} style={{paddingVertical:10}}><Text style={{color:c.accent,fontWeight:'700'}}>{detailsLabel||'Ver detalhes'}</Text></Pressable>:<View/>}
+    {onDetails?<Pressable accessibilityRole="button" onPress={onDetails} style={{paddingVertical:10}}><Text style={{color:c.accent,fontWeight:'600'}}>{detailsLabel||'Ver detalhes'}</Text></Pressable>:<View/>}
     {task.due_at?<Pressable accessibilityRole="button" onPress={()=>void save(true)} style={{paddingVertical:10}}><Text style={{color:c.muted}}>Tirar a data</Text></Pressable>:null}
    </View>
    {/* 0.3.225: remover a tarefa direto daqui */}
    {onRemoved&&task.id?<Pressable accessibilityRole="button" accessibilityLabel="Remover tarefa" disabled={saving} onPress={()=>appAlert('Remover tarefa?','A tarefa "'+(task.title||'')+'" sai da lista e do site.',[
     {text:'Cancelar',style:'cancel'},
     {text:'Remover',style:'destructive',onPress:()=>{void(async()=>{setSaving(true);setError('');try{await api.deleteTask(task.id);onRemoved(task.id);}catch(e){setError(errorText(e));}finally{setSaving(false);}})();}}
-   ])} style={{paddingVertical:10,alignItems:'center'}}><Text style={{color:c.danger,fontWeight:'700'}}>Remover tarefa</Text></Pressable>:null}
+   ])} style={{paddingVertical:10,alignItems:'center'}}><Text style={{color:c.danger,fontWeight:'600'}}>Remover tarefa</Text></Pressable>:null}
   </ScrollView>
  </Sheet>;
 }

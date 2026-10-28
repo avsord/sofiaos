@@ -41,7 +41,7 @@ test('Despesas: a compra de 21/10 cobrada em novembro nao conta em outubro, cont
 test('previsto: despesas = Total do mes de Contas (pagas ou nao, inclusive no cartao); aporte em vermelho',()=>{
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes("const f = simpleForecast(d.txs, d.cards, r, accountId, today, aporteInCycle(r));"));
-  assert.ok(s.includes("['Despesas do ciclo (pagas ou não)', forecastP.toPay, BAD"));
+  assert.ok(s.includes("['Despesas do ciclo (pagas ou não)', forecastP.toPay, c.danger"));
   // a conta do Pedro: 279,45 + 9.674,54 - 4.793,43 - 0 - 4.000 = 1.160,56
   assert.equal(Math.round((279.45+9674.54-4793.43-0-4000)*100)/100,1160.56);
 });

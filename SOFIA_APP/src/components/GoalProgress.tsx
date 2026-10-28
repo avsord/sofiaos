@@ -28,24 +28,24 @@ export function GoalProgressCard({g,compact=false,onPress,flat=false,masked=fals
  // flat: dentro de uma secao dos Relatorios (sem a moldura de cartao, para nao ficar caixa dentro de caixa)
  const body=<View style={flat?{gap:10}:{backgroundColor:c.surface,borderRadius:20,padding:16,gap:10,borderWidth:1,borderColor:c.line}}>
   <View style={{flexDirection:'row',alignItems:'baseline',gap:8}}>
-   <Text numberOfLines={1} style={{flex:1,color:c.text,fontWeight:'800',fontSize:15}}>🎯 {g.name||'Sua meta'}</Text>
+   <Text numberOfLines={1} style={{flex:1,color:c.text,fontWeight:'700',fontSize:16}}>🎯 {g.name||'Sua meta'}</Text>
    {st.deadlineYm?<Text style={{color:c.muted,fontSize:11}}>até {monthName(st.deadlineYm)}</Text>:null}
    {onToggleMask?<Pressable testID="goal-values-eye" accessibilityRole="button" accessibilityLabel={masked?'Mostrar valores':'Esconder valores'} hitSlop={10} onPress={onToggleMask} style={{paddingLeft:6}}><Icon name={masked?'eyeOff':'eye'} size={17} color={c.muted}/></Pressable>:null}
   </View>
   <View style={{flexDirection:'row',alignItems:'baseline',gap:6}}>
-   <Text style={{color:c.text,fontWeight:'800',fontSize:26}}>{brl(g.saved)}</Text>
+   <Text style={{color:c.text,fontWeight:'700',fontSize:28}}>{brl(g.saved)}</Text>
    <Text style={{color:c.muted,fontSize:12}}>de {brl(g.target)}</Text>
    <View style={{flex:1}}/>
-   <Text style={{color:GOOD,fontWeight:'800',fontSize:13}}>{Math.round(st.pct*100)}%</Text>
+   <Text style={{color:GOOD,fontWeight:'700',fontSize:13}}>{Math.round(st.pct*100)}%</Text>
   </View>
   <View style={{height:12,borderRadius:6,backgroundColor:c.line,overflow:'hidden',justifyContent:'center'}}>
    <View style={{position:'absolute',left:0,top:0,bottom:0,width:`${Math.round(st.pct*100)}%` as `${number}%`,borderRadius:6,backgroundColor:GUARD}}/>
    {[0.25,0.5,0.75].map(m=><View key={m} style={{position:'absolute',left:`${m*100}%` as `${number}%`,top:2,bottom:2,width:2,borderRadius:1,backgroundColor:st.pct>=m?'#ffffffaa':c.muted+'66'}}/>)}
   </View>
   <View style={{flexDirection:'row',justifyContent:'space-between'}}><Text style={{color:c.muted,fontSize:10}}>R$ 0</Text><Text style={{color:c.muted,fontSize:10}}>{brl(g.target)}</Text></View>
-  {st.pct<1?<Text style={{color:c.text,fontSize:13,fontWeight:'600'}}>Faltam {brl(st.missing)}{st.next&&st.next<1?' · próximo marco: '+Math.round(st.next*100)+'% (faltam '+brl(st.nextMissing)+')':''}</Text>:null}
+  {st.pct<1?<Text style={{color:c.text,fontSize:13,fontWeight:'500'}}>Faltam {brl(st.missing)}{st.next&&st.next<1?' · próximo marco: '+Math.round(st.next*100)+'% (faltam '+brl(st.nextMissing)+')':''}</Text>:null}
   {!compact&&st.pct<1?<Text style={{color:c.muted,fontSize:12,lineHeight:18}}>{g.monthly>0&&st.reach?'No ritmo de '+brl(g.monthly)+' por mês, você chega lá em '+monthName(st.reach)+(st.deadlineYm?(st.diff>0?' — '+st.diff+(st.diff===1?' mês':' meses')+' antes do prazo.':st.diff<0?' — '+(-st.diff)+(st.diff===-1?' mês':' meses')+' depois do prazo. Para chegar a tempo: '+brl(st.needed)+' por mês.':' — bem no prazo.'):'.'):st.deadlineYm?'Para chegar até '+monthName(st.deadlineYm)+': '+brl(st.needed)+' por mês.':'Defina um aporte mensal para ver quando você chega lá.'}</Text>:null}
-  <Text style={{color:GOOD,fontSize:12,fontWeight:'600'}}>{st.message}</Text>
+  <Text style={{color:GOOD,fontSize:12,fontWeight:'500'}}>{st.message}</Text>
  </View>;
  return onPress?<Pressable accessibilityRole="button" accessibilityLabel={'Abrir a meta '+(g.name||'')} onPress={onPress}>{body}</Pressable>:body;
 }

@@ -129,7 +129,7 @@ test('0.3.177: ao pagar, a conta fica verde e continua na lista do mes',()=>{
   const paga=list.find(d=>d.title==='paga-outubro');assert.equal(paga.paid,true);assert.equal(paga.late,false);
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes("if (due.paid) return ("),'linha propria para paga');
-  assert.ok(s.includes("backgroundColor: GOOD + '1a'"),'verde');
+  assert.ok(s.includes("backgroundColor: c.good + '1a'"),'verde');
   assert.ok(s.includes("import_id: t.manualDue ? 'sofia-pendencia:' + (t.seriesId || t.id) + ':' + t.date : ''"),'repeticao paga continua pendencia daquele mes');
   assert.ok(s.includes("{sideOpen.length} em aberto em"),'cabecalho mostra as abertas do lado escolhido');
 });
@@ -148,8 +148,8 @@ test('0.3.178: apagar no historico um pagamento de pendencia desfaz o pagamento 
 test('0.3.181: amarelo em aberto, verde pago, vermelho atrasada e roxo fatura',()=>{
   const s=read('src/screens/Finance.tsx');
   const row=s.slice(s.indexOf('function DueRow('),s.indexOf('// 0.3.175: atualizacoes locais imediatas'));
-  assert.ok(row.includes("const color = due.late ? BAD : due.kind === 'fatura' ? c.accent : WARN;"),'atrasada vermelha, fatura roxa, resto amarelo');
-  assert.ok(row.includes("backgroundColor: color + '1a'"));assert.ok(row.includes("backgroundColor: GOOD + '1a'"),'pago: verde');
+  assert.ok(row.includes("const color = due.late ? c.danger : due.kind === 'fatura' ? c.accent : c.warn;"),'atrasada vermelha, fatura roxa, resto amarelo');
+  assert.ok(row.includes("backgroundColor: color + '1a'"));assert.ok(row.includes("backgroundColor: c.good + '1a'"),'pago: verde');
 });
 
 test('0.3.182: Saldo, detalhes do saldo, listas de receitas e despesas, cartao no lugar da lampada',()=>{
@@ -293,7 +293,7 @@ test('0.3.196: modelo simples - previsto = receitas - despesas e pendentes - fat
   const ctl=f.spendControl(txs,[],'',f.cycleRange(25,'2026-10-19'),'a1',1779.53);
   assert.equal(ctl.left,1779.53,'controle de gastos e o Saldo');assert.equal(ctl.out,803.18);assert.equal(ctl.available,2582.71);assert.equal(Math.round(ctl.pct*100),69);
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes("['Aporte', forecastP.aporte, BAD, '−', [] as Tx[]]"),'aporte aparece na conta do previsto (0.3.223: em vermelho, e um valor que sai)');
+  assert.ok(s.includes("['Aporte', forecastP.aporte, c.danger, '−', [] as Tx[]]"),'aporte aparece na conta do previsto (0.3.223: em vermelho, e um valor que sai)');
 });
 
 test('0.3.197: Pendentes com seletor A pagar | A receber, mesmo esquema nos dois lados',()=>{

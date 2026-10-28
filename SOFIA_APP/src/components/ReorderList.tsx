@@ -30,7 +30,7 @@ export function ReorderList({rows,onChange,onRemove}:{rows:ReorderRow[];onChange
     <View {...handle(id).panHandlers} accessibilityLabel={'Arrastar '+row.title} style={{width:52,height:ROW,alignItems:'center',justifyContent:'center'}}>
      {[0,1,2].map(n=><View key={n} style={{width:18,height:2,borderRadius:1,backgroundColor:c.muted,marginVertical:2}}/>)}
     </View>
-    <Text numberOfLines={1} style={{flex:1,color:c.text,fontSize:15,fontWeight:'600'}}>{row.title}</Text>
+    <Text numberOfLines={1} style={{flex:1,color:c.text,fontSize:16,fontWeight:'500'}}>{row.title}</Text>
     {row.removable&&onRemove?<Pressable accessibilityRole="button" accessibilityLabel={'Tirar '+row.title+' da tela inicial'} hitSlop={8} onPress={()=>onRemove(id)} style={{width:44,height:ROW,alignItems:'center',justifyContent:'center'}}><View style={{width:22,height:22,borderRadius:11,backgroundColor:c.danger,alignItems:'center',justifyContent:'center'}}><View style={{width:10,height:2,borderRadius:1,backgroundColor:'#fff'}}/></View></Pressable>:<View style={{width:44}}/>}
    </Animated.View>;})}
  </View>;

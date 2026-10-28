@@ -78,12 +78,12 @@ export function PageLoading({title, eyebrow, label, rows = 4, testID}: {title?: 
   return (
     <View testID={testID} style={{flex: 1, backgroundColor: c.bg, paddingHorizontal: 20, paddingTop: 22, gap: 18}}>
       <View style={{paddingLeft: 52, gap: 4}}>
-        {eyebrow ? <Text style={{fontSize: 11, letterSpacing: 1.2, color: c.muted, fontWeight: '600'}}>{eyebrow}</Text> : null}
-        <Text style={{fontSize: 24, fontWeight: '800', color: c.text}}>{title}</Text>
+        {eyebrow ? <Text style={{fontSize: 11, letterSpacing: 1.2, color: c.muted, fontWeight: '500'}}>{eyebrow}</Text> : null}
+        <Text style={{fontSize: 24, fontWeight: '700', color: c.text}}>{title}</Text>
       </View>
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'flex-start', backgroundColor: c.surface, borderRadius: 99, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: c.line}}>
         <Spinner size={16} stroke={1.8} />
-        <Text style={{color: c.text, fontSize: 13, fontWeight: '600'}}>{label || 'Carregando'}</Text>
+        <Text style={{color: c.text, fontSize: 13, fontWeight: '500'}}>{label || 'Carregando'}</Text>
       </View>
       <LoadingLines rows={rows} />
     </View>

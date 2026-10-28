@@ -1,0 +1,4 @@
+Plus Jakarta Sans (arquivos SofiaSans-*.ttf / .woff2 nesta pasta e em public/assets/fonts)
+Copyright 2020 The Plus Jakarta Sans Project Authors (https://github.com/tokotype/PlusJakartaSans)
+Licenciada sob a SIL Open Font License, Version 1.1 — https://openfontlicense.org
+Os arquivos foram só renomeados para uso interno da Sofia OS; o desenho e o nome interno da fonte não mudaram.

@@ -39,7 +39,7 @@ export function LibraryTagManager({api, kind, fieldKey, facet, onClose, onChange
   }
   const remove = (o: TagOption) => appAlert('Apagar a etiqueta “' + o.label + '”?', 'Ela sai de ' + o.count + (o.count === 1 ? ' item' : ' itens') + '. Os itens continuam na Biblioteca.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Apagar', style: 'destructive', onPress: () => void apply(o.label, v => removeTagFromValue(v, o.label), 'Atualizando')}]);
   return <Sheet visible onClose={() => { if (!busy) onClose(); }} label="Fechar etiquetas">
-    <Text style={{color: c.text, fontSize: 22, fontWeight: '700'}}>{facet}</Text>
+    <Text style={{color: c.text, fontSize: 24, fontWeight: '600'}}>{facet}</Text>
     <Text style={{color: c.muted, fontSize: 13, marginTop: 4, marginBottom: 12}}>Renomeie, junte (renomeando para uma que já existe) ou apague. Muda em todos os itens deste tipo.</Text>
     {error ? <Text style={{color: c.danger, marginBottom: 8}}>{error}</Text> : null}
     {busy ? <Text style={{color: c.accent, marginBottom: 8}}>{busy}</Text> : null}
@@ -50,9 +50,9 @@ export function LibraryTagManager({api, kind, fieldKey, facet, onClose, onChange
         <TextInput accessibilityLabel={'Novo nome para ' + o.label} autoFocus value={name} onChangeText={setName} onSubmitEditing={() => rename(o.label)} style={[forms.input, {borderColor: c.line, color: c.text, backgroundColor: c.surface}]} />
         <View style={{flexDirection: 'row', gap: 8}}><View style={{flex: 1}}><Button title="Salvar nome" disabled={!!busy} onPress={() => rename(o.label)} /></View><View style={{flex: 1}}><Button title="Cancelar" secondary disabled={!!busy} onPress={() => setEditing('')} /></View></View>
       </View> : <View key={o.label} style={{flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line}}>
-        <Text style={{flex: 1, color: c.text, fontWeight: '600'}}>{o.label} <Text style={{color: c.muted, fontWeight: '400'}}>· {o.count}</Text></Text>
-        <Pressable accessibilityRole="button" accessibilityLabel={'Renomear ' + o.label} disabled={!!busy} onPress={() => { setEditing(o.label); setName(o.label); }} hitSlop={8}><Text style={{color: c.accent, fontWeight: '700'}}>Renomear</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel={'Apagar ' + o.label} disabled={!!busy} onPress={() => remove(o)} hitSlop={8}><Text style={{color: c.danger, fontWeight: '700'}}>Apagar</Text></Pressable>
+        <Text style={{flex: 1, color: c.text, fontWeight: '500'}}>{o.label} <Text style={{color: c.muted, fontWeight: '400'}}>· {o.count}</Text></Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={'Renomear ' + o.label} disabled={!!busy} onPress={() => { setEditing(o.label); setName(o.label); }} hitSlop={8}><Text style={{color: c.accent, fontWeight: '600'}}>Renomear</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={'Apagar ' + o.label} disabled={!!busy} onPress={() => remove(o)} hitSlop={8}><Text style={{color: c.danger, fontWeight: '600'}}>Apagar</Text></Pressable>
       </View>)}
     </ScrollView>
   </Sheet>;

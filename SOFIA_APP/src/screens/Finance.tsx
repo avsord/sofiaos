@@ -24,7 +24,7 @@ import {MotionModal} from '../components/MotionModal';
 import {Sheet, markSheetHandoff} from '../components/Sheet';
 import {InternalBackGesture} from '../components/InternalBackGesture';
 import {DateTimeField} from '../components/DateTimeField';
-import {Icon} from '../components/Icon';
+import {Icon, type IconName} from '../components/Icon';
 import {Button, IconButton} from '../components/UI';
 import {PriceChart} from '../components/PriceChart';
 import {Spinner, LoadingLines, ShimmerBlock, ShimmerGroup} from '../components/Loading';
@@ -148,7 +148,7 @@ function Chips<T extends string | number>({value, options, onChange, scroll = fa
   const inner = options.map(o => (
     <SurePressable key={String(o.value)} accessibilityRole="button" accessibilityState={{selected: o.value === value}} onPress={() => onChange(o.value)}
       style={{paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99, backgroundColor: o.value === value ? c.surface : 'transparent'}}>
-      <Text style={{fontSize: 13, fontWeight: '600', color: o.value === value ? c.text : c.muted}}>{o.label}</Text>
+      <Text style={{fontSize: 13, fontWeight: '500', color: o.value === value ? c.text : c.muted}}>{o.label}</Text>
     </SurePressable>
   ));
   const box = {flexDirection: 'row' as const, backgroundColor: c.input, borderRadius: 99, padding: 3};
@@ -160,14 +160,18 @@ function Card_({children, style}: {children: React.ReactNode; style?: any}) {
 }
 function Title({text, action, onAction}: {text: string; action?: string; onAction?: () => void}) {
   const c = useTheme();
-  return <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Text style={{flex: 1, fontSize: 17, fontWeight: '700', color: c.text}}>{text}</Text>{action ? <Pressable onPress={onAction}><Text style={{color: c.accent, fontWeight: '600', fontSize: 13}}>{action}</Text></Pressable> : null}</View>;
+  return <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}><Text style={{flex: 1, fontSize: 18, fontWeight: '600', color: c.text}}>{text}</Text>{action ? <Pressable onPress={onAction}><Text style={{color: c.accent, fontWeight: '500', fontSize: 13}}>{action}</Text></Pressable> : null}</View>;
 }
 function Bar({pct, color}: {pct: number; color: string}) {
   const c = useTheme();
   return <View style={{height: 8, borderRadius: 4, backgroundColor: c.input, overflow: 'hidden'}}><View style={{width: `${Math.min(100, Math.max(0, pct * 100))}%`, height: 8, borderRadius: 4, backgroundColor: color}} /></View>;
 }
-function Dot({color, icon, size = 36}: {color: string; icon: string; size?: number}) {
-  return <View style={{width: size, height: size, borderRadius: size / 2, backgroundColor: color + '26', alignItems: 'center', justifyContent: 'center'}}><Text style={{fontSize: size * 0.48}}>{icon}</Text></View>;
+/** 0.3.259: icone da categoria (conjunto da Sofia) no lugar do emoji. */
+function CatIcon({cat, size = 18, color}: {cat: {glyph?: string; color: string}; size?: number; color?: string}) {
+  return <Icon name={(cat.glyph || 'circle') as IconName} size={size} color={color || cat.color} weight="duotone" />;
+}
+function Dot({color, icon, glyph, size = 36}: {color: string; icon: string; glyph?: string; size?: number}) {
+  return <View style={{width: size, height: size, borderRadius: size / 2, backgroundColor: color + '26', alignItems: 'center', justifyContent: 'center'}}>{glyph ? <CatIcon cat={{glyph, color}} size={Math.round(size * 0.52)} /> : <Text style={{fontSize: size * 0.48}}>{icon}</Text>}</View>;
 }
 
 // ============================ TELA ============================
@@ -289,7 +293,7 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
         <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 12, paddingBottom: 2}}>
           <IconButton name="back" label="Voltar à tela anterior" onPress={backFinance} />
           <View style={{flex: 1, paddingHorizontal: 4}}>
-            <Text style={{fontSize: 24, fontWeight: '800', color: c.text}}>Finanças</Text>
+            <Text style={{fontSize: 24, fontWeight: '700', color: c.text}}>Finanças</Text>
           </View>
           <IconButton name="settings" label="Contas e cartões" onPress={() => setManage(true)} />
         </View>
@@ -298,13 +302,13 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
           {d?.accounts.length ? <Pressable accessibilityRole="button" accessibilityLabel={'Conta: ' + (account?.name || 'selecionar') + '. Trocar'} onPress={() => setAccountPicker(true)}
             style={{flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: c.surface, borderColor: c.line, borderWidth: 1, borderRadius: 99, paddingHorizontal: 12, paddingVertical: 8}}>
             <View style={{width: 9, height: 9, borderRadius: 5, backgroundColor: account?.color || c.accent}} />
-            <Text numberOfLines={1} style={{flexShrink: 1, fontWeight: '700', color: c.text, fontSize: 13}}>{account?.name || 'Selecionar conta'}</Text>
+            <Text numberOfLines={1} style={{flexShrink: 1, fontWeight: '600', color: c.text, fontSize: 13}}>{account?.name || 'Selecionar conta'}</Text>
             <Text style={{color: c.muted, fontSize: 11}}>▾</Text>
           </Pressable> : <View style={{flex: 1}} />}
           <View style={{flex: 1}} />
-          {desktop && d?.accounts.length ? <Pressable accessibilityRole="button" accessibilityLabel="Novo lançamento" onPress={() => setNewMenu(true)} style={{flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: c.accent, marginRight: 10}}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 13}}>＋ Novo lançamento</Text></Pressable> : null}
+          {desktop && d?.accounts.length ? <Pressable accessibilityRole="button" accessibilityLabel="Novo lançamento" onPress={() => setNewMenu(true)} style={{flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: c.accent, marginRight: 10}}><Text style={{color: c.onAccent, fontWeight: '600', fontSize: 13}}>＋ Novo lançamento</Text></Pressable> : null}
           <IconButton name="back" label="Mês anterior" size={32} onPress={() => setMonth(m => addMonths(m, -1))} />
-          <Pressable accessibilityLabel="Voltar ao mês atual" onPress={() => setMonth(monthOf(todayISO()))}><Text style={{fontSize: 14, fontWeight: '700', color: c.text, minWidth: 104, textAlign: 'center'}}>{monthLabel(month)}</Text></Pressable>
+          <Pressable accessibilityLabel="Voltar ao mês atual" onPress={() => setMonth(monthOf(todayISO()))}><Text style={{fontSize: 14, fontWeight: '600', color: c.text, minWidth: 104, textAlign: 'center'}}>{monthLabel(month)}</Text></Pressable>
           <Pressable accessibilityLabel="Próximo mês" onPress={() => setMonth(m => addMonths(m, 1))} style={{width: 32, height: 32, alignItems: 'center', justifyContent: 'center', transform: [{rotate: '180deg'}]}}><Icon name="back" size={18} color={c.text} /></Pressable>
         </View>
         <View style={{paddingHorizontal: 20, paddingBottom: 14}}>
@@ -334,13 +338,13 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
           </Pressable> : null}
           <Sheet visible={newMenu} onClose={() => setNewMenu(false)} label="Fechar novo lançamento">
             <View style={{gap: 4, paddingBottom: 12}}>
-              <Text style={{fontSize: 18, fontWeight: '800', color: c.text, marginBottom: 6}}>Novo lançamento</Text>
-              {([['expense', '↓ Despesa', BAD], ['income', '↑ Receita', GOOD], ['transfer', '⇄ Transferência entre contas', c.accent]] as const).map(([k, label, color]) =>
-                <Pressable key={k} accessibilityRole="button" onPress={() => { setNewMenu(false); afterSheet(() => newTx(k as TxKind)); }} style={{paddingVertical: 15, borderBottomWidth: 1, borderColor: c.line}}><Text style={{color, fontSize: 16, fontWeight: '700'}}>{label}</Text></Pressable>)}
-              <Pressable accessibilityRole="button" onPress={() => { setNewMenu(false); navigateFinance('home'); afterSheet(() => setAporteKey(k => k + 1)); }} style={{paddingVertical: 15, borderBottomWidth: 1, borderColor: c.line}}><Text style={{color: GUARD, fontSize: 16, fontWeight: '700'}}>🔒 Aporte (guardar dinheiro)</Text></Pressable>
+              <Text style={{fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 6}}>Novo lançamento</Text>
+              {([['expense', '↓ Despesa', c.danger], ['income', '↑ Receita', c.good], ['transfer', '⇄ Transferência entre contas', c.accent]] as const).map(([k, label, color]) =>
+                <Pressable key={k} accessibilityRole="button" onPress={() => { setNewMenu(false); afterSheet(() => newTx(k as TxKind)); }} style={{paddingVertical: 15, borderBottomWidth: 1, borderColor: c.line}}><Text style={{color, fontSize: 16, fontWeight: '600'}}>{label}</Text></Pressable>)}
+              <Pressable accessibilityRole="button" onPress={() => { setNewMenu(false); navigateFinance('home'); afterSheet(() => setAporteKey(k => k + 1)); }} style={{paddingVertical: 15, borderBottomWidth: 1, borderColor: c.line}}><Text style={{color: GUARD, fontSize: 16, fontWeight: '600'}}>🔒 Aporte (guardar dinheiro)</Text></Pressable>
               {/* 0.3.213: um "+" com as cinco entradas do modulo */}
               {([['expense', '⏰ Conta a pagar', c.text], ['income', '⏰ Conta a receber', c.text]] as const).map(([flow, label, color]) =>
-                <Pressable key={flow} accessibilityRole="button" onPress={() => { setNewMenu(false); setBillScope('series'); setBillFlow(flow); afterSheet(() => setBillEditor('new')); }} style={{paddingVertical: 15, borderBottomWidth: flow === 'expense' ? 1 : 0, borderColor: c.line}}><Text style={{color, fontSize: 16, fontWeight: '700'}}>{label}</Text></Pressable>)}
+                <Pressable key={flow} accessibilityRole="button" onPress={() => { setNewMenu(false); setBillScope('series'); setBillFlow(flow); afterSheet(() => setBillEditor('new')); }} style={{paddingVertical: 15, borderBottomWidth: flow === 'expense' ? 1 : 0, borderColor: c.line}}><Text style={{color, fontSize: 16, fontWeight: '600'}}>{label}</Text></Pressable>)}
             </View>
           </Sheet>
         </> : null}
@@ -356,13 +360,13 @@ export function Finance({api, active, onBack, onAppsTap}: {onAppsTap?: (handler:
         {manage && d ? <ManageSheet api={api} d={d} onClose={() => setManage(false)} onFinished={goHome} reload={reload} /> : null}
         <Sheet visible={accountPicker} onClose={() => setAccountPicker(false)} label="Fechar seletor de contas">
           <View style={{gap:14,paddingBottom:12}}>
-            <Text style={{fontSize:19,fontWeight:'800',color:c.text}}>Qual conta quer acompanhar?</Text>
+            <Text style={{fontSize:20,fontWeight:'700',color:c.text}}>Qual conta quer acompanhar?</Text>
             <Text style={{fontSize:12,color:c.muted}}>Cada conta mostra apenas o próprio saldo, entradas, saídas, faturas e pendências.</Text>
             {d?.accounts.filter(a=>!a.archived).map(a=><Pressable key={a.id} accessibilityRole="button" accessibilityState={{selected:a.id===accountId}} onPress={()=>{setSelectedAccount(a.id);setTab('home');setTabHistory([]);setAccountPicker(false);}}
               style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:13,borderBottomWidth:1,borderColor:c.line}}>
               <View style={{width:12,height:12,borderRadius:6,backgroundColor:a.color}} />
-              <View style={{flex:1}}><Text style={{color:c.text,fontSize:15,fontWeight:'700'}}>{a.name}</Text><Text style={{color:c.muted,fontSize:11}}>{a.id===primary?.id?'Principal':'Secundária'}</Text></View>
-              <Text style={{color:c.text,fontWeight:'700'}}>{money(accountBalance(a,d.txs))}</Text>
+              <View style={{flex:1}}><Text style={{color:c.text,fontSize:16,fontWeight:'600'}}>{a.name}</Text><Text style={{color:c.muted,fontSize:11}}>{a.id===primary?.id?'Principal':'Secundária'}</Text></View>
+              <Text style={{color:c.text,fontWeight:'600'}}>{money(accountBalance(a,d.txs))}</Text>
             </Pressable>)}
             <Button title="Gerenciar ou adicionar conta" secondary onPress={()=>{setAccountPicker(false);setManage(true);}} />
           </View>
@@ -473,7 +477,7 @@ function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi
             import_id: 'sofia-pendencia:' + Date.now() + ':' + n + ':' + day, remind_days: 0}}));
       }
       if (money0(saved) > 0 || money0(plan) > 0 || money0(goalValue) > 0) {
-        const data: Record<string, unknown> = {role: 'reserve', saved: money0(saved), monthly_plan: money0(plan), color: GOOD, account_id: account.id,
+        const data: Record<string, unknown> = {role: 'reserve', saved: money0(saved), monthly_plan: money0(plan), color: c.good, account_id: account.id,
           plan_day: Math.min(28, Math.max(1, Number(planDay) || Number(cycleDay) || 5)), remind_time: '09:00', remind_before_days: 0, remind_repeat_days: 0,
           target: money0(goalValue) || '', deadline: /^\d{4}-\d{2}-\d{2}$/.test(goalMonth) ? goalMonth : ''};
         jobs.push(api.saveEntity(reserve ? {...reserve.entity, data: {...reserve.entity.data, ...data}} : {kind: 'fin_goal', title: 'Dinheiro guardado', content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data}));
@@ -500,8 +504,8 @@ function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi
       {bills.map((b, i) => <Pressable key={i} accessibilityRole="button" accessibilityLabel={'Editar ' + b.title}
         onPress={() => { setBillEditing(i); setBillTitle(b.title); setBillAmount(b.amount); setBillDay(b.day); setBillParcels(b.parcels); setBillAt(b.at); }}
         style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderColor: billEditing === i ? c.accent : c.line}}>
-        <View style={{flex: 1}}><Text style={{color: billEditing === i ? c.accent : c.text, fontWeight: '600'}}>{b.title}</Text><Text style={{color: c.muted, fontSize: 11}}>dia {b.day || 1}{Number(b.parcels) > 1 ? ' · parcela ' + (Math.max(1, Number(b.at) || 1)) + ' de ' + Math.round(Number(b.parcels)) : ''}{billEditing === i ? ' · editando' : ''}</Text></View>
-        <Text style={{color: c.text, fontWeight: '700'}}>{money(money0(b.amount))}</Text>
+        <View style={{flex: 1}}><Text style={{color: billEditing === i ? c.accent : c.text, fontWeight: '500'}}>{b.title}</Text><Text style={{color: c.muted, fontSize: 11}}>dia {b.day || 1}{Number(b.parcels) > 1 ? ' · parcela ' + (Math.max(1, Number(b.at) || 1)) + ' de ' + Math.round(Number(b.parcels)) : ''}{billEditing === i ? ' · editando' : ''}</Text></View>
+        <Text style={{color: c.text, fontWeight: '600'}}>{money(money0(b.amount))}</Text>
         <IconButton name="trash" label={'Remover ' + b.title} onPress={() => { setBills(list => list.filter((_, n) => n !== i)); if (billEditing === i) { setBillEditing(null); setBillTitle(''); setBillAmount(''); setBillDay(''); setBillParcels(''); setBillAt(''); } }} />
       </Pressable>)}
       {bills.length ? <Text style={{color: c.muted, fontSize: 11}}>{tap('Toque em uma conta para corrigir os dados dela.')}</Text> : null}
@@ -535,14 +539,14 @@ function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi
       <DateTimeField label="Até" value={goalMonth} onChange={setGoalMonth} dateOnly emptyLabel="Escolher data" />
     </>},
     {title: 'Tudo pronto', hint: 'Você pode mudar qualquer coisa depois.', body: <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 8}}>
-      <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Conta</Text><Text style={{color: c.text, fontWeight: '700'}}>{name || 'Conta principal'} · {money(money0(balance))}</Text></View>
-      {cycleDay ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Recebe</Text><Text style={{color: c.text, fontWeight: '700'}}>{money0(salary) > 0 ? money(money0(salary)) + ' · ' : ''}todo dia {cycleDay}</Text></View> : null}
-      {bills.length ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Contas fixas</Text><Text style={{color: c.text, fontWeight: '700'}}>{bills.length} · {money(fixedTotal)}</Text></View> : null}
-      {money0(saved) > 0 ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Guardado</Text><Text style={{color: c.text, fontWeight: '700'}}>{money(money0(saved))}</Text></View> : null}
-      {money0(plan) > 0 ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Aporte</Text><Text style={{color: c.text, fontWeight: '700'}}>{money(money0(plan))} por mês</Text></View> : null}
-      {money0(goalValue) > 0 ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Meta</Text><Text style={{color: c.text, fontWeight: '700'}}>{money(money0(goalValue))}{goalMonth ? ' até ' + goalMonth.split('-').reverse().join('/') : ''}</Text></View> : null}
+      <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Conta</Text><Text style={{color: c.text, fontWeight: '600'}}>{name || 'Conta principal'} · {money(money0(balance))}</Text></View>
+      {cycleDay ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Recebe</Text><Text style={{color: c.text, fontWeight: '600'}}>{money0(salary) > 0 ? money(money0(salary)) + ' · ' : ''}todo dia {cycleDay}</Text></View> : null}
+      {bills.length ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Contas fixas</Text><Text style={{color: c.text, fontWeight: '600'}}>{bills.length} · {money(fixedTotal)}</Text></View> : null}
+      {money0(saved) > 0 ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Guardado</Text><Text style={{color: c.text, fontWeight: '600'}}>{money(money0(saved))}</Text></View> : null}
+      {money0(plan) > 0 ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Aporte</Text><Text style={{color: c.text, fontWeight: '600'}}>{money(money0(plan))} por mês</Text></View> : null}
+      {money0(goalValue) > 0 ? <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>Meta</Text><Text style={{color: c.text, fontWeight: '600'}}>{money(money0(goalValue))}{goalMonth ? ' até ' + goalMonth.split('-').reverse().join('/') : ''}</Text></View> : null}
       <View style={{height: 1, backgroundColor: c.line}} />
-      <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.text, fontWeight: '700', fontSize: 12}}>Saldo deste ciclo</Text><Text style={{color: GOOD, fontWeight: '800'}}>{money(ceiling)}</Text></View>
+      <View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.text, fontWeight: '600', fontSize: 12}}>Saldo deste ciclo</Text><Text style={{color: c.good, fontWeight: '700'}}>{money(ceiling)}</Text></View>
       <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>É o que sobra depois das contas fixas e do aporte. Essa é a conta que a tela inicial acompanha.</Text>
     </View>},
   ];
@@ -554,7 +558,7 @@ function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi
       </View>
       <View style={{gap: 6}}>
         <Text style={{fontSize: 12, color: c.muted}}>Passo {step + 1} de {steps.length}</Text>
-        <Text style={{fontSize: 21, fontWeight: '800', color: c.text}}>{current.title}</Text>
+        <Text style={{fontSize: 20, fontWeight: '700', color: c.text}}>{current.title}</Text>
         <Text style={{fontSize: 13, color: c.muted, lineHeight: 20}}>{current.hint}</Text>
       </View>
       {current.body}
@@ -563,7 +567,7 @@ function Onboarding({api, onDone, existing, onClose, onFinished}: {api: SofiaApi
       <Button title={last ? (existing ? 'Substituir configuração' : 'Começar a usar') : 'Continuar'} loading={busy} disabled={step === 0 && !name.trim()}
         onPress={() => last ? confirmFinish() : setStep(s => s + 1)} />
       <View style={{flexDirection: 'row', justifyContent: 'center', gap: 18}}>
-        {step > 0 ? <Pressable accessibilityRole="button" onPress={() => setStep(s => s - 1)}><Text style={{color: c.accent, fontSize: 13, fontWeight: '700'}}>Voltar</Text></Pressable> : null}
+        {step > 0 ? <Pressable accessibilityRole="button" onPress={() => setStep(s => s - 1)}><Text style={{color: c.accent, fontSize: 13, fontWeight: '600'}}>Voltar</Text></Pressable> : null}
         {!last ? <Pressable accessibilityRole="button" onPress={() => setStep(steps.length - 1)}><Text style={{color: c.muted, fontSize: 13}}>{step === 0 ? 'Pular: só a conta. O resto a Sofia cadastra pelos seus prints' : 'Pular o resto'}</Text></Pressable> : null}
         {existing && onClose ? <Pressable accessibilityRole="button" onPress={onClose}><Text style={{color: c.muted, fontSize: 13}}>Cancelar</Text></Pressable> : null}
       </View>
@@ -615,9 +619,9 @@ function ReserveHistorySheet({api, reserve, moves, show, onClose, reload, startE
   </View>;
   if (edit) return <Sheet visible onClose={() => setEdit(null)} label="Fechar edição do movimento">
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 14, paddingBottom: 18}}>
-      <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>{reserveMoveLabel(edit)}</Text>
+      <Text style={{fontSize: 20, fontWeight: '700', color: c.text}}>{reserveMoveLabel(edit)}</Text>
       <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Ao salvar, o dinheiro guardado e o aporte do mês são recalculados com o novo valor.</Text>
-      {error ? <Text style={{color: BAD}}>{error}</Text> : null}
+      {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
       {input('Valor', amount, setAmount, true)}
       <DateTimeField label="Data" value={date} onChange={v => setDate(v || date)} dateOnly allowClear={false} />
       {input('Observação (opcional)', note, setNote)}
@@ -626,30 +630,30 @@ function ReserveHistorySheet({api, reserve, moves, show, onClose, reload, startE
         {([[false, 'Recompor este mês'], [true, 'Retirada planejada']] as const).map(([v, label]) =>
           <Pressable key={label} accessibilityRole="button" accessibilityState={{selected: planned === v}} onPress={() => setPlanned(v)}
             style={{padding: 12, borderRadius: 14, borderWidth: 1, borderColor: planned === v ? c.accent : c.line, backgroundColor: planned === v ? c.accentSoft : 'transparent'}}>
-            <Text style={{color: planned === v ? c.accent : c.text, fontWeight: '700', fontSize: 14}}>{label}</Text>
+            <Text style={{color: planned === v ? c.accent : c.text, fontWeight: '600', fontSize: 14}}>{label}</Text>
           </Pressable>)}
       </View> : null}
       <Button title="Salvar" loading={busy} onPress={() => void save()} />
-      <Pressable accessibilityRole="button" onPress={remove} disabled={busy}><Text style={{color: BAD, fontWeight: '700', textAlign: 'center'}}>Apagar movimento</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={remove} disabled={busy}><Text style={{color: c.danger, fontWeight: '600', textAlign: 'center'}}>Apagar movimento</Text></Pressable>
     </ScrollView>
   </Sheet>;
   return <Sheet visible onClose={onClose} label="Fechar histórico da reserva">
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 16, paddingBottom: 18}}>
-      <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Histórico da reserva</Text>
+      <Text style={{fontSize: 20, fontWeight: '700', color: c.text}}>Histórico da reserva</Text>
       <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>{tap('Toque em um movimento para corrigir o valor, a data ou apagá-lo.')}</Text>
       {months.length ? months.map(m => <View key={m.month} style={{gap: 8}}>
         <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8}}>
-          <Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 15}}>{monthLabel(m.month)}</Text>
-          <Text style={{color: m.net >= 0 ? GOOD : BAD, fontWeight: '800', fontSize: 14}}>{m.net >= 0 ? '+' : '−'}{show(Math.abs(m.net))}</Text>
+          <Text style={{flex: 1, color: c.text, fontWeight: '700', fontSize: 16}}>{monthLabel(m.month)}</Text>
+          <Text style={{color: m.net >= 0 ? c.good : c.danger, fontWeight: '700', fontSize: 14}}>{m.net >= 0 ? '+' : '−'}{show(Math.abs(m.net))}</Text>
         </View>
         <Text style={{color: c.muted, fontSize: 12}}>Entrou {show(m.in)} · Saiu {show(m.out)}</Text>
         <View style={{backgroundColor: c.input, borderRadius: 16, paddingHorizontal: 14}}>
           {m.items.map((it, i) => <Pressable key={it.id} accessibilityRole="button" accessibilityLabel={'Editar ' + reserveMoveLabel(it) + ' de ' + show(it.amount)} onPress={() => open(it)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderColor: c.line}}>
             <View style={{flex: 1, gap: 2}}>
-              <Text style={{color: c.text, fontSize: 14, fontWeight: '600'}}>{reserveMoveLabel(it)}</Text>
+              <Text style={{color: c.text, fontSize: 14, fontWeight: '500'}}>{reserveMoveLabel(it)}</Text>
               <Text style={{color: c.muted, fontSize: 11}}>{it.date.slice(8, 10) + '/' + it.date.slice(5, 7)}{it.note ? ' · ' + it.note : ''}</Text>
             </View>
-            <Text style={{color: it.direction === 'in' ? GOOD : BAD, fontWeight: '800', fontSize: 15}}>{it.direction === 'in' ? '+' : '−'}{show(it.amount)}</Text>
+            <Text style={{color: it.direction === 'in' ? c.good : c.danger, fontWeight: '700', fontSize: 16}}>{it.direction === 'in' ? '+' : '−'}{show(it.amount)}</Text>
             <Text style={{color: c.muted, fontSize: 13}}>›</Text>
           </Pressable>)}
         </View>
@@ -703,7 +707,7 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
       if (kind === 'setup') {
         const saved = parseMoney(amount) ?? 0, monthly = parseMoney(plan) ?? 0;
         if (saved < 0 || monthly < 0) throw Error('Use valores positivos.');
-        await api.saveEntity({kind: 'fin_goal', title: name.trim() || 'Dinheiro guardado', content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {role: 'reserve', saved, ...planFields, ...goalFields, monthly_plan: monthly, color: GOOD, account_id: accountId || ''}});
+        await api.saveEntity({kind: 'fin_goal', title: name.trim() || 'Dinheiro guardado', content: '', area: 'Pessoal', privacy: 'private', state: 'active', tags: [], data: {role: 'reserve', saved, ...planFields, ...goalFields, monthly_plan: monthly, color: c.good, account_id: accountId || ''}});
       } else if ((kind === 'plan' || kind === 'goal' || kind === 'adjust') && reserve) {
         let savedBase: Record<string, any> = {};
         if (kind === 'adjust' && split) {
@@ -749,8 +753,8 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
   </View>;
   return <Sheet visible onClose={onClose} label={'Fechar ' + title}>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 14, paddingBottom: 18}}>
-      <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>{title}</Text>
-      {error ? <Text style={{color: BAD}}>{error}</Text> : null}
+      <Text style={{fontSize: 20, fontWeight: '700', color: c.text}}>{title}</Text>
+      {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
       {kind === 'setup' ? <>
         <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Informe quanto você tem guardado, esteja onde estiver. Esse valor fica separado: não entra no Saldo, que continua sendo o que você tem para usar. Depois é só registrar cada aporte em “Guardar dinheiro”.</Text>
         {input('Nome', name, setName, 'Dinheiro guardado')}
@@ -765,16 +769,16 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
       </> : kind === 'goal' ? <>
         <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Quanto você quer juntar e até quando. A Sofia mostra se o aporte atual chega lá e quanto por mês fecharia no prazo.</Text>
         {goalEditor}
-        {reserve?.target ? <Pressable accessibilityRole="button" onPress={() => { setGoalValue(''); setGoalMonth(''); }}><Text style={{color: BAD, fontSize: 13, fontWeight: '700'}}>Tirar a meta</Text></Pressable> : null}
+        {reserve?.target ? <Pressable accessibilityRole="button" onPress={() => { setGoalValue(''); setGoalMonth(''); }}><Text style={{color: c.danger, fontSize: 13, fontWeight: '600'}}>Tirar a meta</Text></Pressable> : null}
       </> : kind === 'plan' ? <>
         <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>É quanto você pretende guardar por mês, e quando. O saldo só muda quando você registra o aporte em “Guardar dinheiro”. O que faltar não passa para o mês seguinte.</Text>
         {input('Aportes de (por mês)', plan, setPlan, 'Ex.: 4.000')}
         {planEditor}
         {goalEditor}
-        {reserve ? <Pressable accessibilityRole="button" onPress={() => { setPlan(''); setRepeatDays('0'); }}><Text style={{color: BAD, fontSize: 13, fontWeight: '700'}}>Parar os aportes</Text></Pressable> : null}
+        {reserve ? <Pressable accessibilityRole="button" onPress={() => { setPlan(''); setRepeatDays('0'); }}><Text style={{color: c.danger, fontSize: 13, fontWeight: '600'}}>Parar os aportes</Text></Pressable> : null}
       </> : <>
         {kind === 'in' && split ? <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Sai do saldo geral ({money(split.daily)}) e passa a ser guardado. Não é despesa nem receita.{split.realized > 0 ? ' Você já guardou ' + money(split.realized) + ' neste mês.' : ''}</Text> : null}
-        {kind === 'in' && split && (parseMoney(amount) ?? 0) > split.daily ? <Text style={{color: BAD, fontSize: 12}}>Esse valor é maior que o saldo geral e o deixaria negativo.</Text> : null}
+        {kind === 'in' && split && (parseMoney(amount) ?? 0) > split.daily ? <Text style={{color: c.danger, fontSize: 12}}>Esse valor é maior que o saldo geral e o deixaria negativo.</Text> : null}
         {kind === 'out' && split ? <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>Hoje guardado: {money(split.saved)}. A retirada devolve o valor ao saldo geral.</Text> : null}
         {input('Valor', amount, setAmount, 'Ex.: 500')}
         {kind === 'out' ? <View style={{gap: 8}}>
@@ -782,7 +786,7 @@ function ReserveSheet({api, kind, reserve, split, onClose, onDone, accountId = '
           {([[false, 'Recompor este mês', 'Soma ao que falta guardar neste mês.'], [true, 'Retirada planejada', 'Sai do guardado e não precisa ser recomposta.']] as const).map(([v, label, hint]) =>
             <Pressable key={label} accessibilityRole="button" accessibilityState={{selected: plannedOut === v}} onPress={() => setPlannedOut(v)}
               style={{padding: 12, borderRadius: 14, borderWidth: 1, borderColor: plannedOut === v ? c.accent : c.line, backgroundColor: plannedOut === v ? c.accentSoft : 'transparent', gap: 2}}>
-              <Text style={{color: plannedOut === v ? c.accent : c.text, fontWeight: '700', fontSize: 14}}>{label}</Text>
+              <Text style={{color: plannedOut === v ? c.accent : c.text, fontWeight: '600', fontSize: 14}}>{label}</Text>
               <Text style={{color: c.muted, fontSize: 11}}>{hint}</Text>
             </Pressable>)}
         </View> : null}
@@ -810,7 +814,7 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
   const sideList=side==='pagar'?list.filter(r=>r.kind!=='receber'):list.filter(r=>r.kind==='receber');
   const sideNext=nextList.some(r=>side==='receber'?r.kind==='receber':r.kind!=='receber');
   const nextHint=(kind:'pagar'|'receber')=>{const rows=nextList.filter(r=>kind==='receber'?r.kind==='receber':r.kind!=='receber');if(!rows.length||!onMonth)return null;
-    return <Pressable accessibilityRole="button" onPress={()=>onMonth(nextMonth)} style={{paddingVertical:6}}><Text style={{color:c.accent,fontSize:12,fontWeight:'700'}}>Em {monthLabel(nextMonth).split(' ')[0].toLowerCase()}: {rows.length} {kind==='receber'?'a receber':'a pagar'} · {money(rows.reduce((s,r)=>s+r.amount,0))} ›</Text></Pressable>;};
+    return <Pressable accessibilityRole="button" onPress={()=>onMonth(nextMonth)} style={{paddingVertical:6}}><Text style={{color:c.accent,fontSize:12,fontWeight:'600'}}>Em {monthLabel(nextMonth).split(' ')[0].toLowerCase()}: {rows.length} {kind==='receber'?'a receber':'a pagar'} · {money(rows.reduce((s,r)=>s+r.amount,0))} ›</Text></Pressable>;};
   // 0.3.188: o aporte do mes entra junto das contas: amarelo enquanto falta, verde quando feito
   const reserve=reserveFor(d.goals,accountId,isPrimary);
   const aporte=useMemo(()=>reserve?moneySplit(reserve,d.moves||[],d.accounts,d.txs,d.cards,month,today):null,[reserve,d,month,today]);
@@ -833,14 +837,14 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
       <Segmented value={side} onChange={setSide} options={[{value: 'pagar' as const, label: 'A pagar'}, {value: 'receber' as const, label: 'A receber'}]} />
       <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
         <View style={{flex:1,gap:4}}>
-          <Text style={{fontSize:17,fontWeight:'800',color:c.text}}>{side==='pagar'?'Contas a pagar':'Contas a receber'}</Text>
+          <Text style={{fontSize:18,fontWeight:'700',color:c.text}}>{side==='pagar'?'Contas a pagar':'Contas a receber'}</Text>
           <Text style={{fontSize:12,color:c.muted}}>{sideOpen.length} em aberto em {monthLabel(month).split(' ')[0].toLowerCase()} · {money(sideOpen.reduce((s,r)=>s+r.amount,0))}</Text>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel={side==='pagar'?'Nova conta a pagar':'Nova conta a receber'} onPress={()=>onNew(side==='pagar'?'expense':'income')} style={{backgroundColor:c.accent,paddingHorizontal:13,paddingVertical:11,borderRadius:12}}>
-          <Text style={{color:c.onAccent,fontSize:13,fontWeight:'800'}}>＋ Nova</Text>
+          <Text style={{color:c.onAccent,fontSize:13,fontWeight:'700'}}>＋ Nova</Text>
         </Pressable>
       </View>
-      {warning ? <Text style={{fontSize:12,color:WARN}}>{warning}</Text> : null}
+      {warning ? <Text style={{fontSize:12,color:c.warn}}>{warning}</Text> : null}
     </Card_>
     {fx.bills.length||upcomingFx.length ? <Card_>
       <Title text={side==='pagar'?'Contas fixas':'Receitas fixas'} />
@@ -849,25 +853,25 @@ function PendingTab({d,api,month,accountId,warning,onBill,reload,isPrimary=true,
       {fx.bills.map(b=>{const original=d.txs.find(t=>!t.virtual&&t.id===(b.tx.seriesId||b.tx.id))||(!b.tx.virtual?b.tx:null);
         return <Pressable key={b.id+b.date} accessibilityRole="button" accessibilityLabel={'Editar '+b.title} disabled={!original} onPress={()=>original&&onBill(original,'series')} style={({pressed})=>({flexDirection:'row',alignItems:'center',gap:10,paddingVertical:9,borderTopWidth:1,borderColor:c.line,opacity:pressed?0.6:1})}>
         <View style={{flex:1,gap:2}}>
-          <Text style={{color:c.text,fontSize:14,fontWeight:'600'}}>{b.title}</Text>
+          <Text style={{color:c.text,fontSize:14,fontWeight:'500'}}>{b.title}</Text>
           <Text style={{color:c.muted,fontSize:11}}>dia {b.day}{b.cardId?' · 💳 '+(d.cards.find(x=>x.id===b.cardId)?.name||'cartão')+(b.paid?' · paga com a fatura':' · na fatura'):' · '+(side==='pagar'?(b.paid?'paga':'a pagar'):(b.paid?'recebida':'a receber'))}{b.installments?' · parcela '+b.index+' de '+b.installments+(b.left?' · faltam '+b.left:' · última'):''}</Text>
         </View>
-        <Text style={{color:b.paid?c.muted:c.text,fontWeight:'700',fontSize:14,textDecorationLine:b.paid?'line-through':'none'}}>{money(b.amount)}</Text>
+        <Text style={{color:b.paid?c.muted:c.text,fontWeight:'600',fontSize:14,textDecorationLine:b.paid?'line-through':'none'}}>{money(b.amount)}</Text>
         {original?<Text style={{color:c.muted,fontSize:16}}>›</Text>:null}
       </Pressable>;})}
       {/* 0.3.230: a fixa que comeca depois aparece igual as outras (sem botao); so diz de quando e */}
       {upcomingFx.map(t=>{const n=Math.round(Number(t.entity?.data?.installments)||0),from=monthLabel(monthOf(t.date)).split(' ')[0].toLowerCase(),to=n>1?monthLabel(addMonths(monthOf(t.date),n-Math.max(1,Math.round(Number(t.entity?.data?.installment)||1)))).split(' ')[0].toLowerCase():'';
         return <Pressable key={'u'+t.id} accessibilityRole="button" accessibilityLabel={'Editar '+t.desc} onPress={()=>onBill(t,'series')} style={({pressed})=>({flexDirection:'row',alignItems:'center',gap:10,paddingVertical:12,borderTopWidth:1,borderColor:c.line,opacity:pressed?0.7:1})}>
         <View style={{flex:1,gap:2}}>
-          <Text style={{color:c.text,fontSize:14,fontWeight:'600'}}>{t.desc}</Text>
+          <Text style={{color:c.text,fontSize:14,fontWeight:'500'}}>{t.desc}</Text>
           <Text style={{color:c.muted,fontSize:11}}>dia {Number(t.date.slice(8,10))} · {side==='pagar'?'a pagar':'a receber'} · {to?'de '+from+' a '+to:'a partir de '+from}</Text>
         </View>
-        <Text style={{color:c.text,fontWeight:'700',fontSize:14}}>{money(t.amount)}</Text>
+        <Text style={{color:c.text,fontWeight:'600',fontSize:14}}>{money(t.amount)}</Text>
         <Text style={{color:c.muted,fontSize:16}}>›</Text>
       </Pressable>;})}
       <Text style={{color:c.muted,fontSize:11}}>{tap('Toque numa conta para mudar nome, valor, dia, parcelas ou avisos. Vale para todos os meses.')}</Text>
       <View style={{borderTopWidth:1,borderColor:c.line,paddingTop:12,gap:6}}>
-        <View style={{flexDirection:'row'}}><Text style={{flex:1,color:c.text,fontWeight:'700'}}>Total do mês</Text><Text style={{color:c.text,fontWeight:'800'}}>{money(fx.total)}</Text></View>
+        <View style={{flexDirection:'row'}}><Text style={{flex:1,color:c.text,fontWeight:'600'}}>Total do mês</Text><Text style={{color:c.text,fontWeight:'700'}}>{money(fx.total)}</Text></View>
         <View style={{flexDirection:'row'}}><Text style={{flex:1,color:c.muted,fontSize:12}}>{side==='pagar'?'Pagas':'Recebidas'}</Text><Text style={{color:c.muted,fontSize:12}}>{money(fx.paid)}{fx.card?' · no cartão '+money(fx.card):''} · faltam {money(fx.open)}</Text></View>
         {side==='pagar'&&fx.share!==null?<Text style={{color:c.muted,fontSize:12,lineHeight:18}}>Suas fixas são {Math.round(fx.share*100)}% do que entrou em {range.label} ({money(fx.income)}){prevShare!==null?`, contra ${Math.round(prevShare*100)}% na média dos meses anteriores`:''}.</Text>
           :side==='pagar'?<Text style={{color:c.muted,fontSize:12}}>Ainda não há receitas registradas em {range.label} para calcular a proporção.</Text>:null}
@@ -1009,7 +1013,7 @@ function BillEditor({api,tx,accountId,onClose,onSaved,onOptimistic,scope='series
   }
   return <Sheet visible onClose={() => { void clearDraft(); onClose(); }} label="Fechar cadastro de vencimento">
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap:13,paddingBottom:24}}>
-      <Text style={{fontSize:20,fontWeight:'800',color:c.text}}>{monthOnly?'Editar só '+monthLabel(monthOf(tx!.date)).split(' ')[0].toLowerCase():existing?'Editar vencimento':'Novo vencimento'}</Text>
+      <Text style={{fontSize:20,fontWeight:'700',color:c.text}}>{monthOnly?'Editar só '+monthLabel(monthOf(tx!.date)).split(' ')[0].toLowerCase():existing?'Editar vencimento':'Novo vencimento'}</Text>
       <Text style={{fontSize:13,lineHeight:19,color:c.muted}}>Este registro só afeta o saldo depois que você confirmar o pagamento. Não vem automaticamente do extrato bancário.</Text>
       <Chips value={flow} onChange={setFlow} options={[{value:'expense',label:'A pagar'},{value:'income',label:'A receber'}]}/>
       <Field label={flow==='income'?'Conta a receber':'Conta a pagar'} value={name} onChange={setName} placeholder={flow==='income'?'Ex.: Freela, aluguel recebido, reembolso':'Ex.: Boleto de energia, dívida, aluguel'} />
@@ -1044,10 +1048,10 @@ function BillEditor({api,tx,accountId,onClose,onSaved,onOptimistic,scope='series
       <Chips value={before} onChange={setBefore} options={[{value:'0',label:'No dia'},{value:'1',label:'1 dia antes'},{value:'3',label:'3 dias antes'},{value:'7',label:'7 dias antes'}]}/>
       <Text style={{color:c.muted,fontSize:11}}>{before==='0'?'Aviso às '+(time||'9h')+' do dia do vencimento.':'Aviso às '+(time||'9h')+', '+before+(before==='1'?' dia':' dias')+' antes e de novo no dia.'}</Text>
       {tx?.virtual?<Text style={{color:c.muted,fontSize:12}}>Esta ocorrência pertence a uma série mensal. Editá-la cria uma exceção, preservando a série.</Text>:null}
-      {error?<Text style={{color:BAD,fontSize:13}}>{error}</Text>:null}
+      {error?<Text style={{color:c.danger,fontSize:13}}>{error}</Text>:null}
       <Button title={flow==='income'?'Salvar recebimento':'Salvar vencimento'} loading={busy} onPress={()=>void save()} />
       {existing?<Pressable accessibilityRole="button" accessibilityLabel="Excluir vencimento" onPress={erase} style={{alignItems:'center',paddingVertical:12}}>
-        <Text style={{color:BAD,fontWeight:'700'}}>Excluir vencimento</Text></Pressable>:null}
+        <Text style={{color:c.danger,fontWeight:'600'}}>Excluir vencimento</Text></Pressable>:null}
     </ScrollView>
   </Sheet>;
 }
@@ -1149,26 +1153,26 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
       {breakdown ? <MonthBreakdown kind={breakdown} d={d} month={month} show={show} net={net} api={api} accountId={accountId} reload={reload} onPatch={onPatchTx} onRemove={onRemoveTx} onTx={(t: Tx) => { setBreakdown(null); afterSheet(() => onTx(t)); }} onClose={() => setBreakdown(null)} /> : null}
       {forecastOpen ? <Sheet visible onClose={() => setForecastOpen(false)} label="Fechar previsão">
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 12, paddingBottom: 18}}>
-          <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Previsto até {forecastEnd}</Text>
+          <Text style={{fontSize: 20, fontWeight: '700', color: c.text}}>Previsto até {forecastEnd}</Text>
           <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>{paydayKnown ? 'Quanto sobra do ciclo, do dia do salário até a véspera do próximo' : 'Quanto sobra do mês'}, depois de tudo pago: salário e outras receitas do ciclo − todas as despesas do ciclo (pagas ou não) − faturas do cartão − aporte. Não usa o Saldo: pagar uma conta não muda o previsto.{paydayKnown ? ' Nos 5 dias antes do pagamento, já mostra o ciclo seguinte.' : ''}</Text>
           <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 6}}>
-            {([['Salário e receitas', forecastP.income, GOOD, '+', forecastP.incomeItems], ['Despesas do ciclo (pagas ou não)', forecastP.toPay, BAD, '−', forecastP.expenseItems], ['Faturas do cartão', forecastP.card, BAD, '−', [] as Tx[]], ['Aporte', forecastP.aporte, BAD, '−', [] as Tx[]]] as const)
+            {([['Salário e receitas', forecastP.income, c.good, '+', forecastP.incomeItems], ['Despesas do ciclo (pagas ou não)', forecastP.toPay, c.danger, '−', forecastP.expenseItems], ['Faturas do cartão', forecastP.card, c.danger, '−', [] as Tx[]], ['Aporte', forecastP.aporte, c.danger, '−', [] as Tx[]]] as const)
               .filter(([, v], i) => i < 2 || v > 0).map(([label, v, color, sign, items]) => <View key={label} style={{gap: 4}}>
                 <Pressable accessibilityRole="button" disabled={!items.length} onPress={() => setForecastOpenLine(l => l === label ? '' : label)} style={{flexDirection: 'row', justifyContent: 'space-between'}}>
-                  <Text style={{color: c.muted, fontSize: 13}}>{sign} {label}{items.length ? (forecastOpenLine === label ? ' ▾' : ' ▸') : ''}</Text><Text style={{color, fontWeight: '700'}}>{show(v)}</Text>
+                  <Text style={{color: c.muted, fontSize: 13}}>{sign} {label}{items.length ? (forecastOpenLine === label ? ' ▾' : ' ▸') : ''}</Text><Text style={{color, fontWeight: '600'}}>{show(v)}</Text>
                 </Pressable>
                 {forecastOpenLine === label ? items.map(t => { const original = t.virtual ? (d.txs.find(x => !x.virtual && x.id === (t.seriesId || t.id)) || t) : t;
                   return <Pressable key={t.id} accessibilityRole="button" accessibilityLabel={'Abrir ' + t.desc} onPress={() => { setForecastOpen(false); afterSheet(() => original.manualDue ? onBill(original) : onTx(original)); }}
                     style={{flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 12, paddingVertical: 4}}>
                     <Text numberOfLines={1} style={{flex: 1, color: c.text, fontSize: 12}}>{t.desc}</Text>
                     <Text style={{color: c.muted, fontSize: 11}}>{t.date.slice(8, 10)}/{t.date.slice(5, 7)}{t.virtual || t.recurrence === 'monthly' ? ' · 🔁' : ''}</Text>
-                    <Text style={{color: c.text, fontSize: 12, fontWeight: '700'}}>{show(t.amount)}</Text>
+                    <Text style={{color: c.text, fontSize: 12, fontWeight: '600'}}>{show(t.amount)}</Text>
                   </Pressable>; }) : null}
               </View>)}
             <View style={{height: 1, backgroundColor: c.line, marginVertical: 4}} />
-            <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '800'}}>= Previsto</Text><Text style={{color: forecastP.left < 0 ? BAD : c.text, fontWeight: '800'}}>{show(forecastP.left)}</Text></View>
+            <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '700'}}>= Previsto</Text><Text style={{color: forecastP.left < 0 ? c.danger : c.text, fontWeight: '700'}}>{show(forecastP.left)}</Text></View>
           </View>
-          {forecastP.left < 0 ? <Text style={{color: BAD, fontSize: 12, lineHeight: 18}}>O que ainda falta pagar passa {show(-forecastP.left)} do que você tem e do que vai entrar até lá.</Text> : null}
+          {forecastP.left < 0 ? <Text style={{color: c.danger, fontSize: 12, lineHeight: 18}}>O que ainda falta pagar passa {show(-forecastP.left)} do que você tem e do que vai entrar até lá.</Text> : null}
         </ScrollView>
       </Sheet> : null}
       {reserveHistoryOpen && reserve ? <ReserveHistorySheet api={api} reserve={reserve} moves={d.moves || []} show={show} reload={reload} startEdit={aporteEdit} onClose={() => { setReserveHistoryOpen(false); setAporteEdit(null); }} /> : null}
@@ -1177,10 +1181,10 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
       <View style={{backgroundColor: accountId ? GUARD : 'transparent', borderRadius: 24}}>
       {accountId ? <Pressable accessibilityRole="button" accessibilityLabel="Gerenciar dinheiro guardado" onPress={() => split ? setReserveMenu(true) : setReserveSheet('setup')}
         style={{paddingTop: 15, paddingHorizontal: 20, paddingBottom: 13, flexDirection: 'row', alignItems: 'center', gap: 10}}>
-        <Text style={{color: '#fff', fontWeight: '800', fontSize: 18}}>{split ? show(split.saved) : 'Configurar ›'}</Text>
+        <Text style={{color: '#fff', fontWeight: '700', fontSize: 18}}>{split ? show(split.saved) : 'Configurar ›'}</Text>
         {split && outlook ? <Text style={{color: '#ffffffcc', fontSize: 11}}>de {show(outlook.target)} · {Math.round(Math.min(1, split.saved / outlook.target) * 100)}%</Text> : split && badge ? <Text style={{color: '#ffffffcc', fontSize: 11}}>{badge}</Text> : null}
         <View style={{flex: 1}} />
-        <Text style={{color: '#ffffffdd', fontWeight: '700', fontSize: 13}}>Guardado</Text>
+        <Text style={{color: '#ffffffdd', fontWeight: '600', fontSize: 13}}>Guardado</Text>
         <Icon name="shield" size={16} color="#ffffffdd" />
       </Pressable> : null}
       <View style={{backgroundColor: c.accent, borderRadius: 24, padding: 20, gap: 16, elevation: 2}}>
@@ -1188,54 +1192,54 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
           <Text style={{flex: 1, color: c.onAccent + 'cc', fontSize: 13}}>Saldo</Text>
           <Pressable accessibilityLabel={hide ? 'Mostrar valores' : 'Esconder valores'} onPress={() => setHide(h => !h)} hitSlop={8}><Icon name={hide ? 'eyeOff' : 'eye'} size={18} color={c.onAccent + 'cc'} /></Pressable>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Ver como o saldo é calculado" onPress={() => setBreakdown('saldo')}><Text style={{color: c.onAccent, fontSize: 32, fontWeight: '800'}}>{show(future ? 0 : total)}</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Ver a previsão" onPress={() => setForecastOpen(true)}><Text style={{color: c.onAccent + 'cc', fontSize: 12}}>{future ? monthLabel(month).split(' ')[0] + ' ainda não começou · previsto' : 'Previsto até ' + forecastEnd}: <Text style={{color: c.onAccent, fontWeight: '700'}}>{show(future ? 0 : forecastP.left)}</Text> ›</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Ver como o saldo é calculado" onPress={() => setBreakdown('saldo')}><Text style={{color: c.onAccent, fontSize: 32, fontWeight: '700'}}>{show(future ? 0 : total)}</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Ver a previsão" onPress={() => setForecastOpen(true)}><Text style={{color: c.onAccent + 'cc', fontSize: 12}}>{future ? monthLabel(month).split(' ')[0] + ' ainda não começou · previsto' : 'Previsto até ' + forecastEnd}: <Text style={{color: c.onAccent, fontWeight: '600'}}>{show(future ? 0 : forecastP.left)}</Text> ›</Text></Pressable>
         <View style={{flexDirection: 'row', gap: 12}}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Ver receitas do mês" onPress={() => setBreakdown('income')} style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 16, padding: 12, gap: 2}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↑ Receitas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(future ? 0 : s.income)}</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Ver despesas do mês" onPress={() => setBreakdown('expense')} style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 16, padding: 12, gap: 2}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↓ Despesas</Text><Text style={{color: c.onAccent, fontWeight: '800', fontSize: 16}}>{show(future ? 0 : s.expense)}</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Ver receitas do mês" onPress={() => setBreakdown('income')} style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 16, padding: 12, gap: 2}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↑ Receitas</Text><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 16}}>{show(future ? 0 : s.income)}</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Ver despesas do mês" onPress={() => setBreakdown('expense')} style={{flex: 1, backgroundColor: c.onAccent + '22', borderRadius: 16, padding: 12, gap: 2}}><Text style={{color: c.onAccent + 'cc', fontSize: 11}}>↓ Despesas</Text><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 16}}>{show(future ? 0 : s.expense)}</Text></Pressable>
         </View>
 
       </View>
       </View>
       <Sheet visible={reserveMenu} onClose={() => setReserveMenu(false)} label="Fechar detalhes da reserva">
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 14, paddingBottom: 28}}>
-          <Text style={{fontSize: 18, fontWeight: '800', color: c.text}}>Sua reserva</Text>
+          <Text style={{fontSize: 18, fontWeight: '700', color: c.text}}>Sua reserva</Text>
           {split ? <>
-            <Text style={{fontSize: 29, fontWeight: '800', color: c.text}}>{show(split.saved)}</Text>
+            <Text style={{fontSize: 28, fontWeight: '700', color: c.text}}>{show(split.saved)}</Text>
             <Text style={{fontSize: 12, lineHeight: 18, color: c.muted}}>Esse valor é separado das suas contas: não entra no Saldo, que é o que você tem para usar. Aportar tira do Saldo e soma aqui; retirar devolve. É uma organização da Sofia, não bloqueia nada no banco.</Text>
             {outlook ? <Pressable accessibilityRole="button" accessibilityLabel="Editar meta" onPress={() => { setReserveMenu(false); afterSheet(() => setReserveSheet('goal')); }} style={{backgroundColor: GUARD + '1f', borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: GUARD + '55'}}>
-              <Text style={{color: c.text, fontWeight: '800', fontSize: 14}}>Meta: {show(outlook.target)} até {outlook.deadline.split('-').reverse().join('/')}</Text>
+              <Text style={{color: c.text, fontWeight: '700', fontSize: 14}}>Meta: {show(outlook.target)} até {outlook.deadline.split('-').reverse().join('/')}</Text>
               <View style={{height: 8, borderRadius: 4, backgroundColor: c.line, overflow: 'hidden'}}>
                 <View style={{width: `${Math.round(Math.min(1, split.saved / outlook.target) * 100)}%` as `${number}%`, height: 8, backgroundColor: GUARD}} />
               </View>
               <Text style={{color: c.muted, fontSize: 12}}>Hoje {show(split.saved)} · faltam {show(outlook.missing)}{outlook.months > 0 ? ' em ' + outlook.months + (outlook.months === 1 ? ' mês' : ' meses') : ''}</Text>
               {split.planned > 0 ? <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Com {show(split.planned)} por mês: {show(outlook.atCurrent)} em {monthLabel(outlook.deadline.slice(0, 7))}{outlook.reachDate ? ', e a meta inteira em ' + monthLabel(outlook.reachDate) : ''}.</Text> : null}
-              {outlook.onTrack ? <Text style={{color: GOOD, fontWeight: '700', fontSize: 13}}>No ritmo atual você chega no prazo ✓</Text>
-                : <Text style={{color: c.text, fontWeight: '700', fontSize: 13}}>Para fechar no prazo: {show(outlook.neededMonthly)} por mês</Text>}
+              {outlook.onTrack ? <Text style={{color: c.good, fontWeight: '600', fontSize: 13}}>No ritmo atual você chega no prazo ✓</Text>
+                : <Text style={{color: c.text, fontWeight: '600', fontSize: 13}}>Para fechar no prazo: {show(outlook.neededMonthly)} por mês</Text>}
               {!outlook.onTrack && split.planned > 0 ? <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Você pode manter {show(split.planned)} e compensar com aportes maiores quando sobrar, ou ajustar o valor em “Editar aportes”.</Text> : null}
             </Pressable> : null}
-            {!outlook ? <Pressable accessibilityRole="button" onPress={() => { setReserveMenu(false); afterSheet(() => setReserveSheet('goal')); }}><Text style={{color: c.accent, fontSize: 13, fontWeight: '700'}}>+ Definir uma meta (quanto e até quando)</Text></Pressable> : null}
+            {!outlook ? <Pressable accessibilityRole="button" onPress={() => { setReserveMenu(false); afterSheet(() => setReserveSheet('goal')); }}><Text style={{color: c.accent, fontSize: 13, fontWeight: '600'}}>+ Definir uma meta (quanto e até quando)</Text></Pressable> : null}
             {split.monthTarget > 0 || split.realized > 0 ? <View style={{backgroundColor: GUARD + '1f', borderRadius: 16, padding: 14, gap: 6, borderWidth: 1, borderColor: GUARD + '55'}}>
-              <Text style={{color: c.text, fontWeight: '800', fontSize: 14}}>Aportes de {monthLabel(month)}</Text>
+              <Text style={{color: c.text, fontWeight: '700', fontSize: 14}}>Aportes de {monthLabel(month)}</Text>
               {split.planned > 0 ? <Text style={{color: c.muted, fontSize: 12}}>{show(split.planned)} todo dia {split.planDay}, avisar às {split.remindTime}</Text> : null}
               <Text style={{color: c.muted, fontSize: 12}}>Guardado no mês: {show(split.realized)}</Text>
               {split.takenBack > 0 ? <Text style={{color: c.muted, fontSize: 12}}>Retirado no mês, a recompor: −{show(split.takenBack)}</Text> : null}
-              {split.monthTarget > 0 ? <Text style={{color: split.closed ? GOOD : c.text, fontWeight: '700', fontSize: 13}}>{split.closed ? 'Aporte do mês fechado ✓' : 'Faltam ' + show(split.missing) + ' para fechar o mês'}</Text> : null}
+              {split.monthTarget > 0 ? <Text style={{color: split.closed ? c.good : c.text, fontWeight: '600', fontSize: 13}}>{split.closed ? 'Aporte do mês fechado ✓' : 'Faltam ' + show(split.missing) + ' para fechar o mês'}</Text> : null}
               {split.monthTarget > 0 ? <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>O que faltar não passa para o mês seguinte: a conta recomeça no valor do aporte.</Text> : null}
             </View> : null}
             <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 10}}>
-            <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Saldo (para usar)</Text><Text style={{color: split.daily < 0 ? BAD : c.text, fontWeight: '700'}}>{show(split.daily)}</Text></View>
-              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Guardado + Saldo</Text><Text style={{color: c.text, fontWeight: '700'}}>{show(split.total)}</Text></View>
-              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Despesas previstas do mês</Text><Text style={{color: c.text, fontWeight: '700'}}>{show(split.committed)}</Text></View>
+            <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Saldo (para usar)</Text><Text style={{color: split.daily < 0 ? c.danger : c.text, fontWeight: '600'}}>{show(split.daily)}</Text></View>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Guardado + Saldo</Text><Text style={{color: c.text, fontWeight: '600'}}>{show(split.total)}</Text></View>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Despesas previstas do mês</Text><Text style={{color: c.text, fontWeight: '600'}}>{show(split.committed)}</Text></View>
               <View style={{height: 1, backgroundColor: c.line}} />
-              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '700', fontSize: 12}}>Livre após despesas previstas</Text><Text style={{color: split.free < 0 ? BAD : GOOD, fontWeight: '800'}}>{show(split.free)}</Text></View>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '600', fontSize: 12}}>Livre após despesas previstas</Text><Text style={{color: split.free < 0 ? c.danger : c.good, fontWeight: '700'}}>{show(split.free)}</Text></View>
             </View>
-            {split.daily < 0 ? <Text style={{color: BAD, fontSize: 12}}>O saldo geral ficou negativo: o que foi guardado é maior que o dinheiro que estava disponível. Confira os valores.</Text> : null}
+            {split.daily < 0 ? <Text style={{color: c.danger, fontSize: 12}}>O saldo geral ficou negativo: o que foi guardado é maior que o dinheiro que estava disponível. Confira os valores.</Text> : null}
           </> : null}
           {[['Guardar dinheiro', 'in'], ['Retirar da reserva', 'out'], ['Ajustar valor guardado', 'adjust'], ['Editar aportes', 'plan'], ['Editar meta', 'goal'], ['Histórico da reserva', 'history']].map(([label, k]) => (
             <Pressable key={k} accessibilityRole="button" onPress={() => { setReserveMenu(false); afterSheet(() => { if (k === 'history') setReserveHistoryOpen(true); else setReserveSheet(k as 'in' | 'out' | 'plan' | 'goal' | 'adjust'); }); }}
               style={{paddingVertical: 13, borderBottomWidth: 1, borderColor: c.line}}>
-              <Text style={{color: k === 'out' ? BAD : c.text, fontSize: 15, fontWeight: '600'}}>{label}  ›</Text>
+              <Text style={{color: k === 'out' ? c.danger : c.text, fontSize: 16, fontWeight: '500'}}>{label}  ›</Text>
             </Pressable>
           ))}
         </ScrollView>
@@ -1243,77 +1247,77 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
 
       {/* 0.3.188: o aporte do mes aparece como uma conta a fazer, com o valor sugerido; tocar abre ja preenchido */}
       {aporteDue && split ? <Pressable accessibilityRole="button" accessibilityLabel={'Aportar ' + show(split.missing)} onPress={() => setReserveSheet('in')}
-        style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: WARN + '1a', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: WARN}}>
+        style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.warn + '1a', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: c.warn}}>
         <Text style={{fontSize: 18}}>🔒</Text>
         <View style={{flex: 1, gap: 2}}>
-          <Text style={{color: c.text, fontWeight: '700', fontSize: 14}}>Aporte de {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
+          <Text style={{color: c.text, fontWeight: '600', fontSize: 14}}>Aporte de {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
           <Text style={{color: c.muted, fontSize: 12}}>{show(split.missing)} {split.planDay ? '· dia ' + split.planDay : ''} · toque para aportar este ou outro valor</Text>
         </View>
-        <View style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: WARN + '33'}}><Text style={{color: c.text, fontWeight: '800', fontSize: 12}}>Aportar</Text></View>
+        <View style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: c.warn + '33'}}><Text style={{color: c.text, fontWeight: '700', fontSize: 12}}>Aportar</Text></View>
       </Pressable> : null}
 
 
       {/* 0.3.161: quanto ainda da para gastar neste ciclo, depois das contas fixas e do aporte */}
       {!fresh && !future && !failed ? <ShimmerGroup><View accessibilityRole="progressbar" accessibilityLabel="Atualizando o controle de gastos" style={{backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 12, borderWidth: 1, borderColor: c.line}}>
-        <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8}}><Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 15}}>Controle de gastos</Text><Text style={{color: c.muted, fontSize: 11}}>{monthLabel(month).split(' ')[0]}</Text></View>
+        <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8}}><Text style={{flex: 1, color: c.text, fontWeight: '700', fontSize: 16}}>Controle de gastos</Text><Text style={{color: c.muted, fontSize: 11}}>{monthLabel(month).split(' ')[0]}</Text></View>
         <ShimmerBlock width={'52%'} height={24} radius={8} /><ShimmerBlock width={'100%'} height={10} radius={5} /><ShimmerBlock width={'78%'} height={10} />
       </View></ShimmerGroup> :
       (() => { const b = future ? {...spend, start: 0, available: 0, left: 0, extra: 0, spent: 0, pct: 0} : spend, over = b.left < 0, pct = Math.min(1, b.pct);
         return <Pressable accessibilityRole="button" accessibilityLabel="Ver as despesas do mês" onPress={() => setBreakdown('expense')}
-        style={{backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 10, borderWidth: 1, borderColor: over ? BAD : c.line}}>
+        style={{backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 10, borderWidth: 1, borderColor: over ? c.danger : c.line}}>
         <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8}}>
-          <Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 15}}>Controle de gastos</Text>
+          <Text style={{flex: 1, color: c.text, fontWeight: '700', fontSize: 16}}>Controle de gastos</Text>
           <Text style={{color: c.muted, fontSize: 11}}>{monthLabel(month).split(' ')[0]}</Text>
         </View>
         <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 6}}>
-          <Text style={{color: over ? BAD : c.text, fontWeight: '800', fontSize: 26}}>{show(b.left)}</Text>
+          <Text style={{color: over ? c.danger : c.text, fontWeight: '700', fontSize: 28}}>{show(b.left)}</Text>
           <Text style={{color: c.muted, fontSize: 12}}>de {show(b.available)}</Text>
           <View style={{flex: 1}} />
-          <Text style={{color: over ? BAD : pct <= 0.25 ? WARN : GOOD, fontWeight: '700', fontSize: 13}}>{Math.round(b.pct * 100)}%</Text>
+          <Text style={{color: over ? c.danger : pct <= 0.25 ? c.warn : c.good, fontWeight: '600', fontSize: 13}}>{Math.round(b.pct * 100)}%</Text>
         </View>
         <View style={{height: 10, borderRadius: 5, backgroundColor: c.line, overflow: 'hidden'}}>
-          <View style={{width: `${Math.round(pct * 100)}%` as `${number}%`, height: 10, borderRadius: 5, backgroundColor: over ? BAD : pct <= 0.25 ? WARN : GOOD}} />
+          <View style={{width: `${Math.round(pct * 100)}%` as `${number}%`, height: 10, borderRadius: 5, backgroundColor: over ? c.danger : pct <= 0.25 ? c.warn : c.good}} />
         </View>
         {future ? <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>{monthLabel(month).split(' ')[0]} ainda não começou. Os números passam a contar quando o mês chegar.</Text> : <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Você começou {monthLabel(month).split(' ')[0].toLowerCase()} com {show(b.start)}{b.extra > 0 ? ', somou ' + show(b.extra) + ' de receita avulsa' : ''} e agora tem {show(b.left)}.{b.manual ? '' : tap(' Para informar o saldo do início do mês, toque no Saldo → Ajustar saldo.')}</Text>}
       </Pressable>; })()}
 
-      {dups.slice(0, 2).map(g => <Pressable key={g.key} accessibilityRole="button" onPress={() => setDupOpen(g.key)} style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: BAD + '14', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: BAD}}>
+      {dups.slice(0, 2).map(g => <Pressable key={g.key} accessibilityRole="button" onPress={() => setDupOpen(g.key)} style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.danger + '14', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: c.danger}}>
         <Text style={{fontSize: 18}}>⚠️</Text>
         <View style={{flex: 1, gap: 2}}>
-          <Text style={{color: c.text, fontWeight: '700', fontSize: 13}}>“{g.title}” ({show(g.amount)}) aparece {g.items.length} vezes</Text>
+          <Text style={{color: c.text, fontWeight: '600', fontSize: 13}}>“{g.title}” ({show(g.amount)}) aparece {g.items.length} vezes</Text>
           <Text style={{color: c.muted, fontSize: 12}}>Pode ter sido lançado repetido e descontado {g.items.length} vezes. Toque para revisar.</Text>
         </View>
       </Pressable>)}
       <FixedDupCard d={d} api={api} reload={reload} />
       {dupGroup ? <Sheet visible onClose={() => setDupOpen(null)} label="Fechar revisão de repetidos">
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 12, paddingBottom: 18}}>
-          <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Lançamentos repetidos</Text>
+          <Text style={{fontSize: 20, fontWeight: '700', color: c.text}}>Lançamentos repetidos</Text>
           <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>“{dupGroup.title}”, {show(dupGroup.amount)}, aparece {dupGroup.items.length} vezes em {monthLabel(month).split(' ')[0].toLowerCase()}. Apague os que foram lançados a mais: cada um que sai devolve o valor ao Saldo.</Text>
           {dupGroup.items.map((t, i) => <View key={t.id} style={{flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.input, borderRadius: 14, padding: 12}}>
-            <View style={{flex: 1}}><Text style={{color: c.text, fontWeight: '600'}}>{i + 1}. {t.desc}</Text><Text style={{color: c.muted, fontSize: 12}}>{t.date.split('-').reverse().join('/')} · {t.category}{(t.entity as {created_at?: string} | undefined)?.created_at ? ' · lançado às ' + new Date(String((t.entity as {created_at?: string}).created_at)).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : ''}</Text></View>
+            <View style={{flex: 1}}><Text style={{color: c.text, fontWeight: '500'}}>{i + 1}. {t.desc}</Text><Text style={{color: c.muted, fontSize: 12}}>{t.date.split('-').reverse().join('/')} · {t.category}{(t.entity as {created_at?: string} | undefined)?.created_at ? ' · lançado às ' + new Date(String((t.entity as {created_at?: string}).created_at)).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : ''}</Text></View>
             <Pressable accessibilityRole="button" disabled={!!dupBusy || dupGroup.items.length < 2} onPress={() => { setDupBusy(t.id); void api.deleteEntity(t.entity!.id).then(() => reload()).catch(e => appAlert('Finanças', errorText(e))).finally(() => setDupBusy('')); }}
-              style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: BAD + '1f'}}>{dupBusy === t.id ? <ActivityIndicator color={BAD} /> : <Text style={{color: BAD, fontWeight: '700'}}>Apagar</Text>}</Pressable>
+              style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: c.danger + '1f'}}>{dupBusy === t.id ? <ActivityIndicator color={c.danger} /> : <Text style={{color: c.danger, fontWeight: '600'}}>Apagar</Text>}</Pressable>
           </View>)}
           <Pressable accessibilityRole="button" onPress={() => { const next = [...dupOk, dupCode(dupGroup.key)].slice(-150); setDupOk(next); void SecureStore.setItemAsync('sofia_fin_dupok_v1', JSON.stringify(next)).catch(() => {}); setDupOpen(null); }} style={{paddingVertical: 12}}>
-            <Text style={{color: c.accent, fontWeight: '700'}}>São compras diferentes, pode manter</Text></Pressable>
+            <Text style={{color: c.accent, fontWeight: '600'}}>São compras diferentes, pode manter</Text></Pressable>
         </ScrollView>
       </Sheet> : null}
       {/* 0.3.199: categoria que ja passou do que voce costuma gastar no mes */}
       {month === monthOf(today) ? catAlerts.slice(0, 2).map(a => <Pressable key={a.category} accessibilityRole="button" onPress={() => setBreakdown('expense')}
-        style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: WARN + '1a', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: WARN}}>
-        <Text style={{fontSize: 18}}>{categoryOf(a.category).icon}</Text>
+        style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.warn + '1a', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: c.warn}}>
+        <CatIcon cat={categoryOf(a.category)} size={20} />
         <View style={{flex: 1, gap: 2}}>
-          <Text style={{color: c.text, fontWeight: '700', fontSize: 13}}>{a.category}: {show(a.total)} em {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
+          <Text style={{color: c.text, fontWeight: '600', fontSize: 13}}>{a.category}: {show(a.total)} em {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
           <Text style={{color: c.muted, fontSize: 12}}>{Math.round(a.pct * 100)}% acima do que você costuma gastar ({show(a.average)} por mês)</Text>
         </View>
       </Pressable>) : null}
 
       {/* 0.3.152: vencimentos proximos viram uma linha so (o detalhe fica em Pendentes); cartoes ficam na aba Cartoes */}
       {dues.length ? <Pressable accessibilityRole="button" accessibilityLabel="Ver pendentes" onPress={() => onTab('bills')}
-        style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.surface, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: dues.some(x => x.late) ? BAD : c.line}}>
+        style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.surface, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: dues.some(x => x.late) ? c.danger : c.line}}>
         <Text style={{fontSize: 16}}>⏰</Text>
         <Text style={{flex: 1, color: c.text, fontSize: 13}}>{dues.some(x => x.late) ? 'Há conta atrasada' : dues.length === 1 ? '1 vencimento nos próximos 3 dias' : dues.length + ' vencimentos nos próximos 3 dias'}</Text>
-        <Text style={{color: c.text, fontWeight: '700', fontSize: 13}}>{show(dues.reduce((sum, x) => sum + x.amount, 0))}</Text><Text style={{color: c.muted}}>›</Text>
+        <Text style={{color: c.text, fontWeight: '600', fontSize: 13}}>{show(dues.reduce((sum, x) => sum + x.amount, 0))}</Text><Text style={{color: c.muted}}>›</Text>
       </Pressable> : null}
 
     </>
@@ -1335,7 +1339,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
 function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; reload: () => Promise<void>; onTx: (t: Partial<Tx>) => void}) {
   const c = useTheme(), [busy, setBusy] = useState(false), [pick, setPick] = useState(false);
   // 0.3.181: atrasada continua vermelha e fatura roxa; o resto em aberto (inclusive a receber) amarelo; paga verde
-  const color = due.late ? BAD : due.kind === 'fatura' ? c.accent : WARN;
+  const color = due.late ? c.danger : due.kind === 'fatura' ? c.accent : c.warn;
   const local = React.useContext(FinanceLocal);
   async function settle(accountId?: string) {
     setBusy(true);
@@ -1379,29 +1383,29 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
       style={({pressed}) => ({flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 14, backgroundColor: c.input, opacity: pressed ? 0.7 : 1})}>
       <View style={{width: 4, height: 36, borderRadius: 2, backgroundColor: cardOf?.color || c.accent}} />
       <View style={{flex: 1, gap: 2}}>
-        <Text numberOfLines={1} style={{color: c.text, fontWeight: '600'}}>💳 {due.title}</Text>
+        <Text numberOfLines={1} style={{color: c.text, fontWeight: '500'}}>💳 {due.title}</Text>
         <Text style={{fontSize: 11, color: c.muted}}>{dateBR(due.date)}{due.tx?.time ? ' · ' + due.tx.time : ''} · na fatura do {cardOf?.name || 'cartão'}{cardOf && due.tx ? ' de ' + monthLabel(txInvoiceMonth(cardOf, due.tx)).split(' ')[0].toLowerCase() : ''}</Text>
       </View>
-      <Text style={{color: c.text, fontWeight: '700'}}>{money(due.amount)}</Text>
+      <Text style={{color: c.text, fontWeight: '600'}}>{money(due.amount)}</Text>
       {/* 0.3.222: Paguei numa conta do cartao paga a fatura dela inteira - todas as contas daquela fatura ficam pagas */}
       {cardOf && due.tx ? <Pressable disabled={busy} onPress={() => askPayInvoice(cardOf, due.tx!)} style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: c.accent + '22'}}>
-        {busy ? <ActivityIndicator size="small" color={c.accent} /> : <Text style={{color: c.accent, fontWeight: '700', fontSize: 12}}>Paguei</Text>}
+        {busy ? <ActivityIndicator size="small" color={c.accent} /> : <Text style={{color: c.accent, fontWeight: '600', fontSize: 12}}>Paguei</Text>}
       </Pressable> : null}
       <Sheet visible={pick} onClose={() => setPick(false)} label="Fechar escolha de conta">
-        <Text style={{fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 8}}>Pagar a fatura com qual conta?</Text>
-        {d.accounts.filter(a => !a.archived).map(a => <Pressable key={a.id} onPress={() => { setPick(false); if (cardOf && due.tx) void payInvoiceOf(cardOf, due.tx, a.id); }} style={{paddingVertical: 14}}><Text style={{color: c.text, fontSize: 15}}>{a.name} · {money(accountBalance(a, d.txs))}</Text></Pressable>)}
+        <Text style={{fontSize: 18, fontWeight: '600', color: c.text, marginBottom: 8}}>Pagar a fatura com qual conta?</Text>
+        {d.accounts.filter(a => !a.archived).map(a => <Pressable key={a.id} onPress={() => { setPick(false); if (cardOf && due.tx) void payInvoiceOf(cardOf, due.tx, a.id); }} style={{paddingVertical: 14}}><Text style={{color: c.text, fontSize: 16}}>{a.name} · {money(accountBalance(a, d.txs))}</Text></Pressable>)}
       </Sheet>
     </Pressable>); }
   if (due.paid) return (
     <Pressable accessibilityRole="button" accessibilityLabel={'Editar ' + due.title} disabled={!target} onPress={openEdit}
-      style={({pressed}) => ({flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 14, backgroundColor: GOOD + '1a', opacity: pressed ? 0.7 : 1})}>
-      <View style={{width: 4, height: 36, borderRadius: 2, backgroundColor: GOOD}} />
+      style={({pressed}) => ({flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 14, backgroundColor: c.good + '1a', opacity: pressed ? 0.7 : 1})}>
+      <View style={{width: 4, height: 36, borderRadius: 2, backgroundColor: c.good}} />
       <View style={{flex: 1, gap: 2}}>
-        <Text numberOfLines={1} style={{color: c.text, fontWeight: '600'}}>{due.title}</Text>
-        <Text style={{fontSize: 11, color: GOOD}}>{due.kind === 'receber' ? 'Recebido' : 'Pago'} · {dateBR(due.date)}{due.tx?.time ? ' · ' + due.tx.time : ''}{due.tx?.cardId ? ' · com a fatura do ' + (d.cards.find(x => x.id === due.tx!.cardId)?.name || 'cartão') : ''}</Text>
+        <Text numberOfLines={1} style={{color: c.text, fontWeight: '500'}}>{due.title}</Text>
+        <Text style={{fontSize: 11, color: c.good}}>{due.kind === 'receber' ? 'Recebido' : 'Pago'} · {dateBR(due.date)}{due.tx?.time ? ' · ' + due.tx.time : ''}{due.tx?.cardId ? ' · com a fatura do ' + (d.cards.find(x => x.id === due.tx!.cardId)?.name || 'cartão') : ''}</Text>
       </View>
-      <Text style={{color: GOOD, fontWeight: '700'}}>{money(due.amount)}</Text>
-      <Text style={{color: GOOD, fontWeight: '800', fontSize: 12}}>✓ {due.kind === 'receber' ? 'Recebido' : 'Pago'}</Text>
+      <Text style={{color: c.good, fontWeight: '600'}}>{money(due.amount)}</Text>
+      <Text style={{color: c.good, fontWeight: '700', fontSize: 12}}>✓ {due.kind === 'receber' ? 'Recebido' : 'Pago'}</Text>
     </Pressable>
   );
   return (
@@ -1409,16 +1413,16 @@ function DueRow({due, d, api, reload, onTx}: {due: Due; d: Data; api: SofiaApi; 
       style={({pressed}) => ({flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 14, backgroundColor: color + '1a', opacity: pressed ? 0.7 : 1})}>
       <View style={{width: 4, height: 36, borderRadius: 2, backgroundColor: color}} />
       <View style={{flex: 1, gap: 2}}>
-        <Text numberOfLines={1} style={{color: c.text, fontWeight: '600'}}>{due.title}</Text>
-        <Text style={{fontSize: 11, color: due.late ? BAD : c.muted}}>{due.late ? 'Atrasado · ' : ''}{due.kind === 'receber' ? 'receber' : 'vence'} {dateBR(due.date)}{due.tx?.time ? ' · ' + due.tx.time : ''}{due.tx?.virtual ? ' · repetição' : ''}</Text>
+        <Text numberOfLines={1} style={{color: c.text, fontWeight: '500'}}>{due.title}</Text>
+        <Text style={{fontSize: 11, color: due.late ? c.danger : c.muted}}>{due.late ? 'Atrasado · ' : ''}{due.kind === 'receber' ? 'receber' : 'vence'} {dateBR(due.date)}{due.tx?.time ? ' · ' + due.tx.time : ''}{due.tx?.virtual ? ' · repetição' : ''}</Text>
       </View>
-      <Text style={{color: c.text, fontWeight: '700'}}>{money(due.amount)}</Text>
+      <Text style={{color: c.text, fontWeight: '600'}}>{money(due.amount)}</Text>
       <Pressable disabled={busy} onPress={() => due.invoice && d.accounts.length > 1 ? setPick(true) : void settle()} style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: color + '22'}}>
-        {busy ? <ActivityIndicator size="small" color={color} /> : <Text style={{color, fontWeight: '700', fontSize: 12}}>{due.kind === 'receber' ? 'Recebi' : 'Paguei'}</Text>}
+        {busy ? <ActivityIndicator size="small" color={color} /> : <Text style={{color, fontWeight: '600', fontSize: 12}}>{due.kind === 'receber' ? 'Recebi' : 'Paguei'}</Text>}
       </Pressable>
       <Sheet visible={pick} onClose={() => setPick(false)} label="Fechar escolha de conta">
-        <Text style={{fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 8}}>Pagar {due.title} com qual conta?</Text>
-        {d.accounts.filter(a => !a.archived).map(a => <Pressable key={a.id} onPress={() => { setPick(false); void settle(a.id); }} style={{paddingVertical: 14}}><Text style={{color: c.text, fontSize: 15}}>{a.name} · {money(accountBalance(a, d.txs))}</Text></Pressable>)}
+        <Text style={{fontSize: 18, fontWeight: '600', color: c.text, marginBottom: 8}}>Pagar {due.title} com qual conta?</Text>
+        {d.accounts.filter(a => !a.archived).map(a => <Pressable key={a.id} onPress={() => { setPick(false); void settle(a.id); }} style={{paddingVertical: 14}}><Text style={{color: c.text, fontSize: 16}}>{a.name} · {money(accountBalance(a, d.txs))}</Text></Pressable>)}
       </Sheet>
 
     </Pressable>
@@ -1486,11 +1490,11 @@ async function confirmTx(api: SofiaApi, t: Tx, txs: Tx[] = [], extra: Record<str
   return null;
 }
 function BudgetRow({p}: {p: ReturnType<typeof budgetProgress>[number]}) {
-  const c = useTheme(), cat = categoryOf(p.budget.category), color = p.state === 'estourado' ? BAD : p.state === 'alerta' ? WARN : GOOD;
+  const c = useTheme(), cat = categoryOf(p.budget.category), color = p.state === 'estourado' ? c.danger : p.state === 'alerta' ? c.warn : c.good;
   return (
     <View style={{gap: 6}}>
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-        <Text style={{fontSize: 16}}>{cat.icon}</Text><Text style={{flex: 1, color: c.text, fontWeight: '600'}}>{cat.name}</Text>
+        <CatIcon cat={cat} size={18} /><Text style={{flex: 1, color: c.text, fontWeight: '500'}}>{cat.name}</Text>
         <Text style={{color: c.muted, fontSize: 12}}>{money(p.spent)} de {money(p.budget.limit)}</Text>
       </View>
       <Bar pct={p.pct} color={color} />
@@ -1517,7 +1521,7 @@ function Segmented<T extends string>({value, onChange, options}: {value: T; onCh
 function Chevron({open}: {open: boolean}) {
   const c = useTheme();
   return <View style={{width: 30, height: 30, borderRadius: 15, backgroundColor: c.input, alignItems: 'center', justifyContent: 'center'}}>
-    <Text style={{color: c.text, fontSize: 20, lineHeight: 22, fontWeight: '600', transform: [{rotate: open ? '90deg' : '0deg'}]}}>›</Text>
+    <Text style={{color: c.text, fontSize: 20, lineHeight: 22, fontWeight: '500', transform: [{rotate: open ? '90deg' : '0deg'}]}}>›</Text>
   </View>;
 }
 /** 0.3.219: arrastar para o lado mostra "Apagar"; passando do ponto, pede confirmacao. Rolagem vertical nao e afetada. */
@@ -1531,8 +1535,8 @@ function SwipeToDelete({children, onDelete, label, busy = false}: {children: Rea
     onPanResponderTerminate: back,
   })).current;
   return <View style={{borderRadius: 18, overflow: 'hidden'}}>
-    <View style={{position: 'absolute', top: 0, bottom: 0, right: 0, left: 0, backgroundColor: BAD, alignItems: 'flex-end', justifyContent: 'center', paddingRight: 22}}>
-      {busy ? <ActivityIndicator color="#fff" /> : <Text accessibilityLabel={label} style={{color: '#fff', fontWeight: '800'}}>Apagar</Text>}
+    <View style={{position: 'absolute', top: 0, bottom: 0, right: 0, left: 0, backgroundColor: c.danger, alignItems: 'flex-end', justifyContent: 'center', paddingRight: 22}}>
+      {busy ? <ActivityIndicator color="#fff" /> : <Text accessibilityLabel={label} style={{color: '#fff', fontWeight: '700'}}>Apagar</Text>}
     </View>
     <Animated.View {...pan.panHandlers} style={{transform: [{translateX: x}]}}>{children}</Animated.View>
   </View>;
@@ -1546,24 +1550,24 @@ function FixedDupCard({d, api, reload}: {d: Data; api: SofiaApi; reload: () => P
   const g = groups.find(x => x.key === open) || null;
   if (!groups.length) return null;
   return <>
-    {groups.slice(0, 2).map(x => <Pressable key={x.key} accessibilityRole="button" onPress={() => setOpen(x.key)} style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: BAD + '14', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: BAD}}>
+    {groups.slice(0, 2).map(x => <Pressable key={x.key} accessibilityRole="button" onPress={() => setOpen(x.key)} style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.danger + '14', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: c.danger}}>
       <Text style={{fontSize: 18}}>⚠️</Text>
       <View style={{flex: 1, gap: 2}}>
-        <Text style={{color: c.text, fontWeight: '700', fontSize: 13}}>“{x.title}” está cadastrada {x.items.length} vezes</Text>
+        <Text style={{color: c.text, fontWeight: '600', fontSize: 13}}>“{x.title}” está cadastrada {x.items.length} vezes</Text>
         <Text style={{color: c.muted, fontSize: 12}}>{x.kind === 'income' ? 'Receita' : 'Conta'} do dia {x.day}. Toque para apagar as cópias.</Text>
       </View>
     </Pressable>)}
     {g ? <Sheet visible onClose={() => setOpen(null)} label="Fechar cadastros repetidos">
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 12, paddingBottom: 18}}>
-        <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Cadastros repetidos</Text>
+        <Text style={{fontSize: 20, fontWeight: '700', color: c.text}}>Cadastros repetidos</Text>
         <Text style={{color: c.muted, fontSize: 13, lineHeight: 19}}>“{g.title}” aparece {g.items.length} vezes, todas no dia {g.day}. Apague as que sobram e deixe só a certa.</Text>
         {g.items.map((t, i) => <View key={t.id} style={{flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.input, borderRadius: 14, padding: 12}}>
-          <View style={{flex: 1, gap: 2}}><Text style={{color: c.text, fontWeight: '600'}}>{i + 1}. {t.desc} · {money(t.amount)}</Text><Text style={{color: c.muted, fontSize: 12}}>{t.recurrence === 'monthly' ? (t.installments > 1 ? 'parcela ' + t.installment + ' de ' + t.installments : 'todo mês, sem prazo') : 'só esta vez'} · desde {t.date.split('-').reverse().join('/')}</Text></View>
+          <View style={{flex: 1, gap: 2}}><Text style={{color: c.text, fontWeight: '500'}}>{i + 1}. {t.desc} · {money(t.amount)}</Text><Text style={{color: c.muted, fontSize: 12}}>{t.recurrence === 'monthly' ? (t.installments > 1 ? 'parcela ' + t.installment + ' de ' + t.installments : 'todo mês, sem prazo') : 'só esta vez'} · desde {t.date.split('-').reverse().join('/')}</Text></View>
           <Pressable accessibilityRole="button" disabled={!!busy || g.items.length < 2} onPress={() => { setBusy(t.id); void api.deleteEntity(t.entity!.id).then(() => reload()).catch(e => appAlert('Finanças', errorText(e))).finally(() => setBusy('')); }}
-            style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: BAD + '1f'}}>{busy === t.id ? <ActivityIndicator color={BAD} /> : <Text style={{color: BAD, fontWeight: '700'}}>Apagar</Text>}</Pressable>
+            style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: c.danger + '1f'}}>{busy === t.id ? <ActivityIndicator color={c.danger} /> : <Text style={{color: c.danger, fontWeight: '600'}}>Apagar</Text>}</Pressable>
         </View>)}
         <Pressable accessibilityRole="button" onPress={() => { const next = [...ok, code(g.key)].slice(-150); setOk(next); void SecureStore.setItemAsync('sofia_fin_dupok_v1', JSON.stringify(next)).catch(() => {}); setOpen(null); }} style={{paddingVertical: 12}}>
-          <Text style={{color: c.accent, fontWeight: '700'}}>São diferentes, pode manter</Text></Pressable>
+          <Text style={{color: c.accent, fontWeight: '600'}}>São diferentes, pode manter</Text></Pressable>
       </ScrollView>
     </Sheet> : null}
   </>;
@@ -1583,7 +1587,7 @@ function BankStatements({d, api, reload, onImport}: {d: Data; api: SofiaApi; rel
     try { await api.financeStatementDelete(st.id); await reload(); } catch (e) { appAlert('Finanças', errorText(e)); } finally { setBusy(''); }
   }
   if (!d.statements.length) return <View style={{backgroundColor: c.surface, borderRadius: 18, padding: 16, gap: 8, borderWidth: 1, borderColor: c.line}}>
-    <Text style={{color: c.text, fontWeight: '700'}}>Nenhum extrato ainda</Text>
+    <Text style={{color: c.text, fontWeight: '600'}}>Nenhum extrato ainda</Text>
     <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>O extrato do banco fica guardado só aqui, para você conferir com o app. Ele não mexe na conta.</Text>
     <Button title="Importar extrato (OFX ou CSV)" secondary onPress={onImport} />
   </View>;
@@ -1592,14 +1596,14 @@ function BankStatements({d, api, reload, onImport}: {d: Data; api: SofiaApi; rel
       return <SwipeToDelete key={st.id} busy={busy === st.id} label="Apagar extrato" onDelete={() => appAlert('Apagar este extrato?', 'O extrato sai daqui' + (st.lines.some(l => d.txs.some(x => String(x.entity?.data?.import_id || '') === l.import_id)) ? ' e o que foi lançado a partir dele também, e a conta volta a como era.' : '.'), [{text: 'Cancelar', style: 'cancel'}, {text: 'Apagar', style: 'destructive', onPress: () => void remove(st)}])}>
       <View style={{backgroundColor: c.surface, borderRadius: 18, borderWidth: 1, borderColor: c.line, overflow: 'hidden'}}>
         <Pressable accessibilityRole="button" onPress={() => setOpen(o => o === st.id ? '' : st.id)} style={{padding: 14, gap: 4}}>
-          <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}><Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 14}}>{st.from.split('-').reverse().slice(0, 2).join('/')} a {st.to.split('-').reverse().slice(0, 2).join('/')}{acc ? ' · ' + acc.name : ''}</Text><Chevron open={open === st.id} /></View>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}><Text style={{flex: 1, color: c.text, fontWeight: '700', fontSize: 14}}>{st.from.split('-').reverse().slice(0, 2).join('/')} a {st.to.split('-').reverse().slice(0, 2).join('/')}{acc ? ' · ' + acc.name : ''}</Text><Chevron open={open === st.id} /></View>
           <Text style={{color: c.muted, fontSize: 12}}>{st.lines.length} linhas · {missing ? missing + (missing === 1 ? ' falta no app' : ' faltam no app') : 'tudo confere'}{st.closing !== null ? ' · saldo no banco ' + money(st.closing) : ''}</Text>
         </Pressable>
         {open === st.id ? <View style={{paddingHorizontal: 14, paddingBottom: 14, gap: 6}}>
-          {acc && st.closing !== null ? <Text style={{color: c.text, fontSize: 12, backgroundColor: c.input, borderRadius: 12, padding: 10}}>Banco no fim do extrato: <Text style={{fontWeight: '800'}}>{money(st.closing)}</Text> · app agora: <Text style={{fontWeight: '800'}}>{money(accountBalance(acc, d.txs))}</Text></Text> : null}
+          {acc && st.closing !== null ? <Text style={{color: c.text, fontSize: 12, backgroundColor: c.input, borderRadius: 12, padding: 10}}>Banco no fim do extrato: <Text style={{fontWeight: '700'}}>{money(st.closing)}</Text> · app agora: <Text style={{fontWeight: '700'}}>{money(accountBalance(acc, d.txs))}</Text></Text> : null}
           {rows.map(({l, m, before}) => <View key={l.import_id} style={{flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7, borderTopWidth: 1, borderColor: c.line}}>
-            <View style={{flex: 1}}><Text numberOfLines={1} style={{color: c.text, fontSize: 13}}>{l.desc}</Text><Text style={{color: m ? GOOD : before ? c.muted : WARN, fontSize: 11}}>{l.date.split('-').reverse().slice(0, 2).join('/')} · {m ? (m.how === 'app' ? 'bate com “' + m.tx.desc + '”' : 'lançado pelo extrato') : before ? 'antes do ponto de partida (já no Saldo)' : 'falta no app'}</Text></View>
-            <Text style={{color: l.kind === 'income' ? GOOD : c.text, fontWeight: '700', fontSize: 13}}>{l.kind === 'income' ? '+' : '−'}{money(l.amount)}</Text>
+            <View style={{flex: 1}}><Text numberOfLines={1} style={{color: c.text, fontSize: 13}}>{l.desc}</Text><Text style={{color: m ? c.good : before ? c.muted : c.warn, fontSize: 11}}>{l.date.split('-').reverse().slice(0, 2).join('/')} · {m ? (m.how === 'app' ? 'bate com “' + m.tx.desc + '”' : 'lançado pelo extrato') : before ? 'antes do ponto de partida (já no Saldo)' : 'falta no app'}</Text></View>
+            <Text style={{color: l.kind === 'income' ? c.good : c.text, fontWeight: '600', fontSize: 13}}>{l.kind === 'income' ? '+' : '−'}{money(l.amount)}</Text>
           </View>)}
         </View> : null}
       </View>
@@ -1639,7 +1643,7 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
     <>
       {/* 0.3.152: historico direto sob os cartoes; busca, filtros e importacao ficam recolhidos */}
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 2}}>
-        <Text style={{flex: 1, fontSize: 18, fontWeight: '800', color: c.text}}>Histórico</Text>
+        <Text style={{flex: 1, fontSize: 18, fontWeight: '700', color: c.text}}>Histórico</Text>
         {hasAnyTx ? <IconButton name="filter" label={tools ? 'Esconder filtros' : 'Filtrar'} onPress={() => setTools(v => !v)} /> : null}
       </View>
       <Segmented value={source} onChange={setSource} options={[{value: 'app' as const, label: 'Lançamentos'}, {value: 'months' as const, label: 'Histórico'}]} />
@@ -1648,12 +1652,12 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
         return <Card_ key={m} style={{padding: 0, gap: 0}}>
           <Pressable accessibilityRole="button" accessibilityLabel={(open ? 'Fechar ' : 'Abrir ') + monthLabel(m)} onPress={() => setOpenMonth(open ? '' : m)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14}}>
             <Text style={{fontSize: 16}}>🔒</Text>
-            <View style={{flex: 1, gap: 2}}><Text style={{color: c.text, fontWeight: '800', fontSize: 15}}>{monthLabel(m)}</Text>
+            <View style={{flex: 1, gap: 2}}><Text style={{color: c.text, fontWeight: '700', fontSize: 16}}>{monthLabel(m)}</Text>
               <Text style={{color: c.muted, fontSize: 12}}>{its.length} {its.length === 1 ? 'lançamento' : 'lançamentos'} · resultado {money(res)}</Text></View>
             <Chevron open={open} />
           </Pressable>
           {open ? <View style={{paddingHorizontal: 10, paddingBottom: 10, gap: 8}}>{daysOf(its).map(([date, items]) => <View key={date} style={{gap: 6}}>
-            <Text style={{color: c.muted, fontSize: 12, fontWeight: '700', paddingLeft: 4}}>{weekday(date)}</Text>
+            <Text style={{color: c.muted, fontSize: 12, fontWeight: '600', paddingLeft: 4}}>{weekday(date)}</Text>
             {items.map((t, i) => <TxRow key={t.id} t={t} d={d} first={i === 0} onPress={() => appAlert('Mês fechado', CLOSED_MSG)} api={api} reload={reload} />)}
           </View>)}</View> : null}
         </Card_>; }) : <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>Nenhum mês fechado ainda. Quando o mês virar, ele aparece aqui para consulta.</Text>) : null}
@@ -1663,7 +1667,7 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
       <Chips scroll value={kind} onChange={setKind} options={[{value: 'all' as const, label: 'Todos'}, {value: 'expense' as const, label: 'Despesas'}, {value: 'income' as const, label: 'Receitas'}, {value: 'transfer' as const, label: 'Transferências'}, {value: 'card_payment' as const, label: 'Faturas'}]} />
       <View style={{flexDirection: 'row', gap: 8, flexWrap: 'wrap', alignItems: 'center'}}>
         <Chips value={status} onChange={setStatus} options={[{value: 'all' as const, label: 'Tudo'}, {value: 'pending' as const, label: 'Só pendentes'}]} />
-        {filterName ? <Pressable onPress={() => setAccountFilter('')} style={{paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99, backgroundColor: c.accentSoft}}><Text style={{color: c.accent, fontWeight: '600', fontSize: 12}}>{filterName} ✕</Text></Pressable> : null}
+        {filterName ? <Pressable onPress={() => setAccountFilter('')} style={{paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99, backgroundColor: c.accentSoft}}><Text style={{color: c.accent, fontWeight: '500', fontSize: 12}}>{filterName} ✕</Text></Pressable> : null}
       </View>
       </View> : null}
       {source === 'months' ? null : <>
@@ -1671,7 +1675,7 @@ function TxTab({d, month, accountFilter, setAccountFilter, onTx, api, reload}: {
       {list.length ? <Text style={{color: c.muted, fontSize: 12}}>{list.length} movimentações no mês · resultado {money(sum)}</Text> : null}
       {!days.length ? <Text style={{color: c.muted, textAlign: 'center', paddingVertical: 30}}>{activeCat || kind !== 'all' || status !== 'all' ? 'Nenhum lançamento com esses filtros.' : (isClosedMonth(month) ? 'Nenhum lançamento neste mês.' : tap('Nenhum lançamento neste mês. Toque em ＋ para registrar.'))}</Text> : days.map(([date, items]) => (
         <View key={date} style={{gap: 8}}>
-          <Text style={{color: c.muted, fontSize: 12, fontWeight: '700', paddingLeft: 4}}>{weekday(date)}</Text>
+          <Text style={{color: c.muted, fontSize: 12, fontWeight: '600', paddingLeft: 4}}>{weekday(date)}</Text>
           <Card_ style={{padding: 10, gap: 0}}>{items.map((t, i) => <TxRow key={t.id} t={t} d={d} first={i === 0} onPress={() => onTx(t)} api={api} reload={reload} />)}</Card_>
         </View>
       ))}
@@ -1691,17 +1695,17 @@ function TxRow({t, d, first, onPress, api, reload, inInvoice = false}: {inInvoic
   const pending = !t.paid && !t.cardId;
   // 0.3.256: despesa marcada para reembolso mostra o estado na linha do Historico
   const refund = t.kind === 'expense' ? (d.refunds || []).find(x => x.expenseId === t.id && x.state !== 'archived') : undefined, refundTag = (refund ? (refund.state === 'received' ? ' · ↩️ reembolsada' : ' · ↩️ reembolso pendente') : '') + (t.noBalance ? ' · não mexe no saldo' : '');
-  const color = t.kind === 'income' ? GOOD : t.kind === 'transfer' ? c.muted : c.text;
+  const color = t.kind === 'income' ? c.good : t.kind === 'transfer' ? c.muted : c.text;
   return (
     <Pressable onPress={onPress} style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 6, borderTopWidth: first ? 0 : 1, borderColor: c.line, opacity: later && !inInvoice ? 0.5 : t.virtual ? 0.75 : 1}}>
-      <Dot color={cat.color} icon={cat.icon} />
+      <Dot color={cat.color} icon={cat.icon} glyph={cat.glyph} />
       <View style={{flex: 1}}>
-        <Text numberOfLines={1} style={{color: c.text, fontWeight: '600'}}>{t.desc}</Text>
+        <Text numberOfLines={1} style={{color: c.text, fontWeight: '500'}}>{t.desc}</Text>
         <Text numberOfLines={later && !inInvoice ? 2 : 1} style={{color: c.muted, fontSize: 11}}>{t.time ? t.time + ' · ' : ''}{cat.name} · {source}{t.installments > 1 ? ' · ' + t.installment + '/' + t.installments : ''}{t.recurrence !== 'none' || t.virtual ? ' · 🔁' : ''}{refundTag}</Text>
       </View>
       <View style={{alignItems: 'flex-end', gap: 2}}>
-        <Text style={{color, fontWeight: '700'}}>{t.kind === 'income' ? '+' : t.kind === 'transfer' ? '' : '−'}{money(t.amount)}</Text>
-        {pending ? <Pressable onPress={() => void receiveTx(api, d, t).then(reload).catch(e => appAlert('Finanças', errorText(e)))}><Text style={{fontSize: 11, color: t.date < todayISO() ? BAD : WARN, fontWeight: '700'}}>{t.virtual ? 'previsto · confirmar' : t.kind === 'income' ? 'a receber · ✓' : 'a pagar · ✓'}</Text></Pressable> : null}
+        <Text style={{color, fontWeight: '600'}}>{t.kind === 'income' ? '+' : t.kind === 'transfer' ? '' : '−'}{money(t.amount)}</Text>
+        {pending ? <Pressable onPress={() => void receiveTx(api, d, t).then(reload).catch(e => appAlert('Finanças', errorText(e)))}><Text style={{fontSize: 11, color: t.date < todayISO() ? c.danger : c.warn, fontWeight: '600'}}>{t.virtual ? 'previsto · confirmar' : t.kind === 'income' ? 'a receber · ✓' : 'a pagar · ✓'}</Text></Pressable> : null}
       </View>
     </Pressable>
   );
@@ -1730,21 +1734,21 @@ function RefundsTab({d, api, reload, accountId}: {d: Data; api: SofiaApi; reload
   return <View style={{gap: 14}}>
     <View style={{backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 6, borderWidth: 1, borderColor: c.line}}>
       <Text style={{color: c.muted, fontSize: 12}}>A receber de devoluções</Text>
-      <Text testID="refunds-total" style={{color: c.text, fontSize: 26, fontWeight: '800'}}>{money(total)}</Text>
+      <Text testID="refunds-total" style={{color: c.text, fontSize: 28, fontWeight: '700'}}>{money(total)}</Text>
       <Text style={{color: c.muted, fontSize: 12, lineHeight: 17}}>Não entra no Saldo nem no previsto. Quando o dinheiro cair, toque em “Recebi”: ele vai para o Saldo e para o Histórico.</Text>
     </View>
     <Button title="+ Nova devolução a receber" secondary onPress={() => setEditing('new')} />
     {pending.length ? pending.map(r => <Pressable key={r.id} accessibilityRole="button" accessibilityLabel={'Editar ' + r.title} onPress={() => setEditing(r)} style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.surface, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: c.line}}>
       <Text style={{fontSize: 20}}>↩️</Text>
       <View style={{flex: 1, gap: 2}}>
-        <Text style={{color: c.text, fontWeight: '700'}} numberOfLines={2}>{r.title}</Text>
+        <Text style={{color: c.text, fontWeight: '600'}} numberOfLines={2}>{r.title}</Text>
         <Text style={{color: c.muted, fontSize: 12}}>{money(r.amount)}{r.expected ? ' · previsão ' + r.expected.split('-').reverse().join('/') : ''}{accountName(r.accountId) ? ' · ' + accountName(r.accountId) : ''}</Text>
       </View>
-      <Pressable testID={'refund-receive-' + r.id} accessibilityRole="button" accessibilityLabel={'Recebi ' + r.title} disabled={!!busy} onPress={() => receive(r)} style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: GOOD + '22'}}>
-        {busy === r.id ? <ActivityIndicator color={GOOD} /> : <Text style={{color: GOOD, fontWeight: '800', fontSize: 12}}>Recebi</Text>}
+      <Pressable testID={'refund-receive-' + r.id} accessibilityRole="button" accessibilityLabel={'Recebi ' + r.title} disabled={!!busy} onPress={() => receive(r)} style={{paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: c.good + '22'}}>
+        {busy === r.id ? <ActivityIndicator color={c.good} /> : <Text style={{color: c.good, fontWeight: '700', fontSize: 12}}>Recebi</Text>}
       </Pressable>
     </Pressable>) : <Text style={{color: c.muted, fontSize: 13, textAlign: 'center', paddingVertical: 12}}>Nenhuma devolução esperando.</Text>}
-    {received.length ? <View style={{gap: 8}}><Text style={{color: c.muted, fontSize: 12, fontWeight: '700'}}>RECEBIDAS</Text>{received.map(r => <View key={r.id} style={{flexDirection: 'row', gap: 10, paddingVertical: 6}}>
+    {received.length ? <View style={{gap: 8}}><Text style={{color: c.muted, fontSize: 12, fontWeight: '600'}}>RECEBIDAS</Text>{received.map(r => <View key={r.id} style={{flexDirection: 'row', gap: 10, paddingVertical: 6}}>
       <Text style={{flex: 1, color: c.text}} numberOfLines={1}>✓ {r.title}</Text><Text style={{color: c.muted, fontSize: 12}}>{money(r.amount)}{r.receivedAt ? ' · ' + r.receivedAt.split('-').reverse().join('/') : ''}</Text></View>)}</View> : null}
     {editing ? <RefundSheet api={api} refund={editing === 'new' ? null : editing} accounts={accounts} defaultAccount={accountId || accounts[0]?.id || ''} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} /> : null}
   </View>;
@@ -1767,15 +1771,15 @@ function RefundSheet({api, refund, accounts, defaultAccount, expense, onClose, o
   }
   return <Sheet visible onClose={onClose} label="Fechar devolução">
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 14, paddingBottom: 12}}>
-      <Text style={{color: c.text, fontSize: 20, fontWeight: '800'}}>{refund ? 'Devolução a receber' : expense ? 'Vai ser reembolsada' : 'Nova devolução a receber'}</Text>
+      <Text style={{color: c.text, fontSize: 20, fontWeight: '700'}}>{refund ? 'Devolução a receber' : expense ? 'Vai ser reembolsada' : 'Nova devolução a receber'}</Text>
       {expense && !refund ? <Text style={{color: c.muted, fontSize: 12, lineHeight: 17}}>A despesa continua no Histórico e no Saldo (o dinheiro já saiu). O valor entra em Devoluções como a receber; quando cair, toque em “Recebi” e ele volta para o Saldo.</Text> : null}
       <Field label="De onde vem" value={title} onChange={setTitle} placeholder="Ex.: Estorno da loja" />
       <Field label="Valor (R$)" value={amount} onChange={setAmount} placeholder="0,00" numeric />
       <DateTimeField label="Previsão de chegada (opcional)" value={expected} onChange={setExpected} dateOnly />
       {accounts.length > 1 ? <View style={{gap: 6}}><Text style={{fontSize: 12, color: c.muted}}>Conta onde vai cair</Text><Chips scroll value={account} onChange={setAccount} options={accounts.map(a => ({value: a.id, label: a.name}))} /></View> : null}
-      {error ? <Text style={{color: BAD, fontSize: 13}}>{error}</Text> : null}
+      {error ? <Text style={{color: c.danger, fontSize: 13}}>{error}</Text> : null}
       <Button title="Salvar" loading={busy} onPress={() => void save()} />
-      {refund ? <Pressable accessibilityRole="button" onPress={erase} style={{alignItems: 'center', paddingVertical: 10}}><Text style={{color: BAD, fontWeight: '700'}}>Apagar devolução</Text></Pressable> : null}
+      {refund ? <Pressable accessibilityRole="button" onPress={erase} style={{alignItems: 'center', paddingVertical: 10}}><Text style={{color: c.danger, fontWeight: '600'}}>Apagar devolução</Text></Pressable> : null}
     </ScrollView>
   </Sheet>;
 }
@@ -1884,7 +1888,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
   // A abinha selecionada tem fundo branco fixo, então o texto dela precisa de uma cor sempre
   // escura o bastante contra branco — a própria cor do destaque no modo claro serve bem para isso,
   // mesmo no app em modo escuro (é só o texto dessa abinha, não muda o resto da tela).
-  const head = kind === 'income' ? GOOD : kind === 'transfer' ? '#4fa3ff' : c.accent, headText = head === c.accent ? c.onAccent : '#fff', selectedTabText = head === c.accent ? light.accent : head;
+  const head = kind === 'income' ? c.good : kind === 'transfer' ? c.info : c.accent, headText = head === c.accent ? c.onAccent : '#fff', selectedTabText = head === c.accent ? light.accent : head;
   return (
     <MotionModal visible animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{flex: 1, backgroundColor: c.bg}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -1892,7 +1896,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
         <View style={{backgroundColor: head, paddingTop: 40, paddingBottom: 18, paddingHorizontal: 16, gap: 12, zIndex: 2}}>
           <View style={{flexDirection: 'row', alignItems: 'center'}}>
             <Pressable accessibilityLabel="Fechar" onPress={onClose} style={{padding: 8}}><Text style={{color: headText, fontSize: 18}}>✕</Text></Pressable>
-            <Text style={{flex: 1, color: headText, fontWeight: '700', fontSize: 17}}>{editing ? 'Editar' : tx.virtual ? 'Confirmar repetição' : 'Novo lançamento'}</Text>
+            <Text style={{flex: 1, color: headText, fontWeight: '600', fontSize: 18}}>{editing ? 'Editar' : tx.virtual ? 'Confirmar repetição' : 'Novo lançamento'}</Text>
             {editing ? <Pressable accessibilityLabel={tx.manualDue && tx.paid && (tx.recurrence === 'monthly' || !!tx.seriesId) ? "Desfazer pagamento" : "Apagar lançamento"} onPress={remove} style={{padding: 8}}><Icon name="trash" size={20} color={headText} /></Pressable> : null}
           </View>
           {/* 0.3.255: tocar num item do Historico mostra quando ele foi lancado (data e hora) */}
@@ -1902,15 +1906,15 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
             <View style={{flexDirection: 'row', backgroundColor: headText + '26', borderRadius: 99, padding: 3}}>
               {([['expense', 'Despesa'], ['income', 'Receita'], ['transfer', 'Transferência']] as Array<[TxKind, string]>).map(([k, l]) => (
                 <Pressable key={k} onPress={() => { setKind(k); setCategory(''); if (k !== 'expense' && d.cards.some(x => x.id === source)) setSource(firstAccount); }} style={{flex: 1, paddingVertical: 7, borderRadius: 99, backgroundColor: kind === k ? '#fff' : 'transparent', alignItems: 'center'}}>
-                  <Text style={{color: kind === k ? selectedTabText : headText, fontWeight: '700', fontSize: 13}}>{l}</Text>
+                  <Text style={{color: kind === k ? selectedTabText : headText, fontWeight: '600', fontSize: 13}}>{l}</Text>
                 </Pressable>
               ))}
             </View>
           ) : null}
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
-            <Text style={{color: headText + 'cc', fontSize: 22}}>R$</Text>
+            <Text style={{color: headText + 'cc', fontSize: 24}}>R$</Text>
             <TextInput accessibilityLabel="Valor" value={amount} onChangeText={v => setAmount(old => formatMoneyInput(v, old))} onBlur={() => setAmount(v => finishMoneyInput(v))} placeholder="0,00" placeholderTextColor={headText + '88'} keyboardType="decimal-pad" autoFocus={!editing}
-              style={{flex: 1, color: headText, fontSize: 38, fontWeight: '800', padding: 0}} />
+              style={{flex: 1, color: headText, fontSize: 40, fontWeight: '700', padding: 0}} />
           </View>
         </View>
         <ScrollView keyboardShouldPersistTaps="handled" style={{flex: 1, overflow: 'hidden', zIndex: 1}} overScrollMode="never" contentContainerStyle={{padding: 18, gap: 16, paddingBottom: 40}}>
@@ -1923,7 +1927,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
                 {cats.map(cat => (
                   <Pressable key={cat.name} accessibilityRole="radio" accessibilityState={{checked: category === cat.name}} onPress={() => setCategory(cat.name)}
                     style={{flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 99, borderWidth: 1, borderColor: category === cat.name ? cat.color : c.line, backgroundColor: category === cat.name ? cat.color + '22' : 'transparent'}}>
-                    <Text>{cat.icon}</Text><Text style={{color: c.text, fontSize: 13}}>{cat.name}</Text>
+                    <CatIcon cat={cat} size={16} /><Text style={{color: c.text, fontSize: 13}}>{cat.name}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -1932,7 +1936,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
           <View style={{gap: 8}}>
             <Text style={{fontSize: 12, color: c.muted}}>{kind === 'transfer' ? 'Sai de' : kind === 'income' ? 'Entra em' : 'Pago com'}</Text>
             <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
-              {sources.map(s => <SurePressable key={s.id} accessibilityRole="button" accessibilityState={{selected: source === s.id}} onPress={() => setSource(s.id)} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: source === s.id ? c.accent : c.input}}><Text style={{color: source === s.id ? '#fff' : c.text, fontSize: 13, fontWeight: '600'}}>{s.label}</Text></SurePressable>)}
+              {sources.map(s => <SurePressable key={s.id} accessibilityRole="button" accessibilityState={{selected: source === s.id}} onPress={() => setSource(s.id)} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: source === s.id ? c.accent : c.input}}><Text style={{color: source === s.id ? '#fff' : c.text, fontSize: 13, fontWeight: '500'}}>{s.label}</Text></SurePressable>)}
             </View>
             {isCard ? <Text style={{fontSize: 11, color: c.muted}}>Entra na fatura de {monthLabel(invoiceMonth(d.cards.find(x => x.id === source)!, date)).toLowerCase()}.</Text> : null}
           </View>
@@ -1940,18 +1944,18 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
             <View style={{gap: 8}}>
               <Text style={{fontSize: 12, color: c.muted}}>Vai para</Text>
               <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
-                {d.accounts.filter(a => !a.archived && a.id !== source).map(a => <SurePressable key={a.id} accessibilityRole="button" onPress={() => setTo(a.id)} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: to === a.id ? c.accent : c.input}}><Text style={{color: to === a.id ? '#fff' : c.text, fontSize: 13, fontWeight: '600'}}>{a.name}</Text></SurePressable>)}
+                {d.accounts.filter(a => !a.archived && a.id !== source).map(a => <SurePressable key={a.id} accessibilityRole="button" onPress={() => setTo(a.id)} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: to === a.id ? c.accent : c.input}}><Text style={{color: to === a.id ? '#fff' : c.text, fontSize: 13, fontWeight: '500'}}>{a.name}</Text></SurePressable>)}
               </View>
               {d.accounts.filter(a => !a.archived).length < 2 ? <Text style={{fontSize: 12, color: c.muted}}>Crie uma segunda conta em ⚙ para transferir.</Text> : null}
             </View>
           ) : null}
           <View style={{flexDirection: 'row', gap: 8}}>
-            {[['Hoje', todayISO()], ['Ontem', addDays(todayISO(), -1)]].map(([l, v]) => <Pressable key={l} onPress={() => setDate(v)} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: date === v ? c.accent : c.input}}><Text style={{color: date === v ? '#fff' : c.text, fontWeight: '600', fontSize: 13}}>{l}</Text></Pressable>)}
+            {[['Hoje', todayISO()], ['Ontem', addDays(todayISO(), -1)]].map(([l, v]) => <Pressable key={l} onPress={() => setDate(v)} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: date === v ? c.accent : c.input}}><Text style={{color: date === v ? '#fff' : c.text, fontWeight: '500', fontSize: 13}}>{l}</Text></Pressable>)}
           </View>
           <DateTimeField label="Data" value={date} onChange={v => v && setDate(v)} dateOnly allowClear={false} />
           <DateTimeField label="Horário (opcional)" value={time} onChange={v => setTime(v ? String(v).slice(0, 5) : '')} timeOnly emptyLabel="Sem horário" />
           {!isCard && kind !== 'transfer' ? (
-            <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text, fontSize: 15}}>{kind === 'income' ? 'Já recebi' : 'Já paguei'}</Text><Switch value={paid} onValueChange={setPaid} /></View>
+            <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text, fontSize: 16}}>{kind === 'income' ? 'Já recebi' : 'Já paguei'}</Text><Switch value={paid} onValueChange={setPaid} /></View>
           ) : null}
           {kind === 'income' && !isCard && goalForSplit && (repeat === 'monthly' || paid) ? (
             <View style={{gap: 6}}>
@@ -1969,9 +1973,9 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
               {repeat === 'installments' ? (
                 <View style={{gap: 8}}>
                   <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
-                    {[2, 3, 4, 5, 6, 8, 10, 12, 18, 24].map(n => <Pressable key={n} onPress={() => setParts(n)} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: parts === n ? c.accent : c.input}}><Text style={{color: parts === n ? '#fff' : c.text, fontWeight: '600'}}>{n}x</Text></Pressable>)}
+                    {[2, 3, 4, 5, 6, 8, 10, 12, 18, 24].map(n => <Pressable key={n} onPress={() => setParts(n)} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: parts === n ? c.accent : c.input}}><Text style={{color: parts === n ? '#fff' : c.text, fontWeight: '500'}}>{n}x</Text></Pressable>)}
                   </View>
-                  {plan ? <Text style={{fontSize: 13, color: c.text}}>{parts}x de <Text style={{fontWeight: '700'}}>{money(plan[plan.length - 1].amount)}</Text> · última em {dateBR(plan[plan.length - 1].date)}/{plan[plan.length - 1].date.slice(0, 4)}</Text> : null}
+                  {plan ? <Text style={{fontSize: 13, color: c.text}}>{parts}x de <Text style={{fontWeight: '600'}}>{money(plan[plan.length - 1].amount)}</Text> · última em {dateBR(plan[plan.length - 1].date)}/{plan[plan.length - 1].date.slice(0, 4)}</Text> : null}
                 </View>
               ) : null}
             </View>
@@ -1979,14 +1983,14 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
           {/* 0.3.257: "Nao mexer no saldo" - fica registrado (Historico, totais do mes), mas o Saldo nao muda */}
           {kind !== 'transfer' && !isCard ? (
             <View style={{gap: 4}}>
-              <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text, fontSize: 15}}>Não mexer no saldo</Text><Switch testID="tx-no-balance" accessibilityLabel="Não mexer no saldo" value={noBalance} onValueChange={setNoBalance} /></View>
+              <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text, fontSize: 16}}>Não mexer no saldo</Text><Switch testID="tx-no-balance" accessibilityLabel="Não mexer no saldo" value={noBalance} onValueChange={setNoBalance} /></View>
               {noBalance ? <Text style={{fontSize: 12, color: c.muted, lineHeight: 17}}>{kind === 'income' ? 'Fica registrada no Histórico e nos totais do mês, mas não soma no Saldo.' : 'Fica registrada no Histórico e nos totais do mês, mas não desconta do Saldo.'}</Text> : null}
             </View>
           ) : null}
           {/* 0.3.256/0.3.257: despesa que vai ser reembolsada (liga com Devolucoes) - junto das outras opcoes */}
           {editing && kind === 'expense' && tx.id ? (() => { const r = (d.refunds || []).find(x => x.expenseId === tx.id && x.state !== 'archived');
-            return r ? <View testID="tx-refund-status" style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text, fontSize: 15}}>Reembolso</Text><Text style={{color: r.state === 'received' ? GOOD : c.muted, fontSize: 13, fontWeight: '600'}}>{r.state === 'received' ? 'Reembolsada' + (r.receivedAt ? ' em ' + r.receivedAt.split('-').reverse().join('/') : '') : 'Pendente · ' + money(r.amount)}</Text></View>
-              : <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text, fontSize: 15}}>Vai ser reembolsada</Text><Switch testID="tx-refund-mark" accessibilityLabel="Marcar que esta despesa vai ser reembolsada" value={refundOpen} onValueChange={v => setRefundOpen(v)} /></View>; })() : null}
+            return r ? <View testID="tx-refund-status" style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text, fontSize: 16}}>Reembolso</Text><Text style={{color: r.state === 'received' ? c.good : c.muted, fontSize: 13, fontWeight: '500'}}>{r.state === 'received' ? 'Reembolsada' + (r.receivedAt ? ' em ' + r.receivedAt.split('-').reverse().join('/') : '') : 'Pendente · ' + money(r.amount)}</Text></View>
+              : <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text, fontSize: 16}}>Vai ser reembolsada</Text><Switch testID="tx-refund-mark" accessibilityLabel="Marcar que esta despesa vai ser reembolsada" value={refundOpen} onValueChange={v => setRefundOpen(v)} /></View>; })() : null}
           {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
           <Button title={editing ? 'Salvar alterações' : 'Salvar'} loading={busy} onPress={() => void save()} />
         </ScrollView>
@@ -2004,9 +2008,9 @@ function CardsTab({d, month, api, reload, onTx, onManage, onNewBill}: {month: st
   const i = card ? invoiceForMonth(card, d.txs, month) : undefined;
   const [pick, setPick] = useState(false), [busy, setBusy] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false), linking = useRef(false);
-  if (!card) return <Card_><Text style={{color: c.text, fontWeight: '700'}}>Nenhum cartão ainda</Text><Text style={{color: c.muted}}>Adicione seu cartão com limite, dia de fechamento e vencimento. A Sofia monta as faturas sozinha.</Text><Button title="Adicionar cartão" onPress={onManage} /></Card_>;
+  if (!card) return <Card_><Text style={{color: c.text, fontWeight: '600'}}>Nenhum cartão ainda</Text><Text style={{color: c.muted}}>Adicione seu cartão com limite, dia de fechamento e vencimento. A Sofia monta as faturas sozinha.</Text><Button title="Adicionar cartão" onPress={onManage} /></Card_>;
   const used = cardUsed(card, d.txs);
-  const statusColor: Record<Invoice['status'], string> = {aberta: '#4fa3ff', fechada: WARN, paga: GOOD, vencida: BAD, futura: c.muted};
+  const statusColor: Record<Invoice['status'], string> = {aberta: c.info, fechada: c.warn, paga: c.good, vencida: c.danger, futura: c.muted};
   async function pay(accountId: string) {
     if (!i) return;
     setPick(false); setBusy(true);
@@ -2017,30 +2021,30 @@ function CardsTab({d, month, api, reload, onTx, onManage, onNewBill}: {month: st
     <>
       {cards.length > 1 ? <Chips scroll value={card.id} onChange={setCardId} options={cards.map(x => ({value: x.id, label: x.name}))} /> : null}
       <View style={{backgroundColor: card.color, borderRadius: 22, padding: 18, gap: 10}}>
-        <Text style={{color: '#fff', fontWeight: '800', fontSize: 18}}>💳 {card.name}</Text>
-        <Text style={{color: '#ffffffcc', fontSize: 12}}>Limite {money(card.limit)} · usado {money(used)} · {card.limit && used > card.limit ? <Text style={{color: '#fff', fontWeight: '800', backgroundColor: BAD, borderRadius: 6}}> passou {money(used - card.limit)} do limite </Text> : 'disponível ' + money(Math.max(0, card.limit - used))}</Text>
+        <Text style={{color: '#fff', fontWeight: '700', fontSize: 18}}>💳 {card.name}</Text>
+        <Text style={{color: '#ffffffcc', fontSize: 12}}>Limite {money(card.limit)} · usado {money(used)} · {card.limit && used > card.limit ? <Text style={{color: '#fff', fontWeight: '700', backgroundColor: c.danger, borderRadius: 6}}> passou {money(used - card.limit)} do limite </Text> : 'disponível ' + money(Math.max(0, card.limit - used))}</Text>
         <View style={{height: 8, borderRadius: 4, backgroundColor: '#ffffff44', overflow: 'hidden'}}><View style={{width: `${Math.min(100, card.limit ? used / card.limit * 100 : 0)}%`, height: 8, backgroundColor: '#fff'}} /></View>
         <Text style={{color: '#ffffffcc', fontSize: 11}}>Fecha dia {card.closing} · vence dia {card.due}</Text>
       </View>
       {i ? (
         <Card_>
           <View style={{alignItems: 'center'}}>
-              <Text style={{color: c.text, fontWeight: '700'}}>Fatura de {monthLabel(i.month).toLowerCase()}</Text>
-              <View style={{paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99, backgroundColor: statusColor[i.status] + '22', marginTop: 4}}><Text style={{color: statusColor[i.status], fontWeight: '700', fontSize: 11}}>{i.status.toUpperCase()}</Text></View>
+              <Text style={{color: c.text, fontWeight: '600'}}>Fatura de {monthLabel(i.month).toLowerCase()}</Text>
+              <View style={{paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99, backgroundColor: statusColor[i.status] + '22', marginTop: 4}}><Text style={{color: statusColor[i.status], fontWeight: '600', fontSize: 11}}>{i.status.toUpperCase()}</Text></View>
           </View>
-          <Text style={{color: c.text, fontSize: 30, fontWeight: '800', textAlign: 'center'}}>{money(i.total)}</Text>
-          <Text style={{color: c.muted, fontSize: 12, textAlign: 'center'}}>{i.status === 'fechada' || i.status === 'paga' ? 'Fechou' : 'Fecha'} {dateBR(i.close)} · {i.status !== 'paga' && todayISO() > i.due ? <Text style={{color: BAD, fontWeight: '700'}}>venceu {dateBR(i.due)}</Text> : 'vence ' + dateBR(i.due)}{i.paid ? ' · pago ' + money(i.paid) : ''}</Text>
+          <Text style={{color: c.text, fontSize: 32, fontWeight: '700', textAlign: 'center'}}>{money(i.total)}</Text>
+          <Text style={{color: c.muted, fontSize: 12, textAlign: 'center'}}>{i.status === 'fechada' || i.status === 'paga' ? 'Fechou' : 'Fecha'} {dateBR(i.close)} · {i.status !== 'paga' && todayISO() > i.due ? <Text style={{color: c.danger, fontWeight: '600'}}>venceu {dateBR(i.due)}</Text> : 'vence ' + dateBR(i.due)}{i.paid ? ' · pago ' + money(i.paid) : ''}</Text>
           {i.total > i.paid && i.status !== 'futura' && i.status !== 'paga' ? <Button title={busy ? 'Pagando…' : 'Pagar fatura · ' + money(i.total - i.paid)} loading={busy} onPress={() => d.accounts.filter(a => !a.archived).length > 1 ? setPick(true) : void pay(card.accountId || d.accounts[0].id)} /> : null}
           {i.items.length ? i.items.map((t, k) => <TxRow key={t.id} t={t} d={d} first={k === 0} onPress={() => onTx(t)} api={api} reload={reload} inInvoice />) : <Text style={{color: c.muted, textAlign: 'center'}}>Nenhuma compra nesta fatura.</Text>}
           <View style={{flexDirection: 'row', gap: 8, marginTop: 4}}>
-            <SurePressable accessibilityRole="button" disabled={busy} onPress={() => { if (!busy) setLinkOpen(true); }} style={{flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: c.accentSoft, alignItems: 'center'}}><Text style={{color: c.accent, fontWeight: '700', fontSize: 13}}>Usar conta existente</Text></SurePressable>
-            <Pressable accessibilityRole="button" disabled={busy} onPress={() => onNewBill?.(card.id)} style={{flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: c.accent, alignItems: 'center'}}><Text style={{color: c.onAccent, fontWeight: '700', fontSize: 13}}>Nova conta</Text></Pressable>
+            <SurePressable accessibilityRole="button" disabled={busy} onPress={() => { if (!busy) setLinkOpen(true); }} style={{flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: c.accentSoft, alignItems: 'center'}}><Text style={{color: c.accent, fontWeight: '600', fontSize: 13}}>Usar conta existente</Text></SurePressable>
+            <Pressable accessibilityRole="button" disabled={busy} onPress={() => onNewBill?.(card.id)} style={{flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: c.accent, alignItems: 'center'}}><Text style={{color: c.onAccent, fontWeight: '600', fontSize: 13}}>Nova conta</Text></Pressable>
           </View>
         </Card_>
       ) : null}
       <Sheet visible={pick} onClose={() => setPick(false)} label="Fechar escolha de conta">
-        <Text style={{fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 8}}>Pagar com qual conta?</Text>
-        {d.accounts.filter(a => !a.archived).map(a => <Pressable key={a.id} onPress={() => void pay(a.id)} style={{paddingVertical: 14}}><Text style={{color: c.text, fontSize: 15}}>{a.name} · {money(accountBalance(a, d.txs))}</Text></Pressable>)}
+        <Text style={{fontSize: 18, fontWeight: '600', color: c.text, marginBottom: 8}}>Pagar com qual conta?</Text>
+        {d.accounts.filter(a => !a.archived).map(a => <Pressable key={a.id} onPress={() => void pay(a.id)} style={{paddingVertical: 14}}><Text style={{color: c.text, fontSize: 16}}>{a.name} · {money(accountBalance(a, d.txs))}</Text></Pressable>)}
       </Sheet>
       {/* 0.3.223: "Usar conta existente" - escolhe uma conta de Contas para passar a ser paga neste cartao */}
       {(() => { const candidates = d.txs.filter(t => !t.virtual && t.manualDue && t.kind === 'expense' && !t.cardId && ((t.recurrence === 'monthly' && !t.seriesId) || (t.recurrence === 'none' && !t.paid)));
@@ -2048,11 +2052,11 @@ function CardsTab({d, month, api, reload, onTx, onManage, onNewBill}: {month: st
         return <>
           {linkOpen ? <Sheet visible onClose={() => setLinkOpen(false)} label="Fechar escolher conta">
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 10, paddingBottom: 18}}>
-              <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Pagar no {card.name}</Text>
+              <Text style={{fontSize: 20, fontWeight: '700', color: c.text}}>Pagar no {card.name}</Text>
               <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>Escolha a conta que passa a ser paga neste cartão. Conta fixa já paga este mês continua paga pela conta; o cartão vale a partir do mês que vem.</Text>
               {candidates.length ? candidates.map(t => <SurePressable key={t.id} accessibilityRole="button" disabled={busy} onPress={() => void link(t)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 12, borderRadius: 14, backgroundColor: c.input}}>
-                <View style={{flex: 1, gap: 2}}><Text numberOfLines={1} style={{color: c.text, fontWeight: '600'}}>{t.desc}</Text><Text style={{color: c.muted, fontSize: 11}}>{t.recurrence === 'monthly' ? 'todo mês, dia ' + Number(t.date.slice(8, 10)) : dateBR(t.date)}</Text></View>
-                <Text style={{color: c.text, fontWeight: '700'}}>{money(t.amount)}</Text>
+                <View style={{flex: 1, gap: 2}}><Text numberOfLines={1} style={{color: c.text, fontWeight: '500'}}>{t.desc}</Text><Text style={{color: c.muted, fontSize: 11}}>{t.recurrence === 'monthly' ? 'todo mês, dia ' + Number(t.date.slice(8, 10)) : dateBR(t.date)}</Text></View>
+                <Text style={{color: c.text, fontWeight: '600'}}>{money(t.amount)}</Text>
               </SurePressable>) : <Text style={{color: c.muted}}>Nenhuma conta a pagar em Contas para trazer para o cartão.</Text>}
             </ScrollView>
           </Sheet> : null}
@@ -2073,7 +2077,7 @@ function PlanTab({d, month, api, reload}: {d: Data; month: string; api: SofiaApi
         {d.budgets.length ? (
           <>
             <Text style={{color: c.muted, fontSize: 12}}>{money(totalSpent)} gastos de {money(totalLimit)} planejados</Text>
-            <Bar pct={totalLimit ? totalSpent / totalLimit : 0} color={totalSpent > totalLimit ? BAD : c.accent} />
+            <Bar pct={totalLimit ? totalSpent / totalLimit : 0} color={totalSpent > totalLimit ? c.danger : c.accent} />
             {progress.map(p => <Pressable key={p.budget.id} onPress={() => setBudgetSheet(p.budget)}><BudgetRow p={p} /></Pressable>)}
           </>
         ) : <Text style={{color: c.muted}}>Defina quanto quer gastar por mês em cada categoria. A Sofia mostra quanto ainda pode gastar e avisa quando passar de 80%.</Text>}
@@ -2084,11 +2088,11 @@ function PlanTab({d, month, api, reload}: {d: Data; month: string; api: SofiaApi
           const p = goalProgress(g);
           return (
             <Pressable key={g.id} onPress={() => setGoalSheet(g)} style={{gap: 6}}>
-              <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text, fontWeight: '600'}}>{g.done ? '✅ ' : '🎯 '}{g.name}</Text><Text style={{color: c.muted, fontSize: 12}}>{Math.round(p.pct * 100)}%</Text></View>
+              <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text, fontWeight: '500'}}>{g.done ? '✅ ' : '🎯 '}{g.name}</Text><Text style={{color: c.muted, fontSize: 12}}>{Math.round(p.pct * 100)}%</Text></View>
               <Bar pct={p.pct} color={g.color} />
               <View style={{flexDirection: 'row', alignItems: 'center'}}>
                 <Text style={{flex: 1, color: c.muted, fontSize: 11}}>{money(g.saved)} de {money(g.target)}{p.perMonth ? ' · guarde ' + money(p.perMonth) + '/mês até ' + dateBR(g.deadline) + '/' + g.deadline.slice(0, 4) : p.left ? ' · faltam ' + money(p.left) : ' · concluído!'}</Text>
-                {p.left > 0 ? <Pressable onPress={() => setDeposit(g)} style={{paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, backgroundColor: g.color + '22'}}><Text style={{color: g.color, fontWeight: '700', fontSize: 12}}>+ Guardar</Text></Pressable> : null}
+                {p.left > 0 ? <Pressable onPress={() => setDeposit(g)} style={{paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, backgroundColor: g.color + '22'}}><Text style={{color: g.color, fontWeight: '600', fontSize: 12}}>+ Guardar</Text></Pressable> : null}
               </View>
             </Pressable>
           );
@@ -2105,7 +2109,7 @@ function AmountSheet({title, onClose, onSave}: {title: string; onClose: () => vo
   return (
     <Sheet visible onClose={onClose} label="Fechar">
       <View style={{gap: 12}}>
-        <Text style={{fontSize: 18, fontWeight: '700', color: c.text}}>{title}</Text>
+        <Text style={{fontSize: 18, fontWeight: '600', color: c.text}}>{title}</Text>
         <Field label="Valor (R$)" value={text} onChange={setText} numeric big placeholder="0,00" />
         {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
         <Button title="Salvar" loading={busy} onPress={async () => { const v = parseMoney(text); if (!v || v <= 0) { setError('Digite um valor.'); return; } setBusy(true); try { await onSave(v); } catch (e) { setError(errorText(e)); } finally { setBusy(false); } }} />
@@ -2118,9 +2122,9 @@ function BudgetSheet({api, budget, used, onClose, onSaved}: {api: SofiaApi; budg
   return (
     <Sheet visible onClose={onClose} label="Fechar orçamento">
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 12}}>
-        <Text style={{fontSize: 18, fontWeight: '700', color: c.text}}>{budget ? 'Editar orçamento' : 'Novo orçamento'}</Text>
+        <Text style={{fontSize: 18, fontWeight: '600', color: c.text}}>{budget ? 'Editar orçamento' : 'Novo orçamento'}</Text>
         <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
-          {EXPENSE_CATEGORIES.filter(x => x.name === budget?.category || !used.includes(x.name)).map(x => <Pressable key={x.name} onPress={() => setCat(x.name)} style={{flexDirection: 'row', gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 99, borderWidth: 1, borderColor: cat === x.name ? x.color : c.line, backgroundColor: cat === x.name ? x.color + '22' : 'transparent'}}><Text>{x.icon}</Text><Text style={{color: c.text, fontSize: 13}}>{x.name}</Text></Pressable>)}
+          {EXPENSE_CATEGORIES.filter(x => x.name === budget?.category || !used.includes(x.name)).map(x => <Pressable key={x.name} onPress={() => setCat(x.name)} style={{flexDirection: 'row', gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 99, borderWidth: 1, borderColor: cat === x.name ? x.color : c.line, backgroundColor: cat === x.name ? x.color + '22' : 'transparent'}}><CatIcon cat={x} size={16} /><Text style={{color: c.text, fontSize: 13}}>{x.name}</Text></Pressable>)}
         </View>
         <Field label="Limite por mês (R$)" value={limit} onChange={setLimit} numeric placeholder="0,00" />
         {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
@@ -2136,7 +2140,7 @@ function GoalSheet({api, goal, onClose, onSaved}: {api: SofiaApi; goal: Goal | n
   return (
     <Sheet visible onClose={onClose} label="Fechar objetivo">
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 12}}>
-        <Text style={{fontSize: 18, fontWeight: '700', color: c.text}}>{goal ? 'Editar objetivo' : 'Novo objetivo'}</Text>
+        <Text style={{fontSize: 18, fontWeight: '600', color: c.text}}>{goal ? 'Editar objetivo' : 'Novo objetivo'}</Text>
         <Field label="Nome" value={name} onChange={setName} placeholder="Ex.: Reserva de emergência" />
         <Field label="Valor do objetivo (R$)" value={target} onChange={setTarget} numeric placeholder="0,00" />
         <Field label="Já guardado (R$)" value={saved} onChange={setSaved} numeric placeholder="0,00" />
@@ -2206,7 +2210,7 @@ function Fold({id, title, children}: {id: string; title: string; children: React
   const toggle = () => { const next = !(open ?? true); setOpen(next); foldMemory = {...(foldMemory || {}), [id]: next}; void SecureStore.setItemAsync(FOLD_KEY, JSON.stringify(foldMemory)).catch(() => {}); };
   return <Card_>
     <Pressable accessibilityRole="button" accessibilityState={{expanded: !!open}} accessibilityLabel={(open ? 'Fechar ' : 'Abrir ') + title} onPress={toggle} style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-      <Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 16}}>{title}</Text>
+      <Text style={{flex: 1, color: c.text, fontWeight: '700', fontSize: 16}}>{title}</Text>
       <Chevron open={!!open} />
     </Pressable>
     {open ? children : null}
@@ -2250,12 +2254,12 @@ function ReportsTab({d: full, month, reserve, api, reload}: {d: Data; month: str
         <View style={{alignSelf: 'flex-start'}}><Chips value={kind} onChange={setKind} options={[{value: 'expense' as const, label: 'Despesas'}, {value: 'income' as const, label: 'Receitas'}]} /></View>
         <View style={{alignItems: 'center', justifyContent: 'center'}}>
           <Donut slices={cats.map(x => ({value: x.total, color: x.category.color}))} />
-          <View style={{position: 'absolute', alignItems: 'center'}}><Text style={{color: c.muted, fontSize: 11}}>Total</Text><Text style={{color: c.text, fontWeight: '800', fontSize: 16}}>{money(total)}</Text></View>
+          <View style={{position: 'absolute', alignItems: 'center'}}><Text style={{color: c.muted, fontSize: 11}}>Total</Text><Text style={{color: c.text, fontWeight: '700', fontSize: 16}}>{money(total)}</Text></View>
         </View>
         {cats.length ? cats.map(x => (
           <View key={x.category.name} style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-            <Dot color={x.category.color} icon={x.category.icon} size={30} />
-            <View style={{flex: 1, gap: 4}}><View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.text}}>{x.category.name}</Text><Text style={{color: c.text, fontWeight: '700'}}>{money(x.total)}</Text></View><Bar pct={x.pct} color={x.category.color} /></View>
+            <Dot color={x.category.color} icon={x.category.icon} glyph={x.category.glyph} size={30} />
+            <View style={{flex: 1, gap: 4}}><View style={{flexDirection: 'row'}}><Text style={{flex: 1, color: c.text}}>{x.category.name}</Text><Text style={{color: c.text, fontWeight: '600'}}>{money(x.total)}</Text></View><Bar pct={x.pct} color={x.category.color} /></View>
             <Text style={{color: c.muted, fontSize: 11, width: 36, textAlign: 'right'}}>{Math.round(x.pct * 100)}%</Text>
           </View>
         )) : <Text style={{color: c.muted, textAlign: 'center'}}>Sem {kind === 'expense' ? 'despesas' : 'receitas'} neste mês.</Text>}
@@ -2278,10 +2282,10 @@ function ReportsTab({d: full, month, reserve, api, reload}: {d: Data; month: str
         
         <Text style={{color: c.muted, fontSize: 12}}>{week.start.split('-').reverse().slice(0, 2).join('/')} a {week.end.split('-').reverse().slice(0, 2).join('/')} · {money(week.total)} em gastos</Text>
         {week.lines.slice(0, 6).map(l => <View key={l.category} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, borderTopWidth: 1, borderColor: c.line}}>
-          <Text style={{fontSize: 16}}>{categoryOf(l.category).icon}</Text>
+          <CatIcon cat={categoryOf(l.category)} size={18} />
           <Text style={{flex: 1, color: c.text, fontSize: 13}}>{l.category}</Text>
-          {l.change !== null ? <Text style={{color: l.change > 0.3 ? WARN : l.change < -0.1 ? GOOD : c.muted, fontSize: 11, fontWeight: '700'}}>{l.change > 0 ? '+' : ''}{Math.round(l.change * 100)}% vs média</Text> : <Text style={{color: c.muted, fontSize: 11}}>novo</Text>}
-          <Text style={{color: c.text, fontWeight: '700', fontSize: 13}}>{money(l.total)}</Text>
+          {l.change !== null ? <Text style={{color: l.change > 0.3 ? c.warn : l.change < -0.1 ? c.good : c.muted, fontSize: 11, fontWeight: '600'}}>{l.change > 0 ? '+' : ''}{Math.round(l.change * 100)}% vs média</Text> : <Text style={{color: c.muted, fontSize: 11}}>novo</Text>}
+          <Text style={{color: c.text, fontWeight: '600', fontSize: 13}}>{money(l.total)}</Text>
         </View>)}
       </Fold> : null}
       <Fold id="seis" title="Receitas × despesas · 6 meses">
@@ -2289,11 +2293,11 @@ function ReportsTab({d: full, month, reserve, api, reload}: {d: Data; month: str
         <View onLayout={e => setW(e.nativeEvent.layout.width)} style={{height: 150}}>
           {w ? <Svg width={w} height={150}>
             <Line x1={0} x2={w} y1={130} y2={130} stroke={c.line} />
-            {t6.map((m, i) => { const bw = w / t6.length, x = i * bw + bw * 0.18, h1 = m.income / max * 120, h2 = m.expense / max * 120; return <React.Fragment key={m.month}><Rect x={x} y={130 - h1} width={bw * 0.3} height={h1} rx={3} fill={GOOD} /><Rect x={x + bw * 0.33} y={130 - h2} width={bw * 0.3} height={h2} rx={3} fill={BAD} /></React.Fragment>; })}
+            {t6.map((m, i) => { const bw = w / t6.length, x = i * bw + bw * 0.18, h1 = m.income / max * 120, h2 = m.expense / max * 120; return <React.Fragment key={m.month}><Rect x={x} y={130 - h1} width={bw * 0.3} height={h1} rx={3} fill={c.good} /><Rect x={x + bw * 0.33} y={130 - h2} width={bw * 0.3} height={h2} rx={3} fill={c.danger} /></React.Fragment>; })}
           </Svg> : null}
         </View>
         <View style={{flexDirection: 'row'}}>{t6.map(m => <Text key={m.month} style={{flex: 1, textAlign: 'center', fontSize: 10, color: m.month === month ? c.text : c.muted, fontWeight: m.month === month ? '700' : '400'}}>{monthLabel(m.month).slice(0, 3)}</Text>)}</View>
-        <View style={{flexDirection: 'row', gap: 14, justifyContent: 'center'}}><Text style={{color: GOOD, fontSize: 12}}>● Receitas</Text><Text style={{color: BAD, fontSize: 12}}>● Despesas</Text></View>
+        <View style={{flexDirection: 'row', gap: 14, justifyContent: 'center'}}><Text style={{color: c.good, fontSize: 12}}>● Receitas</Text><Text style={{color: c.danger, fontSize: 12}}>● Despesas</Text></View>
       </Fold>
 
     </>
@@ -2386,72 +2390,72 @@ function MonthBreakdown({kind, d, month, show, net, onTx, onClose, api, accountI
     {/* 0.3.219: em Receitas/Despesas, o titulo e o valor ficam fixos no topo (fundo solido) e a lista rola por baixo */}
     <ScrollView keyboardShouldPersistTaps="handled" stickyHeaderIndices={parts ? undefined : [0]} contentContainerStyle={{gap: 12, paddingBottom: 18}}>
       {parts ? <>
-        <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>Saldo</Text>
+        <Text style={{fontSize: 20, fontWeight: '700', color: c.text}}>Saldo</Text>
         {target && api ? (adjusting ? <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 10}}>
-          <Text style={{color: c.text, fontWeight: '700'}}>Saldo no início de {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
+          <Text style={{color: c.text, fontWeight: '600'}}>Saldo no início de {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
           <TextInput accessibilityLabel="Saldo no início do mês" value={startReal} onChangeText={v => setStartReal(old => formatMoneyInput(v, old))} keyboardType="decimal-pad" placeholder="0,00" placeholderTextColor={c.muted}
-            style={{fontSize: 22, fontWeight: '800', color: c.text, borderWidth: 1, borderColor: c.line, borderRadius: 12, padding: 12, backgroundColor: c.surface}} />
-          <Text style={{color: c.text, fontWeight: '700'}}>Saldo atual</Text>
+            style={{fontSize: 24, fontWeight: '700', color: c.text, borderWidth: 1, borderColor: c.line, borderRadius: 12, padding: 12, backgroundColor: c.surface}} />
+          <Text style={{color: c.text, fontWeight: '600'}}>Saldo atual</Text>
           <TextInput accessibilityLabel="Saldo atual" value={real} onChangeText={v => setReal(old => formatMoneyInput(v, old))} keyboardType="decimal-pad" placeholder="0,00" placeholderTextColor={c.muted}
-            style={{fontSize: 22, fontWeight: '800', color: c.text, borderWidth: 1, borderColor: c.line, borderRadius: 12, padding: 12, backgroundColor: c.surface}} />
+            style={{fontSize: 24, fontWeight: '700', color: c.text, borderWidth: 1, borderColor: c.line, borderRadius: 12, padding: 12, backgroundColor: c.surface}} />
           <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>O saldo atual é o que aparece no Saldo. O do início do mês é de onde o Controle de gastos parte: ele compara quanto você tinha com quanto tem agora. Nenhum lançamento é apagado.</Text>
-          {adjError ? <Text style={{color: BAD}}>{adjError}</Text> : null}
+          {adjError ? <Text style={{color: c.danger}}>{adjError}</Text> : null}
           <Button title="Salvar" loading={adjBusy} onPress={() => void applyAdjust(parts.total)} />
           <Pressable accessibilityRole="button" onPress={() => setAdjusting(false)}><Text style={{color: c.muted, textAlign: 'center'}}>Cancelar</Text></Pressable>
         </View> : <Button title="Ajustar saldo" secondary onPress={() => { setReal(finishMoneyInput(String(parts.total).replace('.', ','))); setStartReal(finishMoneyInput(String(target.monthStarts[month] ?? monthStartGuess).replace('.', ','))); setAdjusting(true); }} />)
           : <Text style={{color: c.muted, fontSize: 12}}>Para ajustar o saldo, escolha uma conta no topo.</Text>}
-        <Text style={{fontSize: 15, fontWeight: '800', color: c.text, marginTop: 6}}>Como o saldo é calculado</Text>
+        <Text style={{fontSize: 16, fontWeight: '700', color: c.text, marginTop: 6}}>Como o saldo é calculado</Text>
         <View style={{backgroundColor: c.input, borderRadius: 16, padding: 14, gap: 2}}>
           {row('Ponto de partida (saldo inicial e ajustes)', show(parts.initial - parts.carry))}
-          {parts.carry ? row((parts.carry > 0 ? '+' : '−') + ' Lançamentos de meses anteriores', show(Math.abs(parts.carry)), false, parts.carry > 0 ? GOOD : BAD) : null}
+          {parts.carry ? row((parts.carry > 0 ? '+' : '−') + ' Lançamentos de meses anteriores', show(Math.abs(parts.carry)), false, parts.carry > 0 ? c.good : c.danger) : null}
           {parts.initial ? <Text style={{color: c.muted, fontSize: 11, lineHeight: 16, marginBottom: 4}}>Não é um lançamento: é o saldo inicial da conta, já com os ajustes ao valor do banco. Muda pelo botão acima ou em Contas e cartões → conta.</Text> : null}
-          {row('+ Receitas recebidas', show(parts.income), false, GOOD)}
-          {row('− Despesas pagas', show(parts.expense), false, BAD)}
-          {parts.cards ? row('− Faturas de cartão pagas', show(parts.cards), false, BAD) : null}
-          {parts.transfers ? row((parts.transfers > 0 ? '+' : '−') + ' Transferências entre contas', show(Math.abs(parts.transfers)), false, parts.transfers > 0 ? GOOD : BAD) : null}
-          {net ? row(net > 0 ? '− Guardado (aportes − retiradas)' : '+ Retirado da reserva', show(Math.abs(net)), false, net > 0 ? BAD : GOOD) : null}
+          {row('+ Receitas recebidas', show(parts.income), false, c.good)}
+          {row('− Despesas pagas', show(parts.expense), false, c.danger)}
+          {parts.cards ? row('− Faturas de cartão pagas', show(parts.cards), false, c.danger) : null}
+          {parts.transfers ? row((parts.transfers > 0 ? '+' : '−') + ' Transferências entre contas', show(Math.abs(parts.transfers)), false, parts.transfers > 0 ? c.good : c.danger) : null}
+          {net ? row(net > 0 ? '− Guardado (aportes − retiradas)' : '+ Retirado da reserva', show(Math.abs(net)), false, net > 0 ? c.danger : c.good) : null}
           <View style={{height: 1, backgroundColor: c.line, marginVertical: 6}} />
           {row('= Saldo', show(parts.total), true)}
         </View>
         {/* 0.3.225: extrato do saldo retirado a pedido do Pedro */}
         {ledgerOpen && parts && ledger ? <View style={{backgroundColor: c.input, borderRadius: 16, padding: 12, gap: 4}}>
-          <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '700', fontSize: 12}}>Ponto de partida</Text><Text style={{color: c.text, fontWeight: '800', fontSize: 12}}>{show(ledger.start)}</Text></View>
-          {ledger.carry ? <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Lançamentos de meses anteriores (somados)</Text><Text style={{color: ledger.carry > 0 ? GOOD : BAD, fontWeight: '700', fontSize: 12}}>{ledger.carry > 0 ? '+' : '−'}{show(Math.abs(ledger.carry))}</Text></View> : null}
-          {ledger.rows.map(r => <Pressable key={r.id} accessibilityRole="button" disabled={!r.tx} onPress={() => { if (r.tx) onTx(r.tx); }} style={{flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5, borderTopWidth: 1, borderColor: c.line, backgroundColor: r.change ? WARN + '14' : 'transparent'}}>
+          <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.text, fontWeight: '600', fontSize: 12}}>Ponto de partida</Text><Text style={{color: c.text, fontWeight: '700', fontSize: 12}}>{show(ledger.start)}</Text></View>
+          {ledger.carry ? <View style={{flexDirection: 'row', justifyContent: 'space-between'}}><Text style={{color: c.muted, fontSize: 12}}>Lançamentos de meses anteriores (somados)</Text><Text style={{color: ledger.carry > 0 ? c.good : c.danger, fontWeight: '600', fontSize: 12}}>{ledger.carry > 0 ? '+' : '−'}{show(Math.abs(ledger.carry))}</Text></View> : null}
+          {ledger.rows.map(r => <Pressable key={r.id} accessibilityRole="button" disabled={!r.tx} onPress={() => { if (r.tx) onTx(r.tx); }} style={{flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5, borderTopWidth: 1, borderColor: c.line, backgroundColor: r.change ? c.warn + '14' : 'transparent'}}>
             <Text style={{color: c.muted, fontSize: 11, width: 38}}>{r.date.slice(8, 10)}/{r.date.slice(5, 7)}</Text>
-            <Text numberOfLines={2} style={{flex: 1, color: c.text, fontSize: 12}}>{r.desc}{r.note ? <Text style={{color: r.change ? WARN : c.muted}}> · {r.note}</Text> : null}</Text>
-            <Text style={{color: r.delta >= 0 ? GOOD : BAD, fontSize: 12, fontWeight: '700'}}>{r.delta >= 0 ? '+' : '−'}{show(Math.abs(r.delta))}</Text>
-            <Text style={{color: r.run < 0 ? BAD : c.text, fontSize: 11, width: 76, textAlign: 'right'}}>{show(r.run)}</Text>
+            <Text numberOfLines={2} style={{flex: 1, color: c.text, fontSize: 12}}>{r.desc}{r.note ? <Text style={{color: r.change ? c.warn : c.muted}}> · {r.note}</Text> : null}</Text>
+            <Text style={{color: r.delta >= 0 ? c.good : c.danger, fontSize: 12, fontWeight: '600'}}>{r.delta >= 0 ? '+' : '−'}{show(Math.abs(r.delta))}</Text>
+            <Text style={{color: r.run < 0 ? c.danger : c.text, fontSize: 11, width: 76, textAlign: 'right'}}>{show(r.run)}</Text>
           </Pressable>)}
           <Text style={{color: c.muted, fontSize: 11, lineHeight: 16, marginTop: 6}}>{tap('Funciona como o extrato do banco: o que já passou não muda. Ajustes e alterações entram como uma linha nova, na hora em que aconteceram, com quanto mudou e quanto ficou. A última coluna é o saldo depois de cada linha. Toque num item para corrigir ou apagar.')}</Text>
         </View> : null}
         <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>{tap('Soma de tudo o que já foi pago ou recebido nas contas (não só deste mês). Se algum valor parecer errado, toque em Receitas ou Despesas para ver os lançamentos, ou confira o saldo inicial da conta em Contas e cartões.')}</Text>
       </> : <View style={{backgroundColor: c.surface, paddingBottom: 10, gap: 2, borderBottomWidth: 1, borderColor: c.line}}>
-        <Text style={{fontSize: 20, fontWeight: '800', color: c.text}}>{kind === 'income' ? 'Receitas' : 'Despesas'} de {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
-        <Text style={{color: kind === 'income' ? GOOD : BAD, fontWeight: '800', fontSize: 22}}>{show(total)}</Text>
+        <Text style={{fontSize: 20, fontWeight: '700', color: c.text}}>{kind === 'income' ? 'Receitas' : 'Despesas'} de {monthLabel(month).split(' ')[0].toLowerCase()}</Text>
+        <Text style={{color: kind === 'income' ? c.good : c.danger, fontWeight: '700', fontSize: 24}}>{show(total)}</Text>
       </View>}
       {parts ? null : <View>
         {/* 0.3.226: editar o valor ou apagar o item AQUI DENTRO; o item, o total e o Historico mudam na hora */}
         {list.length ? list.map((t, i) => rowEdit === t.id ? <View key={t.id} style={{gap: 10, paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderColor: c.line}}>
-          <Text numberOfLines={1} style={{color: c.text, fontWeight: '700'}}>{categoryOf(t.category).icon}  {t.desc}</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}><CatIcon cat={categoryOf(t.category)} size={16} /><Text numberOfLines={1} style={{flex: 1, color: c.text, fontWeight: '600'}}>{t.desc}</Text></View>
           <TextInput accessibilityLabel={'Valor de ' + t.desc} autoFocus value={rowAmount} onChangeText={v => setRowAmount(old => formatMoneyInput(v, old))} keyboardType="decimal-pad" placeholder="0,00" placeholderTextColor={c.muted}
-            style={{fontSize: 22, fontWeight: '800', color: c.text, borderWidth: 1, borderColor: c.line, borderRadius: 12, padding: 12, backgroundColor: c.input}} />
-          {rowError ? <Text style={{color: BAD}}>{rowError}</Text> : null}
+            style={{fontSize: 24, fontWeight: '700', color: c.text, borderWidth: 1, borderColor: c.line, borderRadius: 12, padding: 12, backgroundColor: c.input}} />
+          {rowError ? <Text style={{color: c.danger}}>{rowError}</Text> : null}
           <View style={{flexDirection: 'row', gap: 8}}>
             <View style={{flex: 1}}><Button title="Salvar" onPress={() => saveRow(t)} /></View>
             <View style={{flex: 1}}><Button title="Apagar" secondary onPress={() => removeRow(t)} /></View>
           </View>
           <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
-            <Pressable accessibilityRole="button" onPress={() => onTx(t)} style={{paddingVertical: 6}}><Text style={{color: c.accent, fontWeight: '700'}}>Mais opções</Text></Pressable>
+            <Pressable accessibilityRole="button" onPress={() => onTx(t)} style={{paddingVertical: 6}}><Text style={{color: c.accent, fontWeight: '600'}}>Mais opções</Text></Pressable>
             <Pressable accessibilityRole="button" onPress={() => { Keyboard.dismiss(); setRowEdit(null); setRowError(''); }} style={{paddingVertical: 6}}><Text style={{color: c.muted}}>Cancelar</Text></Pressable>
           </View>
         </View> : <Pressable key={t.id} accessibilityRole="button" accessibilityLabel={'Editar ' + t.desc} onPress={() => { if (isClosedMonth(monthOf(t.date))) { appAlert('Mês fechado', CLOSED_MSG); return; } if (onPatch && t.entity) { setRowEdit(t.id); setRowError(''); setRowAmount(finishMoneyInput(String(t.amount).replace('.', ','))); } else onTx(t); }} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderColor: c.line}}>
-          <Text style={{fontSize: 18}}>{categoryOf(t.category).icon}</Text>
+          <CatIcon cat={categoryOf(t.category)} size={20} />
           <View style={{flex: 1, gap: 2}}>
-            <Text numberOfLines={1} style={{color: c.text, fontWeight: '600'}}>{t.desc}</Text>
+            <Text numberOfLines={1} style={{color: c.text, fontWeight: '500'}}>{t.desc}</Text>
             <Text style={{color: c.muted, fontSize: 11}}>{t.date.split('-').reverse().slice(0, 2).join('/')} · {t.category}</Text>
           </View>
-          <Text style={{color: kind === 'income' ? GOOD : BAD, fontWeight: '700'}}>{kind === 'income' ? '+' : '−'}{show(t.amount)}</Text>
+          <Text style={{color: kind === 'income' ? c.good : c.danger, fontWeight: '600'}}>{kind === 'income' ? '+' : '−'}{show(t.amount)}</Text>
         </Pressable>) : <Text style={{color: c.muted}}>Nenhuma {kind === 'income' ? 'receita' : 'despesa'} paga neste mês.</Text>}
       </View>}
     </ScrollView>
@@ -2468,25 +2472,25 @@ function ManageSheet({api, d, onClose, reload, onFinished}: {api: SofiaApi; d: D
     <MotionModal visible animationType="slide" onRequestClose={onClose}>
       <View style={{flex: 1, backgroundColor: c.bg}}>
         <View style={{paddingTop: 40, paddingBottom: 8, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: c.line}}>
-          <IconButton name="back" label="Voltar" onPress={onClose} /><Text style={{flex: 1, fontSize: 17, fontWeight: '700', color: c.text}}>Contas e cartões</Text>
+          <IconButton name="back" label="Voltar" onPress={onClose} /><Text style={{flex: 1, fontSize: 18, fontWeight: '600', color: c.text}}>Contas e cartões</Text>
         </View>
         {setup ? <Onboarding api={api} onDone={reload} onClose={() => setSetup(false)} onFinished={() => { setSetup(false); onFinished ? onFinished() : onClose(); }} existing={{account: d.accounts.find(a => !a.archived) || null, reserve: reserveOf(d.goals), fixed: d.txs.filter(t => t.manualDue && t.recurrence === 'monthly' && !t.virtual && t.kind === 'expense' && t.entity?.state !== 'archived'),
             salary: d.txs.filter(t => !t.virtual && t.kind === 'income' && t.recurrence === 'monthly' && !t.seriesId && t.entity?.state !== 'archived').sort((a, b) => b.amount - a.amount)[0] || null}} /> :
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 18, gap: 14}}>
           {/* 0.3.223: Redefinir Financas - apaga tudo e abre o passo a passo do zero */}
           <View style={{backgroundColor: c.surface, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: c.line, gap: 10}}>
-            <View style={{gap: 2}}><Text style={{color: c.text, fontWeight: '700', fontSize: 14}}>Redefinir Finanças</Text><Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Apaga contas, cartões, lançamentos, reserva e metas. Você recomeça do zero, pelo passo a passo ou mandando seus prints para a Sofia.</Text></View>
+            <View style={{gap: 2}}><Text style={{color: c.text, fontWeight: '600', fontSize: 14}}>Redefinir Finanças</Text><Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Apaga contas, cartões, lançamentos, reserva e metas. Você recomeça do zero, pelo passo a passo ou mandando seus prints para a Sofia.</Text></View>
             {resetting ? <View style={{gap: 8}}>
               <TextInput accessibilityLabel="Confirmação para zerar" value={resetWord} onChangeText={setResetWord} autoCapitalize="characters" placeholder="Digite REDEFINIR" placeholderTextColor={c.muted} style={{color: c.text, backgroundColor: c.input, borderRadius: 12, padding: 12, fontSize: 16, letterSpacing: 2}} />
               <View style={{flexDirection: 'row', gap: 8}}>
-                <Pressable accessibilityRole="button" disabled={resetWord.trim().toUpperCase() !== 'REDEFINIR' || resetBusy} onPress={() => { setResetBusy(true); void api.financeReset().then(async () => { await clearAllFormDrafts(); setResetBusy(false); setResetting(false); void reload(); onClose(); }).catch(e => { setResetBusy(false); appAlert('Finanças', errorText(e)); }); }} style={{flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: resetWord.trim().toUpperCase() === 'REDEFINIR' ? BAD : c.line, alignItems: 'center'}}>{resetBusy ? <ActivityIndicator color="#fff" /> : <Text style={{color: '#fff', fontWeight: '800'}}>Redefinir</Text>}</Pressable>
-                <Pressable accessibilityRole="button" onPress={() => setResetting(false)} style={{flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: c.input, alignItems: 'center'}}><Text style={{color: c.text, fontWeight: '700'}}>Cancelar</Text></Pressable>
+                <Pressable accessibilityRole="button" disabled={resetWord.trim().toUpperCase() !== 'REDEFINIR' || resetBusy} onPress={() => { setResetBusy(true); void api.financeReset().then(async () => { await clearAllFormDrafts(); setResetBusy(false); setResetting(false); void reload(); onClose(); }).catch(e => { setResetBusy(false); appAlert('Finanças', errorText(e)); }); }} style={{flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: resetWord.trim().toUpperCase() === 'REDEFINIR' ? c.danger : c.line, alignItems: 'center'}}>{resetBusy ? <ActivityIndicator color="#fff" /> : <Text style={{color: '#fff', fontWeight: '700'}}>Redefinir</Text>}</Pressable>
+                <Pressable accessibilityRole="button" onPress={() => setResetting(false)} style={{flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: c.input, alignItems: 'center'}}><Text style={{color: c.text, fontWeight: '600'}}>Cancelar</Text></Pressable>
               </View>
-            </View> : <Pressable accessibilityRole="button" onPress={() => { setResetWord(''); setResetting(true); }} style={{paddingVertical: 10, borderRadius: 12, backgroundColor: BAD + '1f', alignItems: 'center'}}><Text style={{color: BAD, fontWeight: '700', fontSize: 13}}>Redefinir Finanças</Text></Pressable>}
+            </View> : <Pressable accessibilityRole="button" onPress={() => { setResetWord(''); setResetting(true); }} style={{paddingVertical: 10, borderRadius: 12, backgroundColor: c.danger + '1f', alignItems: 'center'}}><Text style={{color: c.danger, fontWeight: '600', fontSize: 13}}>Redefinir Finanças</Text></Pressable>}
           </View>
           <Pressable accessibilityRole="button" onPress={() => setSetup(true)} style={{backgroundColor: c.surface, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: c.line, flexDirection: 'row', alignItems: 'center', gap: 10}}>
             <View style={{flex: 1, gap: 2}}>
-              <Text style={{color: c.text, fontWeight: '700', fontSize: 14}}>Refazer a configuração</Text>
+              <Text style={{color: c.text, fontWeight: '600', fontSize: 14}}>Refazer a configuração</Text>
               <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Passo a passo com o que você já tem: conta, dia do recebimento, contas fixas, guardado, aporte e meta. Nada é apagado.</Text>
             </View>
             <Text style={{color: c.muted}}>›</Text>
@@ -2556,7 +2560,7 @@ function AccountCardSheet({api, d, edit, onClose, onSaved}: {api: SofiaApi; d: D
   return (
     <Sheet visible onClose={onClose} label="Fechar edição">
       <ScrollView contentContainerStyle={{gap: 12}} keyboardShouldPersistTaps="handled">
-        <Text style={{fontSize: 18, fontWeight: '700', color: c.text}}>{edit.item ? 'Editar' : 'Novo'} {isCard ? 'cartão' : 'conta'}</Text>
+        <Text style={{fontSize: 18, fontWeight: '600', color: c.text}}>{edit.item ? 'Editar' : 'Novo'} {isCard ? 'cartão' : 'conta'}</Text>
         <Field label="Nome" value={name} onChange={setName} placeholder={isCard ? 'Ex.: Nubank Visa' : 'Ex.: Itaú'} />
         {isCard ? (
           <>
@@ -2578,7 +2582,7 @@ function AccountCardSheet({api, d, edit, onClose, onSaved}: {api: SofiaApi; d: D
         {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
         <Button title="Salvar" loading={busy} onPress={() => void save()} />
         {edit.item ? <Pressable onPress={async () => { try { await saveEntity(api, isCard ? 'fin_card' : 'fin_account', edit.item!.name, {}, edit.item!.entity, archived ? 'active' : 'archived'); onSaved(); } catch (e) { setError(errorText(e)); } }} style={{alignItems: 'center', padding: 10}}><Text style={{color: archived ? c.accent : c.danger}}>{archived ? 'Reativar' : 'Arquivar (o histórico fica)'}</Text></Pressable> : null}
-        {card && !card.archived ? <Pressable accessibilityRole="button" accessibilityLabel="Excluir cartão" disabled={busy} onPress={()=>void removeCard()} style={{alignItems:'center',padding:12}}><Text style={{color:BAD,fontWeight:'800'}}>Excluir cartão</Text></Pressable>:null}
+        {card && !card.archived ? <Pressable accessibilityRole="button" accessibilityLabel="Excluir cartão" disabled={busy} onPress={()=>void removeCard()} style={{alignItems:'center',padding:12}}><Text style={{color:c.danger,fontWeight:'700'}}>Excluir cartão</Text></Pressable>:null}
       </ScrollView>
     </Sheet>
   );
@@ -2621,7 +2625,7 @@ function ImportSheet({api, d, onClose, onDone}: {api: SofiaApi; d: Data; onClose
   return (
     <Sheet visible onClose={onClose} label="Fechar importação de extrato">
       <View style={{gap: 12}}>
-        <Text style={{fontSize: 18, fontWeight: '700', color: c.text}}>Importar extrato</Text>
+        <Text style={{fontSize: 18, fontWeight: '600', color: c.text}}>Importar extrato</Text>
         {result ? (
           <View style={{gap: 10}}>
             <Text style={{color: c.text}}>{result.created} lançamento{result.created === 1 ? '' : 's'} importado{result.created === 1 ? '' : 's'}{result.skipped ? ' · ' + result.skipped + ' já existia' + (result.skipped === 1 ? '' : 'm') + ' (não duplicado)' : ''}.</Text>
@@ -2630,27 +2634,27 @@ function ImportSheet({api, d, onClose, onDone}: {api: SofiaApi; d: Data; onClose
         ) : (
           <>
             <Text style={{fontSize: 12, color: c.muted}}>Exporte o extrato no app do banco (OFX ou CSV) e escolha o arquivo aqui. Nada entra duplicado: o que já foi importado fica desmarcado.</Text>
-            <Text style={{fontSize: 12, color: c.muted, fontWeight: '700'}}>1. De onde é o extrato?</Text>
+            <Text style={{fontSize: 12, color: c.muted, fontWeight: '600'}}>1. De onde é o extrato?</Text>
             <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>
-              {d.accounts.filter(a => !a.archived).map(a => <Pressable key={a.id} onPress={() => { setTarget({type: 'account', id: a.id}); setPreview(null); }} style={{paddingVertical: 8, paddingHorizontal: 12, borderRadius: 99, backgroundColor: target?.id === a.id ? c.accent : c.surface, borderWidth: 1, borderColor: c.line}}><Text style={{color: target?.id === a.id ? '#fff' : c.text, fontWeight: '600'}}>{a.name}</Text></Pressable>)}
-              {d.cards.filter(x => !x.archived).map(x => <Pressable key={x.id} onPress={() => { setTarget({type: 'card', id: x.id}); setPreview(null); }} style={{paddingVertical: 8, paddingHorizontal: 12, borderRadius: 99, backgroundColor: target?.id === x.id ? c.accent : c.surface, borderWidth: 1, borderColor: c.line}}><Text style={{color: target?.id === x.id ? '#fff' : c.text, fontWeight: '600'}}>💳 {x.name}</Text></Pressable>)}
+              {d.accounts.filter(a => !a.archived).map(a => <Pressable key={a.id} onPress={() => { setTarget({type: 'account', id: a.id}); setPreview(null); }} style={{paddingVertical: 8, paddingHorizontal: 12, borderRadius: 99, backgroundColor: target?.id === a.id ? c.accent : c.surface, borderWidth: 1, borderColor: c.line}}><Text style={{color: target?.id === a.id ? '#fff' : c.text, fontWeight: '500'}}>{a.name}</Text></Pressable>)}
+              {d.cards.filter(x => !x.archived).map(x => <Pressable key={x.id} onPress={() => { setTarget({type: 'card', id: x.id}); setPreview(null); }} style={{paddingVertical: 8, paddingHorizontal: 12, borderRadius: 99, backgroundColor: target?.id === x.id ? c.accent : c.surface, borderWidth: 1, borderColor: c.line}}><Text style={{color: target?.id === x.id ? '#fff' : c.text, fontWeight: '500'}}>💳 {x.name}</Text></Pressable>)}
             </View>
-            <Text style={{fontSize: 12, color: c.muted, fontWeight: '700'}}>2. Arquivo</Text>
+            <Text style={{fontSize: 12, color: c.muted, fontWeight: '600'}}>2. Arquivo</Text>
             <Button title={file ? file.name : 'Escolher arquivo (OFX ou CSV)'} secondary onPress={() => void pick()} />
             {file && target && !preview ? <Button title={target?.type === 'account' ? 'Guardar extrato' : 'Conferir com o app'} loading={busy} onPress={() => void analyze()} /> : null}
             {preview ? (
               <View style={{gap: 6}}>
-                <Text style={{fontSize: 12, color: c.muted, fontWeight: '700'}}>3. Confira ({chosenItems.length} de {preview.length} marcados · {money(Math.abs(sum))} {sum >= 0 ? 'de entrada' : 'de saída'})</Text>
+                <Text style={{fontSize: 12, color: c.muted, fontWeight: '600'}}>3. Confira ({chosenItems.length} de {preview.length} marcados · {money(Math.abs(sum))} {sum >= 0 ? 'de entrada' : 'de saída'})</Text>
                 {/* 0.3.210: a lista rola por dentro e o botao Importar fica sempre visivel logo abaixo */}
                 <View style={{flexDirection: 'row', gap: 16}}>
-                  <Pressable accessibilityRole="button" onPress={() => setChosen(new Set(preview.filter(i => !i.skip && !i.duplicate).map(i => i.import_id)))}><Text style={{color: c.accent, fontWeight: '700', fontSize: 12}}>Marcar todos</Text></Pressable>
-                  <Pressable accessibilityRole="button" onPress={() => setChosen(new Set())}><Text style={{color: c.accent, fontWeight: '700', fontSize: 12}}>Desmarcar todos</Text></Pressable>
+                  <Pressable accessibilityRole="button" onPress={() => setChosen(new Set(preview.filter(i => !i.skip && !i.duplicate).map(i => i.import_id)))}><Text style={{color: c.accent, fontWeight: '600', fontSize: 12}}>Marcar todos</Text></Pressable>
+                  <Pressable accessibilityRole="button" onPress={() => setChosen(new Set())}><Text style={{color: c.accent, fontWeight: '600', fontSize: 12}}>Desmarcar todos</Text></Pressable>
                 </View>
                 <View style={{maxHeight: Math.round(Dimensions.get('window').height * 0.42), borderRadius: 12, borderWidth: 1, borderColor: c.line, paddingHorizontal: 10}}><ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
                   {preview.map(i => <Pressable key={i.import_id} disabled={!!i.skip} onPress={() => toggle(i.import_id)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderColor: c.line, opacity: i.skip ? 0.45 : 1}}>
-                    <View style={{width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: chosen.has(i.import_id) ? c.accent : c.line, backgroundColor: chosen.has(i.import_id) ? c.accent : 'transparent', alignItems: 'center', justifyContent: 'center'}}>{chosen.has(i.import_id) ? <Text style={{color: c.onAccent, fontSize: 13, fontWeight: '800'}}>✓</Text> : null}</View>
+                    <View style={{width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: chosen.has(i.import_id) ? c.accent : c.line, backgroundColor: chosen.has(i.import_id) ? c.accent : 'transparent', alignItems: 'center', justifyContent: 'center'}}>{chosen.has(i.import_id) ? <Text style={{color: c.onAccent, fontSize: 13, fontWeight: '700'}}>✓</Text> : null}</View>
                     <View style={{flex: 1}}><Text style={{color: c.text}} numberOfLines={1}>{i.desc}</Text><Text style={{fontSize: 11, color: c.muted}}>{i.date.split('-').reverse().join('/')}{i.category ? ' · ' + i.category : ''}{i.duplicate ? ' · já importado' : ''}{i.match ? ' · já está no app: “' + i.match.title + '”' + (typeof i.match.amount === 'number' && Math.abs(i.match.amount - i.amount) > 0.004 ? ' (lá com ' + money(i.match.amount) + ')' : '') : ''}{i.before ? ' · antes do seu ponto de partida (já está no Saldo)' : ''}{i.skip ? ' · ' + i.skip : ''}</Text></View>
-                    <Text style={{fontWeight: '700', color: i.kind === 'income' ? '#2fc58b' : c.text}}>{i.kind === 'income' ? '+' : '-'}{money(i.amount)}</Text>
+                    <Text style={{fontWeight: '600', color: i.kind === 'income' ? c.good : c.text}}>{i.kind === 'income' ? '+' : '-'}{money(i.amount)}</Text>
                   </Pressable>)}
                 </ScrollView></View>
                 <Text style={{color: c.muted, fontSize: 12, lineHeight: 18}}>O extrato já ficou guardado em Lançamentos → Extrato do banco, para conferir e acertar o Saldo. Só o que está marcado vira lançamento.</Text>

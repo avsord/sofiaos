@@ -27,15 +27,15 @@ export function CapsuleMissedList({plans,history,saving,take,compact=false}:{pla
   {[...groups.values()].map(list=>{const plan=list[0].plan;return <View key={plan.id} style={{padding:compact?12:14,gap:8,borderRadius:18,backgroundColor:c.danger+'12',borderWidth:1,borderColor:c.danger+'55'}}>
    <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
     <View style={{flex:1,gap:2}}>
-     <Text style={{color:c.text,fontSize:compact?15:16,fontWeight:'600'}}>{plan.title}</Text>
-     <Text style={{color:c.danger,fontSize:12,fontWeight:'700'}}>{list.length===1?'1 dose atrasada':list.length+' doses atrasadas'}</Text>
+     <Text style={{color:c.text,fontSize:compact?15:16,fontWeight:'500'}}>{plan.title}</Text>
+     <Text style={{color:c.danger,fontSize:12,fontWeight:'600'}}>{list.length===1?'1 dose atrasada':list.length+' doses atrasadas'}</Text>
     </View>
-    {list.length>1?<Pressable accessibilityRole="button" accessibilityLabel={'Tomei todas as doses atrasadas de '+plan.title} disabled={!!saving||!!busy} onPress={()=>void takeAll(list)} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:99,backgroundColor:c.accent}}><Text style={{color:c.onAccent,fontWeight:'700',fontSize:12}}>{busy===plan.id?'Marcando…':'Tomei todas'}</Text></Pressable>:null}
+    {list.length>1?<Pressable accessibilityRole="button" accessibilityLabel={'Tomei todas as doses atrasadas de '+plan.title} disabled={!!saving||!!busy} onPress={()=>void takeAll(list)} style={{paddingHorizontal:12,paddingVertical:8,borderRadius:99,backgroundColor:c.accent}}><Text style={{color:c.onAccent,fontWeight:'600',fontSize:12}}>{busy===plan.id?'Marcando…':'Tomei todas'}</Text></Pressable>:null}
    </View>
    {list.map(d=><View key={d.key} style={{flexDirection:'row',alignItems:'center',gap:10}}>
     <Pressable accessibilityRole="checkbox" accessibilityLabel={'Tomei '+plan.title+' de '+capsuleDayLabel(d.day)+' às '+d.time} accessibilityState={{checked:false}} disabled={!!saving||!!busy} onPress={()=>void take(d.plan.id,d.day,d.time).catch(()=>{})} style={{padding:6}}><Icon name="check" color={c.danger}/></Pressable>
     <Text style={{flex:1,color:c.muted,fontSize:13}}>{capsuleDayLabel(d.day)}, {d.time} · atrasada</Text>
-    <Pressable accessibilityRole="button" disabled={!!saving||!!busy} onPress={()=>void take(d.plan.id,d.day,d.time).catch(()=>{})} style={{paddingHorizontal:10,paddingVertical:6,borderRadius:99,backgroundColor:c.accent+'22'}}><Text style={{color:c.accent,fontWeight:'700',fontSize:12}}>Tomei</Text></Pressable>
+    <Pressable accessibilityRole="button" disabled={!!saving||!!busy} onPress={()=>void take(d.plan.id,d.day,d.time).catch(()=>{})} style={{paddingHorizontal:10,paddingVertical:6,borderRadius:99,backgroundColor:c.accent+'22'}}><Text style={{color:c.accent,fontWeight:'600',fontSize:12}}>Tomei</Text></Pressable>
    </View>)}
   </View>;})}
  </View>;

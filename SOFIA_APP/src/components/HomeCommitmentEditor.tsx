@@ -46,7 +46,7 @@ export function HomeCommitmentEditor({api,day,areas,onClose,onSaved}:{api:SofiaA
    <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
     <View style={{padding:12,flexDirection:'row',alignItems:'center',borderBottomWidth:1,borderColor:c.line}}>
      <IconButton name="close" label="Fechar novo compromisso" disabled={saving} onPress={onClose}/>
-     <Text style={{color:c.text,fontSize:19,fontWeight:'700',flex:1}}>Novo compromisso</Text>
+     <Text style={{color:c.text,fontSize:20,fontWeight:'600',flex:1}}>Novo compromisso</Text>
     </View>
     <ScrollView keyboardShouldPersistTaps="always" contentContainerStyle={{padding:22,paddingBottom:40,gap:16}}>
      {error?<ErrorBanner text={error}/>:null}

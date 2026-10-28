@@ -1,43 +1,230 @@
 import React from 'react';
-import Svg, { Path } from 'react-native-svg';
-const paths = {
- capsule:'M5 13l8-8a4.24 4.24 0 0 1 6 6l-8 8a4.24 4.24 0 0 1-6-6zM9 9l6 6',
- filter:'M4 6h16M7 12h10M10 18h4',
- box:'M3 7l9-4 9 4v10l-9 4-9-4V7zm0 0l9 4 9-4M12 11v10M7.5 5l9 4',
- checklist:'M4 6l1.5 1.5L8 5M4 12l1.5 1.5L8 11M4 18l1.5 1.5L8 17M11 6h9M11 12h9M11 18h9',
- cart:'M3 4h2l2.5 11h11L21 8H6.5M9 20a1 1 0 1 0 2 0 1 1 0 0 0-2 0m7 0a1 1 0 1 0 2 0 1 1 0 0 0-2 0',
- cycle:'M20 11a8 8 0 0 0-14.5-4.5L4 8m0-4v4h4M4 13a8 8 0 0 0 14.5 4.5L20 16m0 4v-4h-4',
- mail:'M3 5h18v14H3V5zm0 1l9 7 9-7',
- tag:'M3 3h8l10 10-8 8L3 11V3zm4 4h.01',
- more:'M5 12h.01M12 12h.01M19 12h.01',camera:'M3 7h4l2-3h6l2 3h4v14H3V7zm5 7a4 4 0 1 0 8 0 4 4 0 0 0-8 0',clip:'M8 12l7-7a4 4 0 0 1 6 6L10 22a6 6 0 0 1-8-8L13 3',
- settings:'M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1 1-3zm-1 9a4 4 0 1 0 8 0 4 4 0 0 0-8 0',
- undo:'M3 10h10a7 7 0 0 1 7 7v3M3 10l6-6M3 10l6 6', redo:'M21 10H11a7 7 0 0 0-7 7v3M21 10l-6-6M21 10l-6 6', image:'M3 3h18v18H3V3zm0 13 6-6 6 6 3-3 3 3M15 7h1', copy:'M8 8h13v13H8V8zM3 16V3h13',
- home:'M3 10l9-7 9 7v10H3V10zm6 10v-7h6v7', chat:'M4 4h16v12H9l-5 4V4z',
- calendar:'M4 5h16v16H4V5zm0 5h16M8 3v4m8-4v4M8 14h2m4 0h2m-8 4h2',
- bell:'M5 17h14l-2-3V9a5 5 0 0 0-10 0v5l-2 3zm5 3h4',
- user:'M8 7a4 4 0 1 0 8 0 4 4 0 0 0-8 0zm-4 14v-2a8 6 0 0 1 16 0v2',
- mic:'M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0V5zm-3 5v2a6 6 0 0 0 12 0v-2m-6 8v4m-4 0h8',
- send:'M3 3l19 9-19 9 4-9-4-9zm4 9h15', play:'M8 4l12 8-12 8V4z', pause:'M8 5v14m8-14v14', stop:'M6 6h12v12H6V6z',
- plus:'M12 4v16M4 12h16', close:'M6 6l12 12M6 18L18 6', back:'M15 5l-7 7 7 7',
- history:'M3 9a9 9 0 1 1 0 6M3 3v6h6m3-3v6l4 2', trash:'M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7',
- eye:'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zm7 0a3 3 0 1 0 6 0 3 3 0 0 0-6 0',
- eyeOff:'M3 3l18 18M9 5c7-2 13 7 13 7l-3 4M6 6l-4 6s4 7 10 7l4-1',
- check:'M4 12l5 5L20 6', refresh:'M20 7a9 9 0 1 0 1 8M20 2v5h-5', logout:'M10 3H4v18h6m4-14 5 5-5 5M8 12h11',
- volume:'M3 9h4l5-5v16l-5-5H3V9zm13-2c4 3 4 7 0 10m3-13c6 5 6 11 0 16',
- chevron:'M9 5l7 7-7 7', shield:'M12 3l8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3zm-4 9 3 3 5-6',
- grid:'M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h7v7h-7v-7z',
- book:'M3 4h7l2 2 2-2h7v16h-7l-2 1-2-1H3V4zm9 2v15',
- list:'M9 6h12M9 12h12M9 18h12M3 6h1M3 12h1M3 18h1',
- edit:'M15 4l5 5M4 15L16 3l5 5L9 20l-6 1 1-6z',
- monitor:'M3 4h18v13H3V4zm5 17h8m-4-4v4M6 13l4-4 4 2 4-5',
- wallet:'M3 7h15a3 3 0 0 1 3 3v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7zm0 0V6a2 2 0 0 1 2-2h11v3M16 14h2',
- search:'M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14zm9 16l-4-4',
- sidebar:'M4 4h16v16H4V4zm5 0v16',
- move:'M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4',
- backlog:'M4 5h16M4 10h10M4 15h7M17 13v8m-4-4h8',
- toAgenda:'M4 6h16v14H4V6zm0 4h16M8 4v4m8-4v4M12 18v-5m-2.5 2.5L12 13l2.5 2.5'
+import * as PAirplane from 'phosphor-react-native/src/icons/Airplane';
+import * as PAlarm from 'phosphor-react-native/src/icons/Alarm';
+import * as PArrowClockwise from 'phosphor-react-native/src/icons/ArrowClockwise';
+import * as PArrowCounterClockwise from 'phosphor-react-native/src/icons/ArrowCounterClockwise';
+import * as PArrowRight from 'phosphor-react-native/src/icons/ArrowRight';
+import * as PArrowUUpLeft from 'phosphor-react-native/src/icons/ArrowUUpLeft';
+import * as PArrowsClockwise from 'phosphor-react-native/src/icons/ArrowsClockwise';
+import * as PArrowsDownUp from 'phosphor-react-native/src/icons/ArrowsDownUp';
+import * as PBank from 'phosphor-react-native/src/icons/Bank';
+import * as PBarbell from 'phosphor-react-native/src/icons/Barbell';
+import * as PBell from 'phosphor-react-native/src/icons/Bell';
+import * as PBookOpen from 'phosphor-react-native/src/icons/BookOpen';
+import * as PBriefcase from 'phosphor-react-native/src/icons/Briefcase';
+import * as PBus from 'phosphor-react-native/src/icons/Bus';
+import * as PCalendarBlank from 'phosphor-react-native/src/icons/CalendarBlank';
+import * as PCalendarPlus from 'phosphor-react-native/src/icons/CalendarPlus';
+import * as PCamera from 'phosphor-react-native/src/icons/Camera';
+import * as PCar from 'phosphor-react-native/src/icons/Car';
+import * as PCaretLeft from 'phosphor-react-native/src/icons/CaretLeft';
+import * as PCaretRight from 'phosphor-react-native/src/icons/CaretRight';
+import * as PChartBar from 'phosphor-react-native/src/icons/ChartBar';
+import * as PChartPie from 'phosphor-react-native/src/icons/ChartPie';
+import * as PChatCircle from 'phosphor-react-native/src/icons/ChatCircle';
+import * as PCheck from 'phosphor-react-native/src/icons/Check';
+import * as PCheckCircle from 'phosphor-react-native/src/icons/CheckCircle';
+import * as PCircle from 'phosphor-react-native/src/icons/Circle';
+import * as PClockCounterClockwise from 'phosphor-react-native/src/icons/ClockCounterClockwise';
+import * as PCoffee from 'phosphor-react-native/src/icons/Coffee';
+import * as PCoins from 'phosphor-react-native/src/icons/Coins';
+import * as PConfetti from 'phosphor-react-native/src/icons/Confetti';
+import * as PCopy from 'phosphor-react-native/src/icons/Copy';
+import * as PCreditCard from 'phosphor-react-native/src/icons/CreditCard';
+import * as PDotsThree from 'phosphor-react-native/src/icons/DotsThree';
+import * as PEnvelopeSimple from 'phosphor-react-native/src/icons/EnvelopeSimple';
+import * as PEye from 'phosphor-react-native/src/icons/Eye';
+import * as PEyeSlash from 'phosphor-react-native/src/icons/EyeSlash';
+import * as PFilmSlate from 'phosphor-react-native/src/icons/FilmSlate';
+import * as PForkKnife from 'phosphor-react-native/src/icons/ForkKnife';
+import * as PFunnelSimple from 'phosphor-react-native/src/icons/FunnelSimple';
+import * as PGasPump from 'phosphor-react-native/src/icons/GasPump';
+import * as PGearSix from 'phosphor-react-native/src/icons/GearSix';
+import * as PGift from 'phosphor-react-native/src/icons/Gift';
+import * as PGraduationCap from 'phosphor-react-native/src/icons/GraduationCap';
+import * as PHeart from 'phosphor-react-native/src/icons/Heart';
+import * as PHeartbeat from 'phosphor-react-native/src/icons/Heartbeat';
+import * as PHourglass from 'phosphor-react-native/src/icons/Hourglass';
+import * as PHouse from 'phosphor-react-native/src/icons/House';
+import * as PHouseLine from 'phosphor-react-native/src/icons/HouseLine';
+import * as PImage from 'phosphor-react-native/src/icons/Image';
+import * as PInfo from 'phosphor-react-native/src/icons/Info';
+import * as PLightbulb from 'phosphor-react-native/src/icons/Lightbulb';
+import * as PLightning from 'phosphor-react-native/src/icons/Lightning';
+import * as PLink from 'phosphor-react-native/src/icons/Link';
+import * as PListBullets from 'phosphor-react-native/src/icons/ListBullets';
+import * as PListChecks from 'phosphor-react-native/src/icons/ListChecks';
+import * as PLock from 'phosphor-react-native/src/icons/Lock';
+import * as PMagnifyingGlass from 'phosphor-react-native/src/icons/MagnifyingGlass';
+import * as PMapPin from 'phosphor-react-native/src/icons/MapPin';
+import * as PMegaphone from 'phosphor-react-native/src/icons/Megaphone';
+import * as PMicrophone from 'phosphor-react-native/src/icons/Microphone';
+import * as PMonitor from 'phosphor-react-native/src/icons/Monitor';
+import * as PMusicNotes from 'phosphor-react-native/src/icons/MusicNotes';
+import * as PNote from 'phosphor-react-native/src/icons/Note';
+import * as PNotebook from 'phosphor-react-native/src/icons/Notebook';
+import * as PPackage from 'phosphor-react-native/src/icons/Package';
+import * as PPaperPlaneRight from 'phosphor-react-native/src/icons/PaperPlaneRight';
+import * as PPaperclip from 'phosphor-react-native/src/icons/Paperclip';
+import * as PPause from 'phosphor-react-native/src/icons/Pause';
+import * as PPawPrint from 'phosphor-react-native/src/icons/PawPrint';
+import * as PPencilSimple from 'phosphor-react-native/src/icons/PencilSimple';
+import * as PPhone from 'phosphor-react-native/src/icons/Phone';
+import * as PPiggyBank from 'phosphor-react-native/src/icons/PiggyBank';
+import * as PPill from 'phosphor-react-native/src/icons/Pill';
+import * as PPlay from 'phosphor-react-native/src/icons/Play';
+import * as PPlus from 'phosphor-react-native/src/icons/Plus';
+import * as PPushPin from 'phosphor-react-native/src/icons/PushPin';
+import * as PReceipt from 'phosphor-react-native/src/icons/Receipt';
+import * as PRepeat from 'phosphor-react-native/src/icons/Repeat';
+import * as PRobot from 'phosphor-react-native/src/icons/Robot';
+import * as PShieldCheck from 'phosphor-react-native/src/icons/ShieldCheck';
+import * as PShoppingCart from 'phosphor-react-native/src/icons/ShoppingCart';
+import * as PSidebarSimple from 'phosphor-react-native/src/icons/SidebarSimple';
+import * as PSignOut from 'phosphor-react-native/src/icons/SignOut';
+import * as PSparkle from 'phosphor-react-native/src/icons/Sparkle';
+import * as PSpeakerHigh from 'phosphor-react-native/src/icons/SpeakerHigh';
+import * as PSquaresFour from 'phosphor-react-native/src/icons/SquaresFour';
+import * as PStar from 'phosphor-react-native/src/icons/Star';
+import * as PStop from 'phosphor-react-native/src/icons/Stop';
+import * as PStorefront from 'phosphor-react-native/src/icons/Storefront';
+import * as PTShirt from 'phosphor-react-native/src/icons/TShirt';
+import * as PTag from 'phosphor-react-native/src/icons/Tag';
+import * as PTelevision from 'phosphor-react-native/src/icons/Television';
+import * as PTicket from 'phosphor-react-native/src/icons/Ticket';
+import * as PTrash from 'phosphor-react-native/src/icons/Trash';
+import * as PTray from 'phosphor-react-native/src/icons/Tray';
+import * as PTrendDown from 'phosphor-react-native/src/icons/TrendDown';
+import * as PTrendUp from 'phosphor-react-native/src/icons/TrendUp';
+import * as PTruck from 'phosphor-react-native/src/icons/Truck';
+import * as PUser from 'phosphor-react-native/src/icons/User';
+import * as PUsers from 'phosphor-react-native/src/icons/Users';
+import * as PWallet from 'phosphor-react-native/src/icons/Wallet';
+import * as PWarning from 'phosphor-react-native/src/icons/Warning';
+import * as PWrench from 'phosphor-react-native/src/icons/Wrench';
+import * as PX from 'phosphor-react-native/src/icons/X';
+
+/** 0.3.259 (rodada premium, fase 1): icones de um conjunto profissional (Phosphor, licenca MIT), no mesmo grid e no
+ * mesmo traco. Dois estados: contorno (regular) e preenchido quando `active` (ex.: aba atual do menu), como nos apps
+ * premium. Os nomes antigos continuam valendo; os novos substituem os emojis que faziam papel de icone. */
+const ICONS = {
+ capsule: PPill.PillIcon,
+ filter: PFunnelSimple.FunnelSimpleIcon,
+ box: PPackage.PackageIcon,
+ checklist: PListChecks.ListChecksIcon,
+ cart: PShoppingCart.ShoppingCartIcon,
+ cycle: PArrowsClockwise.ArrowsClockwiseIcon,
+ mail: PEnvelopeSimple.EnvelopeSimpleIcon,
+ tag: PTag.TagIcon,
+ more: PDotsThree.DotsThreeIcon,
+ camera: PCamera.CameraIcon,
+ clip: PPaperclip.PaperclipIcon,
+ settings: PGearSix.GearSixIcon,
+ undo: PArrowCounterClockwise.ArrowCounterClockwiseIcon,
+ redo: PArrowClockwise.ArrowClockwiseIcon,
+ image: PImage.ImageIcon,
+ copy: PCopy.CopyIcon,
+ home: PHouse.HouseIcon,
+ chat: PChatCircle.ChatCircleIcon,
+ calendar: PCalendarBlank.CalendarBlankIcon,
+ bell: PBell.BellIcon,
+ user: PUser.UserIcon,
+ mic: PMicrophone.MicrophoneIcon,
+ send: PPaperPlaneRight.PaperPlaneRightIcon,
+ play: PPlay.PlayIcon,
+ pause: PPause.PauseIcon,
+ stop: PStop.StopIcon,
+ plus: PPlus.PlusIcon,
+ close: PX.XIcon,
+ back: PCaretLeft.CaretLeftIcon,
+ history: PClockCounterClockwise.ClockCounterClockwiseIcon,
+ trash: PTrash.TrashIcon,
+ eye: PEye.EyeIcon,
+ eyeOff: PEyeSlash.EyeSlashIcon,
+ check: PCheck.CheckIcon,
+ refresh: PArrowClockwise.ArrowClockwiseIcon,
+ logout: PSignOut.SignOutIcon,
+ volume: PSpeakerHigh.SpeakerHighIcon,
+ chevron: PCaretRight.CaretRightIcon,
+ shield: PShieldCheck.ShieldCheckIcon,
+ grid: PSquaresFour.SquaresFourIcon,
+ book: PBookOpen.BookOpenIcon,
+ list: PListBullets.ListBulletsIcon,
+ edit: PPencilSimple.PencilSimpleIcon,
+ monitor: PMonitor.MonitorIcon,
+ wallet: PWallet.WalletIcon,
+ search: PMagnifyingGlass.MagnifyingGlassIcon,
+ sidebar: PSidebarSimple.SidebarSimpleIcon,
+ move: PArrowsDownUp.ArrowsDownUpIcon,
+ backlog: PTray.TrayIcon,
+ toAgenda: PCalendarPlus.CalendarPlusIcon,
+ refund: PArrowUUpLeft.ArrowUUpLeftIcon,
+ repeat: PRepeat.RepeatIcon,
+ sparkle: PSparkle.SparkleIcon,
+ warning: PWarning.WarningIcon,
+ info: PInfo.InfoIcon,
+ receipt: PReceipt.ReceiptIcon,
+ piggy: PPiggyBank.PiggyBankIcon,
+ note: PNote.NoteIcon,
+ checkCircle: PCheckCircle.CheckCircleIcon,
+ pin: PPushPin.PushPinIcon,
+ link: PLink.LinkIcon,
+ star: PStar.StarIcon,
+ heart: PHeart.HeartIcon,
+ lightning: PLightning.LightningIcon,
+ lock: PLock.LockIcon,
+ phone: PPhone.PhoneIcon,
+ users: PUsers.UsersIcon,
+ lightbulb: PLightbulb.LightbulbIcon,
+ alarm: PAlarm.AlarmIcon,
+ mapPin: PMapPin.MapPinIcon,
+ card: PCreditCard.CreditCardIcon,
+ bank: PBank.BankIcon,
+ coins: PCoins.CoinsIcon,
+ trendUp: PTrendUp.TrendUpIcon,
+ trendDown: PTrendDown.TrendDownIcon,
+ chartPie: PChartPie.ChartPieIcon,
+ chartBar: PChartBar.ChartBarIcon,
+ robot: PRobot.RobotIcon,
+ megaphone: PMegaphone.MegaphoneIcon,
+ truck: PTruck.TruckIcon,
+ gift: PGift.GiftIcon,
+ film: PFilmSlate.FilmSlateIcon,
+ music: PMusicNotes.MusicNotesIcon,
+ forkKnife: PForkKnife.ForkKnifeIcon,
+ car: PCar.CarIcon,
+ graduation: PGraduationCap.GraduationCapIcon,
+ briefcase: PBriefcase.BriefcaseIcon,
+ barbell: PBarbell.BarbellIcon,
+ heartbeat: PHeartbeat.HeartbeatIcon,
+ house2: PHouseLine.HouseLineIcon,
+ storefront: PStorefront.StorefrontIcon,
+ ticket: PTicket.TicketIcon,
+ airplane: PAirplane.AirplaneIcon,
+ coffee: PCoffee.CoffeeIcon,
+ tshirt: PTShirt.TShirtIcon,
+ tv: PTelevision.TelevisionIcon,
+ paw: PPawPrint.PawPrintIcon,
+ wrench: PWrench.WrenchIcon,
+ gas: PGasPump.GasPumpIcon,
+ bus: PBus.BusIcon,
+ confetti: PConfetti.ConfettiIcon,
+ hourglass: PHourglass.HourglassIcon,
+ notebook: PNotebook.NotebookIcon,
+ arrowRight: PArrowRight.ArrowRightIcon,
+ circle: PCircle.CircleIcon,
 } as const;
-export type IconName = keyof typeof paths;
-export function Icon({ name, size=22, color='#7258E8' }: { name: IconName; size?: number; color?: string }) {
- return <Svg width={size} height={size} viewBox="0 0 24 24" fill="none"><Path d={paths[name]} stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" /></Svg>;
+export type IconName = keyof typeof ICONS;
+export const ICON_NAMES = Object.keys(ICONS) as IconName[];
+export function Icon({ name, size = 22, color = '#7258E8', active = false, weight }: { name: IconName; size?: number; color?: string; active?: boolean; weight?: 'thin' | 'light' | 'regular' | 'bold' | 'fill' | 'duotone' }) {
+  const Glyph = ICONS[name] || ICONS.circle;
+  return <Glyph size={size} color={color} weight={weight || (active ? 'fill' : 'regular')} />;
+}
+
+/** 0.3.259: emojis que faziam papel de icone viram o icone equivalente do conjunto (o que nao estiver aqui segue como texto). */
+const EMOJI_GLYPH: Record<string, IconName> = {'🏪': 'storefront', '💰': 'coins', '📌': 'pin', '🏆': 'star', '📉': 'trendDown', '📈': 'trendUp', '🎯': 'star', '👍': 'checkCircle', '〰️': 'arrowRight', '⏳': 'hourglass', '🔎': 'search', '🔍': 'search', '✅': 'checkCircle', '📦': 'box', '🔔': 'bell', '⏰': 'alarm', '📎': 'clip', '🧾': 'receipt', '💳': 'card', '⚠️': 'warning', '📅': 'calendar', '💊': 'capsule', '🔁': 'repeat', '📝': 'note', '💡': 'lightbulb', '✨': 'sparkle'};
+export function glyphForEmoji(e: string): IconName | null { return EMOJI_GLYPH[String(e || '').trim()] || null; }
+export function EmojiIcon({e, size = 18, color = '#7258E8', fallback}: {e: string; size?: number; color?: string; fallback?: React.ReactNode}) {
+  const g = glyphForEmoji(e);
+  return g ? <Icon name={g} size={size} color={color} weight="duotone" /> : <>{fallback ?? null}</>;
 }

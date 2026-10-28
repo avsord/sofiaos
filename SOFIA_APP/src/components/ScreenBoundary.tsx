@@ -22,10 +22,10 @@ export class ScreenBoundary extends Component<Props,State>{
 function ScreenFallback({onRetry,line}:{onRetry:()=>void;line:string}){
  const c=useTheme();
  return <View testID="screen-error" style={{flex:1,backgroundColor:c.bg,padding:28,justifyContent:'center'}}>
-  <Text style={{fontSize:20,fontWeight:'700',color:c.text}}>Algo deu errado nesta tela.</Text>
+  <Text style={{fontSize:20,fontWeight:'600',color:c.text}}>Algo deu errado nesta tela.</Text>
   <Text style={{marginTop:10,lineHeight:21,color:c.muted}}>O restante da Sofia continua funcionando. Seus rascunhos salvos não foram apagados.</Text>
   <Pressable accessibilityRole="button" accessibilityLabel="Recarregar esta tela" onPress={onRetry} style={{marginTop:22,alignSelf:'flex-start',paddingVertical:12,paddingHorizontal:18,borderRadius:10,backgroundColor:c.accent}}>
-   <Text style={{color:c.onAccent,fontWeight:'600'}}>Recarregar esta tela</Text>
+   <Text style={{color:c.onAccent,fontWeight:'500'}}>Recarregar esta tela</Text>
   </Pressable>
   {line?<Text testID="screen-error-detail" selectable style={{marginTop:22,fontSize:11,lineHeight:16,color:c.muted}}>{'Detalhe técnico: '+line}</Text>:null}
  </View>;

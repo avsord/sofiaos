@@ -24,12 +24,12 @@ Nada é apagado (o corte de funções depende dele). Decisões de design ficam r
 ### Fase 1 — fundação visual (app e site)
 | # | Pedido | Estado |
 |---|---|---|
-| 1.1 | Fonte própria: Plus Jakarta Sans embutida no app e no site | anotado |
-| 1.2 | Escala curta de tamanhos de letra (hoje 29) e pesos com hierarquia (hoje quase tudo negrito) | anotado |
-| 1.3 | Cores no tema (hoje 80 cores soltas no código), funcionando no claro e no escuro | anotado |
-| 1.4 | Poucos arredondamentos (hoje 30) e espaçamentos (hoje 27), usados com intenção | anotado |
-| 1.5 | Ícones premium: conjunto profissional, dois estados (contorno/preenchido), tamanhos ópticos, traço casando com a fonte, ícones próprios (Cápsulas, Guardado, Sofia); trocar os 218 emojis usados como ícone | anotado |
-| 1.6 | Modo escuro desenhado (não invertido): fundo não preto puro, camadas que clareiam | anotado |
+| 1.1 | Fonte própria: Plus Jakarta Sans embutida no app e no site | entregue (0.3.259) |
+| 1.2 | Escala curta de tamanhos de letra (hoje 29) e pesos com hierarquia (hoje quase tudo negrito) | entregue (0.3.259): 13 tamanhos, pesos um degrau abaixo (`tools/type-scale-259.py`) |
+| 1.3 | Cores no tema (hoje 80 cores soltas no código), funcionando no claro e no escuro | entregue em parte (0.3.259): tokens good/warn/info/elevated; Finanças, notificações e status vêm do tema; texto branco sobre o destaque virou onAccent. As cores das categorias viram paleta própria na 4.1 |
+| 1.4 | Poucos arredondamentos (hoje 30) e espaçamentos (hoje 27), usados com intenção | movido para a Fase 3: muitos raios são metade do tamanho de círculos; trocar no automático deformaria. Entra tela a tela |
+| 1.5 | Ícones premium: conjunto profissional, dois estados (contorno/preenchido), tamanhos ópticos, traço casando com a fonte, ícones próprios (Cápsulas, Guardado, Sofia); trocar os 218 emojis usados como ícone | entregue em parte (0.3.259): conjunto Phosphor com dois estados (menu e lateral), categorias de Finanças, notificações, Monitoramento, Encomendas e Lembretes com ícones. Emojis escolhidos pela pessoa (ícone de Página, marcador de e-mail) continuam por serem conteúdo. Ícones próprios da Sofia vão para a 4.7 |
+| 1.6 | Modo escuro desenhado (não invertido): fundo não preto puro, camadas que clareiam | entregue (0.3.259) |
 
 ### Fase 2 — comportamento de site de verdade
 | # | Pedido | Estado |

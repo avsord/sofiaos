@@ -15,22 +15,23 @@ export type Tx = {paidAt: string; reservePart: number; time: string; noBalance?:
 export type Budget = {id: string; category: string; limit: number; entity: Entity};
 export type Goal = {id: string; name: string; target: number; saved: number; deadline: string; color: string; done: boolean; entity: Entity};
 
-export type Category = {name: string; icon: string; color: string};
+/** 0.3.259: `glyph` e o icone de verdade (conjunto da Sofia); `icon` (emoji) fica so por compatibilidade (chat, dados antigos). */
+export type Category = {name: string; icon: string; color: string; glyph?: string};
 export const EXPENSE_CATEGORIES: Category[] = [
-  {name: 'Alimentação', icon: '🍽️', color: '#ff8a5b'}, {name: 'Mercado', icon: '🛒', color: '#2fc58b'}, {name: 'Transporte', icon: '🚗', color: '#4fa3ff'},
-  {name: 'Moradia', icon: '🏠', color: '#a98bff'}, {name: 'Contas', icon: '💳', color: '#ffb547'}, {name: 'Saúde', icon: '💊', color: '#ff6b7a'},
-  {name: 'Educação', icon: '📚', color: '#3fd0d4'}, {name: 'Lazer', icon: '🎬', color: '#ef7bd0'}, {name: 'Compras', icon: '🛍️', color: '#c6d84a'},
-  {name: 'Assinaturas', icon: '📺', color: '#8f7cf7'}, {name: 'Viagem', icon: '✈️', color: '#38b6ff'}, {name: 'Pets', icon: '🐾', color: '#d99a5b'},
-  {name: 'Presentes', icon: '🎁', color: '#ff7eb6'}, {name: 'Impostos', icon: '🧾', color: '#9a9aa8'}, {name: 'Trabalho', icon: '💼', color: '#6c8ebf'},
-  {name: 'Outros', icon: '📦', color: '#8a84a0'},
+  {name: 'Alimentação', icon: '🍽️', color: '#ff8a5b', glyph: 'forkKnife'}, {name: 'Mercado', icon: '🛒', color: '#2fc58b', glyph: 'cart'}, {name: 'Transporte', icon: '🚗', color: '#4fa3ff', glyph: 'car'},
+  {name: 'Moradia', icon: '🏠', color: '#a98bff', glyph: 'house2'}, {name: 'Contas', icon: '💳', color: '#ffb547', glyph: 'receipt'}, {name: 'Saúde', icon: '💊', color: '#ff6b7a', glyph: 'heartbeat'},
+  {name: 'Educação', icon: '📚', color: '#3fd0d4', glyph: 'graduation'}, {name: 'Lazer', icon: '🎬', color: '#ef7bd0', glyph: 'film'}, {name: 'Compras', icon: '🛍️', color: '#c6d84a', glyph: 'storefront'},
+  {name: 'Assinaturas', icon: '📺', color: '#8f7cf7', glyph: 'tv'}, {name: 'Viagem', icon: '✈️', color: '#38b6ff', glyph: 'airplane'}, {name: 'Pets', icon: '🐾', color: '#d99a5b', glyph: 'paw'},
+  {name: 'Presentes', icon: '🎁', color: '#ff7eb6', glyph: 'gift'}, {name: 'Impostos', icon: '🧾', color: '#9a9aa8', glyph: 'bank'}, {name: 'Trabalho', icon: '💼', color: '#6c8ebf', glyph: 'briefcase'},
+  {name: 'Outros', icon: '📦', color: '#8a84a0', glyph: 'box'},
 ];
 export const INCOME_CATEGORIES: Category[] = [
-  {name: 'Salário', icon: '💼', color: '#2fc58b'}, {name: 'Freelance', icon: '💻', color: '#4fa3ff'}, {name: 'Investimentos', icon: '📈', color: '#a98bff'},
-  {name: 'Vendas', icon: '🏷️', color: '#ffb547'}, {name: 'Reembolso', icon: '↩️', color: '#3fd0d4'}, {name: 'Presente', icon: '🎁', color: '#ff7eb6'},
-  {name: 'Outros', icon: '💰', color: '#8a84a0'},
+  {name: 'Salário', icon: '💼', color: '#2fc58b', glyph: 'briefcase'}, {name: 'Freelance', icon: '💻', color: '#4fa3ff', glyph: 'monitor'}, {name: 'Investimentos', icon: '📈', color: '#a98bff', glyph: 'trendUp'},
+  {name: 'Vendas', icon: '🏷️', color: '#ffb547', glyph: 'tag'}, {name: 'Reembolso', icon: '↩️', color: '#3fd0d4', glyph: 'refund'}, {name: 'Presente', icon: '🎁', color: '#ff7eb6', glyph: 'gift'},
+  {name: 'Outros', icon: '💰', color: '#8a84a0', glyph: 'coins'},
 ];
-export const INVOICE_CATEGORY: Category = {name: 'Fatura do cartão', icon: '💳', color: '#7258e8'};
-export const TRANSFER_CATEGORY: Category = {name: 'Transferência', icon: '🔁', color: '#8a84a0'};
+export const INVOICE_CATEGORY: Category = {name: 'Fatura do cartão', icon: '💳', color: '#7258e8', glyph: 'card'};
+export const TRANSFER_CATEGORY: Category = {name: 'Transferência', icon: '🔁', color: '#8a84a0', glyph: 'repeat'};
 export const ACCOUNT_TYPES = [{value: 'corrente', label: 'Conta corrente'}, {value: 'poupanca', label: 'Poupança'}, {value: 'carteira', label: 'Carteira'}, {value: 'investimento', label: 'Investimento'}, {value: 'outro', label: 'Outro'}];
 export const FIN_COLORS = ['#7258e8', '#2fc58b', '#4fa3ff', '#ff8a5b', '#ff6b7a', '#ffb547', '#ef7bd0', '#3fd0d4'];
 
@@ -38,7 +39,7 @@ export function categoryOf(name: string, kind: TxKind = 'expense'): Category {
   if (kind === 'card_payment') return INVOICE_CATEGORY;
   if (kind === 'transfer') return TRANSFER_CATEGORY;
   const list = kind === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-  return list.find(c => c.name === name) || {name: name || 'Outros', icon: kind === 'income' ? '💰' : '📦', color: '#8a84a0'};
+  return list.find(c => c.name === name) || {name: name || 'Outros', icon: kind === 'income' ? '💰' : '📦', color: '#8a84a0', glyph: kind === 'income' ? 'coins' : 'box'};
 }
 
 const num = (v: any) => { const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(',', '.')); return Number.isFinite(n) ? n : 0; };

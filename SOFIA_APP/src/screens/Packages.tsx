@@ -1,4 +1,5 @@
 import React,{useEffect,useMemo,useState} from 'react';
+import {EmojiIcon} from '../components/Icon';
 import {tap} from '../lib/desktop';
 import {Alert,Linking,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
 import type {SofiaApi} from '../lib/api';
@@ -49,11 +50,11 @@ export function Packages({api,active,onBack}:{api:SofiaApi;active:boolean;onBack
  function archive(item:Entity){appAlert('Remover encomenda?',`“${item.title}” sai da lista (fica no histórico).`,[{text:'Cancelar'},{text:'Remover',style:'destructive',onPress:()=>{setBusy(true);api.saveEntity({...item,state:'archived',revision:item.revision}).then(saved=>{records.merge(saved);setViewing(null);}).catch(e=>setError(errorText(e))).finally(()=>setBusy(false));}}]);}
  const row=(item:Entity)=>{const delivered=item.state==='delivered',err=String(item.data?.error||''),status=String(item.data?.status||'')||(err?'Consulta indisponível':'Aguardando a primeira consulta');
   return <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={'Abrir encomenda '+item.title} onPress={()=>setViewing(item)} style={({pressed})=>({minHeight:74,borderRadius:22,paddingHorizontal:14,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:12,backgroundColor:delivered?c.surface:c.card,borderWidth:1,borderColor:c.line,opacity:pressed?0.85:1})}>
-   <View style={{width:40,height:40,borderRadius:20,alignItems:'center',justifyContent:'center',backgroundColor:delivered?c.accentSoft:c.surface}}><Text style={{fontSize:20}}>{delivered?'✅':'📦'}</Text></View>
-   <View style={{flex:1,minWidth:0,gap:3}}><Text numberOfLines={1} style={{fontSize:15,fontWeight:'700',color:c.text}}>{item.title}</Text><Text numberOfLines={2} style={{fontSize:12,color:err&&!item.data?.status?c.danger:c.muted}}>{status}</Text><Text style={{fontSize:10,color:c.muted}}>{CARRIER_LABEL[String(item.data?.carrier)]||'Transportadora'} · {String(item.data?.code||'')}{item.data?.last_event_at?' · '+whenLabel(String(item.data.last_event_at)):''}</Text></View>
+   <View style={{width:40,height:40,borderRadius:20,alignItems:'center',justifyContent:'center',backgroundColor:delivered?c.accentSoft:c.surface}}><EmojiIcon e={delivered?'✅':'📦'} size={22} color={c.accent}/></View>
+   <View style={{flex:1,minWidth:0,gap:3}}><Text numberOfLines={1} style={{fontSize:16,fontWeight:'600',color:c.text}}>{item.title}</Text><Text numberOfLines={2} style={{fontSize:12,color:err&&!item.data?.status?c.danger:c.muted}}>{status}</Text><Text style={{fontSize:10,color:c.muted}}>{CARRIER_LABEL[String(item.data?.carrier)]||'Transportadora'} · {String(item.data?.code||'')}{item.data?.last_event_at?' · '+whenLabel(String(item.data.last_event_at)):''}</Text></View>
    <Icon name="chevron" size={18} color={c.muted}/>
   </Pressable>;};
- const section=(title:string,list:Entity[])=>list.length?<View style={{gap:10}}><Text style={{color:c.muted,fontSize:12,fontWeight:'700',paddingHorizontal:6}}>{title}</Text>{list.map(row)}</View>:null;
+ const section=(title:string,list:Entity[])=>list.length?<View style={{gap:10}}><Text style={{color:c.muted,fontSize:12,fontWeight:'600',paddingHorizontal:6}}>{title}</Text>{list.map(row)}</View>:null;
  const events=viewing?parseEvents(viewing.data?.events):[];
  return <View style={{flex:1}}>
   <ScreenTitle title="Encomendas" eyebrow="RASTREIO · AVISA QUANDO MUDA" right={<View style={{flexDirection:'row'}}><IconButton name="back" label="Voltar aos apps" onPress={onBack}/><IconButton name="plus" label="Nova encomenda" onPress={open}/></View>}/>
@@ -66,7 +67,7 @@ export function Packages({api,active,onBack}:{api:SofiaApi;active:boolean;onBack
    <Text style={{color:c.muted,fontSize:11,lineHeight:18,paddingHorizontal:4}}>Todas as transportadoras (Correios, AliExpress, Shopee e outras) são acompanhadas automaticamente pela Ship24, e você recebe aviso quando o status muda. Cada encomenda nova usa 1 das 10 grátis do mês; atualizar não gasta.</Text>
   </ScrollView>
   <Sheet visible={!!editing} onClose={()=>{if(!busy)setEditing(null);}} label="Fechar encomenda">
-   <View style={{flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,color:c.text,fontSize:22,fontWeight:'700'}}>Nova encomenda</Text><IconButton name="close" label="Fechar encomenda" disabled={busy} onPress={()=>setEditing(null)}/></View>
+   <View style={{flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,color:c.text,fontSize:24,fontWeight:'600'}}>Nova encomenda</Text><IconButton name="close" label="Fechar encomenda" disabled={busy} onPress={()=>setEditing(null)}/></View>
    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{gap:16,paddingBottom:18}}>
     {error?<ErrorBanner text={error}/>:null}
     {field(c,'Código de rastreio',String(editing?.data?.code||''),code=>patchData({code}),'Ex.: AA123456789BR',{autoCapitalize:'characters',autoCorrect:false})}
@@ -78,10 +79,10 @@ export function Packages({api,active,onBack}:{api:SofiaApi;active:boolean;onBack
   </Sheet>
   <Sheet visible={!!viewing} onClose={()=>setViewing(null)} label="Fechar linha do tempo">
    {viewing?<View style={{gap:14,paddingBottom:18}}>
-    <View style={{flexDirection:'row',alignItems:'center'}}><View style={{flex:1}}><Text style={{color:c.text,fontSize:22,fontWeight:'700'}}>{viewing.title}</Text><Text style={{color:c.muted,fontSize:12}}>{CARRIER_LABEL[String(viewing.data?.carrier)]||'Transportadora'} · {String(viewing.data?.code||'')}</Text></View><IconButton name="close" label="Fechar linha do tempo" onPress={()=>setViewing(null)}/></View>
+    <View style={{flexDirection:'row',alignItems:'center'}}><View style={{flex:1}}><Text style={{color:c.text,fontSize:24,fontWeight:'600'}}>{viewing.title}</Text><Text style={{color:c.muted,fontSize:12}}>{CARRIER_LABEL[String(viewing.data?.carrier)]||'Transportadora'} · {String(viewing.data?.code||'')}</Text></View><IconButton name="close" label="Fechar linha do tempo" onPress={()=>setViewing(null)}/></View>
     {/* 0.3.232: etapa em portugues, taxa a pagar e previsao de entrega (Ship24) */}
-    {viewing.data?.milestone_label?<View style={{alignSelf:'flex-start',paddingHorizontal:10,paddingVertical:5,borderRadius:99,backgroundColor:c.accentSoft}}><Text style={{color:c.accent,fontWeight:'800',fontSize:12}}>{String(viewing.data.milestone_label)}</Text></View>:null}
-    {viewing.data?.fee?<View style={{padding:12,borderRadius:12,backgroundColor:c.danger+'1f',gap:4}}><Text style={{color:c.danger,fontWeight:'800'}}>💰 Taxa a pagar</Text><Text style={{color:c.text,fontSize:13}}>A encomenda está esperando o pagamento de taxa/imposto. Toque em "Abrir rastreio oficial" para pagar.</Text></View>:null}
+    {viewing.data?.milestone_label?<View style={{alignSelf:'flex-start',paddingHorizontal:10,paddingVertical:5,borderRadius:99,backgroundColor:c.accentSoft}}><Text style={{color:c.accent,fontWeight:'700',fontSize:12}}>{String(viewing.data.milestone_label)}</Text></View>:null}
+    {viewing.data?.fee?<View style={{padding:12,borderRadius:12,backgroundColor:c.danger+'1f',gap:4}}><Text style={{color:c.danger,fontWeight:'700'}}>💰 Taxa a pagar</Text><Text style={{color:c.text,fontSize:13}}>A encomenda está esperando o pagamento de taxa/imposto. Toque em "Abrir rastreio oficial" para pagar.</Text></View>:null}
     {viewing.data?.estimated&&viewing.state!=='delivered'?<Text style={{color:c.muted,fontSize:12}}>Previsão de entrega: {String(viewing.data.estimated).slice(8,10)+'/'+String(viewing.data.estimated).slice(5,7)}</Text>:null}
     {viewing.data?.error?<Text style={{color:c.danger,fontSize:12}}>Última consulta falhou: {String(viewing.data.error)}</Text>:null}
     {viewing.data?.ok_at?<Text style={{color:c.muted,fontSize:11}}>Última atualização com sucesso: {whenLabel(String(viewing.data.ok_at))}</Text>:<Text style={{color:c.muted,fontSize:11}}>Ainda sem nenhuma atualização com sucesso.</Text>}

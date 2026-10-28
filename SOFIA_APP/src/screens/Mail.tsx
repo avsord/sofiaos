@@ -51,11 +51,11 @@ async function listAll(api: SofiaApi, kind: string) {
 }
 function Chips<T extends string>({value, options, onChange}: {value: T; options: Array<{value: T; label: string}>; onChange: (v: T) => void}) {
   const c = useTheme();
-  return <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>{options.map(o => <Pressable key={o.value} onPress={() => onChange(o.value)} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: o.value === value ? c.accent : c.input}}><Text style={{color: o.value === value ? c.onAccent : c.text, fontWeight: '600', fontSize: 13}}>{o.label}</Text></Pressable>)}</View>;
+  return <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8}}>{options.map(o => <Pressable key={o.value} onPress={() => onChange(o.value)} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: o.value === value ? c.accent : c.input}}><Text style={{color: o.value === value ? c.onAccent : c.text, fontWeight: '500', fontSize: 13}}>{o.label}</Text></Pressable>)}</View>;
 }
 function Field({label, value, onChange, placeholder, secure = false, email = false}: {label: string; value: string; onChange: (v: string) => void; placeholder?: string; secure?: boolean; email?: boolean}) {
   const c = useTheme();
-  return <View style={{gap: 6}}><Text style={{fontSize: 12, color: c.muted}}>{label}</Text><TextInput accessibilityLabel={label} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={c.muted} secureTextEntry={secure} autoCapitalize="none" autoCorrect={false} keyboardType={email ? 'email-address' : 'default'} style={{fontSize: 15, color: c.text, borderWidth: 1, borderColor: c.line, borderRadius: 12, padding: 12, backgroundColor: c.input}} /></View>;
+  return <View style={{gap: 6}}><Text style={{fontSize: 12, color: c.muted}}>{label}</Text><TextInput accessibilityLabel={label} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={c.muted} secureTextEntry={secure} autoCapitalize="none" autoCorrect={false} keyboardType={email ? 'email-address' : 'default'} style={{fontSize: 16, color: c.text, borderWidth: 1, borderColor: c.line, borderRadius: 12, padding: 12, backgroundColor: c.input}} /></View>;
 }
 
 // ---------- 0.3.146: selecao por grupo/conta ----------
@@ -90,7 +90,7 @@ function SelectionSheet({api, accounts, selection, onSelect, onClose, onChanged}
   const row = (label: string, v: MailSelection, sub = '', indent = 0) => <Pressable key={label + JSON.stringify(v)} accessibilityRole="button" accessibilityState={{selected: isSel(v)}} onPress={() => onSelect(v)} style={{paddingVertical: 12, paddingLeft: 12 + indent, paddingRight: 12, borderRadius: 12, backgroundColor: isSel(v) ? c.accentSoft : 'transparent', flexDirection: 'row', alignItems: 'center', gap: 8}}><Text style={{flex: 1, color: isSel(v) ? c.accent : c.text, fontWeight: indent ? '500' : '700'}}>{label}</Text>{sub ? <Text style={{color: c.muted, fontSize: 12}}>{sub}</Text> : null}</Pressable>;
   return <Sheet visible onClose={onClose} label="Fechar seleção de contas">
     <ScrollView contentContainerStyle={{gap: 4}} keyboardShouldPersistTaps="handled">
-      <Text style={{fontSize: 18, fontWeight: '800', color: c.text, marginBottom: 6}}>Mostrar e-mails de</Text>
+      <Text style={{fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 6}}>Mostrar e-mails de</Text>
       {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
       {row('Todas as contas', {type: 'all'}, accounts.length + ' conta(s)')}
       {groups.map(g => { const list = accounts.filter(a => String(a.data?.group || '').trim() === g); return <View key={g} style={{gap: 2, marginTop: 6}}>
@@ -154,7 +154,7 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
       <View style={{flex: 1, backgroundColor: c.bg}}>
         <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 14, paddingBottom: 6, ...pad(12)}}>
           <IconButton name="back" label="Voltar aos apps" onPress={onBack} />
-          <View style={{flex: 1, paddingHorizontal: 4}}><Text style={{fontSize: 11, letterSpacing: 1.2, color: c.muted, fontWeight: '600'}}>A SOFIA DE OLHO NO QUE IMPORTA</Text><Pressable accessibilityRole="button" accessibilityLabel={'Mostrando: ' + selectionLabel(selection, accounts || []) + '. Trocar'} onPress={() => setPicker(true)} disabled={!accounts?.length}><Text numberOfLines={1} style={{fontSize: 24, fontWeight: '800', color: c.text}}>{accounts?.length ? selectionLabel(selection, accounts) + ' ▾' : 'E-mails'}</Text></Pressable></View>
+          <View style={{flex: 1, paddingHorizontal: 4}}><Text style={{fontSize: 11, letterSpacing: 1.2, color: c.muted, fontWeight: '500'}}>A SOFIA DE OLHO NO QUE IMPORTA</Text><Pressable accessibilityRole="button" accessibilityLabel={'Mostrando: ' + selectionLabel(selection, accounts || []) + '. Trocar'} onPress={() => setPicker(true)} disabled={!accounts?.length}><Text numberOfLines={1} style={{fontSize: 24, fontWeight: '700', color: c.text}}>{accounts?.length ? selectionLabel(selection, accounts) + ' ▾' : 'E-mails'}</Text></Pressable></View>
           <IconButton name="refresh" label="Verificar agora" disabled={checking || !accounts?.length} onPress={() => void check()} />
         </View>
         <View style={{paddingHorizontal: 16, paddingBottom: 8, ...pad(16)}}>
@@ -166,8 +166,8 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
             {checking ? <View style={{flexDirection: 'row', gap: 8, alignItems: 'center'}}><ActivityIndicator color={c.accent} /><Text style={{color: c.muted}}>Lendo as caixas de entrada…</Text></View> : info ? <Text style={{color: c.muted, fontSize: 12}}>{info}</Text> : null}
             {!accounts.length ? (
               <View style={{alignItems: 'center', gap: 12, paddingVertical: 30}}>
-                <View style={{width: 84, height: 84, borderRadius: 42, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center'}}><Text style={{fontSize: 38}}>✉️</Text></View>
-                <Text style={{fontSize: 20, fontWeight: '800', color: c.text, textAlign: 'center'}}>Deixe a Sofia de olho no seu e-mail</Text>
+                <View style={{width: 84, height: 84, borderRadius: 42, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center'}}><Text style={{fontSize: 40}}>✉️</Text></View>
+                <Text style={{fontSize: 20, fontWeight: '700', color: c.text, textAlign: 'center'}}>Deixe a Sofia de olho no seu e-mail</Text>
                 <Text style={{fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 21}}>Conecte uma ou mais contas e diga o que importa: um nome, um e-mail, um assunto ou uma palavra. Quando chegar, ela avisa no celular e guarda aqui.</Text>
                 <View style={{alignSelf: 'stretch'}}><Button title="Conectar uma conta" onPress={() => setAddAccount('new')} /></View>
                 <Text style={{fontSize: 11, color: c.muted, textAlign: 'center'}}>A Sofia lê só remetente, assunto e um trecho curto dos e-mails novos. Nada é apagado, movido ou respondido.</Text>
@@ -175,11 +175,11 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
             ) : tab === 'hits' ? (
               <>
                 <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.muted, fontSize: 12}}>{shown.length} e-mails encontrados pelas regras</Text><Text style={{color: c.text, fontSize: 13, marginRight: 6}}>Só importantes</Text><Switch value={onlyImportant} onValueChange={setOnlyImportant} /></View>
-                {!rules.length ? <Pressable onPress={() => setTab('rules')} style={{padding: 14, borderRadius: 16, backgroundColor: c.accentSoft}}><Text style={{color: c.accent, fontWeight: '700'}}>Crie sua primeira regra →</Text><Text style={{color: c.text, fontSize: 12}}>Sem regras, a Sofia não sabe o que procurar.</Text></Pressable> : null}
+                {!rules.length ? <Pressable onPress={() => setTab('rules')} style={{padding: 14, borderRadius: 16, backgroundColor: c.accentSoft}}><Text style={{color: c.accent, fontWeight: '600'}}>Crie sua primeira regra →</Text><Text style={{color: c.text, fontSize: 12}}>Sem regras, a Sofia não sabe o que procurar.</Text></Pressable> : null}
                 {shown.length ? shown.map(h => (
                   <Pressable key={h.id} onPress={() => { setOpen(h); if (h.state === 'new') void api.saveEntity({...h, state: 'read'}).then(load).catch(() => {}); }}
                     style={{flexDirection: 'row', gap: 12, padding: 12, borderRadius: 16, backgroundColor: h.state === 'new' ? '#38b6ff14' : c.surface, borderWidth: 1, borderColor: c.line}}>
-                    <View style={{width: 38, height: 38, borderRadius: 19, backgroundColor: '#38b6ff26', alignItems: 'center', justifyContent: 'center'}}><Text style={{fontWeight: '800', color: '#38b6ff'}}>{String(h.data.from_name || h.data.from_addr || '?').charAt(0).toUpperCase()}</Text></View>
+                    <View style={{width: 38, height: 38, borderRadius: 19, backgroundColor: '#38b6ff26', alignItems: 'center', justifyContent: 'center'}}><Text style={{fontWeight: '700', color: '#38b6ff'}}>{String(h.data.from_name || h.data.from_addr || '?').charAt(0).toUpperCase()}</Text></View>
                     <View style={{flex: 1, gap: 2}}>
                       <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>{hitEmoji(h, rules) ? <Text>{hitEmoji(h, rules)}</Text> : null}<Text numberOfLines={1} style={{flex: 1, color: c.text, fontWeight: h.state === 'new' ? '700' : '500'}}>{h.data.from_name || h.data.from_addr}</Text><Text style={{color: c.muted, fontSize: 10}}>{relativeTime(String(h.data.received_at))}</Text></View>
                       <Text numberOfLines={1} style={{color: c.text, fontSize: 13}}>{h.title}</Text>
@@ -192,10 +192,10 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
             ) : tab === 'rules' ? (
               <>
                 <Button title="+ Nova regra" onPress={() => setRuleSheet({data: {field: 'from', notify: true, account_id: newRuleAccount}})} />
-                {!scopedRules.length ? <View style={{gap: 8}}><Text style={{color: c.muted, fontSize: 12}}>Comece por um modelo:</Text>{TEMPLATES.map(t => <Pressable key={t.title} onPress={() => setRuleSheet({title: t.title, data: {field: t.field, contains: t.contains, notify: true, important: t.important, account_id: newRuleAccount}})} style={{padding: 12, borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}><Text style={{color: c.text, fontWeight: '600'}}>{t.title}</Text><Text style={{color: c.muted, fontSize: 12}}>{t.contains}</Text></Pressable>)}</View> : null}
+                {!scopedRules.length ? <View style={{gap: 8}}><Text style={{color: c.muted, fontSize: 12}}>Comece por um modelo:</Text>{TEMPLATES.map(t => <Pressable key={t.title} onPress={() => setRuleSheet({title: t.title, data: {field: t.field, contains: t.contains, notify: true, important: t.important, account_id: newRuleAccount}})} style={{padding: 12, borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface}}><Text style={{color: c.text, fontWeight: '500'}}>{t.title}</Text><Text style={{color: c.muted, fontSize: 12}}>{t.contains}</Text></Pressable>)}</View> : null}
                 {scopedRules.map(r => (
                   <Pressable key={r.id} onPress={() => setRuleSheet(r)} style={{padding: 14, borderRadius: 16, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, gap: 4, opacity: r.state === 'paused' ? 0.55 : 1}}>
-                    <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>{r.data.important ? <Text>{String(r.data.emoji || '') || '⭐'}</Text> : null}<Text style={{flex: 1, color: c.text, fontWeight: '700'}}>{r.title}</Text><Text style={{color: c.muted, fontSize: 11}}>{hits.filter(h => String(h.data.rule_names).includes(r.title)).length} encontrados</Text></View>
+                    <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>{r.data.important ? <Text>{String(r.data.emoji || '') || '⭐'}</Text> : null}<Text style={{flex: 1, color: c.text, fontWeight: '600'}}>{r.title}</Text><Text style={{color: c.muted, fontSize: 11}}>{hits.filter(h => String(h.data.rule_names).includes(r.title)).length} encontrados</Text></View>
                     <Text style={{color: c.muted, fontSize: 12}}>{FIELDS.find(f => f.value === r.data.field)?.label} contém: <Text style={{color: c.text}}>{r.data.contains}</Text></Text>
                     <Text style={{color: c.muted, fontSize: 11}}>{accountName(ruleOwner(r)) || 'Conta removida'} · {r.data.notify === false ? 'sem aviso' : 'avisa no celular'}{r.state === 'paused' ? ' · pausada' : ''}</Text>
                   </Pressable>
@@ -206,7 +206,7 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
                 <Button title="+ Conectar outra conta" onPress={() => setAddAccount('new')} />
                 {accounts.map(a => (
                   <Pressable key={a.id} onPress={() => setAddAccount(a)} style={{padding: 14, borderRadius: 16, backgroundColor: c.surface, borderWidth: 1, borderColor: a.data.last_error ? '#ff6b7a88' : c.line, gap: 4}}>
-                    <Text style={{color: c.text, fontWeight: '700'}}>{a.data.address}</Text>
+                    <Text style={{color: c.text, fontWeight: '600'}}>{a.data.address}</Text>
                     <Text style={{color: c.muted, fontSize: 12}}>{PROVIDERS.find(p => p.value === a.data.provider)?.label}{a.data.group ? ' · ' + a.data.group : ''} · {a.state === 'paused' ? 'pausada' : a.data.provider === 'gmail_google' ? 'pela Conta Google' : a.data.secret_set ? 'conectada' : 'falta a senha de app'}{a.data.last_check ? ' · lida ' + relativeTime(String(a.data.last_check)) : ''}</Text>
                     {a.data.last_error ? <Text style={{color: c.danger, fontSize: 12}}>{a.data.last_error}</Text> : null}
                   </Pressable>
@@ -221,7 +221,7 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
         <Sheet visible={!!open} onClose={() => setOpen(null)} label="Fechar e-mail">
           {open ? (
             <View style={{gap: 10}}>
-              <Text style={{fontSize: 18, fontWeight: '800', color: c.text}}>{open.title}</Text>
+              <Text style={{fontSize: 18, fontWeight: '700', color: c.text}}>{open.title}</Text>
               <Text style={{color: c.text}}>{open.data.from_name} <Text style={{color: c.muted}}>&lt;{open.data.from_addr}&gt;</Text></Text>
               <Text style={{color: c.muted, fontSize: 12}}>{new Date(String(open.data.received_at)).toLocaleString('pt-BR')} · {accountName(open.data.account_id)}</Text>
               <Text style={{color: c.text, lineHeight: 21}}>{open.data.snippet}</Text>
@@ -304,7 +304,7 @@ function AccountSheet({api, account, onClose, onDone, groups = []}: {api: SofiaA
     <Sheet visible onClose={onClose} label="Fechar conta de e-mail">
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{gap: 12}} keyboardShouldPersistTaps="handled">
-          <Text style={{fontSize: 18, fontWeight: '800', color: c.text}}>{account ? 'Conta de e-mail' : 'Conectar e-mail'}</Text>
+          <Text style={{fontSize: 18, fontWeight: '700', color: c.text}}>{account ? 'Conta de e-mail' : 'Conectar e-mail'}</Text>
           <Chips value={provider} onChange={setProvider} options={PROVIDERS.map(x => ({value: x.value, label: x.label}))} />
           <Field label="Seu e-mail" value={address} onChange={setAddress} placeholder="voce@gmail.com" email />
           <Text style={{fontSize: 12, color: c.muted}}>Grupo (opcional)</Text>
@@ -315,25 +315,25 @@ function AccountSheet({api, account, onClose, onDone, groups = []}: {api: SofiaA
           {viaGoogle ? null : provider === 'imap' ? <View style={{flexDirection: 'row', gap: 10}}><View style={{flex: 3}}><Field label="Servidor IMAP" value={host} onChange={setHost} placeholder="imap.seudominio.com" /></View><View style={{flex: 1}}><Field label="Porta" value={port} onChange={setPort} /></View></View> : null}
           <View style={{padding: 12, borderRadius: 14, backgroundColor: c.accentSoft, gap: 6}}>
             <Text style={{color: c.text, fontSize: 13, lineHeight: 19}}>{p.help}</Text>
-            {p.link ? <Pressable onPress={() => void Linking.openURL(p.link!)}><Text style={{color: c.accent, fontWeight: '700'}}>Abrir página da senha de app →</Text></Pressable> : null}
+            {p.link ? <Pressable onPress={() => void Linking.openURL(p.link!)}><Text style={{color: c.accent, fontWeight: '600'}}>Abrir página da senha de app →</Text></Pressable> : null}
           </View>
           {/* 0.3.248: este modo le SO a caixa da Conta Google conectada no Perfil - avisa se o e-mail digitado for outro */}
           {viaGoogle && ownGoogle?.linked ? (
             <View testID="mail-own-google" style={{padding: 12, borderRadius: 12, backgroundColor: '#2fc58b1a', gap: 6}}>
-              <Text style={{color: '#2fc58b', fontWeight: '800'}}>✓ Entrou com o Google de {ownGoogle.email || typed}</Text>
+              <Text style={{color: '#2fc58b', fontWeight: '700'}}>✓ Entrou com o Google de {ownGoogle.email || typed}</Text>
               <Text style={{color: c.text, fontSize: 13, lineHeight: 19}}>A Sofia lê esta caixa com o login dela. A Conta Google do Perfil continua a mesma (Agenda e Drive).</Text>
-              <Pressable accessibilityRole="button" onPress={() => appAlert('Sair desta Conta Google?', 'A Sofia para de ler esta caixa. Os e-mails já encontrados ficam.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Sair', style: 'destructive', onPress: () => { if (account) void api.mailGoogleDisconnect(account.id).then(() => setOwnGoogle({linked: false, email: ''})).catch(e => setError(errorText(e))); }}])}><Text style={{color: c.danger, fontWeight: '700'}}>Sair desta Conta Google</Text></Pressable>
+              <Pressable accessibilityRole="button" onPress={() => appAlert('Sair desta Conta Google?', 'A Sofia para de ler esta caixa. Os e-mails já encontrados ficam.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Sair', style: 'destructive', onPress: () => { if (account) void api.mailGoogleDisconnect(account.id).then(() => setOwnGoogle({linked: false, email: ''})).catch(e => setError(errorText(e))); }}])}><Text style={{color: c.danger, fontWeight: '600'}}>Sair desta Conta Google</Text></Pressable>
             </View>
           ) : needsOwnLogin ? (
             <View testID="mail-needs-google" style={{padding: 12, borderRadius: 12, backgroundColor: c.accentSoft, gap: 4}}>
-              <Text style={{color: c.text, fontWeight: '800'}}>Entre com o Google de {typed}</Text>
+              <Text style={{color: c.text, fontWeight: '700'}}>Entre com o Google de {typed}</Text>
               <Text style={{color: c.text, fontSize: 13, lineHeight: 19}}>Toque no botão abaixo e escolha {typed} na janela do Google. A Conta Google do Perfil{google?.email ? ' (' + google.email + ')' : ''} continua a mesma, para Agenda e Drive.</Text>
             </View>
           ) : viaGoogle ? (
-            <Text style={{fontSize: 13, color: google?.gmail ? '#2fc58b' : c.muted}}>{google === null ? 'Conferindo a Conta Google…' : google.gmail ? '✓ Conta Google conectada com acesso ao Gmail' + (google.email ? ' (' + google.email + ')' : '') + '.' : google.connected ? 'A Conta Google está conectada, mas sem o Gmail. Em Perfil → Conta Google, desconecte e conecte de novo.' : 'Conecte a Conta Google em Perfil → Conta Google (a mesma da Agenda e do Drive).'}</Text>
+            <Text style={{fontSize: 13, color: google?.gmail ? c.good : c.muted}}>{google === null ? 'Conferindo a Conta Google…' : google.gmail ? '✓ Conta Google conectada com acesso ao Gmail' + (google.email ? ' (' + google.email + ')' : '') + '.' : google.connected ? 'A Conta Google está conectada, mas sem o Gmail. Em Perfil → Conta Google, desconecte e conecte de novo.' : 'Conecte a Conta Google em Perfil → Conta Google (a mesma da Agenda e do Drive).'}</Text>
           ) : <Field label={account?.data.secret_set ? 'Nova senha de app (deixe vazio para manter)' : 'Senha de app'} value={password} onChange={setPassword} placeholder="xxxx xxxx xxxx xxxx" secure />}
           {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
-          {ok ? <Text style={{color: '#2fc58b', fontWeight: '600'}}>{ok}</Text> : null}
+          {ok ? <Text style={{color: '#2fc58b', fontWeight: '500'}}>{ok}</Text> : null}
           <Button title={needsOwnLogin ? 'Entrar com Google' : account ? 'Salvar e testar' : 'Conectar e testar'} loading={busy} disabled={!address.includes('@')} onPress={() => void connect()} />
           {account ? (
             <View style={{gap: 4}}>
@@ -365,7 +365,7 @@ function RuleSheet({api, rule, accounts, onClose, onDone}: {api: SofiaApi; rule:
   return (
     <Sheet visible onClose={onClose} label="Fechar regra">
       <ScrollView contentContainerStyle={{gap: 12}} keyboardShouldPersistTaps="handled">
-        <Text style={{fontSize: 18, fontWeight: '800', color: c.text}}>{existing ? 'Editar regra' : 'Nova regra'}</Text>
+        <Text style={{fontSize: 18, fontWeight: '700', color: c.text}}>{existing ? 'Editar regra' : 'Nova regra'}</Text>
         <Text style={{fontSize: 12, color: c.muted}}>Procurar em</Text>
         <Chips value={field} onChange={setField} options={FIELDS} />
         <Field label="Contém (separe opções por vírgula)" value={contains} onChange={setContains} placeholder={hint} />
@@ -410,13 +410,13 @@ function BillFromMail({api, hit, onDone}: {api: SofiaApi; hit: Entity; onDone: (
       setMsg('Conta a pagar criada em Finanças: ' + money(v) + ' para ' + due.split('-').reverse().join('/') + '.'); setTimeout(onDone, 1400);
     } catch (e) { setMsg(errorText(e)); } finally { setBusy(false); }
   }
-  if (!open) return <Pressable onPress={() => setOpen(true)} style={{paddingVertical: 12}}><Text style={{color: c.accent, fontWeight: '700'}}>💳 Lançar como conta a pagar{guess.amount ? ' · ' + money(guess.amount) : ''}</Text></Pressable>;
+  if (!open) return <Pressable onPress={() => setOpen(true)} style={{paddingVertical: 12}}><Text style={{color: c.accent, fontWeight: '600'}}>💳 Lançar como conta a pagar{guess.amount ? ' · ' + money(guess.amount) : ''}</Text></Pressable>;
   return (
     <View style={{gap: 10, padding: 12, borderRadius: 14, backgroundColor: c.accentSoft}}>
-      <Text style={{color: c.text, fontWeight: '700'}}>Conta a pagar</Text>
+      <Text style={{color: c.text, fontWeight: '600'}}>Conta a pagar</Text>
       <Field label="Valor (R$)" value={amount} onChange={setAmount} placeholder="0,00" />
       <DateTimeField label="Vencimento" value={due} onChange={v => setDue(v || due)} dateOnly allowClear={false} />
-      {msg ? <Text style={{color: msg.startsWith('Conta a pagar criada') ? '#2fc58b' : c.danger}}>{msg}</Text> : null}
+      {msg ? <Text style={{color: msg.startsWith('Conta a pagar criada') ? c.good : c.danger}}>{msg}</Text> : null}
       <Button title="Criar em Finanças" loading={busy} onPress={() => void create()} />
     </View>
   );

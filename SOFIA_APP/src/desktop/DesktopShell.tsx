@@ -48,7 +48,7 @@ function Row({icon,emoji,label,selected,onPress,depth=0,collapsed,trailing,onTog
  return <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{selected:!!selected}} onPress={onPress}
   style={({hovered}:any)=>({flexDirection:'row',alignItems:'center',gap:8,minHeight:32,paddingLeft:collapsed?0:8+depth*14,paddingRight:8,justifyContent:collapsed?'center':'flex-start',marginHorizontal:8,borderRadius:8,backgroundColor:selected?c.accentSoft:hovered?c.line+'80':'transparent'})}>
   {onToggle?<Pressable accessibilityRole="button" accessibilityLabel={(expanded?'Recolher ':'Abrir ')+label} onPress={onToggle} hitSlop={6} style={{width:16,height:16,alignItems:'center',justifyContent:'center',opacity:hasChildren?1:0.35}}><View style={{transform:[{rotate:expanded?'90deg':'0deg'}]}}><Icon name="chevron" size={13} color={c.muted}/></View></Pressable>:null}
-  {emoji?<Text style={{fontSize:15,width:20,textAlign:'center'}}>{emoji}</Text>:icon?<Icon name={icon} size={18} color={selected?c.accent:c.muted}/>:null}
+  {emoji?<Text style={{fontSize:16,width:20,textAlign:'center'}}>{emoji}</Text>:icon?<Icon name={icon} size={18} color={selected?c.accent:c.muted} active={!!selected}/>:null}
   {collapsed?null:<Text numberOfLines={1} style={{flex:1,color:selected?c.accent:c.text,fontSize:14,fontWeight:selected?'600':'400'}}>{label}</Text>}
   {!collapsed&&hint?<Text style={{color:c.muted,fontSize:11}}>{hint}</Text>:null}
   {!collapsed&&trailing?<Text style={{color:c.muted,fontSize:11}}>{trailing}</Text>:null}
@@ -58,7 +58,7 @@ function Row({icon,emoji,label,selected,onPress,depth=0,collapsed,trailing,onTog
 function Section({title,children,action}:{title:string;children:React.ReactNode;action?:React.ReactNode}){
  const c=useTheme();
  return <View style={{marginTop:18}}>
-  <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:16,marginBottom:4}}><Text style={{flex:1,color:c.muted,fontSize:11,fontWeight:'700',letterSpacing:0.6}}>{title.toUpperCase()}</Text>{action}</View>
+  <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:16,marginBottom:4}}><Text style={{flex:1,color:c.muted,fontSize:11,fontWeight:'600',letterSpacing:0.6}}>{title.toUpperCase()}</Text>{action}</View>
   {children}
  </View>;
 }
@@ -100,9 +100,9 @@ function CommandPalette({visible,onClose,commands}:{visible:boolean;onClose:()=>
     </View>
     <ScrollView keyboardShouldPersistTaps="always" style={{maxHeight:480}} contentContainerStyle={{paddingVertical:6}}>
      {results.length?results.map((cmd,i)=>{const head=cmd.group!==lastGroup;lastGroup=cmd.group;return <React.Fragment key={cmd.id}>
-      {head?<Text style={{color:c.muted,fontSize:11,fontWeight:'700',paddingHorizontal:16,paddingTop:10,paddingBottom:4}}>{cmd.group.toUpperCase()}</Text>:null}
+      {head?<Text style={{color:c.muted,fontSize:11,fontWeight:'600',paddingHorizontal:16,paddingTop:10,paddingBottom:4}}>{cmd.group.toUpperCase()}</Text>:null}
       <Pressable accessibilityRole="menuitem" onHoverIn={()=>setIndex(i)} onPress={()=>run(cmd)} style={{flexDirection:'row',alignItems:'center',gap:10,marginHorizontal:6,paddingHorizontal:10,paddingVertical:9,borderRadius:8,backgroundColor:i===index?c.accentSoft:'transparent'}}>
-       {cmd.emoji?<Text style={{fontSize:15,width:20,textAlign:'center'}}>{cmd.emoji}</Text>:cmd.icon?<Icon name={cmd.icon} size={18} color={i===index?c.accent:c.muted}/>:null}
+       {cmd.emoji?<Text style={{fontSize:16,width:20,textAlign:'center'}}>{cmd.emoji}</Text>:cmd.icon?<Icon name={cmd.icon} size={18} color={i===index?c.accent:c.muted}/>:null}
        <Text numberOfLines={1} style={{flex:1,color:i===index?c.accent:c.text,fontSize:14}}>{cmd.label}</Text>
        {cmd.hint?<Text style={{color:c.muted,fontSize:11}}>{cmd.hint}</Text>:null}
       </Pressable></React.Fragment>;}):<Text style={{color:c.muted,padding:20,fontSize:14}}>Nada encontrado.</Text>}
@@ -136,8 +136,8 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
  return <View testID="desktop-shell" style={{flex:1,flexDirection:'row',backgroundColor:c.bg}}>
   <View testID="desktop-sidebar" style={{width,flexShrink:0,backgroundColor:c.surface,borderRightWidth:1,borderColor:c.line}}>
    <View style={{flexDirection:'row',alignItems:'center',gap:10,height:56,paddingHorizontal:collapsed?0:16,justifyContent:collapsed?'center':'flex-start'}}>
-    {collapsed?null:<><View style={{width:26,height:26,borderRadius:8,backgroundColor:c.accent,alignItems:'center',justifyContent:'center'}}><Text style={{color:c.onAccent,fontWeight:'800',fontSize:15}}>S</Text></View>
-    <Text numberOfLines={1} style={{flex:1,color:c.text,fontWeight:'700',fontSize:15}}>Sofia OS</Text></>}
+    {collapsed?null:<><View style={{width:26,height:26,borderRadius:8,backgroundColor:c.accent,alignItems:'center',justifyContent:'center'}}><Text style={{color:c.onAccent,fontWeight:'700',fontSize:16}}>S</Text></View>
+    <Text numberOfLines={1} style={{flex:1,color:c.text,fontWeight:'600',fontSize:16}}>Sofia OS</Text></>}
     <Pressable testID="desktop-sidebar-toggle" accessibilityRole="button" accessibilityLabel={collapsed?'Mostrar barra lateral':'Recolher barra lateral'} onPress={()=>setCollapsed(!collapsed)} style={({hovered}:any)=>({padding:6,borderRadius:7,backgroundColor:hovered?c.line:'transparent'})}><Icon name="sidebar" size={18} color={c.muted}/></Pressable>
    </View>
    <ScrollView testID="desktop-sidebar-scroll" keyboardShouldPersistTaps="handled" style={{flex:1}} contentContainerStyle={{paddingBottom:24}}>

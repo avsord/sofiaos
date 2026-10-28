@@ -49,7 +49,7 @@ test('lembretes do aporte: antes, no dia e repetindo ate fechar',()=>{
 });
 test('tela: faixa com numero branco e resumo curto; secao de aportes e escolha na retirada',()=>{
   const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes("color: '#fff', fontWeight: '800', fontSize: 18"));assert.ok(!s.includes("'#0d2f1f'"));
+  assert.ok(s.includes("color: '#fff', fontWeight: '700', fontSize: 18"));assert.ok(!s.includes("'#0d2f1f'"));
   assert.ok(s.includes('Aportes de {monthLabel(month)}'));assert.ok(!s.includes('Guardar agora'),'sem botoes duplicados na secao de aportes');assert.ok(s.includes("['Editar aportes', 'plan']"));assert.ok(s.includes("['Histórico da reserva', 'history']"));
   assert.ok(s.includes("[true, 'Retirada planejada'"));assert.ok(s.includes("[false, 'Recompor este mês'"));
   assert.ok(s.includes("label: 'A cada 3 dias até aportar'"));assert.ok(s.includes("input('Todo dia (1 a 28)'"));assert.ok(s.includes('<DateTimeField label="Avisar às" value={remindTime}'),'0.3.172: hora pelo seletor');assert.ok(!s.includes('Hora do lembrete'));assert.ok(!s.includes('plan_time'));

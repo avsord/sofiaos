@@ -26,7 +26,7 @@ export function TagPicker({label, value, options, onChange, maxLength = 1000, pl
       {s.exact ? chip(s.exact, isSel(s.exact), () => add(s.exact!), ' · já existe') : null}
       {s.matches.map(m => chip(m, isSel(m), () => add(m)))}
       {s.canCreate ? <Pressable accessibilityRole="button" accessibilityLabel={'Criar etiqueta ' + typed.trim()} onPress={() => add(typed)} style={{paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, borderWidth: 1, borderStyle: 'dashed', borderColor: c.accent}}>
-        <Text style={{color: c.accent, fontWeight: '700', fontSize: 13}}>+ Criar “{typed.trim()}”</Text></Pressable> : null}
+        <Text style={{color: c.accent, fontWeight: '600', fontSize: 13}}>+ Criar “{typed.trim()}”</Text></Pressable> : null}
     </View> : null}
     {warn ? <Text style={{color: c.danger, fontSize: 12}}>{warn}</Text> : null}
   </View>;

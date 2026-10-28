@@ -33,7 +33,7 @@ export function StoreConnections({api}:{api:SofiaApi}){
   appAlert('Desconectar '+store.name,'As leituras voltam a depender da pagina da loja, que pode pedir verificacao.',[{text:'Cancelar',style:'cancel'},{text:'Desconectar',style:'destructive',onPress:()=>void act(store.provider,()=>api.storeDisconnect(store.provider))}]);
  }
  return <View style={[forms.card,{backgroundColor:c.surface,borderWidth:1,borderColor:c.line,gap:12}]}>
-  <Text style={{fontSize:18,fontWeight:'600',color:c.text}}>Lojas do Price Tracker</Text>
+  <Text style={{fontSize:18,fontWeight:'500',color:c.text}}>Lojas do Price Tracker</Text>
   <Text style={{fontSize:12,lineHeight:19,color:c.muted}}>Conecte uma vez e a leitura de precos passa a usar o caminho oficial de cada loja: sem abrir paginas, sem "nao sou um robo".</Text>
   {error?<ErrorBanner text={error} onRetry={()=>void load()}/>:null}
   {!state?<Text style={{color:c.muted}}>Verificando conexoes…</Text>:state.stores.map(store=>{
@@ -41,15 +41,15 @@ export function StoreConnections({api}:{api:SofiaApi}){
    const status=!store.configured?(store.mode==='login'?'Aguardando configuracao no servidor':'Sem chave no servidor'):store.connected?'Conectado'+(store.account?' · '+store.account:''):'Nao conectado';
    const good=store.configured&&store.connected;
    return <View key={store.provider} accessibilityLabel={store.name+': '+status} style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:8,borderTopWidth:1,borderColor:c.line}}>
-    <View style={{width:40,height:40,borderRadius:12,backgroundColor:logo.bg,alignItems:'center',justifyContent:'center'}}><Text style={{color:logo.fg,fontWeight:'800',fontSize:18}}>{logo.letter}</Text></View>
+    <View style={{width:40,height:40,borderRadius:12,backgroundColor:logo.bg,alignItems:'center',justifyContent:'center'}}><Text style={{color:logo.fg,fontWeight:'700',fontSize:18}}>{logo.letter}</Text></View>
     <View style={{flex:1}}>
-     <Text style={{color:c.text,fontWeight:'600',fontSize:15}}>{store.name}</Text>
-     <Text style={{color:good?'#2fc58b':c.muted,fontSize:12}}>{status}</Text>
+     <Text style={{color:c.text,fontWeight:'500',fontSize:16}}>{store.name}</Text>
+     <Text style={{color:good?c.good:c.muted,fontSize:12}}>{status}</Text>
      {store.error?<Text style={{color:'#ff6b7a',fontSize:12}}>{store.error}</Text>:null}
      {!store.configured&&store.mode==='login'?<Text style={{color:c.muted,fontSize:11,lineHeight:16}}>Falta o aplicativo da loja no servidor (ML_APP_ID / ML_APP_SECRET). Endereco de retorno: {store.redirect_uri||'—'}</Text>:null}
     </View>
     {store.mode==='login'&&store.configured?(store.connected
-      ?<Pressable accessibilityRole="button" disabled={!!busy} onPress={()=>disconnect(store)} style={{paddingHorizontal:12,paddingVertical:8}}><Text style={{color:c.muted,fontWeight:'600'}}>Desconectar</Text></Pressable>
+      ?<Pressable accessibilityRole="button" disabled={!!busy} onPress={()=>disconnect(store)} style={{paddingHorizontal:12,paddingVertical:8}}><Text style={{color:c.muted,fontWeight:'500'}}>Desconectar</Text></Pressable>
       :<View style={{minWidth:120}}><Button title="Conectar" loading={busy===store.provider} onPress={()=>connect(store)}/></View>):null}
    </View>;
   })}
