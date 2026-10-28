@@ -775,21 +775,6 @@ export function moneyLeft(txs: Tx[], cards: Card[], range: {start: string; end: 
   return {start: range.start, end: range.end, saldo: round2(saldo), toReceive, toGuard, toPay, card, aporte, left, spent, available: round2(Math.max(left, 0) + spent), incomeItems, expenseItems};
 }
 
-// ---------- 0.3.255: Controle de gastos comeca no SALARIO (regra do Pedro, 27/10) ----------
-/** A pessoa recebeu, os gastos comecam dali. Ciclo = do dia do salario ate a vespera do proximo (sem dia informado: o mes).
- * Sobra = saldo que tinha antes do salario + salario e outras receitas do ciclo (lancamentos avulsos ou programados)
- * - todas as despesas do ciclo (pagas, avulsas e previstas, contadas como pagas) - faturas do cartao do ciclo - aporte do ciclo.
- * 100% = a sobra + o que ja saiu em gastos avulsos pagos: cada gasto avulso diminui a porcentagem. Pagar uma conta prevista
- * nao muda a sobra (ela ja estava descontada). */
-export type CycleControl = {start: string; end: string; base: number; income: number; expense: number; card: number; aporte: number; left: number; spent: number; available: number; pct: number};
-export function cycleControl(txs: Tx[], cards: Card[], range: {start: string; end: string}, accountId: string, startSaldo: number, aporte: number, today = todayISO()): CycleControl {
-  const f = simpleForecast(txs, cards, range, accountId, today, aporte);
-  const left = round2(startSaldo + f.left);
-  const spent = round2(f.expenseItems.filter(t => t.paid && !t.virtual && !isScheduled(t) && !t.manualDue).reduce((s, t) => s + t.amount, 0));
-  const available = round2(Math.max(0, left) + spent);
-  return {start: range.start, end: range.end, base: round2(startSaldo), income: f.income, expense: f.expense, card: f.card, aporte: f.aporte, left, spent, available, pct: available > 0 ? Math.max(0, Math.min(1, left / available)) : 0};
-}
-
 // ---------- 0.3.214: Controle de gastos = quanto tinha no inicio do mes x quanto tem agora (o Saldo) ----------
 export function parseMonthStarts(v: unknown): Record<string, number> {
   try { const o = JSON.parse(String(v || '{}')); const out: Record<string, number> = {}; if (o && typeof o === 'object') for (const [k, n] of Object.entries(o)) if (/^\d{4}-\d{2}$/.test(k) && Number.isFinite(Number(n))) out[k] = Number(n); return out; } catch { return {}; }

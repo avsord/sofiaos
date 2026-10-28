@@ -210,7 +210,7 @@ test('0.3.215: receita avulsa divide entre saldo e guardado; programada (salario
   assert.equal(f.isOneOffIncome(mk('x','income',1,'2026-10-01')),true);assert.equal(f.isOneOffIncome(mk('x','income',1,'2026-10-01',{recurrence:'monthly'})),false);assert.equal(f.isOneOffIncome(mk('x','income',1,'2026-10-01',{series_id:'s'})),false);
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes('Desta receita, quanto vai para o guardado? (R$)')&&s.includes('syncIncomeReserve(api, d, saved.id, goalForSplit.id, split, true, date, title)'),'lancamento de receita');
-  assert.ok(s.includes("entram {show(b.income)} de salário e receitas"),'texto do Controle'); // 0.3.255: receitas avulsas entram junto com o salario
+  assert.ok(s.includes("somou ' + show(b.extra) + ' de receita avulsa"),'texto do Controle');
   assert.ok(f.balanceAsOf,'balanceAsOf continua existindo');
 });
 
@@ -371,7 +371,7 @@ test('0.3.225: sem aviso verde ao salvar; mes que ainda nao chegou fica zerado n
   assert.ok(!s.includes('salvo em ')&&!s.includes('savedNotice'),'sem o aviso');
   assert.ok(s.includes("setMonth(monthOf(saved.date));setPendingSide(saved.kind==='income'?'receber':'pagar');navigateFinance('bills');"),'continua indo ao mes e ao lado certos');
   assert.ok(s.includes('const future = month > monthOf(today);'));
-  for(const t of ['{show(future ? 0 : total)}','{show(future ? 0 : forecastP.left)}','{show(future ? 0 : s.income)}','{show(future ? 0 : s.expense)}',"const b = future ? {...ctrl, base: 0, income: 0, expense: 0, card: 0, aporte: 0, available: 0, left: 0, spent: 0, pct: 0} : ctrl"])assert.ok(s.includes(t),t);
+  for(const t of ['{show(future ? 0 : total)}','{show(future ? 0 : forecastP.left)}','{show(future ? 0 : s.income)}','{show(future ? 0 : s.expense)}',"const b = future ? {...spend, start: 0, available: 0, left: 0, extra: 0, spent: 0, pct: 0} : spend"])assert.ok(s.includes(t),t);
   assert.ok(s.includes('ainda não começou. Os números passam a contar quando o mês chegar.'),'explica');
 });
 

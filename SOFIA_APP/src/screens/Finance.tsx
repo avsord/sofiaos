@@ -37,7 +37,7 @@ import {
 import type {Account, Card, Tx, TxKind, Budget, Goal, Invoice, Due, ReserveMove, SaldoSnap, SaldoChange} from '../lib/finance';
 import {saldoSnapshot, reserveSnapshot, saldoDiff, cardBillSettled, saldoLedger, txInvoiceMonth, invoiceForMonth} from '../lib/finance';
 import type {LedgerItem} from '../lib/finance';
-import {cycleControl, sinceReportStart, cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, monthDues, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove, effectiveCycleDay, periodBudget, salaryForecast, currentPlan, nextPlan, simpleForecast, spendControl, categoryAlerts, lastWeekByCategory, duplicateGroups, moneyLeft, monthControl, balanceAsOf, isOneOffIncome, fixedDuplicateGroups, fixedUpcoming, isScheduled, exactTwinExtras} from '../lib/finance';
+import {sinceReportStart, cycleRange, cycleRoom, fixedSummary, lastInstallmentMonth, monthDues, moneySplit, reserveOutlook, reserveBadge, reserveHistory, reserveMoveLabel, reserveOf, reserveFor, reserveSeries, toReserveMove, effectiveCycleDay, periodBudget, salaryForecast, currentPlan, nextPlan, simpleForecast, spendControl, categoryAlerts, lastWeekByCategory, duplicateGroups, moneyLeft, monthControl, balanceAsOf, isOneOffIncome, fixedDuplicateGroups, fixedUpcoming, isScheduled, exactTwinExtras} from '../lib/finance';
 import {syncFinanceDueNotifications} from '../lib/finance-notifications';
 import {appAlert} from '../lib/app-alert';
 import {useFormDraft, clearAllFormDrafts} from '../lib/form-draft';
@@ -45,9 +45,9 @@ import {useFormDraft, clearAllFormDrafts} from '../lib/form-draft';
 const GOOD = '#2fc58b', BAD = '#ff6b7a', WARN = '#ffb547', GUARD = '#1f9d63';
 /** 0.3.255: devolucao a receber (reembolso, estorno...). Nao mexe no Saldo nem no previsto; ao tocar em "Recebi" vira uma
  * receita paga de hoje, que entra no Saldo e no Historico. */
-type Refund = {id: string; title: string; amount: number; expected: string; accountId: string; state: string; receivedAt: string; entity: Entity};
+type Refund = {id: string; title: string; amount: number; expected: string; accountId: string; state: string; receivedAt: string; expenseId: string; entity: Entity};
 type Data = {accounts: Account[]; cards: Card[]; txs: Tx[]; budgets: Budget[]; goals: Goal[]; moves: ReserveMove[]; statements: Statement[]; refunds?: Refund[]};
-function toRefund(e: Entity): Refund { return {id: e.id, title: e.title, amount: Number(e.data?.amount || 0), expected: String(e.data?.expected_date || ''), accountId: String(e.data?.account_id || ''), state: e.state, receivedAt: String(e.data?.received_at || ''), entity: e}; }
+function toRefund(e: Entity): Refund { return {id: e.id, title: e.title, amount: Number(e.data?.amount || 0), expected: String(e.data?.expected_date || ''), accountId: String(e.data?.account_id || ''), state: e.state, receivedAt: String(e.data?.received_at || ''), expenseId: String(e.data?.expense_id || ''), entity: e}; }
 // 0.3.213: extrato do banco guardado a parte - serve para conferir (conciliacao) e acertar o saldo; nao e lancamento
 type StatementLine = {import_id: string; date: string; desc: string; original?: string; amount: number; kind: string};
 type Statement = {id: string; accountId: string; from: string; to: string; closing: number | null; lines: StatementLine[]; entity: Entity};
@@ -1116,13 +1116,6 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
     const done = reserve ? (d.moves || []).filter(m => m.goalId === reserve.id && m.direction === 'in' && m.entity?.state !== 'archived' && m.date >= range.start && m.date <= range.end).reduce((t, m) => t + m.amount, 0) : 0;
     return Math.round(Math.max(due, done) * 100) / 100;
   }, [split?.planDay, plan, reserve, d]);
-  // 0.3.255: Controle de gastos comeca no dia do salario (ver cycleControl). Mes passado: o ciclo que contem o fim dele.
-  const controlRange = useMemo(() => cycleRange(cycleDay, month === monthOf(today) ? today : month < monthOf(today) ? dayIn(month, daysIn(month)) : dayIn(month, 1)), [cycleDay, month, today]);
-  const ctrl = useMemo(() => {
-    const before = addDays(controlRange.start, -1);
-    const startSaldo = balanceAsOf(d.accounts.filter(a => a.include && !a.archived && (!accountId || a.id === accountId)), d.txs, d.moves || [], reserve?.id || '', before);
-    return cycleControl(d.txs, d.cards, controlRange, accountId, startSaldo, aporteInCycle(controlRange), today);
-  }, [d, controlRange, accountId, reserve, today, aporteInCycle]);
   const forecastP = useMemo(() => {
     const ref = month === monthOf(today) ? today : dayIn(month, 1), cur = cycleRange(cycleDay, ref), nextPay = addDays(cur.end, 1);
     const daysLeft = Math.round((Date.parse(nextPay + 'T12:00:00Z') - Date.parse(ref + 'T12:00:00Z')) / 864e5), upcoming = daysLeft <= 5;
@@ -1265,12 +1258,12 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
         <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8}}><Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 15}}>Controle de gastos</Text><Text style={{color: c.muted, fontSize: 11}}>{monthLabel(month).split(' ')[0]}</Text></View>
         <ShimmerBlock width={'52%'} height={24} radius={8} /><ShimmerBlock width={'100%'} height={10} radius={5} /><ShimmerBlock width={'78%'} height={10} />
       </View></ShimmerGroup> :
-      (() => { const b = future ? {...ctrl, base: 0, income: 0, expense: 0, card: 0, aporte: 0, available: 0, left: 0, spent: 0, pct: 0} : ctrl, over = b.left < 0, pct = Math.min(1, b.pct), since = b.start.slice(8, 10) + '/' + b.start.slice(5, 7);
+      (() => { const b = future ? {...spend, start: 0, available: 0, left: 0, extra: 0, spent: 0, pct: 0} : spend, over = b.left < 0, pct = Math.min(1, b.pct);
         return <Pressable accessibilityRole="button" accessibilityLabel="Ver as despesas do mês" onPress={() => setBreakdown('expense')}
         style={{backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 10, borderWidth: 1, borderColor: over ? BAD : c.line}}>
         <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 8}}>
           <Text style={{flex: 1, color: c.text, fontWeight: '800', fontSize: 15}}>Controle de gastos</Text>
-          <Text style={{color: c.muted, fontSize: 11}}>{cycleDay > 1 ? 'desde o salário · ' + since : monthLabel(month).split(' ')[0]}</Text>
+          <Text style={{color: c.muted, fontSize: 11}}>{monthLabel(month).split(' ')[0]}</Text>
         </View>
         <View style={{flexDirection: 'row', alignItems: 'baseline', gap: 6}}>
           <Text style={{color: over ? BAD : c.text, fontWeight: '800', fontSize: 26}}>{show(b.left)}</Text>
@@ -1281,7 +1274,7 @@ function HomeTab({d, month, api, reload, onTx, onTab, accountId, isPrimary, onBi
         <View style={{height: 10, borderRadius: 5, backgroundColor: c.line, overflow: 'hidden'}}>
           <View style={{width: `${Math.round(pct * 100)}%` as `${number}%`, height: 10, borderRadius: 5, backgroundColor: over ? BAD : pct <= 0.25 ? WARN : GOOD}} />
         </View>
-        {future ? <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>{monthLabel(month).split(' ')[0]} ainda não começou. Os números passam a contar quando o mês chegar.</Text> : <Text testID="spend-control-text" style={{color: c.muted, fontSize: 11, lineHeight: 16}}>{cycleDay > 1 ? 'Desde o salário de ' + since : 'Desde ' + since}: você tinha {show(b.base)}, entram {show(b.income)} de salário e receitas, saem {show(b.expense)} de despesas (pagas, avulsas e previstas){b.card > 0 ? ', ' + show(b.card) + ' de fatura' : ''}{b.aporte > 0 ? ' e ' + show(b.aporte) + ' de aporte' : ''}. Sobram {show(b.left)} até {b.end.slice(8, 10)}/{b.end.slice(5, 7)}{b.spent > 0 ? ' (já foram ' + show(b.spent) + ' em gastos avulsos)' : ''}.{cycleDay > 1 ? '' : tap(' Informe o dia do salário na conta para o controle começar nele.')}</Text>}
+        {future ? <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>{monthLabel(month).split(' ')[0]} ainda não começou. Os números passam a contar quando o mês chegar.</Text> : <Text style={{color: c.muted, fontSize: 11, lineHeight: 16}}>Você começou {monthLabel(month).split(' ')[0].toLowerCase()} com {show(b.start)}{b.extra > 0 ? ', somou ' + show(b.extra) + ' de receita avulsa' : ''} e agora tem {show(b.left)}.{b.manual ? '' : tap(' Para informar o saldo do início do mês, toque no Saldo → Ajustar saldo.')}</Text>}
       </Pressable>; })()}
 
       {dups.slice(0, 2).map(g => <Pressable key={g.key} accessibilityRole="button" onPress={() => setDupOpen(g.key)} style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: BAD + '14', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: BAD}}>
@@ -1696,13 +1689,15 @@ function TxRow({t, d, first, onPress, api, reload, inInvoice = false}: {inInvoic
       : later ? '💳 ' + (cardOf?.name || 'Cartão') + ' · compra de ' + dm + ' · cobrada na fatura de ' + monthLabel(billedIn).split(' ')[0].toLowerCase() + ' · não mexe no saldo agora'
       : '💳 ' + (cardOf?.name || 'Cartão') + cardWhen(t, d.cards)) : t.kind === 'transfer' ? (d.accounts.find(a => a.id === t.accountId)?.name || '') + ' → ' + (d.accounts.find(a => a.id === t.toAccountId)?.name || '') : d.accounts.find(a => a.id === t.accountId)?.name || '';
   const pending = !t.paid && !t.cardId;
+  // 0.3.256: despesa marcada para reembolso mostra o estado na linha do Historico
+  const refund = t.kind === 'expense' ? (d.refunds || []).find(x => x.expenseId === t.id && x.state !== 'archived') : undefined, refundTag = refund ? (refund.state === 'received' ? ' · ↩️ reembolsada' : ' · ↩️ reembolso pendente') : '';
   const color = t.kind === 'income' ? GOOD : t.kind === 'transfer' ? c.muted : c.text;
   return (
     <Pressable onPress={onPress} style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 6, borderTopWidth: first ? 0 : 1, borderColor: c.line, opacity: later && !inInvoice ? 0.5 : t.virtual ? 0.75 : 1}}>
       <Dot color={cat.color} icon={cat.icon} />
       <View style={{flex: 1}}>
         <Text numberOfLines={1} style={{color: c.text, fontWeight: '600'}}>{t.desc}</Text>
-        <Text numberOfLines={later && !inInvoice ? 2 : 1} style={{color: c.muted, fontSize: 11}}>{t.time ? t.time + ' · ' : ''}{cat.name} · {source}{t.installments > 1 ? ' · ' + t.installment + '/' + t.installments : ''}{t.recurrence !== 'none' || t.virtual ? ' · 🔁' : ''}</Text>
+        <Text numberOfLines={later && !inInvoice ? 2 : 1} style={{color: c.muted, fontSize: 11}}>{t.time ? t.time + ' · ' : ''}{cat.name} · {source}{t.installments > 1 ? ' · ' + t.installment + '/' + t.installments : ''}{t.recurrence !== 'none' || t.virtual ? ' · 🔁' : ''}{refundTag}</Text>
       </View>
       <View style={{alignItems: 'flex-end', gap: 2}}>
         <Text style={{color, fontWeight: '700'}}>{t.kind === 'income' ? '+' : t.kind === 'transfer' ? '' : '−'}{money(t.amount)}</Text>
@@ -1754,15 +1749,16 @@ function RefundsTab({d, api, reload, accountId}: {d: Data; api: SofiaApi; reload
     {editing ? <RefundSheet api={api} refund={editing === 'new' ? null : editing} accounts={accounts} defaultAccount={accountId || accounts[0]?.id || ''} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void reload(); }} /> : null}
   </View>;
 }
-function RefundSheet({api, refund, accounts, defaultAccount, onClose, onSaved}: {api: SofiaApi; refund: Refund | null; accounts: Account[]; defaultAccount: string; onClose: () => void; onSaved: () => void}) {
-  const c = useTheme(), [title, setTitle] = useState(refund?.title || ''), [amount, setAmount] = useState(refund ? finishMoneyInput(String(refund.amount).replace('.', ',')) : '');
+function RefundSheet({api, refund, accounts, defaultAccount, expense, onClose, onSaved}: {api: SofiaApi; refund: Refund | null; accounts: Account[]; defaultAccount: string; expense?: {id: string; desc: string; amount: number}; onClose: () => void; onSaved: () => void}) {
+  // 0.3.256: aberta pelo editar de uma despesa ("Vai ser reembolsada"): ja vem com o nome e o valor dela (valor ajustavel, reembolso parcial)
+  const c = useTheme(), [title, setTitle] = useState(refund?.title || expense?.desc || ''), [amount, setAmount] = useState(refund ? finishMoneyInput(String(refund.amount).replace('.', ',')) : expense ? finishMoneyInput(String(expense.amount).replace('.', ',')) : '');
   const [expected, setExpected] = useState(refund?.expected || ''), [account, setAccount] = useState(refund?.accountId || defaultAccount), [busy, setBusy] = useState(false), [error, setError] = useState('');
   async function save() {
     const value = parseMoney(amount);
     if (!title.trim()) { setError('Diga de onde vem a devolução.'); return; }
     if (!value || value <= 0) { setError('Digite o valor.'); return; }
     setBusy(true); setError('');
-    try { await saveEntity(api, 'fin_refund', title.trim(), {amount: value, expected_date: expected || '', account_id: account || ''}, refund?.entity, refund ? undefined : 'pending'); onSaved(); }
+    try { await saveEntity(api, 'fin_refund', title.trim(), {amount: value, expected_date: expected || '', account_id: account || '', ...(expense && !refund ? {expense_id: expense.id} : {})}, refund?.entity, refund ? undefined : 'pending'); onSaved(); }
     catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }
   function erase() {
@@ -1771,7 +1767,8 @@ function RefundSheet({api, refund, accounts, defaultAccount, onClose, onSaved}: 
   }
   return <Sheet visible onClose={onClose} label="Fechar devolução">
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{gap: 14, paddingBottom: 12}}>
-      <Text style={{color: c.text, fontSize: 20, fontWeight: '800'}}>{refund ? 'Devolução a receber' : 'Nova devolução a receber'}</Text>
+      <Text style={{color: c.text, fontSize: 20, fontWeight: '800'}}>{refund ? 'Devolução a receber' : expense ? 'Vai ser reembolsada' : 'Nova devolução a receber'}</Text>
+      {expense && !refund ? <Text style={{color: c.muted, fontSize: 12, lineHeight: 17}}>A despesa continua no Histórico e no Saldo (o dinheiro já saiu). O valor entra em Devoluções como a receber; quando cair, toque em “Recebi” e ele volta para o Saldo.</Text> : null}
       <Field label="De onde vem" value={title} onChange={setTitle} placeholder="Ex.: Estorno da loja" />
       <Field label="Valor (R$)" value={amount} onChange={setAmount} placeholder="0,00" numeric />
       <DateTimeField label="Previsão de chegada (opcional)" value={expected} onChange={setExpected} dateOnly />
@@ -1793,7 +1790,7 @@ function addedAt(tx: Partial<Tx>): string {
 }
 function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic, onOptimisticRemove}: {onOptimisticRemove?: (id: string) => void; onOptimistic?: (id: string, changes: Partial<Tx>) => void; api: SofiaApi; d: Data; tx: Partial<Tx>; defaultAccountId?: string; onClose: () => void; onSaved: () => void}) {
   const c = useTheme(), editing = !!tx.entity && !tx.virtual;
-  const [kind, setKind] = useState<TxKind>(tx.kind || 'expense');
+  const [kind, setKind] = useState<TxKind>(tx.kind || 'expense'), [refundOpen, setRefundOpen] = useState(false);
   const [amount, setAmount] = useState(tx.amount ? finishMoneyInput(String(tx.amount).replace('.', ',')) : ''), [desc, setDesc] = useState(tx.desc || '');
   const [category, setCategory] = useState(tx.category || ''), [date, setDate] = useState(tx.date || todayISO());
   const firstAccount = (defaultAccountId && d.accounts.some(a=>a.id===defaultAccountId&&!a.archived) ? defaultAccountId : d.accounts.find(a => !a.archived)?.id) || '';
@@ -1899,6 +1896,10 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
           </View>
           {/* 0.3.255: tocar num item do Historico mostra quando ele foi lancado (data e hora) */}
           {editing && addedAt(tx) ? <Text testID="tx-added-at" style={{color: headText + 'cc', fontSize: 12, marginTop: -4}}>Lançado em {addedAt(tx)}{tx.paidAt && tx.paid ? ' · pago em ' + tx.paidAt.slice(0, 10).split('-').reverse().join('/') : ''}</Text> : null}
+          {/* 0.3.256: despesa que vai ser reembolsada - liga com a aba Devolucoes */}
+          {editing && kind === 'expense' && tx.id ? (() => { const r = (d.refunds || []).find(x => x.expenseId === tx.id && x.state !== 'archived');
+            return r ? <View testID="tx-refund-status" style={{flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFFFFF22', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8}}><Text style={{fontSize: 14}}>↩️</Text><Text style={{flex: 1, color: headText, fontSize: 12, fontWeight: '600'}}>{r.state === 'received' ? 'Reembolsada' + (r.receivedAt ? ' em ' + r.receivedAt.split('-').reverse().join('/') : '') + ' · ' + money(r.amount) : 'Reembolso pendente · ' + money(r.amount) + ' em Devoluções'}</Text></View>
+              : <Pressable testID="tx-refund-mark" accessibilityRole="button" accessibilityLabel="Marcar que esta despesa vai ser reembolsada" onPress={() => setRefundOpen(true)} style={{flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', backgroundColor: '#FFFFFF22', borderRadius: 99, paddingHorizontal: 12, paddingVertical: 7}}><Text style={{fontSize: 13}}>↩️</Text><Text style={{color: headText, fontSize: 12, fontWeight: '700'}}>Vai ser reembolsada</Text></Pressable>; })() : null}
           {!editing ? (
             <View style={{flexDirection: 'row', backgroundColor: headText + '26', borderRadius: 99, padding: 3}}>
               {([['expense', 'Despesa'], ['income', 'Receita'], ['transfer', 'Transferência']] as Array<[TxKind, string]>).map(([k, l]) => (
@@ -1981,6 +1982,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
           <Button title={editing ? 'Salvar alterações' : 'Salvar'} loading={busy} onPress={() => void save()} />
         </ScrollView>
       </KeyboardAvoidingView>
+      {refundOpen && tx.id ? <RefundSheet api={api} refund={null} accounts={d.accounts.filter(a => !a.archived)} defaultAccount={tx.accountId || defaultAccountId || ''} expense={{id: tx.id, desc: desc || tx.desc || '', amount: parseMoney(amount) || tx.amount || 0}} onClose={() => setRefundOpen(false)} onSaved={() => { setRefundOpen(false); onSaved(); }} /> : null}
     </MotionModal>
   );
 }

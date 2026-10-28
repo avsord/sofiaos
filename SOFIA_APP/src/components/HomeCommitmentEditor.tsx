@@ -1,4 +1,5 @@
 import React,{useState} from 'react';
+import {TaskLinkPanel,saveEventAsTask,type TaskLink} from './TaskLinkPanel';
 import {RemindersField} from './RemindersField';
 import {reminderFields} from '../lib/agenda-reminders';
 import {KeyboardAvoidingView,Platform,Switch,Text,TextInput,View} from 'react-native';
@@ -19,15 +20,15 @@ import {Button,ErrorBanner,IconButton,forms} from './UI';
 export function HomeCommitmentEditor({api,day,areas,onClose,onSaved}:{api:SofiaApi;day:string;areas:string[];onClose:()=>void;onSaved:()=>void}){
  const c=useTheme();
  const [title,setTitle]=useState(''),[description,setDescription]=useState(''),[start,setStart]=useState(()=>new Date(day+'T09:00:00').toISOString()),[end,setEnd]=useState(''),[priority,setPriority]=useState('none'),[area,setArea]=useState('Pessoal'),[google,setGoogle]=useState(true),[notify,setNotify]=useState(true),[reminders,setReminders]=useState<{reminders_json:string;remind_minutes:number|''}>(reminderFields([10])),[saving,setSaving]=useState(false),[error,setError]=useState('');
- // 0.3.255: pelo + do Inicio da para criar um compromisso ou um evento tarefa (tarefa na agenda, com check)
- const [type,setType]=useState<'commitment'|'task'>('commitment');
+ // 0.3.256: igual ao criar da Agenda - "Tornar tarefa" (check + passa para o dia seguinte) e buscar/criar a tarefa
+ const [taskLink,setTaskLink]=useState<TaskLink>({asTask:false,task:null}),type=taskLink.asTask?'task':'commitment';
  async function save(){
   if(saving||!title.trim())return;
   setSaving(true);setError('');
   try{
    const begin=new Date(start),finish=end?new Date(end):null;
    if(!Number.isFinite(begin.getTime()))throw Error('Escolha uma data e horário válidos.');
-   if(type==='task'){await api.saveTask({title:title.trim(),state:'scheduled',due_at:begin.toISOString(),start_at:begin.toISOString(),end_at:'',priority_level:priority,description,area:area.trim()||'Pessoal'});onSaved();return;}
+   if(type==='task'){await saveEventAsTask(api,{title,startIso:begin.toISOString(),description,priority,area:area.trim()||'Pessoal',task:taskLink.task});onSaved();return;}
    if(finish&&(!Number.isFinite(finish.getTime())||finish<=begin))throw Error('O fim deve ser depois do início.');
    await api.saveEntity({
     kind:'commitment',title:title.trim(),content:description,area:area.trim()||'Pessoal',
@@ -43,14 +44,14 @@ export function HomeCommitmentEditor({api,day,areas,onClose,onSaved}:{api:SofiaA
    <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
     <View style={{padding:12,flexDirection:'row',alignItems:'center',borderBottomWidth:1,borderColor:c.line}}>
      <IconButton name="close" label="Fechar novo compromisso" disabled={saving} onPress={onClose}/>
-     <Text style={{color:c.text,fontSize:19,fontWeight:'700',flex:1}}>{type==='task'?'Nova tarefa na agenda':'Novo compromisso'}</Text>
+     <Text style={{color:c.text,fontSize:19,fontWeight:'700',flex:1}}>Novo compromisso</Text>
     </View>
     <ScrollView keyboardShouldPersistTaps="always" contentContainerStyle={{padding:22,paddingBottom:40,gap:16}}>
      {error?<ErrorBanner text={error}/>:null}
      <View><Text style={[forms.label,{color:c.muted}]}>Título</Text>
       <TextInput autoFocus accessibilityLabel="Título do compromisso" value={title} onChangeText={setTitle} placeholder="Nome do compromisso" placeholderTextColor={c.muted} style={[forms.input,{color:c.text,borderColor:c.line,backgroundColor:c.input}]}/>
      </View>
-     <Choice label="Tipo" value={type} options={[{value:'commitment',label:'Compromisso'},{value:'task',label:'Evento tarefa (com check)'}]} onChange={v=>setType(v as 'commitment'|'task')}/>
+     <TaskLinkPanel api={api} value={taskLink} onChange={setTaskLink} onPick={(t,task)=>{setTitle(t);if(task?.description&&!description.trim())setDescription(task.description);if(task?.priority_level&&task.priority_level!=='none')setPriority(task.priority_level);}}/>
      <DateTimeField label={type==='task'?'Dia e horário':'Início'} value={start} onChange={setStart} allowClear={false}/>
      {type==='commitment'?<DateTimeField label="Fim" value={end} onChange={setEnd}/>:null}
      <Choice label="Prioridade do compromisso" value={priority} options={TASK_PRIORITIES.map(p=>({value:p.value,label:p.label}))} onChange={setPriority}/>
@@ -59,7 +60,7 @@ export function HomeCommitmentEditor({api,day,areas,onClose,onSaved}:{api:SofiaA
       <TextInput accessibilityLabel="Descrição do compromisso" multiline value={description} onChangeText={setDescription} style={[forms.input,{color:c.text,borderColor:c.line,backgroundColor:c.input,minHeight:88,textAlignVertical:'top'}]}/>
      </View>
      {type==='commitment'?<><GoogleCalendarProperty api={api} autoEnable value={google} onChange={setGoogle}/>
-     <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={{color:c.text}}>Notificar neste celular</Text><Switch accessibilityLabel="Notificar compromisso neste celular" value={notify} onValueChange={setNotify}/></View>{notify?<RemindersField data={reminders} onChange={setReminders}/>:null}</>:<Text style={{color:c.muted,fontSize:12,lineHeight:17}}>Na agenda ela ganha um check. Ticada fica riscada; sem ticar, passa sozinha para o dia seguinte à meia-noite.</Text>}
+     <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={{color:c.text}}>Notificar neste celular</Text><Switch accessibilityLabel="Notificar compromisso neste celular" value={notify} onValueChange={setNotify}/></View>{notify?<RemindersField data={reminders} onChange={setReminders}/>:null}</>:null}
      <Button title={type==='task'?'Salvar na agenda':'Salvar compromisso'} loading={saving} disabled={!title.trim()} onPress={()=>void save()}/>
     </ScrollView>
    </KeyboardAvoidingView>

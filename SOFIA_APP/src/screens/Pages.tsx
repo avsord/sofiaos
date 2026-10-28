@@ -45,8 +45,12 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
  const keyboardVisible=useKeyboardVisible(),scrollPositions=useRef(new Map<string,number>());
  // 0.3.251 (computador): barra e capa na largura toda; o texto fica numa coluna de leitura centralizada
  const desktop=useDesktop();
- const c=useTheme(),[pages,setPages]=useState<Entity[]>(()=>cachedPageRows(api)||[]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>()),[pageInteraction,setPageInteraction]=useState(false),[pageDragging,setPageDragging]=useState(false),[pageMenu,setPageMenu]=useState(false);
+ const c=useTheme(),[pages,setPages]=useState<Entity[]>(()=>api.pageOrderApply(cachedPageRows(api)||[])||[]),[selectedId,setSelectedId]=useState<string|null>(null),[tick,setTick]=useState(0),[expanded,setExpanded]=useState(new Set<string>()),[pageInteraction,setPageInteraction]=useState(false),[pageDragging,setPageDragging]=useState(false),[pageMenu,setPageMenu]=useState(false);
  const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[loaded,setLoaded]=useState(()=>cachedPageRows(api)!==undefined),[error,setError]=useState(''),[focus,setFocus]=useState<string|null>(null),[appearance,setAppearance]=useState<'icon'|'cover'|null>(null),[movingId,setMovingId]=useState<string|null>(null),[createParent,setCreateParent]=useState<Entity|null|undefined>(undefined);
+ // 0.3.256: as paginas nunca aparecem fora da ordem escolhida (antes "sambavam" ao abrir): ate a ordem guardada no
+ // aparelho ser lida, a lista mostra o esqueleto com shimmer; depois ja aparece no lugar certo
+ const [orderReady,setOrderReady]=useState(()=>api.pageOrderReady);
+ useEffect(()=>{if(orderReady)return;let alive=true;api.pageOrderLoad().catch(()=>{}).finally(()=>{if(!alive)return;setPages(prev=>api.pageOrderApply(prev));setOrderReady(true);});return()=>{alive=false;};},[api,orderReady]);
  // 0.3.255: reposicionar a capa (arrastar a imagem, como no Notion)
  const [coverMove,setCoverMove]=useState(false),coverLive=useRef(50);
  const refreshFlight=useRef(false),mutationEpoch=useRef(0),moveBusy=useRef(false),pendingPosition=useRef(new Map<string,Record<string,any>>());
@@ -80,7 +84,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    if(!live||!mounted.current)return;
    const local=cachedPageRows(api);
    if(local!==undefined){
-    setPages(prev=>prev.length?prev:local);
+    setPages(prev=>prev.length?prev:api.pageOrderApply(local));
     setLoaded(true);
    }
   }).catch(()=>{});
@@ -234,7 +238,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
    </View>
   </PageDocumentScroll>;
  }
- const listView=<PageTreeList roots={children.get('')||[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={changePageInteraction} onDragChange={setPageDragging}
+ const listView=<PageTreeList roots={orderReady?children.get('')||[]:[]} children={children} expanded={expanded} toggle={toggle} onOpen={open} onMove={movePage} canParent={canParent} onDelete={confirmDeletePage} onInteractionChange={changePageInteraction} onDragChange={setPageDragging}
   virtualized scrollEnabled={!pageDragging}
   refreshControl={<RefreshControl enabled={!pageInteraction&&!selectedId} refreshing={refreshing} onRefresh={refreshPages} tintColor={c.accent}/>}
   header={<>
@@ -243,7 +247,7 @@ export function Pages({api,active,storageScope,onDepthChange,openPageKey=0,openP
   {error?<ErrorBanner text={error} onRetry={()=>void load()}/>:null}
   </>}
   footer={<>
-  {/* Também antes do 'ready' (enquanto as páginas guardadas no aparelho são lidas): antes ficava em branco. */}{(!ready||!loaded)&&!error&&!pages.length?<View testID="pages-loading-placeholder" accessibilityLabel="Carregando páginas" style={{minHeight:80,paddingHorizontal:4,gap:4}}><View style={{flexDirection:'row',alignItems:'center',gap:10,paddingTop:6}}><Spinner size={16} stroke={1.8}/><Text style={{color:c.muted,fontSize:13}}>Carregando páginas</Text></View><LoadingLines rows={4}/></View>:null}
+  {/* Também antes do 'ready' (enquanto as páginas guardadas no aparelho são lidas): antes ficava em branco. */}{((!ready||!loaded)&&!error&&!pages.length)||(!orderReady&&pages.length>0)?<View testID="pages-loading-placeholder" accessibilityLabel="Carregando páginas" style={{minHeight:80,paddingHorizontal:4,gap:4}}><View style={{flexDirection:'row',alignItems:'center',gap:10,paddingTop:6}}><Spinner size={16} stroke={1.8}/><Text style={{color:c.muted,fontSize:13}}>Carregando páginas</Text></View><LoadingLines rows={4}/></View>:null}
   {ready&&loaded&&!pages.length&&!error?<Empty icon="book" title="Sua primeira página" body={tap("Toque em + para criar uma página.")}/>:null}
   </>}/>;
  const createPicker=<PageCreateMenu visible={createParent!==undefined} parentTitle={createParent?.title} onClose={()=>setCreateParent(undefined)}

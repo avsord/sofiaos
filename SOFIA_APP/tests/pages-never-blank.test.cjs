@@ -4,7 +4,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const s=fs.readFileSync(path.join(__dirname,'../src/screens/Pages.tsx'),'utf8');
 test('carregamento (anel + linhas) aparece antes e durante a leitura, nunca tela vazia',()=>{
- assert.ok(s.includes('{(!ready||!loaded)&&!error&&!pages.length?<View testID="pages-loading-placeholder"'));
+ assert.ok(s.includes('{((!ready||!loaded)&&!error&&!pages.length)||(!orderReady&&pages.length>0)?<View testID="pages-loading-placeholder"')); // 0.3.256: tambem enquanto a ordem do aparelho e lida
  const show=(ready,loaded,error,count)=>(!ready||!loaded)&&!error&&!count;
  assert.equal(show(false,true,'',0),true,'antes do ready, mesmo com cache marcado: carregando');
  assert.equal(show(true,false,'',0),true);assert.equal(show(true,true,'',0),false,'pronto e vazio: mostra "Sua primeira página"');

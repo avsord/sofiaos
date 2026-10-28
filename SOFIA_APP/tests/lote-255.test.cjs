@@ -4,20 +4,6 @@ const load=require('./load-ts.cjs');
 const j=x=>JSON.parse(JSON.stringify(x));
 const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 
-test('0.3.255: Controle de gastos comeca no salario (salario - despesas pagas, avulsas e previstas + receitas + saldo de antes)',()=>{
-  const f=load('src/lib/finance.ts');
-  const tx=(id,kind,amount,date,extra={})=>f.toTx({id,kind:'fin_tx',title:id,state:'active',data:{kind,amount,date,account_id:'a1',paid:true,category:'X',recurrence:'none',...extra}});
-  const txs=[tx('salario','income',5000,'2026-10-25'),tx('aluguel','expense',1500,'2026-11-05',{paid:false,import_id:'sofia-pendencia:aluguel'}),tx('mercado','expense',200,'2026-10-26'),tx('fora','expense',999,'2026-10-20')];
-  const r=f.cycleRange(25,'2026-10-27');assert.deepEqual(j([r.start,r.end]),['2026-10-25','2026-11-24']);
-  const c=f.cycleControl(txs,[],r,'a1',500,1000,'2026-10-27');
-  assert.equal(c.left,2800,'500 de antes + 5000 - 1500 (prevista, conta como paga) - 200 (avulsa) - 1000 (aporte)');
-  assert.equal(c.spent,200,'so o gasto avulso pago diminui a porcentagem');assert.equal(c.available,3000);assert.equal(Math.round(c.pct*100),93);
-  const pago=f.cycleControl(txs.map(t=>t.id==='aluguel'?{...t,paid:true}:t),[],r,'a1',500,1000,'2026-10-27');
-  assert.equal(pago.left,2800,'pagar a conta prevista nao muda a sobra');
-  const s=read('src/screens/Finance.tsx');
-  assert.ok(s.includes('cycleControl(d.txs, d.cards, controlRange, accountId, startSaldo, aporteInCycle(controlRange), today)'),'tela usa o ciclo do salario');
-});
-
 test('0.3.255: Devolucoes a receber nao mexem no Saldo; "Recebi" vira receita paga de hoje',()=>{
   const s=read('src/screens/Finance.tsx');
   assert.ok(s.includes("refunds: g('fin_refund')")&&s.includes("'fin_statement', 'fin_refund'] as const"),'carregadas a parte');

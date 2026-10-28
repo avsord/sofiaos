@@ -1831,7 +1831,8 @@ const CATALOG={
       {"key": "expected_date", "label": "Previsão", "type": "date"},
       {"key": "account_id", "label": "Conta", "type": "text", "max": 80},
       {"key": "received_at", "label": "Recebida em", "type": "date"},
-      {"key": "tx_id", "label": "Lançamento da devolução", "type": "text", "max": 80}
+      {"key": "tx_id", "label": "Lançamento da devolução", "type": "text", "max": 80},
+      {"key": "expense_id", "label": "Despesa reembolsada", "type": "text", "max": 80}
     ]
   },
   "fin_goal": {

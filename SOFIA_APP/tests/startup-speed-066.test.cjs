@@ -282,7 +282,7 @@ test('108 pages hydrate from the full archive only AFTER reveal and never show f
  assert.ok(app.includes("useStartupMounts(visible&&!!auth,tab,!!auth,fluency,previewTabs)"));
  assert.ok(!archive.slice(archive.indexOf('export function launchRead('),archive.indexOf('export function cacheableRead(')).includes('user_page'),'Full Pages archive must not decrypt before Home');
  assert.ok(pages.includes('const [refreshing,setRefreshing]=useState(false),[ready,setReady]=useState(false),[loaded,setLoaded]'));
- assert.ok(pages.includes('setPages(prev=>prev.length?prev:local)'));
+ assert.ok(pages.includes('setPages(prev=>prev.length?prev:api.pageOrderApply(local))')); // 0.3.256: ja na ordem do aparelho
  assert.ok(pages.includes("setLoaded(true);setError('')"));
  assert.ok(pages.includes('(!ready||!loaded)&&!error&&!pages.length'));
  assert.ok(pages.includes('ready&&loaded&&!pages.length&&!error'));

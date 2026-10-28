@@ -30,6 +30,10 @@ export class LegacyMdAdapter{
   try{return await this.pending;}finally{this.pending=null;}
  }
  get localOnly(){return this.supported===false;}
+ /** 0.3.256: a ordem guardada no aparelho ja foi lida (so disco, sem rede). Paginas so mostra a lista depois disso. */
+ get orderLoaded(){return this.loaded;}
+ async loadOrder(){await this.load();}
+ decorateNow(items:Entity[]):Entity[]{if(this.supported===true||!this.loaded)return items;return items.map(p=>p.kind==='user_page'&&this.order[p.id]!=null?{...p,data:{...p.data,sort_order:this.order[p.id]}}:p);}
  private key(){return 'sofia.native.md.compat.v1:'+this.scope;}
  private async load(){if(this.loaded)return;if(this.loading)return this.loading;this.loading=(async()=>{const raw=await this.disk.getItem(this.key());if(raw){try{const d=JSON.parse(raw);this.order=Object.fromEntries(Object.entries(d.order||{}).filter(([,v])=>typeof v==='number'&&Number.isFinite(v))) as Record<string,number>;this.dismissed=new Set(Array.isArray(d.dismissed)?d.dismissed.filter((v:unknown)=>typeof v==='string'):[]);}catch{this.order={};this.dismissed=new Set();}}this.loaded=true;})();try{await this.loading;}finally{this.loading=null;}}
  private async persist(){await this.disk.setItem(this.key(),JSON.stringify({order:this.order,dismissed:[...this.dismissed]}));}

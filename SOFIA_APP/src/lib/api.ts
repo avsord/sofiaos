@@ -112,6 +112,10 @@ export class SofiaApi {
   readonly owner: string;
   constructor(private token = '', private onExpired: () => void = () => {},scope='anonymous',restored?:StartupSnapshot) {this.owner=scope;this.md=new LegacyMdAdapter(this.request.bind(this),AsyncStorage,scope);this.snapshots=restored||startupSnapshotFor(scope);if(restored){for(const [key,value] of restored.all())this.startupReads.seed(key,value);}}
   get mdLocalOnly(){return this.md.localOnly;}
+  /** 0.3.256: ordem das Paginas guardada no aparelho - pronta? carregar; aplicar sem rede */
+  get pageOrderReady(){return this.md.orderLoaded;}
+  pageOrderLoad(){return this.md.loadOrder();}
+  pageOrderApply(items:Entity[]){return this.md.decorateNow(items);}
   private async request<T>(path: string, body?: unknown, method = body === undefined ? 'GET' : 'POST', timeout = 20000): Promise<T> {
     if(method!=='GET'){
       // Merge retained records before a mutation can reconcile or remove any
