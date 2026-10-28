@@ -1,37 +1,40 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
-    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
+    <!-- 0.3.260 (rodada premium, fase 2): pagina base da Sofia em portugues, com descricao, cor, previa de link e instalavel -->
     <title>Sofia OS</title>
-    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
+    <meta name="description" content="Sofia OS: conversar, lembrar e organizar o que importa — agenda, finanças, páginas e e-mails num lugar só." />
+    <meta name="theme-color" content="#121017" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#F7F6FA" media="(prefers-color-scheme: light)" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="application-name" content="Sofia OS" />
+    <meta name="apple-mobile-web-app-title" content="Sofia OS" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Sofia OS" />
+    <meta property="og:title" content="Sofia OS — Seu dia. Sua Sofia." />
+    <meta property="og:description" content="Conversar, lembrar e organizar o que importa." />
+    <meta property="og:image" content="/assets/sofia-preview.png" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/assets/sofia-192.png" />
+    <link rel="preload" href="/assets/fonts/SofiaSans-Regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/assets/fonts/SofiaSans-SemiBold.woff2" as="font" type="font/woff2" crossorigin />
     <style id="expo-reset">
-      /* These styles make the body full-height */
-      html,
-      body {
-        height: 100%;
-      }
-      /* These styles disable body scrolling if you are using <ScrollView> */
-      body {
-        overflow: hidden;
-      }
-      /* These styles make the root element full-height */
-      #root {
-        display: flex;
-        height: 100%;
-        flex: 1;
-      }
+      html, body { height: 100%; }
+      body { overflow: hidden; margin: 0; background: #F7F6FA; }
+      @media (prefers-color-scheme: dark) { body { background: #121017; } }
+      #root { display: flex; height: 100%; flex: 1; }
+      ::selection { background: rgba(114, 88, 232, 0.28); }
     </style>
   <link rel="icon" href="/favicon.ico"/></head>
-
   <body>
-    <!-- Use static rendering with Expo Router to support running without JavaScript. -->
-    <noscript>
-      You need to enable JavaScript to run this app.
-    </noscript>
-    <!-- The root element for your Expo app. -->
+    <noscript>Para usar a Sofia OS, ative o JavaScript no seu navegador.</noscript>
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-5ebf9f8541076b1ae5c8fa16e3d84721.js" defer></script>
+  <script src="/_expo/static/js/web/index-e18e63bf481918a3da5fe0125dece2cf.js" defer></script>
 </body>
 </html>

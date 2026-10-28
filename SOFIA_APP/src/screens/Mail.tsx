@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useState} from 'react';
+import {tap} from '../lib/desktop';
 import {useColumnPad} from '../lib/desktop';
 import {ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Platform, Pressable, RefreshControl, Switch, Text, TextInput, View} from 'react-native';
 // 0.3.255: ScrollView que rola sozinho ate o calendario aberto caber na tela (ver RevealScroll)
@@ -168,7 +169,7 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
               <View style={{alignItems: 'center', gap: 12, paddingVertical: 30}}>
                 <View style={{width: 84, height: 84, borderRadius: 42, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center'}}><Text style={{fontSize: 40}}>✉️</Text></View>
                 <Text style={{fontSize: 20, fontWeight: '700', color: c.text, textAlign: 'center'}}>Deixe a Sofia de olho no seu e-mail</Text>
-                <Text style={{fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 21}}>Conecte uma ou mais contas e diga o que importa: um nome, um e-mail, um assunto ou uma palavra. Quando chegar, ela avisa no celular e guarda aqui.</Text>
+                <Text style={{fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 21}}>{tap('Conecte uma ou mais contas e diga o que importa: um nome, um e-mail, um assunto ou uma palavra. Quando chegar, ela avisa no celular e guarda aqui.')}</Text>
                 <View style={{alignSelf: 'stretch'}}><Button title="Conectar uma conta" onPress={() => setAddAccount('new')} /></View>
                 <Text style={{fontSize: 11, color: c.muted, textAlign: 'center'}}>A Sofia lê só remetente, assunto e um trecho curto dos e-mails novos. Nada é apagado, movido ou respondido.</Text>
               </View>
@@ -371,7 +372,7 @@ function RuleSheet({api, rule, accounts, onClose, onDone}: {api: SofiaApi; rule:
         <Field label="Contém (separe opções por vírgula)" value={contains} onChange={setContains} placeholder={hint} />
         <Field label="Nome da regra (opcional)" value={title} onChange={setTitle} placeholder="Ex.: Mensagens da Ana" />
         {accounts.length > 1 ? <><Text style={{fontSize: 12, color: c.muted}}>Em qual conta</Text><Chips value={accountId} onChange={setAccountId} options={accounts.map(a => ({value: a.id, label: String(a.data.address)}))} /></> : null}
-        <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text}}>Avisar no celular</Text><Switch value={notify} onValueChange={setNotify} /></View>
+        <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text}}>{tap('Avisar no celular')}</Text><Switch value={notify} onValueChange={setNotify} /></View>
         <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text}}>Marcar como importante {important ? emoji : '⭐'}</Text><Switch value={important} onValueChange={setImportant} /></View>
         {important ? <View style={{gap: 6}}>
           <Text style={{color: c.muted, fontSize: 12}}>Emoji dos e-mails desta regra (no lugar da estrela)</Text>

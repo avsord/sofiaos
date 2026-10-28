@@ -4,7 +4,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 test('breakpoint so na web, a partir de 1024 px',()=>{
   const d=read('src/lib/desktop.ts');
-  assert.ok(d.includes('export const DESKTOP_MIN=1024;'));
+  assert.ok(d.includes('export const DESKTOP_MIN=900;')); // 0.3.260: metade da tela (~960) ja e computador
   assert.ok(d.includes("return Platform.OS==='web'&&Number.isFinite(width)&&width>=DESKTOP_MIN;"));
   assert.ok(d.includes("if(Platform.OS!=='web')return 2;"),'grade de Apps no celular continua com 2 colunas');
 });

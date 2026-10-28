@@ -34,15 +34,15 @@ Nada é apagado (o corte de funções depende dele). Decisões de design ficam r
 ### Fase 2 — comportamento de site de verdade
 | # | Pedido | Estado |
 |---|---|---|
-| 2.1 | Endereço por tela: F5 mantém a tela, voltar do navegador volta, dá para favoritar/abrir por link | anotado |
-| 2.2 | Título da aba por tela (e aviso de notificação) | anotado |
-| 2.3 | Página base em pt-BR, aviso sem JavaScript em português, descrição, cor, prévia de link, instalável | anotado |
-| 2.4 | Rolagem de site (rodinha, espaço/Page Down, Ctrl+F, imprimir) | anotado |
-| 2.5 | Tamanhos intermediários de janela (1366, metade da tela ~960, ultra-wide) | anotado |
-| 2.6 | Mouse de verdade: hover e cursor em tudo que é clicável, clique direito, nada que dependa de "segurar" | anotado |
-| 2.7 | Teclado: Tab na ordem certa, foco visível, Enter salva, Esc fecha | anotado |
-| 2.8 | Textos de toque reescritos para o computador (30+: "toque", "segure", "deslize", "fuso do celular") | anotado |
-| 2.9 | Folhas que sobem de baixo viram menus/janelas perto de onde se clicou; movimentos de computador | anotado |
+| 2.1 | Endereço por tela: F5 mantém a tela, voltar do navegador volta, dá para favoritar/abrir por link | entregue (0.3.260): /inicio, /agenda, /apps/financas…; testado no navegador (F5, voltar, link direto) |
+| 2.2 | Título da aba por tela (e aviso de notificação) | entregue (0.3.260): "Finanças · Sofia"; o número de avisos na aba fica para a 4.7 |
+| 2.3 | Página base em pt-BR, aviso sem JavaScript em português, descrição, cor, prévia de link, instalável | entregue (0.3.260): public/index.html, manifest.webmanifest, prévia de link |
+| 2.4 | Rolagem de site (rodinha, espaço/Page Down, Ctrl+F, imprimir) | entregue (0.3.260): Page Down/Up, espaço, Home/End e impressão inteira (a rolagem continua por áreas; a página inteira rolando entra na Fase 3, tela por tela) |
+| 2.5 | Tamanhos intermediários de janela (1366, metade da tela ~960, ultra-wide) | entregue (0.3.260): layout de computador a partir de 900 px; conferido em 960, 1366 e 2560 |
+| 2.6 | Mouse de verdade: hover e cursor em tudo que é clicável, clique direito, nada que dependa de "segurar" | entregue (0.3.260): clique direito faz o "segurar" (criar no dia, opções da tarefa, mensagens, Price Tracker); cursor e hover já existiam |
+| 2.7 | Teclado: Tab na ordem certa, foco visível, Enter salva, Esc fecha | em parte: foco visível e Esc já existiam; Enter salvando entra tela a tela na Fase 3 |
+| 2.8 | Textos de toque reescritos para o computador (30+: "toque", "segure", "deslize", "fuso do celular") | entregue (0.3.260): textos de celular adaptados no computador via tap() |
+| 2.9 | Folhas que sobem de baixo viram menus/janelas perto de onde se clicou; movimentos de computador | já existia: no computador as folhas abrem como janela no centro e telas cheias como painel lateral |
 
 ### Fase 3 — diagramação tela por tela (sem moldes: cada tela com a sua intenção)
 | # | Pedido | Estado |

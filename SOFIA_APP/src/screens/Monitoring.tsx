@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {rightClick} from '../lib/web-page';
 import {tap,useColumnPad} from '../lib/desktop';
 import {ActivityIndicator, Alert, AppState, KeyboardAvoidingView, Linking, Platform, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -145,7 +146,7 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
                     const off = hidden.includes(p.monitor.id);
                     return (
                       <Pressable key={p.monitor.id} accessibilityRole="switch" accessibilityState={{checked: !off}} accessibilityLabel={(off ? 'Mostrar ' : 'Esconder ') + p.monitor.title + ' no gráfico'}
-                        onPress={() => setHidden(h => off ? h.filter(x => x !== p.monitor.id) : [...h, p.monitor.id])} onLongPress={() => setOpenId(p.monitor.id)}
+                        onPress={() => setHidden(h => off ? h.filter(x => x !== p.monitor.id) : [...h, p.monitor.id])} onLongPress={() => setOpenId(p.monitor.id)} {...rightClick(() => setOpenId(p.monitor.id))}
                         style={{flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, borderWidth: 1, borderColor: off ? c.line : p.color + '88', backgroundColor: off ? 'transparent' : p.color + '18', opacity: off ? 0.5 : 1}}>
                         <View style={{width: 8, height: 8, borderRadius: 4, backgroundColor: p.color}} />
                         <Text numberOfLines={1} style={{maxWidth: 140, fontSize: 12, color: c.text}}>{p.monitor.title}</Text>
@@ -186,7 +187,7 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
                 );
               })}
               <Text style={{fontSize: 11, lineHeight: 17, color: c.muted, textAlign: 'center', paddingHorizontal: 12}}>
-                Os preços são lidos neste celular, direto na página da loja, enquanto a Sofia está aberta. Sem leitura, sem ponto no gráfico: nada é estimado. Frete não incluído.
+                {tap('Os preços são lidos neste celular, direto na página da loja, enquanto a Sofia está aberta. Sem leitura, sem ponto no gráfico: nada é estimado. Frete não incluído.')}
               </Text>
             </>
           )}
@@ -416,7 +417,7 @@ function ProductDetail({api, product, issues, running, onClose, onChanged, onDel
     return (
       <View key={s.url} style={{borderTopWidth: i ? 1 : 0, borderColor: c.line}}>
         <Pressable accessibilityRole="button" accessibilityLabel={(expanded ? 'Ver análise de ' : 'Opções de ') + s.name}
-          onPress={() => expanded ? setStoreFocus(f => f === s.url ? null : s.url) : setMenu(s)} onLongPress={() => setMenu(s)}
+          onPress={() => expanded ? setStoreFocus(f => f === s.url ? null : s.url) : setMenu(s)} onLongPress={() => setMenu(s)} {...rightClick(() => setMenu(s))}
           style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12}}>
           <View style={{width: 38, height: 38, borderRadius: 19, backgroundColor: sc + '26', alignItems: 'center', justifyContent: 'center'}}><Text style={{color: sc, fontWeight: '700'}}>{s.name.charAt(0)}</Text></View>
           <View style={{flex: 1, gap: 2}}>
@@ -1004,7 +1005,7 @@ function StorePageViewer({api, monitor, store, onClose, onSaved}: {api: SofiaApi
             onMessage={(e: any) => onMessage(e.nativeEvent.data)} />
         </View>
         <View style={{padding: 14, gap: 10, borderTopWidth: 1, borderColor: c.line, backgroundColor: c.surface}}>
-          {status ? <Text style={{color: c.text, fontSize: 13}}>{status}</Text> : <Text style={{color: c.muted, fontSize: 12}}>Se aparecer verificação, aviso de cookies ou "abrir no app", resolva por aqui (sem sair). Quando o produto e o preço aparecerem, toque em Ler preço.</Text>}
+          {status ? <Text style={{color: c.text, fontSize: 13}}>{status}</Text> : <Text style={{color: c.muted, fontSize: 12}}>{tap('Se aparecer verificação, aviso de cookies ou "abrir no app", resolva por aqui (sem sair). Quando o produto e o preço aparecerem, toque em Ler preço.')}</Text>}
           {cands.length ? <View style={{gap: 8}}>{cands.slice(0, 4).map((cand, i) => (
             <Pressable key={i} disabled={busy} onPress={() => void save(cand)} style={{flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: c.line}}>
               <Text style={{fontWeight: '600', color: c.text}}>{money(cand.amount, cand.currency || 'BRL')}</Text>

@@ -1,4 +1,5 @@
 import React,{useEffect,useMemo,useState} from 'react';
+import {tap} from '../lib/desktop';
 import {Alert,Pressable,Text,TextInput,View} from 'react-native';
 // 0.3.255: ScrollView que rola sozinho ate o calendario aberto caber na tela (ver RevealScroll)
 import {RevealScrollView as ScrollView} from '../components/RevealScroll';
@@ -70,7 +71,7 @@ export function Reminders({api,active,onBack}:{api:SofiaApi;active:boolean;onBac
    {section('Concluídos',groups.done,false,true)}
    {!records.loaded&&!records.error?<Text style={{color:c.muted,padding:18}}>Carregando lembretes…</Text>:null}
    {records.loaded&&!records.items.length?<Empty icon="bell" title="Seu primeiro lembrete" body="Ex.: ligar para o dentista às 15h, pagar o condomínio amanhã, tirar a roupa da máquina."/>:null}
-   <Text style={{color:c.muted,fontSize:11,lineHeight:18,paddingHorizontal:4}}>O celular avisa no horário escolhido, mesmo com o app fechado. Os lembretes também aparecem na Agenda.</Text>
+   <Text style={{color:c.muted,fontSize:11,lineHeight:18,paddingHorizontal:4}}>{tap('O celular avisa no horário escolhido, mesmo com o app fechado. Os lembretes também aparecem na Agenda.')}</Text>
   </ScrollView>
   <Sheet visible={!!editing} onClose={()=>{if(!busy)setEditing(null);}} label="Fechar lembrete">
    <View style={{flexDirection:'row',alignItems:'center'}}><Text style={{flex:1,color:c.text,fontSize:24,fontWeight:'600'}}>{editing?.id?'Editar lembrete':'Novo lembrete'}</Text><IconButton name="close" label="Fechar lembrete" disabled={busy} onPress={()=>setEditing(null)}/></View>

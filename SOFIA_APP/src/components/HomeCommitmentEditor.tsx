@@ -1,4 +1,5 @@
 import React,{useState} from 'react';
+import {tap} from '../lib/desktop';
 import {TaskLinkPanel,saveEventAsTask,type TaskLink} from './TaskLinkPanel';
 import {RemindersField} from './RemindersField';
 import {reminderFields} from '../lib/agenda-reminders';
@@ -62,7 +63,7 @@ export function HomeCommitmentEditor({api,day,areas,onClose,onSaved}:{api:SofiaA
       <TextInput accessibilityLabel="Descrição do compromisso" multiline value={description} onChangeText={setDescription} style={[forms.input,{color:c.text,borderColor:c.line,backgroundColor:c.input,minHeight:88,textAlignVertical:'top'}]}/>
      </View>
      {type==='commitment'?<><GoogleCalendarProperty api={api} autoEnable value={google} onChange={setGoogle}/>
-     <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={{color:c.text}}>Notificar neste celular</Text><Switch accessibilityLabel="Notificar compromisso neste celular" value={notify} onValueChange={setNotify}/></View>{notify?<RemindersField data={reminders} onChange={setReminders}/>:null}</>:null}
+     <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={{color:c.text}}>{tap('Notificar neste celular')}</Text><Switch accessibilityLabel="Notificar compromisso neste celular" value={notify} onValueChange={setNotify}/></View>{notify?<RemindersField data={reminders} onChange={setReminders}/>:null}</>:null}
      <Button title={type==='task'?'Salvar na agenda':'Salvar compromisso'} loading={saving} disabled={!title.trim()} onPress={()=>void save()}/>
     </ScrollView>
    </KeyboardAvoidingView>

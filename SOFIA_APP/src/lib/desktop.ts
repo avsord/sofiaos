@@ -7,7 +7,8 @@ import {Dimensions,Platform,useWindowDimensions} from 'react-native';
 import type {Entity,Tab} from './types';
 import type {IconName} from '../components/Icon';
 
-export const DESKTOP_MIN=1024;
+// 0.3.260: 900 (antes 1024) - janela pela metade da tela (~960) e notebooks pequenos ja usam o layout de computador
+export const DESKTOP_MIN=900;
 export const SIDEBAR_WIDTH=256,SIDEBAR_COLLAPSED=60;
 export function isDesktopWidth(width:number):boolean{return Platform.OS==='web'&&Number.isFinite(width)&&width>=DESKTOP_MIN;}
 export function useDesktop():boolean{const {width}=useWindowDimensions();return isDesktopWidth(width);}
@@ -120,7 +121,11 @@ export function tap(text:string):string{
  let w=0;try{w=Dimensions.get('window').width;}catch{return text;}
  if(!isDesktopWidth(w))return text;
  return text
-  .replace(/\bToque e segure\b/g,'Clique e segure').replace(/\btoque e segure\b/g,'clique e segure')
+  // 0.3.260: linguagem de celular que aparecia igual no computador
+  .replace(/\bSalvar no celular\b/g,'Baixar').replace(/\bneste celular\b/g,'no celular').replace(/\bHorário local do celular\b/g,'Horário local deste aparelho').replace(/\bfuso do celular\b/g,'fuso deste aparelho')
+  .replace(/\bDeslize para a esquerda\b/g,'Arraste para a esquerda').replace(/\bdeslize para a esquerda\b/g,'arraste para a esquerda')
+  .replace(/\bCrie no celular e continue no computador\b/g,'Crie no computador e continue no celular')
+  .replace(/\bToque e segure\b/g,'Clique com o botão direito em').replace(/\btoque e segure\b/g,'clique com o botão direito em')
   .replace(/\bcom um toque\b/g,'com um clique')
   .replace(/\bToque\b/g,'Clique').replace(/\btoque\b/g,'clique')
   .replace(/\bao tocar\b/g,'ao clicar')

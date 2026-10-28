@@ -41,9 +41,12 @@ import {Login} from './src/screens/Login';
 import {APP_VERSION,checkForUpdate} from './src/lib/update';
 import {finishLaunchHandoff} from './src/lib/launch-handoff';
 import {appAlert,AppAlertHost} from './src/lib/app-alert';
+import {isWeb,pathToRoute,routeTitle,routeToPath} from './src/lib/web-route';
+import {installWebPage} from './src/lib/web-page';
 import {installSofiaFont} from './src/lib/sofia-font';
 // 0.3.259: fonte propria da Sofia antes do primeiro quadro (app e site)
 installSofiaFont();
+if(typeof document!=='undefined')installWebPage();
 
 // 0.3.250: no navegador com tela larga, a moldura de computador (barra lateral + barra de cima). So carrega na web.
 const DesktopFrame:React.ComponentType<any>|null=Platform.OS==='web'?require('./src/desktop/DesktopShell').DesktopFrame:null;
@@ -181,6 +184,26 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
  const [monitoringTarget,setMonitoringTarget]=useState({n:0,id:''});const openMonitoring=useCallback((id?:string)=>{navigate('apps');setMonitoringTarget(v=>({n:v.n+1,id:id||''}));},[navigate]);
  const [tasksTarget,setTasksTarget]=useState(0);const openTasks=useCallback(()=>{navigate('apps');setTasksTarget(v=>v+1);},[navigate]);
  const [moduleTarget,setModuleTarget]=useState({n:0,id:''});const openModule=useCallback((id:string)=>{navigate('apps');setModuleTarget(v=>({n:v.n+1,id}));},[navigate]);
+ // 0.3.260 (fase 2): endereco por tela no site (F5, voltar do navegador, favoritos) e titulo da aba por tela.
+ const [appsModule,setAppsModule]=useState(''),routeReady=useRef(false),routeFromPop=useRef(false),lastPush=useRef({path:'',at:0}),initialPath=useRef('');
+ useEffect(()=>{if(!isWeb())return;const r=pathToRoute(window.location.pathname);
+  if(r){initialPath.current=routeToPath(r);if(r.tab!=='home')navigate(r.tab);if(r.tab==='apps'&&r.module)setTimeout(()=>openModule(r.module),0);}
+  routeReady.current=true;
+  const onPop=()=>{const p=pathToRoute(window.location.pathname)||{tab:'home' as Tab,module:''};routeFromPop.current=true;
+   if(p.tab==='apps'&&p.module)openModule(p.module);else{navigate(p.tab);if(p.tab==='apps')setWorkspaceReset(v=>v+1);}};
+  window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop);
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[]);
+ useEffect(()=>{if(!isWeb()||!routeReady.current)return;const route={tab,module:tab==='apps'?appsModule:''},path=routeToPath(route);
+  try{document.title=routeTitle(route);}catch{/* sem titulo */}
+  if(path===window.location.pathname){routeFromPop.current=false;return;}
+  // abrir um app pela lateral passa por /apps e logo vai para /apps/financas: vira um passo so no historico
+  // abrindo o site num endereco: os passos ate chegar nele substituem (nao empilham) o historico
+  const opening=!!initialPath.current;if(opening&&path===initialPath.current)initialPath.current='';
+  const quick=lastPush.current.path==='/apps'&&path.startsWith('/apps/')&&Date.now()-lastPush.current.at<1500;
+  if(routeFromPop.current||quick||opening||window.location.pathname==='/'){window.history.replaceState(route,'',path);routeFromPop.current=false;}else window.history.pushState(route,'',path);
+  lastPush.current={path,at:Date.now()};
+ },[tab,appsModule]);
  const [mailTarget,setMailTarget]=useState(0);const openMail=useCallback(()=>{navigate('apps');setMailTarget(v=>v+1);},[navigate]);
  const openMonitoringFromHome=useCallback(()=>openMonitoring(),[openMonitoring]);
  const [pageTarget,setPageTarget]=useState({n:0,id:''}),[createPageKey,setCreatePageKey]=useState(0);
@@ -215,7 +238,7 @@ function Shell({startup}:{startup:LocalLaunch}){useRenderCost('app');
    {<FadeSwap ready={mountedTabs.has('chat')} fallback={<ScreenSkeleton tab='chat'/>}><DeferredScreen key={'chat-'+chatEpoch} load={loadChat} screenProps={{taskContext,onClearTaskContext:clearTaskContext,api,bootstrap,enterToSend:prefs.enterToSend,autoSendVoice:prefs.autoSendVoice,onLock:setLocked,active:screenTab==='chat',onRefreshBootstrap:boot}}/></FadeSwap>}
    {<FadeSwap ready={mountedTabs.has('pages')} fallback={<ScreenSkeleton tab='pages'/>}><DeferredScreen key={bootstrap.profile.email} load={loadPages} screenProps={{openPageKey:pageTarget.n,openPageId:pageTarget.id,createPageKey,api,active:screenTab==='pages',storageScope:bootstrap.profile.email,onDepthChange:setPagesDepth}}/></FadeSwap>}
    {<FadeSwap ready={mountedTabs.has('agenda')} fallback={<ScreenSkeleton tab='agenda'/>}><DeferredScreen load={loadAgenda} screenProps={{onGestureLock:setGestureLocked,api,target:agendaTarget,active:screenTab==='agenda'}}/></FadeSwap>}
-   {<FadeSwap ready={mountedTabs.has('apps')} fallback={<ScreenSkeleton tab='apps'/>}><DeferredScreen load={loadWorkspace} screenProps={{onGestureLock:setGestureLocked,onDiscussTask:discussTask,openCapsulesKey:capsulesTarget,openMonitoringKey:monitoringTarget.n,openMonitoringId:monitoringTarget.id,openFinanceKey:financeTarget,openTasksKey:tasksTarget,openModuleKey:moduleTarget.n,openModuleId:moduleTarget.id,openMailKey:mailTarget,resetKey:workspaceReset,api,navigate,onDepthChange:setWorkspaceDepth,active:screenTab==='apps'}}/></FadeSwap>}
+   {<FadeSwap ready={mountedTabs.has('apps')} fallback={<ScreenSkeleton tab='apps'/>}><DeferredScreen load={loadWorkspace} screenProps={{onModuleChange:setAppsModule,onGestureLock:setGestureLocked,onDiscussTask:discussTask,openCapsulesKey:capsulesTarget,openMonitoringKey:monitoringTarget.n,openMonitoringId:monitoringTarget.id,openFinanceKey:financeTarget,openTasksKey:tasksTarget,openModuleKey:moduleTarget.n,openModuleId:moduleTarget.id,openMailKey:mailTarget,resetKey:workspaceReset,api,navigate,onDepthChange:setWorkspaceDepth,active:screenTab==='apps'}}/></FadeSwap>}
    {<FadeSwap ready={mountedTabs.has('profile')} fallback={<ScreenSkeleton tab='profile'/>}><DeferredScreen load={loadProfile} screenProps={{api,bootstrap,prefs,onPrefs:changePrefs,onProfile:profile,onLogout:logout,onCheckUpdate:manualUpdate,onChatHistoryCleared:clearChat}}/></FadeSwap>}
   </TabPager>
  </View>

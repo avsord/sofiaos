@@ -390,7 +390,7 @@ test('0.3.227: segurar widget nao abre a tela; meta removivel; arrastar app trav
   const sw=read('src/components/SortableWidgets.tsx'),h=read('src/screens/Home.tsx'),w=read('src/screens/Workspace.tsx'),s=read('src/screens/Finance.tsx'),a=read('src/lib/api.ts');
   assert.ok(sw.includes("setNonce(n=>({...n,[id]:(n[id]||0)+1}))")&&sw.includes("key={id+':'+(nonce[id]||0)}"),'o toque do widget segurado e cancelado');
   assert.ok(h.includes("export const HOME_FIXED_WIDGETS:string[]=[];")&&h.includes('order={withFixedWidgets(widgets,goalHidden)} onSave={saveHomeOrder}'),'meta pode sair');
-  assert.ok(w.includes('onDragging={on=>{setDraggingApp(on);onGestureLock?.(on);}}')&&read('App.tsx').includes('load={loadWorkspace} screenProps={{onGestureLock:setGestureLocked,'),'arrastar app nao troca de tela');
+  assert.ok(w.includes('onDragging={on=>{setDraggingApp(on);onGestureLock?.(on);}}')&&read('App.tsx').includes('load={loadWorkspace} screenProps={{onModuleChange:setAppsModule,onGestureLock:setGestureLocked,'),'arrastar app nao troca de tela');
   assert.ok(s.includes("style={{flex: 1, paddingVertical: 9, borderRadius: 11, alignItems: 'center'"),'seletor de duas metades');
   assert.ok(s.includes('paddingBottom: 84')&&s.includes('bottom: 16, width: 56, height: 56,'),'menos espaco embaixo');
   assert.ok(!s.includes('<Fold id="comparado"'),'sem comparado ao mes anterior');

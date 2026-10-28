@@ -1735,7 +1735,7 @@ function RefundsTab({d, api, reload, accountId}: {d: Data; api: SofiaApi; reload
     <View style={{backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 6, borderWidth: 1, borderColor: c.line}}>
       <Text style={{color: c.muted, fontSize: 12}}>A receber de devoluções</Text>
       <Text testID="refunds-total" style={{color: c.text, fontSize: 28, fontWeight: '700'}}>{money(total)}</Text>
-      <Text style={{color: c.muted, fontSize: 12, lineHeight: 17}}>Não entra no Saldo nem no previsto. Quando o dinheiro cair, toque em “Recebi”: ele vai para o Saldo e para o Histórico.</Text>
+      <Text style={{color: c.muted, fontSize: 12, lineHeight: 17}}>{tap('Não entra no Saldo nem no previsto. Quando o dinheiro cair, toque em “Recebi”: ele vai para o Saldo e para o Histórico.')}</Text>
     </View>
     <Button title="+ Nova devolução a receber" secondary onPress={() => setEditing('new')} />
     {pending.length ? pending.map(r => <Pressable key={r.id} accessibilityRole="button" accessibilityLabel={'Editar ' + r.title} onPress={() => setEditing(r)} style={{flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.surface, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: c.line}}>
