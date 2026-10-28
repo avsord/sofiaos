@@ -133,7 +133,7 @@ function createHandler(runtime) {
   const registerResetRequest=req=>{const key=attemptKey(req),now=Date.now(),windowMs=30*60*1000;const arr=(resetAttempts.get(key)||[]).filter(ts=>now-ts<windowMs);arr.push(now);resetAttempts.set(key,arr);return arr.length;};
   const tooManyResetRequests=req=>{const key=attemptKey(req),now=Date.now(),windowMs=30*60*1000;const arr=(resetAttempts.get(key)||[]).filter(ts=>now-ts<windowMs);resetAttempts.set(key,arr);return arr.length>=5;};
   const mobileSessions=new MobileSessions(store,ownerAuth,config);
-  const mobileApi=makeMobileApi(runtime,{bodyJson,json,ownerAuth,mobileSessions,tooManyFailures,registerFailure,clearFailures:req=>loginAttempts.delete(attemptKey(req)),revokeWebSessions});
+  const mobileApi=makeMobileApi(runtime,{accountMailer,bodyJson,json,ownerAuth,mobileSessions,tooManyFailures,registerFailure,clearFailures:req=>loginAttempts.delete(attemptKey(req)),revokeWebSessions});
   return async function handler(req,res) {
     const url=new URL(req.url,'http://localhost');const p=url.pathname,m=req.method;
     if(publicRoute(p,m))publicHeaders(res,p);else headers(res);

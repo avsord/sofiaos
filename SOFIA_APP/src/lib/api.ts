@@ -34,6 +34,10 @@ const inBrowser = typeof document !== 'undefined' && typeof location !== 'undefi
 const rawBase = (inBrowser ? location.origin : (process.env.EXPO_PUBLIC_API_URL || 'https://sofiaos.up.railway.app')).replace(/\/+$/, '');
 const parsedBase = new URL(rawBase);
 if ((parsedBase.protocol !== 'https:' && !(inBrowser && parsedBase.protocol === 'http:')) || parsedBase.username || parsedBase.password || parsedBase.search || parsedBase.hash || parsedBase.pathname !== '/') throw new Error('Configure a raiz HTTPS do servidor Sofia.');
+export type LoginCodeNeeded = {need_code: true; challenge: string; sent_to: string};
+const WEB_TRUST_KEY = 'sofia.web.trust.v1';
+// sem importar react-native aqui (os testes carregam este arquivo sozinho): no site existe document
+const isWebRuntime = () => typeof document !== 'undefined';
 export const SITE = rawBase;
 const AUTH_KEY = AUTH_STORAGE_KEY, PREFS_KEY = PREFS_STORAGE_KEY;
 const secureOptions = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
@@ -181,7 +185,15 @@ export class SofiaApi {
   }
   /** Encomendas (0.3.142): consulta a transportadora agora e devolve o registro atualizado. */
   refreshPackage(id: string) { return this.request<{item: Entity; changed: boolean; error: string}>('/packages/refresh', { id }); }
-  login(email: string, password: string, device: string) { return this.request<Auth>('/auth/login', { email: email.trim(), password, device_name: device }); }
+  /** 0.3.258: no site, um navegador novo pede um codigo enviado ao e-mail cadastrado (segundo passo); depois de
+   * acertar, o navegador guarda uma marca de confianca de 90 dias. No app do celular nada muda. */
+  async login(email: string, password: string, device: string, step: {code?: string; challenge?: string} = {}): Promise<Auth | LoginCodeNeeded> {
+    const trust = isWebRuntime() ? await AsyncStorage.getItem(WEB_TRUST_KEY).catch(() => null) : null;
+    const r = await this.request<Auth & {need_code?: boolean; challenge?: string; sent_to?: string; trust?: string}>('/auth/login', { email: email.trim(), password, device_name: device, ...(trust ? {trust} : {}), ...step });
+    if (r.need_code) return {need_code: true, challenge: String(r.challenge || ''), sent_to: String(r.sent_to || '')};
+    if (r.trust && isWebRuntime()) await AsyncStorage.setItem(WEB_TRUST_KEY, r.trust).catch(() => {});
+    const {trust: _t, ...auth} = r; return auth as Auth;
+  }
   bootstrap() { return this.request<Bootstrap>('/bootstrap'); }
   logout() { return this.request<{ok: boolean}>('/auth/logout', {}); }
   logoutAll() { return this.request<{ok: boolean}>('/auth/logout-all', {}); }

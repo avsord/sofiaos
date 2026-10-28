@@ -24,6 +24,36 @@ function checkMobileOrigin(req, config) {
 function makeMobileApi(runtime, deps) {
   const { store, config, core, routing, workspace, audioService } = runtime;
   const { bodyJson, json, ownerAuth, mobileSessions, tooManyFailures, registerFailure, clearFailures } = deps;
+  // 0.3.258: segundo passo no login do SITE. O navegador (pedido com Origin) que nao tem a marca de confianca recebe
+  // um codigo de 6 digitos no e-mail cadastrado; depois de acertar, ganha uma marca de 90 dias e nao pede mais.
+  // O app do celular (sem Origin) continua so com e-mail e senha. Sem envio de e-mail configurado, nao trava ninguem.
+  const crypto = require('node:crypto');
+  const store2fa = runtime.store.db;
+  try { store2fa.exec('CREATE TABLE IF NOT EXISTS web_login_trust(hash TEXT PRIMARY KEY, created_at TEXT NOT NULL, expires_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS web_login_codes(id TEXT PRIMARY KEY, code_hash TEXT NOT NULL, tries INTEGER NOT NULL, expires_at TEXT NOT NULL);'); } catch { /* banco de teste */ }
+  const sha = v => crypto.createHash('sha256').update(String(v)).digest('hex');
+  const trusted = token => { if (!token) return false; const r = store2fa.prepare('SELECT expires_at FROM web_login_trust WHERE hash=?').get(sha(token)); return !!r && Date.parse(r.expires_at) > Date.now(); };
+  const issueTrust = () => { const t = crypto.randomBytes(32).toString('base64url'); store2fa.prepare('DELETE FROM web_login_trust WHERE expires_at<?').run(new Date().toISOString()); store2fa.prepare('INSERT INTO web_login_trust VALUES(?,?,?)').run(sha(t), new Date().toISOString(), new Date(Date.now() + 90 * 864e5).toISOString()); return t; };
+  async function webSecondStep(req, b) {
+    const mailer = deps.accountMailer;
+    if (!req.headers.origin || !mailer || !mailer.configured() || runtime.config.webSecondStep === false) return {ok: true, trust: ''};
+    if (trusted(String(b.trust || ''))) return {ok: true, trust: ''};
+    const challenge = String(b.challenge || ''), code = String(b.code || '').replace(/\D/g, '');
+    if (challenge && code) {
+      const row = store2fa.prepare('SELECT * FROM web_login_codes WHERE id=?').get(challenge);
+      if (!row || Date.parse(row.expires_at) < Date.now()) { store2fa.prepare('DELETE FROM web_login_codes WHERE id=?').run(challenge); fail('LOGIN_CODE_EXPIRED', 'O código expirou. Entre de novo para receber outro.', 401); }
+      if (row.tries >= 5) { store2fa.prepare('DELETE FROM web_login_codes WHERE id=?').run(challenge); fail('LOGIN_CODE_LOCKED', 'Muitas tentativas com esse código. Entre de novo para receber outro.', 401); }
+      if (row.code_hash !== sha(challenge + ':' + code)) { store2fa.prepare('UPDATE web_login_codes SET tries=tries+1 WHERE id=?').run(challenge); registerFailure(req); fail('LOGIN_CODE_INVALID', 'Código incorreto. Confira o e-mail e tente de novo.', 401); }
+      store2fa.prepare('DELETE FROM web_login_codes WHERE id=?').run(challenge);
+      return {ok: true, trust: issueTrust()};
+    }
+    const id = crypto.randomBytes(18).toString('base64url'), fresh = String(crypto.randomInt(0, 1e6)).padStart(6, '0');
+    store2fa.prepare('DELETE FROM web_login_codes WHERE expires_at<?').run(new Date().toISOString());
+    store2fa.prepare('INSERT INTO web_login_codes VALUES(?,?,0,?)').run(id, sha(id + ':' + fresh), new Date(Date.now() + 10 * 60000).toISOString());
+    // Se o e-mail falhar, nao tranca o dono fora do site: entra como antes (so senha) e fica registrado.
+    try { await mailer.sendLoginCode({to: ownerAuth.registeredEmail(), code: fresh}); } catch (e) { console.warn('[login] codigo do segundo passo nao enviado:', String(e.message || e).slice(0, 160)); store2fa.prepare('DELETE FROM web_login_codes WHERE id=?').run(id); return {ok: true, trust: ''}; }
+    const to = String(ownerAuth.registeredEmail() || ''), masked = to.replace(/^(.)[^@]*(@.*)$/, '$1•••$2');
+    return {ok: false, need: {challenge: id, sent_to: masked}};
+  }
   const extra = makeApi45(runtime, { bodyJson, json });
   const chatSync = require('../services/chat-sync').makeChatSyncApi(store, { bodyJson, json, client: 'mobile' });
   const inAudio = new Set(), rateBuckets = new Map();
@@ -115,7 +145,9 @@ function makeMobileApi(runtime, deps) {
       if (email.length > 160 || password.length > 200 || !ownerAuth.verifyLogin(email, password)) {
         registerFailure(req); fail('LOGIN_INVALID', 'E-mail ou senha incorretos.', 401);
       }
-      clearFailures(req); return send({ ok: true, ...mobileSessions.issue(b.device_name), profile: profile() });
+      const step = await webSecondStep(req, b);
+      if (!step.ok) return send({ ok: false, need_code: true, ...step.need });
+      clearFailures(req); return send({ ok: true, ...mobileSessions.issue(b.device_name), profile: profile(), ...(step.trust ? {trust: step.trust} : {}) });
     }
     const session = mobileSessions.require(req);
     if (p.startsWith('/api/mobile/chat-sync')) {

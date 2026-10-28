@@ -114,6 +114,9 @@ class GoogleService {
   // ---------- 0.3.257: Gmail por conta de e-mail ----------
   // Cada conta do app E-mails pode entrar com a PROPRIA Conta Google (so leitura do Gmail), separada da Conta Google do
   // Perfil (Agenda/Drive). Ex.: silva.pedro@jota.ag lendo a propria caixa, com o Perfil em 01.pedrohenriquesilva@gmail.com.
+  /** 0.3.258 "tomada pronta" para abrir ao publico: o Gmail pode usar outro projeto Google (ja verificado) so trocando
+   * GOOGLE_MAIL_CLIENT_ID/GOOGLE_MAIL_CLIENT_SECRET no servidor; sem eles, usa o mesmo da Agenda/Drive (como hoje). */
+  mailClient() { return {id: this.env.GOOGLE_MAIL_CLIENT_ID || this.env.GOOGLE_CALENDAR_CLIENT_ID, secret: this.env.GOOGLE_MAIL_CLIENT_SECRET || this.env.GOOGLE_CALENDAR_CLIENT_SECRET}; }
   mailLink(accountId) { const r = this.db.prepare('SELECT data FROM google_mail_link WHERE account_id=?').get(String(accountId || '')); return r ? JSON.parse(r.data) : null; }
   saveMailLink(accountId, d) { this.db.prepare('INSERT INTO google_mail_link VALUES(?,?) ON CONFLICT(account_id) DO UPDATE SET data=excluded.data').run(String(accountId), JSON.stringify(d)); }
   async dropMailLink(accountId) {
@@ -128,7 +131,7 @@ class GoogleService {
     const state = (options.app ? 'a.' : '') + 'm~' + accountId + '~' + crypto.randomBytes(24).toString('base64url');
     this.db.prepare('DELETE FROM google_oauth_state WHERE created_at<?').run(new Date(Date.now() - 15 * 60000).toISOString());
     this.db.prepare('INSERT INTO google_oauth_state VALUES(?,?)').run(state, now());
-    const q = new URLSearchParams({client_id: this.env.GOOGLE_CALENDAR_CLIENT_ID, redirect_uri: this.redirectUri(), response_type: 'code', scope: MAIL_SCOPES.join(' '), access_type: 'offline', prompt: 'consent select_account', state});
+    const q = new URLSearchParams({client_id: this.mailClient().id, redirect_uri: this.redirectUri(), response_type: 'code', scope: MAIL_SCOPES.join(' '), access_type: 'offline', prompt: 'consent select_account', state});
     if (address) q.set('login_hint', String(address).slice(0, 200));
     return {url: AUTH + '?' + q.toString()};
   }
@@ -214,7 +217,8 @@ class GoogleService {
     return `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sofia OS · Google</title><body style="font-family:system-ui;background:#17151e;color:#f5f0ff;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0"><div style="max-width:420px;padding:28px;text-align:center"><div style="font-size:48px">${r.ok ? '✅' : '⚠️'}</div><h2 style="color:${color}">${r.ok ? 'Pronto!' : 'Não deu certo'}</h2><p style="line-height:1.5">${r.message.replace(/[<>&]/g, '')}</p><p style="opacity:.7;font-size:13px">Pode fechar esta aba.</p></div></body></html>`;
   }
   async tokenRequest(extra, scope = {}) {
-    const body = new URLSearchParams({client_id: this.env.GOOGLE_CALENDAR_CLIENT_ID, client_secret: this.env.GOOGLE_CALENDAR_CLIENT_SECRET, ...extra});
+    const client = scope.mail || scope.mailAccount ? this.mailClient() : {id: this.env.GOOGLE_CALENDAR_CLIENT_ID, secret: this.env.GOOGLE_CALENDAR_CLIENT_SECRET};
+    const body = new URLSearchParams({client_id: client.id, client_secret: client.secret, ...extra});
     const res = await this.fetch(TOKEN, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body.toString()});
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {

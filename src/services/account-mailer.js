@@ -33,6 +33,14 @@ class AccountMailer {
     ].join('\r\n');
     await this._send({host,port,user,pass,from,to,message});
   }
+  /** 0.3.258: codigo do segundo passo no login do site (navegador novo). */
+  async sendLoginCode({to,code}){
+    if(!this.config.smtpSecure)throw new Error('O código de acesso exige SMTP seguro (TLS/porta 465).');
+    if(!this.configured())throw new Error('Envio de e-mail ainda não configurado.');
+    const body=['Seu código para entrar na Sofia OS neste navegador:','',code,'','Ele vale por 10 minutos.','Se não foi você, troque sua senha: alguém sabe a senha atual.'].join('\n');
+    const message=['From: '+smtpLine(this.config.smtpFrom),'To: '+smtpLine(to),'Subject: '+encodeSubject('Código de acesso da Sofia OS: '+code),'MIME-Version: 1.0','Content-Type: text/plain; charset=UTF-8','Content-Transfer-Encoding: 8bit','',body].join('\r\n');
+    await this._send({host:this.config.smtpHost,port:this.config.smtpPort,user:this.config.smtpUser,pass:this.config.smtpPass,from:this.config.smtpFrom,to,message});
+  }
   _send({host,port,user,pass,from,to,message}){
     return new Promise((resolve,reject)=>{
       const socket=tls.connect({host,port,servername:host,rejectUnauthorized:true});

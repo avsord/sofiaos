@@ -12,6 +12,7 @@ const {migrate85}=require('./migration85');
 const {migrate119}=require('./migration119');
 const TABLES_PRE82=[...BASE_TABLES,...EXTRA_TABLES,...EXTRA_TABLES_46,...EXTRA_TABLES_49,'voice_messages'];
 const TABLES=[...TABLES_PRE82,...EXTRA_TABLES_82];
+const EXTRA_BACKUP_TABLES=['mobile_capsule_doses','md_kv','google_tombstones'];
 const { AppError, now, id, cleanText, cleanMessage, rejectSecrets, searchTerms, normalize } = require('../core/util');
 const OWNER = 'owner-local';
 const DEFAULTS = { privacyMode: 'auto', dailyCallLimit: 50, maxOutputTokens: 1200, routingEnabled: false, privateConfirmed: false, sharedConfirmed: false, sharedBillingAcknowledged: false, legacyRoute: 'none', privateDailyUSD: 0, privateMonthlyUSD: 0, sharedDailyUSD: 0, sharedMonthlyUSD: 0, privateInputPerMillion: 0, privateOutputPerMillion: 0, sharedInputPerMillion: 0, sharedOutputPerMillion: 0, privateModel: '', sharedModel: 'gpt-5.6-terra', sharedDailyTokenCap: 250000, sharedIncentiveDailyTokens: 2500000, sharedUsageAlertPercent: 90, privateUsageAlertPercent: 90, privateUsageTotalUSD: 5, privateUsageTotalUserSet: false, timezone: 'America/Sao_Paulo', developerModeAllowed: true, uiMode: 'user', homeWidgets: ['priorities','tasks','commitments','notifications','study'], userNavWidgets: ['lists','library'], listViews: ['market','pharmacy','purchase','blackfriday','monitor'], libraryViews: ['recipe','recipe_session','music','film','video','reading','source','asset','file'], profileName: 'Pedro Silva', profileEmail: 'sofiaos.core@gmail.com' };
@@ -336,7 +337,23 @@ class Store {
   taskVersions(taskId) { this.task(taskId); return this.db.prepare('SELECT * FROM task_versions WHERE task_id=? ORDER BY revision DESC').all(taskId); }
   deleteTask(taskId) { const task=this.task(taskId);return this.tx(()=>{this.db.prepare('DELETE FROM annotations WHERE entity_type=? AND entity_id=?').run('task',taskId);this.db.prepare('DELETE FROM task_versions WHERE task_id=?').run(taskId);this.db.prepare('DELETE FROM tasks WHERE id=? AND owner=?').run(taskId,OWNER);this.audit('task.deleted',taskId);return {ok:true,id:taskId,title:task.title,kind:'task'};}); }
   export() {
-    return this.tx(() => ({format:'sofia-core-export',schema:6,created_at:now(),tables:Object.fromEntries(TABLES.map(t=>[t,this.db.prepare(`SELECT * FROM ${t} ORDER BY rowid`).all().map(r=>['attachments','voice_messages'].includes(t)?{...r,blob:Buffer.from(r.blob).toString('base64')}:r)]))}));
+    return this.tx(() => ({format:'sofia-core-export',schema:6,created_at:now(),tables:Object.fromEntries(TABLES.map(t=>[t,this.db.prepare(`SELECT * FROM ${t} ORDER BY rowid`).all().map(r=>['attachments','voice_messages'].includes(t)?{...r,blob:Buffer.from(r.blob).toString('base64')}:r)])),extra:this.exportExtra()}));
+  }
+  /** 0.3.258 (ensaio de restauracao): tabelas criadas pelos servicos que guardam dado da pessoa e ficavam FORA do
+   * backup - historico de doses das Capsulas, ordem dos widgets/estado do Drive (md_kv) e eventos do Google ja
+   * apagados (sem isso, voltariam depois de restaurar). Senhas/tokens e sessoes continuam fora de proposito. */
+  existingTables() { return new Set(this.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r => r.name)); }
+  exportExtra() { const have=this.existingTables(); return Object.fromEntries(EXTRA_BACKUP_TABLES.filter(t=>have.has(t)).map(t=>[t,this.db.prepare(`SELECT * FROM ${t} ORDER BY rowid`).all()])); }
+  importExtra(extra) {
+    if (!extra || typeof extra!=='object') return;
+    const have=this.existingTables();
+    for (const table of EXTRA_BACKUP_TABLES) {
+      const rows=extra[table]; if (!Array.isArray(rows) || !have.has(table)) continue;
+      const fields=this.db.prepare(`PRAGMA table_info(${table})`).all().map(c=>c.name);
+      this.db.prepare(`DELETE FROM ${table}`).run();
+      const insert=this.db.prepare(`INSERT INTO ${table} (${fields.join(',')}) VALUES (${fields.map(()=>'?').join(',')})`);
+      for (const row of rows) { if (!row || typeof row!=='object' || fields.some(k=>!(k in row))) throw new AppError('BAD_BACKUP','Estrutura de backup inválida ('+table+').'); insert.run(...fields.map(k=>row[k])); }
+    }
   }
   importSnapshot(snapshot) {
     if (!snapshot || snapshot.format!=='sofia-core-export' || ![1,2,3,4,5,6].includes(snapshot.schema) || !snapshot.tables) throw new AppError('BAD_BACKUP','Formato de backup incompatível.');
@@ -360,6 +377,7 @@ class Store {
           insert.run(...fields.map(k=>['attachments','voice_messages'].includes(table)&&k==='blob'?Buffer.from(row[k],'base64'):row[k]));
         }
       }
+      this.importExtra(snapshot.extra);
       for(const [k,v] of Object.entries(DEFAULTS))this.db.prepare('INSERT OR IGNORE INTO settings VALUES(?,?)').run(k,JSON.stringify(v));
       // Rebuild search from original records; search indexes are not a source of truth.
       for (const m of this.db.prepare('SELECT * FROM messages ORDER BY rowid').all()) this.index(m.id,m.role,m.conversation_id,this.conversation(m.conversation_id).title,m.content);
