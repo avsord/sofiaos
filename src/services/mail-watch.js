@@ -127,7 +127,10 @@ class MailWatcher {
   assignOrphanRules() {
     const all = this.w.list({kind: 'mail_account', limit: 50});
     if (!all.length) return 0;
-    const oldest = [...all].sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))[0];
+    // 0.3.255: empate no horario de criacao (contas criadas no mesmo milissegundo) era decidido ao acaso e o teste do
+    // CI falhava metade das vezes (a regra ia para a outra conta). A lista vem da mais nova para a mais antiga
+    // (updated_at DESC, rowid DESC), entao no empate vale a que aparece mais para o fim: a criada primeiro.
+    const oldest = all.map((a, i) => ({a, i})).sort((x, y) => String(x.a.created_at || '').localeCompare(String(y.a.created_at || '')) || y.i - x.i)[0].a;
     let n = 0;
     for (const r of this.w.list({kind: 'mail_rule', limit: 200})) {
       if (r.data && r.data.account_id && all.some(a => a.id === r.data.account_id)) continue;
