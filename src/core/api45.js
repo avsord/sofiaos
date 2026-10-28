@@ -1,5 +1,5 @@
 'use strict';
-const {CATALOG}=require('./catalog');const {AREAS}=require('./workspace');
+const {CATALOG}=require('./catalog');
 const {AppError,cleanText,validId,rejectSecrets,id,now}=require('./util');const {saveCredentialValidated}=require('../services/credentials');
 const INTEGRATIONS=[
  {name:'OpenAI',key:'openai',status:'configurable',description:'Chaves e rotas configuradas localmente. Compartilhamento e faturamento são definidos no painel do provedor.'},
@@ -18,7 +18,8 @@ const INTEGRATIONS=[
 function calendar(e){if(e.kind!=='commitment'||!e.data.start_at)throw new AppError('DATE_REQUIRED','Preencha o início do compromisso.');const compact=v=>new Date(v).toISOString().replace(/[-:]/g,'').replace(/\.\d+Z$/,'Z');const esc=v=>String(v||'').replace(/\\/g,'\\\\').replace(/\r?\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//AVSORD Technology//Sofia OS 49//PT-BR','BEGIN:VEVENT','UID:'+e.id+'@sofia.local','DTSTAMP:'+compact(new Date()),'DTSTART:'+compact(e.data.start_at)];if(e.data.end_at)lines.push('DTEND:'+compact(e.data.end_at));lines.push('SUMMARY:'+esc(e.title),'DESCRIPTION:'+esc(e.content),'LOCATION:'+esc(e.data.location),'END:VEVENT','END:VCALENDAR');return lines.join('\r\n')+'\r\n';}
 function makeApi45(runtime,{bodyJson,json}){const {store,workspace:w,routing,vault,core,scheduler,config,backups}=runtime;return async(req,res,p,m,url)=>{
  const body=()=>bodyJson(req);const send=(value,status=200)=>{json(res,status,value);return true;};let match;
- if(m==='GET'&&p==='/api/catalog'){const dynamic=store.db.prepare("SELECT area FROM tasks WHERE trim(area)<>'' UNION SELECT area FROM entities WHERE trim(area)<>'' UNION SELECT area FROM notes WHERE trim(area)<>''").all().map(r=>r.area);const areas=[...new Set([...AREAS,...dynamic])].sort((a,b)=>String(a).localeCompare(String(b),'pt-BR',{sensitivity:'base'}));return send({catalog:CATALOG,areas});}
+ if(m==='GET'&&p==='/api/catalog'){const dynamic=store.db.prepare("SELECT area FROM tasks WHERE trim(area)<>'' UNION SELECT area FROM entities WHERE trim(area)<>'' UNION SELECT area FROM notes WHERE trim(area)<>''").all().map(r=>r.area);// 0.3.257: sem a lista fixa de fabrica - so as areas que a pessoa criou/usou (fora as internas e os tipos da Biblioteca)
+ const internal=new Set(['Assets','Geral',...Object.values(CATALOG).filter(d=>d&&d.group==='library').map(d=>d.label)]);const areas=[...new Set(dynamic.map(a=>String(a).trim()).filter(a=>a&&!internal.has(a)))].sort((a,b)=>String(a).localeCompare(String(b),'pt-BR',{sensitivity:'base'}));return send({catalog:CATALOG,areas});}
  if(m==='GET'&&p==='/api/panorama')return send(w.panorama());
  if(m==='GET'&&p==='/api/ui/home'){const panorama=w.panorama(),settings=store.settings(),pages=w.list({kind:'user_page',state:'active',limit:100});return send({panorama,pages,widgets:settings.homeWidgets||[],uiMode:settings.uiMode||'user'});}
  if(m==='GET'&&p==='/api/ui/pages')return send({items:w.list({kind:'user_page',limit:200})});

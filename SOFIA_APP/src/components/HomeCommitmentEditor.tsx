@@ -39,7 +39,9 @@ export function HomeCommitmentEditor({api,day,areas,onClose,onSaved}:{api:SofiaA
    onSaved();
   }catch(e){setError(errorText(e));}finally{setSaving(false);}
  }
- return <MotionModal visible animationType="slide" onRequestClose={()=>{if(!saving)onClose();}}>
+ // 0.3.257: segurar a data no Inicio abria a janela com uma piscada (a janela cheia do Android mostrava o fundo dela
+ // antes do conteudo). Agora ela entra suave por cima do Inicio, ja com o fundo do app.
+ return <MotionModal visible transparent animationType="fade" onRequestClose={()=>{if(!saving)onClose();}}>
   <SafeAreaView style={{flex:1,backgroundColor:c.bg}}>
    <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
     <View style={{padding:12,flexDirection:'row',alignItems:'center',borderBottomWidth:1,borderColor:c.line}}>
@@ -55,7 +57,7 @@ export function HomeCommitmentEditor({api,day,areas,onClose,onSaved}:{api:SofiaA
      <DateTimeField label={type==='task'?'Dia e horário':'Início'} value={start} onChange={setStart} allowClear={false}/>
      {type==='commitment'?<DateTimeField label="Fim" value={end} onChange={setEnd}/>:null}
      <Choice label="Prioridade do compromisso" value={priority} options={TASK_PRIORITIES.map(p=>({value:p.value,label:p.label}))} onChange={setPriority}/>
-     <Choice label="Área do compromisso" creatable value={area} options={[...new Set(['Pessoal',...areas])].map(value=>({value,label:value}))} onChange={setArea}/>
+     <Choice label="Área do compromisso" creatable value={area} options={[...new Set([area,...areas].filter(Boolean))].map(value=>({value,label:value}))} onChange={setArea}/>
      <View><Text style={[forms.label,{color:c.muted}]}>Descrição</Text>
       <TextInput accessibilityLabel="Descrição do compromisso" multiline value={description} onChangeText={setDescription} style={[forms.input,{color:c.text,borderColor:c.line,backgroundColor:c.input,minHeight:88,textAlignVertical:'top'}]}/>
      </View>

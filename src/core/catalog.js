@@ -1794,6 +1794,11 @@ const CATALOG={
           "key": "import_id",
           "label": "Identificador da importação (extrato)",
           "type": "text"
+        },
+        {
+          "key": "no_balance",
+          "label": "Não mexe no saldo",
+          "type": "checkbox"
         }
     ],
     "description": "Despesa, receita, transferência ou pagamento de fatura."

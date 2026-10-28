@@ -152,7 +152,7 @@ class MailWatcher {
         report.accounts++;
         try { const r = await this.checkAccount(account, rules, rescanDays); report.scanned += r.scanned; report.hits += r.hits; }
         catch (e) {
-          report.errors.push({account: account.id, error: String(e.message).slice(0, 160)});
+          report.errors.push({account: account.id, error: String(e.message).slice(0, 300)}); // 0.3.257: antes 160 cortava a mensagem no meio
           try { const a = this.w.get(account.id); this.w.save({revision: a.revision, data: {...a.data, last_error: String(e.message).slice(0, 300), last_check: now()}}, a.id); } catch { /* conta removida no meio */ }
         }
       }
@@ -165,8 +165,11 @@ class MailWatcher {
    * Gmail fornece (snippet) das mensagens novas da Caixa de Entrada. */
   async checkGmailApi(account, rules, rescanDays = 0) {
     const g = this.google;
+    // 0.3.257: conta com login Google proprio (Entrar com Google nesta conta) le a PROPRIA caixa, independente do Perfil
+    const ownLink = g && g.mailLink && g.mailLink(account.id);
+    if (ownLink && ownLink.refresh) return this.readGmail(account, rules, rescanDays, (method, url) => g.mailCall(account.id, method, url));
     const link = g && g.link && g.link();
-    if (!link || !link.refresh) throw new AppError('GOOGLE_NOT_CONNECTED', 'Conecte a Conta Google em Perfil → Conta Google.');
+    if (!link || !link.refresh) throw new AppError('GOOGLE_NOT_CONNECTED', 'Toque em Entrar com Google nesta conta (ou conecte a Conta Google em Perfil → Conta Google).');
     if (!/gmail\.readonly/.test(link.scopes || '')) throw new AppError('GMAIL_SCOPE', 'Desconecte e conecte a Conta Google de novo para liberar a leitura do Gmail.');
     // 0.3.248: o modo "Conta Google" le a caixa da UNICA Conta Google conectada no Perfil. Uma conta com outro e-mail
     // lia essa mesma caixa (e-mails da outra conta, testes enviados ao endereco certo nunca apareciam). Agora recusa,
@@ -174,8 +177,14 @@ class MailWatcher {
     const linked = String(link.email || '').trim().toLowerCase(), own = String(account.data.address || '').trim().toLowerCase();
     if (linked && own && linked !== own) {
       for (const h of this.w.list({kind: 'mail_hit', limit: 500}).filter(x => x.data && x.data.account_id === account.id)) { try { this.w.deleteEntity(h.id); } catch { /* segue */ } }
-      throw new AppError('GMAIL_OTHER_ACCOUNT', 'A Conta Google conectada no Perfil é ' + linked + ', e o modo "Conta Google" só lê essa caixa. Para ler ' + own + ', escolha "Gmail (senha de app)" ou "Outro (IMAP)" nesta conta.');
+      throw new AppError('GMAIL_OTHER_ACCOUNT', 'A Conta Google do Perfil (' + linked + ') só lê a própria caixa. Para ' + own + ': Entrar com Google nesta conta, ou senha de app.');
     }
+    return this.readGmail(account, rules, rescanDays, (method, url) => g.call(method, url));
+  }
+
+  /** Leitura do Gmail (remetente, assunto, trecho) com a chamada da conta certa. */
+  async readGmail(account, rules, rescanDays, call) {
+    const g = {call};
     const API = 'https://gmail.googleapis.com/gmail/v1/users/me/messages';
     // last_uid guarda, para o Gmail, o horário (em SEGUNDOS) da última mensagem lida: o limite de número do servidor é 1e10.
     const since = rescanDays ? 0 : (Number(account.data.last_uid) || 0) * 1000;

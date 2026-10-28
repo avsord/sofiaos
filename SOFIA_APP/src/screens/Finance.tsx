@@ -1690,7 +1690,7 @@ function TxRow({t, d, first, onPress, api, reload, inInvoice = false}: {inInvoic
       : '💳 ' + (cardOf?.name || 'Cartão') + cardWhen(t, d.cards)) : t.kind === 'transfer' ? (d.accounts.find(a => a.id === t.accountId)?.name || '') + ' → ' + (d.accounts.find(a => a.id === t.toAccountId)?.name || '') : d.accounts.find(a => a.id === t.accountId)?.name || '';
   const pending = !t.paid && !t.cardId;
   // 0.3.256: despesa marcada para reembolso mostra o estado na linha do Historico
-  const refund = t.kind === 'expense' ? (d.refunds || []).find(x => x.expenseId === t.id && x.state !== 'archived') : undefined, refundTag = refund ? (refund.state === 'received' ? ' · ↩️ reembolsada' : ' · ↩️ reembolso pendente') : '';
+  const refund = t.kind === 'expense' ? (d.refunds || []).find(x => x.expenseId === t.id && x.state !== 'archived') : undefined, refundTag = (refund ? (refund.state === 'received' ? ' · ↩️ reembolsada' : ' · ↩️ reembolso pendente') : '') + (t.noBalance ? ' · não mexe no saldo' : '');
   const color = t.kind === 'income' ? GOOD : t.kind === 'transfer' ? c.muted : c.text;
   return (
     <Pressable onPress={onPress} style={{flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 6, borderTopWidth: first ? 0 : 1, borderColor: c.line, opacity: later && !inInvoice ? 0.5 : t.virtual ? 0.75 : 1}}>
@@ -1790,7 +1790,7 @@ function addedAt(tx: Partial<Tx>): string {
 }
 function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic, onOptimisticRemove}: {onOptimisticRemove?: (id: string) => void; onOptimistic?: (id: string, changes: Partial<Tx>) => void; api: SofiaApi; d: Data; tx: Partial<Tx>; defaultAccountId?: string; onClose: () => void; onSaved: () => void}) {
   const c = useTheme(), editing = !!tx.entity && !tx.virtual;
-  const [kind, setKind] = useState<TxKind>(tx.kind || 'expense'), [refundOpen, setRefundOpen] = useState(false);
+  const [kind, setKind] = useState<TxKind>(tx.kind || 'expense'), [refundOpen, setRefundOpen] = useState(false), [noBalance, setNoBalance] = useState(!!tx.noBalance);
   const [amount, setAmount] = useState(tx.amount ? finishMoneyInput(String(tx.amount).replace('.', ',')) : ''), [desc, setDesc] = useState(tx.desc || '');
   const [category, setCategory] = useState(tx.category || ''), [date, setDate] = useState(tx.date || todayISO());
   const firstAccount = (defaultAccountId && d.accounts.some(a=>a.id===defaultAccountId&&!a.archived) ? defaultAccountId : d.accounts.find(a => !a.archived)?.id) || '';
@@ -1818,7 +1818,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
     try {
       const card = d.cards.find(x => x.id === source);
       const base: Record<string, any> = {kind, amount: value, date, category: kind === 'transfer' ? 'Transferência' : category, account_id: card ? '' : source, to_account_id: kind === 'transfer' ? to : '',
-        card_id: card ? card.id : '', invoice_month: card ? invoiceMonth(card, date) : '', paid: card ? false : paid, recurrence: repeat === 'monthly' ? 'monthly' : 'none', time: time || '', __content: note.trim()};
+        card_id: card ? card.id : '', invoice_month: card ? invoiceMonth(card, date) : '', paid: card ? false : paid, recurrence: repeat === 'monthly' ? 'monthly' : 'none', time: time || '', __content: note.trim(), no_balance: kind !== 'transfer' && !card && noBalance};
       const title = desc.trim() || (kind === 'transfer' ? 'Transferência' : category);
       const splitOk = kind === 'income' && !isCard && !!goalForSplit && (repeat === 'monthly' || paid);
       const editSplit = splitOk && reserveValue > 0 && value ? Math.min(reserveValue, value) : 0;
@@ -1826,7 +1826,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
         // 0.3.225: editar um item muda a tela NA HORA (valor, totais de Receitas/Despesas, previsto) e fecha;
         // a gravacao no servidor segue por tras. Se falhar, avisa e volta ao que esta no servidor.
         if (onOptimistic && tx.id) {
-          onOptimistic(tx.id, {kind, amount: value, desc: title, date, category: base.category, paid: base.paid, accountId: base.account_id, cardId: base.card_id, time: base.time, recurrence: base.recurrence});
+          onOptimistic(tx.id, {kind, amount: value, desc: title, date, category: base.category, paid: base.paid, accountId: base.account_id, cardId: base.card_id, time: base.time, recurrence: base.recurrence, noBalance: !!base.no_balance});
           onClose();
           void (async () => {
             try {
@@ -1888,7 +1888,8 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
   return (
     <MotionModal visible animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{flex: 1, backgroundColor: c.bg}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={{backgroundColor: head, paddingTop: 40, paddingBottom: 18, paddingHorizontal: 16, gap: 12}}>
+        {/* 0.3.257: o cabecalho roxo fica sempre por cima; o conteudo rola por baixo dele e nunca aparece sobre o roxo */}
+        <View style={{backgroundColor: head, paddingTop: 40, paddingBottom: 18, paddingHorizontal: 16, gap: 12, zIndex: 2}}>
           <View style={{flexDirection: 'row', alignItems: 'center'}}>
             <Pressable accessibilityLabel="Fechar" onPress={onClose} style={{padding: 8}}><Text style={{color: headText, fontSize: 18}}>✕</Text></Pressable>
             <Text style={{flex: 1, color: headText, fontWeight: '700', fontSize: 17}}>{editing ? 'Editar' : tx.virtual ? 'Confirmar repetição' : 'Novo lançamento'}</Text>
@@ -1896,10 +1897,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
           </View>
           {/* 0.3.255: tocar num item do Historico mostra quando ele foi lancado (data e hora) */}
           {editing && addedAt(tx) ? <Text testID="tx-added-at" style={{color: headText + 'cc', fontSize: 12, marginTop: -4}}>Lançado em {addedAt(tx)}{tx.paidAt && tx.paid ? ' · pago em ' + tx.paidAt.slice(0, 10).split('-').reverse().join('/') : ''}</Text> : null}
-          {/* 0.3.256: despesa que vai ser reembolsada - liga com a aba Devolucoes */}
-          {editing && kind === 'expense' && tx.id ? (() => { const r = (d.refunds || []).find(x => x.expenseId === tx.id && x.state !== 'archived');
-            return r ? <View testID="tx-refund-status" style={{flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFFFFF22', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8}}><Text style={{fontSize: 14}}>↩️</Text><Text style={{flex: 1, color: headText, fontSize: 12, fontWeight: '600'}}>{r.state === 'received' ? 'Reembolsada' + (r.receivedAt ? ' em ' + r.receivedAt.split('-').reverse().join('/') : '') + ' · ' + money(r.amount) : 'Reembolso pendente · ' + money(r.amount) + ' em Devoluções'}</Text></View>
-              : <Pressable testID="tx-refund-mark" accessibilityRole="button" accessibilityLabel="Marcar que esta despesa vai ser reembolsada" onPress={() => setRefundOpen(true)} style={{flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', backgroundColor: '#FFFFFF22', borderRadius: 99, paddingHorizontal: 12, paddingVertical: 7}}><Text style={{fontSize: 13}}>↩️</Text><Text style={{color: headText, fontSize: 12, fontWeight: '700'}}>Vai ser reembolsada</Text></Pressable>; })() : null}
+
           {!editing ? (
             <View style={{flexDirection: 'row', backgroundColor: headText + '26', borderRadius: 99, padding: 3}}>
               {([['expense', 'Despesa'], ['income', 'Receita'], ['transfer', 'Transferência']] as Array<[TxKind, string]>).map(([k, l]) => (
@@ -1915,7 +1913,7 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
               style={{flex: 1, color: headText, fontSize: 38, fontWeight: '800', padding: 0}} />
           </View>
         </View>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 18, gap: 16, paddingBottom: 40}}>
+        <ScrollView keyboardShouldPersistTaps="handled" style={{flex: 1, overflow: 'hidden', zIndex: 1}} overScrollMode="never" contentContainerStyle={{padding: 18, gap: 16, paddingBottom: 40}}>
           <Field label="Nome" value={desc} onChange={setDesc} placeholder={kind === 'income' ? 'Ex.: Salário' : 'Ex.: Mercado do mês'} />
           <View style={{gap: 6}}><Text style={{fontSize: 12, color: c.muted}}>Descrição (opcional)</Text><TextInput accessibilityLabel="Descrição" value={note} onChangeText={setNote} placeholder="Uma observação breve" placeholderTextColor={c.muted} multiline maxLength={280} style={{minHeight: 44, maxHeight: 88, color: c.text, backgroundColor: c.input, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, textAlignVertical: 'top'}} /></View>
           {kind !== 'transfer' ? (
@@ -1978,6 +1976,17 @@ function TxEditor({api, d, tx, defaultAccountId, onClose, onSaved, onOptimistic,
               ) : null}
             </View>
           ) : null}
+          {/* 0.3.257: "Nao mexer no saldo" - fica registrado (Historico, totais do mes), mas o Saldo nao muda */}
+          {kind !== 'transfer' && !isCard ? (
+            <View style={{gap: 4}}>
+              <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text, fontSize: 15}}>Não mexer no saldo</Text><Switch testID="tx-no-balance" accessibilityLabel="Não mexer no saldo" value={noBalance} onValueChange={setNoBalance} /></View>
+              {noBalance ? <Text style={{fontSize: 12, color: c.muted, lineHeight: 17}}>{kind === 'income' ? 'Fica registrada no Histórico e nos totais do mês, mas não soma no Saldo.' : 'Fica registrada no Histórico e nos totais do mês, mas não desconta do Saldo.'}</Text> : null}
+            </View>
+          ) : null}
+          {/* 0.3.256/0.3.257: despesa que vai ser reembolsada (liga com Devolucoes) - junto das outras opcoes */}
+          {editing && kind === 'expense' && tx.id ? (() => { const r = (d.refunds || []).find(x => x.expenseId === tx.id && x.state !== 'archived');
+            return r ? <View testID="tx-refund-status" style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text, fontSize: 15}}>Reembolso</Text><Text style={{color: r.state === 'received' ? GOOD : c.muted, fontSize: 13, fontWeight: '600'}}>{r.state === 'received' ? 'Reembolsada' + (r.receivedAt ? ' em ' + r.receivedAt.split('-').reverse().join('/') : '') : 'Pendente · ' + money(r.amount)}</Text></View>
+              : <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text, fontSize: 15}}>Vai ser reembolsada</Text><Switch testID="tx-refund-mark" accessibilityLabel="Marcar que esta despesa vai ser reembolsada" value={refundOpen} onValueChange={v => setRefundOpen(v)} /></View>; })() : null}
           {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
           <Button title={editing ? 'Salvar alterações' : 'Salvar'} loading={busy} onPress={() => void save()} />
         </ScrollView>

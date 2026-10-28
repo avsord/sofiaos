@@ -24,6 +24,7 @@ function cleanData(kind, data) {
   return out;
 }
 
+const MAIL_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/gmail.readonly'];
 const SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.appdata', 'https://www.googleapis.com/auth/gmail.readonly'];
 const AUTH = 'https://accounts.google.com/o/oauth2/v2/auth', TOKEN = 'https://oauth2.googleapis.com/token', REVOKE = 'https://oauth2.googleapis.com/revoke';
 const CAL = 'https://www.googleapis.com/calendar/v3', DRIVE = 'https://www.googleapis.com/drive/v3', UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
@@ -52,7 +53,9 @@ class GoogleService {
     this.db.exec(`CREATE TABLE IF NOT EXISTS google_link(id TEXT PRIMARY KEY, data TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS google_oauth_state(state TEXT PRIMARY KEY, created_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS google_tombstones(calendar_id TEXT NOT NULL, event_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(calendar_id, event_id));
-      CREATE TABLE IF NOT EXISTS md_kv(key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
+      CREATE TABLE IF NOT EXISTS md_kv(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS google_mail_link(account_id TEXT PRIMARY KEY, data TEXT NOT NULL);`);
+    this.mailAccess = new Map();
     // Anexos (capas, fotos, arquivos) podem morar no Drive da pessoa: aqui fica só a referência.
     try { if (!this.db.prepare('PRAGMA table_info(attachments)').all().some(c => c.name === 'drive_id')) this.db.exec('ALTER TABLE attachments ADD COLUMN drive_id TEXT'); } catch { /* sem tabela de anexos */ }
     // Mensagens de voz (as maiores: até dezenas de MB cada) também podem morar no Drive.
@@ -108,6 +111,65 @@ class GoogleService {
   configured() { return !!(this.env.GOOGLE_CALENDAR_CLIENT_ID && this.env.GOOGLE_CALENDAR_CLIENT_SECRET && this.env.SOFIA_CALENDAR_TOKEN_KEY); }
   redirectUri() { return String(this.config.publicBaseUrl || '').replace(/\/$/, '') + CALLBACK; }
 
+  // ---------- 0.3.257: Gmail por conta de e-mail ----------
+  // Cada conta do app E-mails pode entrar com a PROPRIA Conta Google (so leitura do Gmail), separada da Conta Google do
+  // Perfil (Agenda/Drive). Ex.: silva.pedro@jota.ag lendo a propria caixa, com o Perfil em 01.pedrohenriquesilva@gmail.com.
+  mailLink(accountId) { const r = this.db.prepare('SELECT data FROM google_mail_link WHERE account_id=?').get(String(accountId || '')); return r ? JSON.parse(r.data) : null; }
+  saveMailLink(accountId, d) { this.db.prepare('INSERT INTO google_mail_link VALUES(?,?) ON CONFLICT(account_id) DO UPDATE SET data=excluded.data').run(String(accountId), JSON.stringify(d)); }
+  async dropMailLink(accountId) {
+    const l = this.mailLink(accountId);
+    if (l?.refresh) { try { await this.fetch(REVOKE + '?token=' + encodeURIComponent(this.open(l.refresh)), {method: 'POST'}); } catch { /* revogar e cortesia */ } }
+    this.db.prepare('DELETE FROM google_mail_link WHERE account_id=?').run(String(accountId)); this.mailAccess.delete(String(accountId));
+    return {ok: true};
+  }
+  mailConnectUrl(accountId, address, options = {}) {
+    if (!this.configured()) throw new AppError('GOOGLE_NOT_CONFIGURED', 'A conexão Google ainda não foi configurada no servidor.', 503);
+    if (!/^[\w-]{1,80}$/.test(String(accountId || ''))) throw new AppError('BAD_ACCOUNT', 'Conta de e-mail inválida.');
+    const state = (options.app ? 'a.' : '') + 'm~' + accountId + '~' + crypto.randomBytes(24).toString('base64url');
+    this.db.prepare('DELETE FROM google_oauth_state WHERE created_at<?').run(new Date(Date.now() - 15 * 60000).toISOString());
+    this.db.prepare('INSERT INTO google_oauth_state VALUES(?,?)').run(state, now());
+    const q = new URLSearchParams({client_id: this.env.GOOGLE_CALENDAR_CLIENT_ID, redirect_uri: this.redirectUri(), response_type: 'code', scope: MAIL_SCOPES.join(' '), access_type: 'offline', prompt: 'consent select_account', state});
+    if (address) q.set('login_hint', String(address).slice(0, 200));
+    return {url: AUTH + '?' + q.toString()};
+  }
+  async mailCallback(state, code) {
+    const accountId = state.replace(/^a\./, '').split('~')[1] || '';
+    let account = null; try { account = this.w.get(accountId); } catch { /* removida */ }
+    if (!account || account.kind !== 'mail_account') return {ok: false, message: 'Essa conta de e-mail não existe mais no app. Nada foi conectado.'};
+    const tokens = await this.tokenRequest({code, grant_type: 'authorization_code', redirect_uri: this.redirectUri()}, {mail: true});
+    if (!tokens.refresh_token) return {ok: false, message: 'O Google não devolveu a permissão permanente. Remova a Sofia em myaccount.google.com/permissions e conecte de novo.'};
+    let email = '';
+    try { email = JSON.parse(Buffer.from(String(tokens.id_token || '').split('.')[1] || '', 'base64url').toString('utf8')).email || ''; } catch { /* sem e-mail */ }
+    const own = String(account.data.address || '').trim().toLowerCase(), got = String(email).trim().toLowerCase();
+    if (own && got && own !== got) {
+      try { await this.fetch(REVOKE + '?token=' + encodeURIComponent(tokens.refresh_token), {method: 'POST'}); } catch { /* cortesia */ }
+      return {ok: false, message: 'Você entrou com ' + got + ', mas esta conta é ' + own + '. Toque em Entrar com Google de novo e escolha ' + own + '.'};
+    }
+    if (!/gmail\.readonly/.test(String(tokens.scope || ''))) return {ok: false, message: 'O Google não liberou a leitura do Gmail. Toque em Entrar com Google de novo e marque a permissão de ler e-mails.'};
+    this.saveMailLink(accountId, {refresh: this.seal(tokens.refresh_token), email: got || own, scopes: String(tokens.scope || ''), connected_at: now()});
+    this.mailAccess.set(accountId, {token: tokens.access_token, exp: Date.now() + (Number(tokens.expires_in) || 3000) * 1000 - 60000});
+    try { const a = this.w.get(accountId); this.w.save({revision: a.revision, data: {...a.data, provider: 'gmail_google', secret_set: true, last_error: ''}}, accountId); } catch { /* segue */ }
+    return {ok: true, mail: true, message: 'Gmail de ' + (got || own) + ' conectado. Pode voltar para a Sofia.'};
+  }
+  async mailToken(accountId) {
+    const cur = this.mailAccess.get(accountId); if (cur && cur.exp > Date.now()) return cur.token;
+    const l = this.mailLink(accountId); if (!l?.refresh) throw new AppError('GMAIL_NOT_LINKED', 'Entre com Google nesta conta de e-mail.', 409);
+    const t = await this.tokenRequest({grant_type: 'refresh_token', refresh_token: this.open(l.refresh)}, {mailAccount: accountId});
+    this.mailAccess.set(accountId, {token: t.access_token, exp: Date.now() + (Number(t.expires_in) || 3000) * 1000 - 60000});
+    return t.access_token;
+  }
+  /** Chamada ao Gmail com a Conta Google da propria conta de e-mail. */
+  async mailCall(accountId, method, url) {
+    for (let attempt = 0; ; attempt++) {
+      const res = await this.fetch(url, {method, headers: {Authorization: 'Bearer ' + await this.mailToken(accountId)}});
+      if (res.status === 401 && attempt === 0) { this.mailAccess.delete(accountId); continue; }
+      if ((res.status === 429 || res.status >= 500) && attempt < 3) { await new Promise(r => setTimeout(r, 400 * 2 ** attempt)); continue; }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new AppError('GOOGLE_API', 'Gmail: ' + (data.error?.message || res.status), 502);
+      return data;
+    }
+  }
+
   // ---------- OAuth ----------
   connectUrl(options = {}) {
     if (!this.configured()) throw new AppError('GOOGLE_NOT_CONFIGURED', 'A conexão Google ainda não foi configurada no servidor.', 503);
@@ -124,6 +186,7 @@ class GoogleService {
     const row = state && this.db.prepare('SELECT * FROM google_oauth_state WHERE state=?').get(state);
     if (!row || Date.now() - Date.parse(row.created_at) > 15 * 60000) return {ok: false, message: 'Este link de autorização expirou. Volte ao app e toque em Conectar de novo.'};
     this.db.prepare('DELETE FROM google_oauth_state WHERE state=?').run(state);
+    if (state.replace(/^a\./, '').startsWith('m~')) return this.mailCallback(state, code);
     const tokens = await this.tokenRequest({code, grant_type: 'authorization_code', redirect_uri: this.redirectUri()});
     if (!tokens.refresh_token) return {ok: false, message: 'O Google não devolveu a permissão permanente. Remova a Sofia em myaccount.google.com/permissions e conecte de novo.'};
     let email = '';
@@ -139,7 +202,7 @@ class GoogleService {
   async callbackResponse(params) {
     const fromApp = String(params.get('state') || '').startsWith('a.');
     let r; try { r = await this.callback(params); } catch (e) { r = {ok: false, message: 'Não consegui concluir: ' + String(e.message || e).slice(0, 160)}; }
-    if (fromApp) return {redirect: 'sofiaapp://google?ok=' + (r.ok ? '1' : '0') + '&message=' + encodeURIComponent(r.message)};
+    if (fromApp) return {redirect: 'sofiaapp://google?ok=' + (r.ok ? '1' : '0') + (String(params.get('state') || '').includes('m~') ? '&mail=1' : '') + '&message=' + encodeURIComponent(r.message)};
     return {html: this.page(r)};
   }
   async callbackPage(params) {
@@ -150,12 +213,13 @@ class GoogleService {
     const color = r.ok ? '#2fc58b' : '#ff6b7a';
     return `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sofia OS · Google</title><body style="font-family:system-ui;background:#17151e;color:#f5f0ff;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0"><div style="max-width:420px;padding:28px;text-align:center"><div style="font-size:48px">${r.ok ? '✅' : '⚠️'}</div><h2 style="color:${color}">${r.ok ? 'Pronto!' : 'Não deu certo'}</h2><p style="line-height:1.5">${r.message.replace(/[<>&]/g, '')}</p><p style="opacity:.7;font-size:13px">Pode fechar esta aba.</p></div></body></html>`;
   }
-  async tokenRequest(extra) {
+  async tokenRequest(extra, scope = {}) {
     const body = new URLSearchParams({client_id: this.env.GOOGLE_CALENDAR_CLIENT_ID, client_secret: this.env.GOOGLE_CALENDAR_CLIENT_SECRET, ...extra});
     const res = await this.fetch(TOKEN, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body.toString()});
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      if (data.error === 'invalid_grant') { const l = this.link(); if (l) this.saveLink({...l, refresh: '', last_error: 'O Google revogou o acesso. Conecte de novo.'}); }
+      if (data.error === 'invalid_grant' && scope.mailAccount) { this.db.prepare('DELETE FROM google_mail_link WHERE account_id=?').run(scope.mailAccount); throw new AppError('GMAIL_NOT_LINKED', 'O Google revogou o acesso desta caixa. Toque em Entrar com Google de novo.', 409); }
+      if (data.error === 'invalid_grant' && !scope.mail) { const l = this.link(); if (l) this.saveLink({...l, refresh: '', last_error: 'O Google revogou o acesso. Conecte de novo.'}); }
       throw new AppError('GOOGLE_TOKEN', 'O Google recusou a autorização (' + (data.error || res.status) + ').', 502);
     }
     return data;

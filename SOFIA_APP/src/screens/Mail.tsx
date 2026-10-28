@@ -21,6 +21,8 @@ import {money} from '../lib/monitoring';
 import {openInGmail} from '../lib/open-gmail';
 import {appAlert} from '../lib/app-alert';
 import {DateTimeField} from '../components/DateTimeField';
+import * as WebBrowser from 'expo-web-browser';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Tab = 'hits' | 'rules' | 'accounts';
 const PROVIDERS: Array<{value: string; label: string; help: string; link?: string}> = [
@@ -59,6 +61,12 @@ function Field({label, value, onChange, placeholder, secure = false, email = fal
 // ---------- 0.3.146: selecao por grupo/conta ----------
 export type MailSelection = {type: 'all'} | {type: 'group'; name: string} | {type: 'account'; id: string};
 let lastSelection: MailSelection = {type: 'all'};
+// 0.3.257: o seletor de conta fica onde a pessoa deixou por ultimo, tambem depois de fechar o app
+const SELECTION_KEY = 'sofia.mail.selection.v1';
+let selectionLoaded = false;
+const selectionReady = AsyncStorage.getItem(SELECTION_KEY).then(v => {
+  if (v && !selectionLoaded) { try { const x = JSON.parse(v); if (x && (x.type === 'all' || (x.type === 'group' && typeof x.name === 'string') || (x.type === 'account' && typeof x.id === 'string'))) lastSelection = x; } catch { /* guardado invalido */ } }
+}).catch(() => {}).finally(() => { selectionLoaded = true; });
 export function groupNames(accounts: Entity[]) { return [...new Set(accounts.map(a => String(a.data?.group || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR')); }
 export function selectionAccounts(sel: MailSelection, accounts: Entity[]) {
   const list = sel.type === 'all' ? accounts : sel.type === 'group' ? accounts.filter(a => String(a.data?.group || '').trim() === sel.name) : accounts.filter(a => a.id === sel.id);
@@ -106,7 +114,10 @@ export function Mail({api, active, onBack}: {api: SofiaApi; active: boolean; onB
   // 0.3.146: grupos de contas criados pela pessoa (Profissional, Pessoal, Minha loja...).
   // O titulo vira seletor: todas as contas, um grupo ou uma conta. A lista e os contadores seguem a selecao.
   const [selection, setSelectionState] = useState<MailSelection>(lastSelection), [picker, setPicker] = useState(false);
-  const setSelection = (v: MailSelection) => { lastSelection = v; setSelectionState(v); };
+  const setSelection = (v: MailSelection) => { lastSelection = v; selectionLoaded = true; setSelectionState(v); void AsyncStorage.setItem(SELECTION_KEY, JSON.stringify(v)).catch(() => {}); };
+  useEffect(() => { if (selectionLoaded) return; let live = true; void selectionReady.then(() => { if (live) setSelectionState(lastSelection); }); return () => { live = false; }; }, []);
+  // conta escolhida foi removida: volta para a primeira da lista
+  useEffect(() => { if (!accounts || selection.type !== 'account' || accounts.some(a => a.id === selection.id)) return; const first = [...accounts].sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))[0]; setSelection(first ? {type: 'account', id: first.id} : {type: 'all'}); }, [accounts, selection]);
   const load = useCallback(async () => {
     try { const [a, r, h] = await Promise.all([listAll(api, 'mail_account'), listAll(api, 'mail_rule'), listAll(api, 'mail_hit')]); setAccounts(a.filter(x => x.state !== 'archived')); setRules(r.filter(x => x.state !== 'archived')); setHits(h.filter(x => x.state !== 'archived').sort((x, y) => String(y.data.received_at).localeCompare(String(x.data.received_at)))); setError(''); }
     catch (e) { setError(errorText(e)); setAccounts(a => a || []); }
@@ -243,6 +254,11 @@ function AccountSheet({api, account, onClose, onDone, groups = []}: {api: SofiaA
   const [google, setGoogle] = useState<{connected: boolean; gmail: boolean; email: string} | null>(null);
   useEffect(() => { let live = true; void api.calendarStatus().then(s => { if (live) { setGoogle({connected: !!s.connected, gmail: !!s.gmail?.connected, email: String(s.email || '')}); if (!account && s.email) setAddress(a => a || String(s.email)); } }).catch(() => { if (live) setGoogle({connected: false, gmail: false, email: ''}); }); return () => { live = false; }; }, [api, account]);
   const viaGoogle = provider === 'gmail_google';
+  // 0.3.257: cada conta pode Entrar com Google com a propria conta (ex.: e-mail da empresa), sem trocar a do Perfil
+  const [ownGoogle, setOwnGoogle] = useState<{linked: boolean; email: string} | null>(null);
+  useEffect(() => { if (!account) return; let live = true; void api.mailGoogleStatus(account.id).then(s => { if (live) setOwnGoogle(s); }).catch(() => {}); return () => { live = false; }; }, [api, account]);
+  const typed = address.trim().toLowerCase(), profileReads = !!google?.gmail && !!typed && String(google?.email || '').toLowerCase() === typed;
+  const needsOwnLogin = viaGoogle && google !== null && !!typed && !ownGoogle?.linked && !profileReads;
   const [host, setHost] = useState(String(account?.data.host || '')), [port, setPort] = useState(account?.data.port ? String(account.data.port) : '993');
   const [group, setGroup] = useState(String(account?.data.group || '')), [groupDraft, setGroupDraft] = useState('');
   const [password, setPassword] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [ok, setOk] = useState('');
@@ -254,6 +270,21 @@ function AccountSheet({api, account, onClose, onDone, groups = []}: {api: SofiaA
       // 0.3.146: base_data deixa o servidor aceitar o salvamento quando so a verificacao automatica
       // mudou a conta enquanto o formulario estava aberto (antes: "mudou em outra aba").
       const saved = account ? await api.saveEntity({...account, title: data.address, data: {...account.data, ...data}, base_data: account.data, base_title: account.title} as any) : await api.saveEntity({kind: 'mail_account', title: data.address, content: '', area: 'Pessoal', state: 'active', privacy: 'private', tags: [], data});
+      if (viaGoogle && (ownGoogle?.linked || needsOwnLogin)) {
+        if (needsOwnLogin) {
+          const r = await api.mailGoogleConnect(saved.id, Platform.OS !== 'web'), url = new URL(r.url);
+          if (url.protocol !== 'https:') throw Error('Endereço de autorização inválido.');
+          if (Platform.OS === 'web') { await Linking.openURL(url.toString()); setOk('Entre com ' + typed + ' na janela do Google. Depois volte aqui e toque em Salvar e testar.'); return; }
+          const session = await WebBrowser.openAuthSessionAsync(url.toString(), 'sofiaapp://google');
+          if (session.type !== 'success') { setError('O login no Google foi fechado antes de terminar. Nada foi conectado.'); return; }
+          const back = new URL(session.url.replace('sofiaapp://', 'https://x/'));
+          if (back.searchParams.get('ok') !== '1') { setError(back.searchParams.get('message') || 'O Google não concluiu a conexão.'); return; }
+          setOwnGoogle({linked: true, email: typed});
+        }
+        const r = await api.mailCheck(saved.id);
+        if (r.errors.length) { setError('Conta salva, mas o teste falhou: ' + r.errors[0].error); return; }
+        setOk('Conectado com o Google de ' + typed + '! ' + (r.scanned ? r.scanned + ' e-mails dos últimos 2 dias conferidos.' : 'A Sofia passa a ler os e-mails novos.')); setTimeout(onDone, 1400); return;
+      }
       if (viaGoogle) {
         if (!google?.connected || !google.gmail) { setError(!google?.connected ? 'Conecte primeiro a Conta Google em Perfil → Conta Google. Depois volte aqui.' : 'Em Perfil → Conta Google, desconecte e conecte de novo para liberar o Gmail. Depois volte aqui.'); return; }
         // "Salvar e testar" mostra o resultado real do teste (antes: dizia "Conectado" mesmo com erro na conta).
@@ -287,17 +318,23 @@ function AccountSheet({api, account, onClose, onDone, groups = []}: {api: SofiaA
             {p.link ? <Pressable onPress={() => void Linking.openURL(p.link!)}><Text style={{color: c.accent, fontWeight: '700'}}>Abrir página da senha de app →</Text></Pressable> : null}
           </View>
           {/* 0.3.248: este modo le SO a caixa da Conta Google conectada no Perfil - avisa se o e-mail digitado for outro */}
-          {viaGoogle && google?.email && address.trim() && address.trim().toLowerCase() !== String(google.email).toLowerCase() ? (
-            <View style={{padding: 12, borderRadius: 12, backgroundColor: c.danger + '1a', gap: 4}}>
-              <Text style={{color: c.danger, fontWeight: '800'}}>Este modo não lê {address.trim()}</Text>
-              <Text style={{color: c.text, fontSize: 13, lineHeight: 19}}>"Conta Google" lê só a caixa da Conta Google conectada no Perfil ({google.email}). Para {address.trim()}, escolha "Gmail (senha de app)" ou "Outro (IMAP)".</Text>
+          {viaGoogle && ownGoogle?.linked ? (
+            <View testID="mail-own-google" style={{padding: 12, borderRadius: 12, backgroundColor: '#2fc58b1a', gap: 6}}>
+              <Text style={{color: '#2fc58b', fontWeight: '800'}}>✓ Entrou com o Google de {ownGoogle.email || typed}</Text>
+              <Text style={{color: c.text, fontSize: 13, lineHeight: 19}}>A Sofia lê esta caixa com o login dela. A Conta Google do Perfil continua a mesma (Agenda e Drive).</Text>
+              <Pressable accessibilityRole="button" onPress={() => appAlert('Sair desta Conta Google?', 'A Sofia para de ler esta caixa. Os e-mails já encontrados ficam.', [{text: 'Cancelar', style: 'cancel'}, {text: 'Sair', style: 'destructive', onPress: () => { if (account) void api.mailGoogleDisconnect(account.id).then(() => setOwnGoogle({linked: false, email: ''})).catch(e => setError(errorText(e))); }}])}><Text style={{color: c.danger, fontWeight: '700'}}>Sair desta Conta Google</Text></Pressable>
+            </View>
+          ) : needsOwnLogin ? (
+            <View testID="mail-needs-google" style={{padding: 12, borderRadius: 12, backgroundColor: c.accentSoft, gap: 4}}>
+              <Text style={{color: c.text, fontWeight: '800'}}>Entre com o Google de {typed}</Text>
+              <Text style={{color: c.text, fontSize: 13, lineHeight: 19}}>Toque no botão abaixo e escolha {typed} na janela do Google. A Conta Google do Perfil{google?.email ? ' (' + google.email + ')' : ''} continua a mesma, para Agenda e Drive.</Text>
             </View>
           ) : viaGoogle ? (
             <Text style={{fontSize: 13, color: google?.gmail ? '#2fc58b' : c.muted}}>{google === null ? 'Conferindo a Conta Google…' : google.gmail ? '✓ Conta Google conectada com acesso ao Gmail' + (google.email ? ' (' + google.email + ')' : '') + '.' : google.connected ? 'A Conta Google está conectada, mas sem o Gmail. Em Perfil → Conta Google, desconecte e conecte de novo.' : 'Conecte a Conta Google em Perfil → Conta Google (a mesma da Agenda e do Drive).'}</Text>
           ) : <Field label={account?.data.secret_set ? 'Nova senha de app (deixe vazio para manter)' : 'Senha de app'} value={password} onChange={setPassword} placeholder="xxxx xxxx xxxx xxxx" secure />}
           {error ? <Text style={{color: c.danger}}>{error}</Text> : null}
           {ok ? <Text style={{color: '#2fc58b', fontWeight: '600'}}>{ok}</Text> : null}
-          <Button title={account ? 'Salvar e testar' : 'Conectar e testar'} loading={busy} disabled={!address.includes('@')} onPress={() => void connect()} />
+          <Button title={needsOwnLogin ? 'Entrar com Google' : account ? 'Salvar e testar' : 'Conectar e testar'} loading={busy} disabled={!address.includes('@')} onPress={() => void connect()} />
           {account ? (
             <View style={{gap: 4}}>
               <Pressable onPress={async () => { try { await api.saveEntity({...account, state: account.state === 'paused' ? 'active' : 'paused'}); onDone(); } catch (e) { setError(errorText(e)); } }} style={{paddingVertical: 10}}><Text style={{color: c.text}}>{account.state === 'paused' ? 'Voltar a vigiar esta conta' : 'Pausar esta conta'}</Text></Pressable>

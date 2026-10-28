@@ -7,7 +7,7 @@ export type TxKind = 'expense' | 'income' | 'transfer' | 'card_payment';
 export type Recurrence = 'none' | 'monthly' | 'weekly' | 'yearly';
 export type Account = {carry?: number; id: string; name: string; type: string; initial: number; color: string; include: boolean; archived: boolean; cycleDay: number; reportStart: string; monthStarts: Record<string, number>; entity: Entity};
 export type Card = {id: string; name: string; limit: number; closing: number; due: number; color: string; accountId: string; archived: boolean; entity: Entity};
-export type Tx = {paidAt: string; reservePart: number; time: string; 
+export type Tx = {paidAt: string; reservePart: number; time: string; noBalance?: boolean; 
   id: string; kind: TxKind; desc: string; amount: number; date: string; category: string; accountId: string; toAccountId: string; cardId: string;
   invoice: string; paid: boolean; seriesId: string; installment: number; installments: number; recurrence: Recurrence; recurrenceEnd: string;
   virtual?: boolean; manualDue?: boolean; remindDays?: number; entity?: Entity;
@@ -73,7 +73,7 @@ export function toTx(e: Entity): Tx {
   const d = e.data || {};
   return {id: e.id, kind: (d.kind || 'expense') as TxKind, desc: e.title, amount: num(d.amount), date: String(d.date || ''), category: String(d.category || ''),
     accountId: String(d.account_id || ''), toAccountId: String(d.to_account_id || ''), cardId: String(d.card_id || ''), invoice: String(d.invoice_month || ''),
-    paid: !!d.paid, seriesId: String(d.series_id || ''), installment: num(d.installment), installments: num(d.installments), recurrence: (d.recurrence || 'none') as Recurrence,
+    paid: !!d.paid, noBalance: !!d.no_balance, seriesId: String(d.series_id || ''), installment: num(d.installment), installments: num(d.installments), recurrence: (d.recurrence || 'none') as Recurrence,
     recurrenceEnd: String(d.recurrence_end || ''), manualDue: String(d.import_id || '').startsWith('sofia-pendencia:'), reservePart: Number(d.reserve_part) > 0 ? Number(d.reserve_part) : 0, time: /^\d{2}:\d{2}$/.test(String(d.time || '')) ? String(d.time) : '', paidAt: d.paid === true && /^\d{4}-\d{2}-\d{2}$/.test(String(d.paid_at || '')) ? String(d.paid_at) : '', remindDays: Math.max(0, Math.min(15, Number(d.remind_days) || 0)), entity: e};
 }
 export function toBudget(e: Entity): Budget { return {id: e.id, category: String(e.data?.category || e.title), limit: num(e.data?.limit), entity: e}; }
@@ -189,7 +189,8 @@ export function expandRecurring(txs: Tx[], month: string): Tx[] {
 
 // ---------- Saldos ----------
 export function effect(t: Tx, accountId: string): number {
-  if (!t.paid || t.virtual) return 0;
+  // 0.3.257: "Nao mexer no saldo" - fica no Historico e nos totais do mes, mas nao desconta nem soma no Saldo
+  if (!t.paid || t.virtual || t.noBalance) return 0;
   if (t.kind === 'income' && t.accountId === accountId) return t.amount;
   if (t.kind === 'expense' && !t.cardId && t.accountId === accountId) return -t.amount;
   if (t.kind === 'card_payment' && t.accountId === accountId) return -t.amount;

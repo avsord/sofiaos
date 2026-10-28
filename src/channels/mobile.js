@@ -155,6 +155,16 @@ function makeMobileApi(runtime, deps) {
       rate(session, 'mail', 20);
       let match = p.match(/^\/api\/mobile\/mail\/accounts\/([\w-]+)\/secret$/);
       if (match && m === 'POST') { const b = await bodyJson(req, 4096); return send(await runtime.mailWatch.saveSecretAndTest(match[1], b.password)); }
+      // 0.3.257: Entrar com Google nesta conta de e-mail (le a propria caixa, separada da Conta Google do Perfil)
+      match = p.match(/^\/api\/mobile\/mail\/accounts\/([\w-]+)\/google\/(connect|disconnect|status)$/);
+      if (match) {
+        const account = (() => { try { return runtime.workspace.get(match[1]); } catch { return null; } })();
+        if (!account || account.kind !== 'mail_account') fail('NOT_FOUND', 'Conta de e-mail não encontrada.', 404);
+        if (match[2] === 'status' && m === 'GET') { const l = runtime.google.mailLink(match[1]); return send({linked: !!(l && l.refresh), email: l?.email || ''}); }
+        if (m !== 'POST') fail('NOT_FOUND', 'Operação desconhecida.', 404);
+        if (match[2] === 'connect') { const b = await bodyJson(req, 1024).catch(() => ({})); return send(runtime.google.mailConnectUrl(match[1], account.data.address, {app: !!b.app})); }
+        return send(await runtime.google.dropMailLink(match[1]));
+      }
       match = p.match(/^\/api\/mobile\/mail\/accounts\/([\w-]+)\/forget$/);
       if (match && m === 'POST') { runtime.mailWatch.dropSecret(match[1]); return send({ok: true}); }
       if (p === '/api/mobile/mail/check' && m === 'POST') { const b = await bodyJson(req, 1024); return send(await runtime.mailWatch.checkAll(b.account_id ? String(b.account_id) : undefined, Math.min(60, Math.max(0, Number(b.rescan_days) || 0)))); }

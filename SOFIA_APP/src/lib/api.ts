@@ -328,6 +328,10 @@ export class SofiaApi {
   monitorObservations() { return this.request<{items: Record<string, any[]>}>('/md/monitors/observations'); }
   observations(id: string) { return this.request<{items: any[];status?:{last_at:string|null;last_error:string|null;next_at:string|null}}>('/workspace/entities/' + encodeURIComponent(id) + '/observations'); }
   mailSecret(id: string, password: string) { return this.request<{ok: boolean; messages: number}>('/mail/accounts/' + encodeURIComponent(id) + '/secret', {password}, 'POST', 45000); }
+  /** 0.3.257: Entrar com Google numa conta de e-mail (le a propria caixa, separada da Conta Google do Perfil) */
+  mailGoogleStatus(id: string) { return this.request<{linked: boolean; email: string}>('/mail/accounts/' + encodeURIComponent(id) + '/google/status'); }
+  mailGoogleConnect(id: string, app = true) { return this.request<{url: string}>('/mail/accounts/' + encodeURIComponent(id) + '/google/connect', {app}, 'POST'); }
+  mailGoogleDisconnect(id: string) { return this.request<{ok: boolean}>('/mail/accounts/' + encodeURIComponent(id) + '/google/disconnect', {}, 'POST'); }
   mailForget(id: string) { return this.request<{ok: boolean}>('/mail/accounts/' + encodeURIComponent(id) + '/forget', {}); }
   /** rescanDays > 0 reavalia os ultimos dias (regra nova/editada) sem mexer no ponto de leitura. */
   mailCheck(accountId = '', rescanDays = 0) { return this.request<{accounts: number; scanned: number; hits: number; errors: {account: string; error: string}[]; skipped?: boolean}>('/mail/check', {account_id: accountId, rescan_days: rescanDays}, 'POST', 120000); }
