@@ -5,6 +5,8 @@ import React from 'react';
  * Android: os arquivos vao para android/app/src/main/assets/fonts (plugin with-sofia-fonts) e cada peso tem o seu arquivo;
  * o Text/TextInput do react-native passam a escolher o arquivo pelo peso (sem negrito "fabricado" por cima). */
 export const SOFIA_FONT = 'Sofia Sans';
+/** 0.3.265: fonte de destaque so para o nome na saudacao do Inicio (Playfair Display italico, licenca OFL). */
+export const DISPLAY_ITALIC: {fontFamily: string; fontStyle?: 'italic'; fontWeight?: '500'} = Platform.OS === 'web' ? {fontFamily: 'Sofia Display', fontStyle: 'italic', fontWeight: '500'} : {fontFamily: 'SofiaDisplay-MediumItalic'};
 const FILES: Record<string, string> = {'400': 'Regular', '500': 'Medium', '600': 'SemiBold', '700': 'Bold', '800': 'ExtraBold'};
 export function nativeFamily(weight: TextStyle['fontWeight'], italic = false): string {
   if (italic) return 'SofiaSans-Italic';
@@ -19,7 +21,8 @@ export function nativeFamily(weight: TextStyle['fontWeight'], italic = false): s
 const WEB_ALIASES = [SOFIA_FONT, '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'Helvetica Neue'];
 export function webFontCss(base = '/assets/fonts/'): string {
   const face = (w: string, file: string, style = 'normal') => WEB_ALIASES.map(name => `@font-face{font-family:'${name}';src:url('${base}SofiaSans-${file}.woff2') format('woff2');font-weight:${w};font-style:${style};font-display:swap}`).join('\n');
-  return [face('100 450', 'Regular'), face('451 550', 'Medium'), face('551 650', 'SemiBold'), face('651 750', 'Bold'), face('751 900', 'ExtraBold'), face('100 900', 'Italic', 'italic'),
+  const display = `@font-face{font-family:'Sofia Display';src:url('${base}SofiaDisplay-MediumItalic.woff2') format('woff2');font-weight:100 900;font-style:italic;font-display:swap}`;
+  return [display, face('100 450', 'Regular'), face('451 550', 'Medium'), face('551 650', 'SemiBold'), face('651 750', 'Bold'), face('751 900', 'ExtraBold'), face('100 900', 'Italic', 'italic'),
     `html,body,#root,input,textarea,button,select,div,span{font-family:'${SOFIA_FONT}',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}`,
     `code,pre,kbd,samp,[data-mono]{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}`,
     `body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}`,

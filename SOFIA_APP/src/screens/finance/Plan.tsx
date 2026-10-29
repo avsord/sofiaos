@@ -136,7 +136,7 @@ export function PlanTab({d, month, api, reload}: {d: Data; month: string; api: S
           const p = goalProgress(g);
           return (
             <Pressable key={g.id} onPress={() => setGoalSheet(g)} style={{gap: 6}}>
-              <View style={{flexDirection: 'row', alignItems: 'center'}}><Text style={{flex: 1, color: c.text, fontWeight: '500'}}>{g.done ? '✅ ' : '🎯 '}{g.name}</Text><Text style={{color: c.muted, fontSize: 12}}>{Math.round(p.pct * 100)}%</Text></View>
+              <View style={{flexDirection: 'row', alignItems: 'center'}}><View style={{flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8}}><Icon name={g.done ? 'checkCircle' : 'guardado'} size={16} color={g.done ? c.good : c.accent} /><Text style={{flex: 1, color: c.text, fontWeight: '500'}}>{g.name}</Text></View><Text style={{color: c.muted, fontSize: 12}}>{Math.round(p.pct * 100)}%</Text></View>
               <Bar pct={p.pct} color={g.color} />
               <View style={{flexDirection: 'row', alignItems: 'center'}}>
                 <Text style={{flex: 1, color: c.muted, fontSize: 11}}>{money(g.saved)} de {money(g.target)}{p.perMonth ? ' · guarde ' + money(p.perMonth) + '/mês até ' + dateBR(g.deadline) + '/' + g.deadline.slice(0, 4) : p.left ? ' · faltam ' + money(p.left) : ' · concluído!'}</Text>

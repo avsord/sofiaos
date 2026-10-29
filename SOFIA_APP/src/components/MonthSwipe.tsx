@@ -1,6 +1,6 @@
 import React,{useEffect,useMemo,useRef} from 'react';
 import {PanResponder,Platform,View} from 'react-native';
-export function MonthSwipe({children,onMonth,onLock}:{children:React.ReactNode;onMonth:(delta:number)=>void;onLock?:(locked:boolean)=>void}){
+export function MonthSwipe({children,onMonth,onLock,fill=false}:{children:React.ReactNode;onMonth:(delta:number)=>void;onLock?:(locked:boolean)=>void;fill?:boolean}){
  const latest=useRef({onMonth,onLock});latest.current={onMonth,onLock};
  const locked=useRef(false),claimed=useRef(false);
  // Android reserves the native pager before dispatch. A second asynchronous
@@ -15,5 +15,5 @@ export function MonthSwipe({children,onMonth,onLock}:{children:React.ReactNode;o
   onPanResponderRelease:(_,g)=>{if(Math.abs(g.dx)>35)latest.current.onMonth(g.dx<0?1:-1);claimed.current=false;lock(false);},
   onPanResponderTerminate:()=>{claimed.current=false;lock(false);},onPanResponderTerminationRequest:()=>false
  }),[]);
- return <View testID="calendar-month-swipe" nativeID="sofia-calendar-gesture" collapsable={false} {...pan.panHandlers} onTouchStart={()=>lock(true)} onTouchEnd={event=>{if(!event.nativeEvent.touches.length&&!claimed.current)lock(false);}} onTouchCancel={()=>{if(!claimed.current)lock(false);}}>{children}</View>;
+ return <View testID="calendar-month-swipe" nativeID="sofia-calendar-gesture" collapsable={false} style={fill?{flex:1}:undefined} {...pan.panHandlers} onTouchStart={()=>lock(true)} onTouchEnd={event=>{if(!event.nativeEvent.touches.length&&!claimed.current)lock(false);}} onTouchCancel={()=>{if(!claimed.current)lock(false);}}>{children}</View>;
 }

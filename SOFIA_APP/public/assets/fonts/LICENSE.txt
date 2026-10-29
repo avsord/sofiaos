@@ -2,3 +2,6 @@ Plus Jakarta Sans (arquivos SofiaSans-*.ttf / .woff2 nesta pasta e em public/ass
 Copyright 2020 The Plus Jakarta Sans Project Authors (https://github.com/tokotype/PlusJakartaSans)
 Licenciada sob a SIL Open Font License, Version 1.1 — https://openfontlicense.org
 Os arquivos foram só renomeados para uso interno da Sofia OS; o desenho e o nome interno da fonte não mudaram.
+
+Playfair Display (arquivo SofiaDisplay-MediumItalic.ttf / .woff2): Copyright 2017 The Playfair Display Project Authors
+(https://github.com/clauseggers/Playfair-Display). SIL Open Font License, Version 1.1. Usada so no nome da saudacao do Inicio.

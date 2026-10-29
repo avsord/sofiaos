@@ -66,3 +66,7 @@ fica em `docs/PEDIDOS.md` (Fase 3).
 - Cápsulas: seletor Hoje/Todas/Histórico com largura limitada. Perfil: rótulos sem caixa alta. E-mails: ícone no lugar do emoji.
 - Finanças: decisão de manter as duas colunas (saldo/controle à esquerda, histórico à direita), que já atendem a intenção; ganhou números fixos, saldo com centavos menores, gráfico com detalhe no mouse e menu do botão direito nos lançamentos.
 - Apps, Lembretes e Encomendas: decisão de manter (grade/lista já na largura certa).
+
+## Início — 0.3.264
+- Problema apontado pelo Pedro: vazio enorme embaixo da Agenda (coluna 1 acabava em ~300 px, coluna 2 descia ~900 px).
+- Solução: colunas equilibradas — a Agenda abre a primeira coluna e os widgets são divididos pela melhor combinação de alturas; a lista do dia mostra todos os compromissos.

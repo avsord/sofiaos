@@ -7,7 +7,7 @@ module.exports=function withSofiaFonts(config){
     const from=path.join(cfg.modRequest.projectRoot,'assets','fonts');
     const to=path.join(cfg.modRequest.platformProjectRoot,'app','src','main','assets','fonts');
     fs.mkdirSync(to,{recursive:true});
-    for(const f of fs.readdirSync(from).filter(n=>/^SofiaSans-.*\.ttf$/.test(n)))fs.copyFileSync(path.join(from,f),path.join(to,f));
+    for(const f of fs.readdirSync(from).filter(n=>/^Sofia(Sans|Display)-.*\.ttf$/.test(n)))fs.copyFileSync(path.join(from,f),path.join(to,f));
     return cfg;
   }]);
 };

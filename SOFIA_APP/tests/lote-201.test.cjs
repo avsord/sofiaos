@@ -301,7 +301,7 @@ test('0.3.221: Apps arrastaveis como no iPhone; Inicio: segurar um widget abre o
   assert.ok(!w.includes('Use as setas para mudar os apps de lugar.'),'saiu o modo das setas');
   assert.ok(l.includes('onPanResponderTerminationRequest:()=>false')&&l.includes('useLayoutEffect(()=>{if(reset.current)'),'lista com puxador sem pulo ao soltar');
   assert.ok(sw.includes('const HOLD=450;')&&sw.includes('Organizar Início</Text>')&&sw.includes('<ReorderList '),'segurar abre o seletor');
-  assert.ok(sw.includes("if(noHold.includes(id))return <View key={id}>{item.content}</View>;"),'widget que usa o segurar para outra coisa nao abre o seletor');
+  assert.ok(sw.includes("if(noHold.includes(id))return <View key={id} onLayout={e=>measure(id,e.nativeEvent.layout.height)}>{item.content}</View>;"),'widget que usa o segurar para outra coisa nao abre o seletor (0.3.264: medido para equilibrar as colunas)');
   assert.ok(h.includes("{id:'goal',title:'Meta',content:<GoalProgressCard"),'meta e widget ordenavel');
   assert.ok(h.includes('export function withFixedWidgets(order:string[],goalHidden=false):string[]')&&h.includes('order={withFixedWidgets(widgets,goalHidden)}'),'listas antigas recebem agenda e meta no topo');
 });
@@ -316,7 +316,7 @@ test('0.3.222: Previsto no fim do proximo mes; agenda fixa; meta sem espaco extr
   const sem=f.moneyLeft([tx('c','expense',100,'2026-10-25')],[],{start:'2026-10-01',end:'2026-11-30'},'a1',1000,4000,'2026-10-20');assert.equal(sem.aporte,4000,'sem parte do guardado, o aporte planejado conta inteiro');
   const s=read('src/screens/Finance.tsx'),h=read('src/screens/Home.tsx');
   assert.ok(s.includes('const r = upcoming ? cycleRange(cycleDay, nextPay) : cur;'),'0.3.224: previsto ate a vespera do proximo salario');
-  const ai=h.indexOf('<MiniAgenda '),si=h.indexOf('<SortableWidgets fixed={HOME_FIXED_WIDGETS}');assert.ok(ai>0&&ai<si,'agenda fixa antes da lista');
+  const ai=h.indexOf('<MiniAgenda '),si=h.indexOf('<SortableWidgets fixed={HOME_FIXED_WIDGETS}');assert.ok(h.includes('lead={<MiniAgenda ')||(ai>0&&ai<si),'agenda fixa antes da lista (0.3.264: no computador ela abre a 1a coluna como lead)');
   assert.ok(!h.includes("{id:'agenda'"),'agenda fora do organizador');
   assert.ok(!s.includes('<View style={{marginBottom: 18}}><GoalProgressCard'),'meta sem margem extra');
   assert.ok(h.includes("...(goal?[{id:'goal'"),'sem meta, sem espaco vazio');

@@ -24,3 +24,14 @@ test('0.3.263: site - partes sob demanda, teclado, hover, folhas perto do clique
   assert.ok(read('src/screens/Chat.tsx').includes('testID="chat-side-list"'));
   assert.ok(fs.readFileSync(path.join(__dirname,'..','src/lib/palette.ts'),'utf8').includes('export const PALETTE'));
 });
+test('0.3.264: Inicio no computador com colunas equilibradas (sem vazio ao lado da Agenda) e o dia inteiro na lista',()=>{
+  const sw=read('src/components/SortableWidgets.tsx');assert.ok(sw.includes('for(let mask=0;mask<(1<<n);mask++)')&&sw.includes('lead?:React.ReactNode'));
+  assert.ok(read('src/screens/Home.tsx').includes('testID="home-desk"')); // 0.3.264: desenho aprovado do Inicio no lugar das colunas automaticas
+  assert.ok(read('src/components/DashboardWidgets.tsx').includes('style={wideDay?{maxHeight:560}:{height:190}}'));
+});
+test('0.3.264: Inicio no desenho aprovado (saudacao com nome em italico, barra da Sofia, resumo, agenda, tarefas, capsulas com caixinha)',()=>{
+  const h=read('src/screens/Home.tsx');assert.ok(h.includes('<DaySummaryCard ')&&h.includes('<DeskTasksCard ')&&h.includes('<DeskCapsulesCard ')&&h.includes('<SortableWidgets sheetOnly'));
+  const hero=read('src/components/HomeHero.tsx');assert.ok(hero.includes('DISPLAY_ITALIC')&&hero.includes('api.ensureChat()')&&hero.includes('Continuar na Conversa →'));
+  const d=read('src/desktop/HomeDeskCards.tsx');assert.ok(d.includes("accessibilityRole=\"checkbox\" accessibilityLabel={(on ? 'Tomada: '")&&d.includes('borderLeftWidth: 3'));
+  assert.ok(fs.existsSync(path.join(__dirname,'..','assets/fonts/SofiaDisplay-MediumItalic.ttf'))&&read('plugins/with-sofia-fonts.cjs').includes('Sofia(Sans|Display)'));
+});

@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 test('0.3.262: telas do computador (Inicio, Agenda, Paginas)',()=>{
-  assert.ok(read('src/screens/Home.tsx').includes('testID="home-desktop-columns"'));
+  assert.ok(read('src/screens/Home.tsx').includes('testID="home-desk"')); // 0.3.264: desenho aprovado do Inicio
   const a=read('src/screens/Agenda.tsx');assert.ok(a.includes("const byDay=useMemo(()=>{if(!wideAgenda)return null;")&&a.includes('+{(byDay.get(dayKey(day))||[]).length-3} mais'));
   assert.ok(read('src/screens/Pages.tsx').includes('testID="pages-recent"'));
 });
