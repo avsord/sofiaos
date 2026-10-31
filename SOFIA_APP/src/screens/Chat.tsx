@@ -38,11 +38,18 @@ import {appAlert} from '../lib/app-alert';
 // 0.3.199: a foto da conversa aparece desfocada (miniatura de poucos bytes); o original fica no Drive.
 // Tocar abre a foto nitida, com "Salvar no celular"; ao fechar, nada fica guardado no aparelho.
 function PhotoThumb({api,id}:{api:SofiaApi;id:string}){
- const c=useTheme(),[failed,setFailed]=useState(false);
+ const c=useTheme(),[failed,setFailed]=useState(false),[loaded,setLoaded]=useState(false);
+ // 0.3.266: no SITE a imagem nao manda o cabecalho de login (o navegador ignora "headers" em <img>) e a miniatura voltava
+ // vazia. Aqui ela e baixada com o login e mostrada a partir da memoria do navegador.
+ const source=api.attachmentThumb(id),[webUri,setWebUri]=useState('');
+ useEffect(()=>{if(Platform.OS!=='web')return;let alive=true,url='';fetch(source.uri,{headers:source.headers}).then(r=>{if(!r.ok)throw new Error(String(r.status));return r.blob();}).then(b=>{url=URL.createObjectURL(b);if(alive)setWebUri(url);}).catch(()=>{if(alive)setFailed(true);});return()=>{alive=false;if(url)URL.revokeObjectURL(url);};
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[id]);
  return <View style={{width:220,height:160,borderRadius:12,overflow:'hidden',marginBottom:6,backgroundColor:c.input,alignItems:'center',justifyContent:'center'}}>
   {/* 0.3.265 (Conversa aprovada): a foto aparece na hora (miniatura nitida), sem o quadrado escuro com "Clique para ver" */}
-  {failed?null:<Image source={api.attachmentThumb(id)} resizeMode="cover" onError={()=>setFailed(true)} style={{position:'absolute',top:0,left:0,right:0,bottom:0}}/>}
-  {failed?<View style={{alignItems:'center',gap:6}}><Icon name="image" size={26} color={c.muted}/><Text style={{color:c.muted,fontSize:12}}>{tap('Toque para abrir a foto')}</Text></View>:null}
+  {failed||(Platform.OS==='web'&&!webUri)?null:<Image source={Platform.OS==='web'?{uri:webUri}:source} resizeMode="cover" onLoad={()=>setLoaded(true)} onError={()=>setFailed(true)} style={{position:'absolute',top:0,left:0,right:0,bottom:0}}/>}
+  {/* 0.3.266: enquanto a miniatura nao aparece (ou se ela nao vier), nunca fica um quadrado vazio */}
+  {!loaded||failed?<View style={{alignItems:'center',gap:6}}><Icon name="image" size={26} color={c.muted}/><Text style={{color:c.muted,fontSize:12}}>{tap('Toque para abrir a foto')}</Text></View>:null}
  </View>;
 }
 function PhotoViewer({api,id,name,onSave,onClose}:{api:SofiaApi;id:string;name:string;onSave:()=>void;onClose:()=>void}){
@@ -50,6 +57,8 @@ function PhotoViewer({api,id,name,onSave,onClose}:{api:SofiaApi;id:string;name:s
  // copia temporaria; ao fechar, ela e apagada. Se falhar, mostra o motivo que o servidor devolveu.
  const c=useTheme(),[uri,setUri]=useState(''),[error,setError]=useState('');
  useEffect(()=>{let alive=true,temp:File|null=null;
+  // 0.3.266: no site nao ha arquivo temporario - a foto vem com o login e fica so na memoria do navegador
+  if(Platform.OS==='web'){let url='';const source=api.attachmentSource(id);fetch(source.uri,{headers:source.headers}).then(r=>{if(!r.ok)throw new Error('A foto não abriu ('+r.status+').');return r.blob();}).then(b=>{url=URL.createObjectURL(b);if(alive)setUri(url);}).catch(e=>{if(alive)setError(String(e?.message||e));});return()=>{alive=false;if(url)URL.revokeObjectURL(url);};}
   (async()=>{try{const source=api.attachmentSource(id),safe=name.replace(/[^\p{L}\p{N}._-]/gu,'_');
    const target=new File(Paths.cache,'ver-'+id+'-'+safe);try{if(target.exists)target.delete();}catch{/* segue */}
    temp=await File.downloadFileAsync(source.uri,target,{headers:source.headers,idempotent:true});

@@ -26,8 +26,11 @@ function validId(value) {
   if (typeof value !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(value)) throw new AppError('INVALID_ID', 'Identificador inválido.');
   return value;
 }
+// 0.3.266: "sistema de diario com SENHA E conteudo criptografado" era bloqueado como credencial (o "e" de ligacao
+// contava como "senha e <segredo>"). Agora so bloqueia "senha: X", "senha = X" ou "senha é X" quando X parece um segredo
+// (tem numero ou simbolo). "A senha é forte" e "senha e conteudo" passam.
 function rejectSecrets(text) {
-  if (/\bsk-[A-Za-z0-9_-]{16,}|\bEA[A-Za-z0-9]{60,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|(?:OPENAI_(?:PRIVATE_|SHARED_)?API_KEY|WHATSAPP_ACCESS_TOKEN|APP_SECRET)\s*[=:]\s*\S{8,}|(?:senha|password|pin|codigo (?:2fa|totp|de autenticacao))\s*(?:e|é|:|=)\s*\S{3,}|(?:numero (?:do )?cartao)\s*[:=]?\s*[0-9 -]{13,}/i.test(text)) {
+  if (/\bsk-[A-Za-z0-9_-]{16,}|\bEA[A-Za-z0-9]{60,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|(?:OPENAI_(?:PRIVATE_|SHARED_)?API_KEY|WHATSAPP_ACCESS_TOKEN|APP_SECRET)\s*[=:]\s*\S{8,}|\b(?:senha|password|pin|codigo (?:2fa|totp|de autenticacao))\b\s*(?:é|eh|:|=)\s*(?=\S*[0-9!@#$%&*?_.])\S{4,}|(?:numero (?:do )?cartao)\s*[:=]?\s*[0-9 -]{13,}/i.test(text)) {
     throw new AppError('POSSIBLE_SECRET', 'Este texto parece conter uma credencial. Ela não foi salva nem enviada à IA. Remova o segredo da mensagem.');
   }
 }
