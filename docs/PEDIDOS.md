@@ -69,3 +69,9 @@ Nada é apagado (o corte de funções depende dele). Decisões de design ficam r
 
 ## Conferência no navegador (0.3.263)
 `SOFIA_APP/tools/site-verify.cjs` — 18 de 18 itens OK: Tab na ordem, avisos no título, hover, Ctrl+K encontra e abre tarefa, menu do botão direito em 9 telas, janela perto do clique, rodinha de qualquer lugar, detalhe no gráfico, nenhuma página com erro. Achou e corrigiu: avisos no título não apareciam (contagem fora do lugar), Ctrl+K não abria a tarefa se a tela ainda carregava, Notas aberta por link direto ficava vazia.
+
+## Anotado em 30/10/2026
+| # | Pedido | Estado |
+|---|---|---|
+| 5.1 | BUG Conversa: a lista mostra várias conversas abertas e vazias ("Conversa com a Sofia" repetida, sem mensagens). Achar o que cria conversa vazia, não criar mais e esconder/limpar as que já existem | entregue (0.3.265): o "+" reaproveita a conversa vazia e a lista não mostra vazias |
+| 5.2 | Conversa no desenho aprovado em imagem (Conversa_proposta_2): Sofia como pessoa no topo, balões dos dois lados, ação como cartãozinho dentro do balão dela (Ver/Desfazer), respostas rápidas, lista com nome por assunto e grupos Hoje/Ontem/Esta semana | trocado pelo desenho aprovado: Quadro da conversa (entregue na 0.3.265) |

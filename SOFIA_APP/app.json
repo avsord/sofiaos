@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sofia OS",
     "slug": "sofia-app",
-    "version": "0.3.264",
+    "version": "0.3.265",
     "scheme": "sofiaapp",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.avsord.sofiaapp",
-      "versionCode": 265,
+      "versionCode": 266,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.RECORD_AUDIO",

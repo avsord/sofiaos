@@ -23,6 +23,7 @@ function checkMobileOrigin(req, config) {
 }
 function makeMobileApi(runtime, deps) {
   const { store, config, core, routing, workspace, audioService } = runtime;
+  const board = require('../services/conversation-board').createConversationBoard({store, provider: runtime.provider});
   const { bodyJson, json, ownerAuth, mobileSessions, tooManyFailures, registerFailure, clearFailures } = deps;
   // 0.3.258: segundo passo no login do SITE. O navegador (pedido com Origin) que nao tem a marca de confianca recebe
   // um codigo de 6 digitos no e-mail cadastrado; depois de acertar, ganha uma marca de 90 dias e nao pede mais.
@@ -363,14 +364,23 @@ function makeMobileApi(runtime, deps) {
       const rows = store.db.prepare(`SELECT c.*,
         (SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.owner=c.owner AND m.status<>'deleted') AS message_count
         FROM conversations c WHERE c.owner=? AND c.state IN ('active','paused','archived')
-        AND c.channel IN ('mobile','web','test') ORDER BY (message_count>0) DESC,c.updated_at DESC,c.rowid DESC LIMIT 51 OFFSET ?`).all(OWNER, Math.trunc(offset));
+        AND c.channel IN ('mobile','web','test')
+        AND ((SELECT COUNT(*) FROM messages m2 WHERE m2.conversation_id=c.id AND m2.owner=c.owner AND m2.status<>'deleted')>0 OR c.id=(SELECT conversation_id FROM owner_chat_cursor WHERE owner=c.owner))
+        ORDER BY c.updated_at DESC,c.rowid DESC LIMIT 51 OFFSET ?`).all(OWNER, Math.trunc(offset));
       return send({ items: rows.slice(0, 50), has_more: rows.length > 50, next_offset: offset + 50 });
     }
     if (p === '/api/mobile/conversations' && m === 'POST') {
       rate(session, 'new', 10); const b = await bodyJson(req, 2048);
+      // 0.3.265 (bug das conversas vazias): o "+" reaproveita uma conversa ainda sem mensagens em vez de criar outra
+      const empty = store.db.prepare(`SELECT c.id FROM conversations c WHERE c.owner=? AND c.state='active' AND c.channel IN ('mobile','web')
+        AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id=c.id AND m.owner=c.owner AND m.status<>'deleted') ORDER BY c.updated_at DESC,c.rowid DESC LIMIT 1`).get(OWNER);
+      if (empty) return send({ conversation: store.conversation(empty.id) });
       return send({ conversation: store.createConversation(cleanText(b.title || 'Conversa com a Sofia', 'Título', 100), 'mobile') });
     }
     if (p === '/api/mobile/chat-history' && m === 'DELETE') { rate(session, 'delete', 10); return send(store.clearChatHistory()); }
+    const boardMatch = p.match(/^\/api\/mobile\/conversations\/([\w-]+)\/board$/);
+    if (boardMatch && m === 'GET') { const id = validId(boardMatch[1]); conversation(id); return send(board.read(id)); }
+    if (boardMatch && m === 'POST') { const id = validId(boardMatch[1]); conversation(id); rate(session, 'board', 20); return send(await board.update(id)); }
     let match = p.match(/^\/api\/mobile\/conversations\/([\w-]+)$/);
     if (match && m === 'GET') {
       const c = conversation(match[1], { history: true }), before = Number(url.searchParams.get('before')) || Number.MAX_SAFE_INTEGER;
@@ -394,6 +404,7 @@ function makeMobileApi(runtime, deps) {
         } catch { /* sem a foto anterior, segue so com o texto */ }
       }
       const out = await receive({...payload(b, cleanMessage(b.message, 'Mensagem')), ...(images.length ? {images} : {}), ...(uiNote ? {ui_context: uiNote} : {})});
+      if (out?.conversation_id) board.schedule(out.conversation_id); // 0.3.265: o Quadro da conversa se reorganiza
       return send(out);
     }
     match = p.match(/^\/api\/mobile\/messages\/([\w-]+)$/);
@@ -429,6 +440,7 @@ function makeMobileApi(runtime, deps) {
           const row = store.db.prepare('SELECT id FROM messages WHERE owner=? AND client_id=?').get(OWNER, key);
           if (row) store.saveVoiceMessage(row.id, { mime, duration_ms: duration, transcript, bytes });
         }
+        if (result?.conversation_id) board.schedule(result.conversation_id);
         return send({ ...result, ...messages(result.conversation_id) });
       } finally { inAudio.delete(key); }
     }

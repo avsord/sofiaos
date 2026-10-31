@@ -34,6 +34,8 @@ const inBrowser = typeof document !== 'undefined' && typeof location !== 'undefi
 const rawBase = (inBrowser ? location.origin : (process.env.EXPO_PUBLIC_API_URL || 'https://sofiaos.up.railway.app')).replace(/\/+$/, '');
 const parsedBase = new URL(rawBase);
 if ((parsedBase.protocol !== 'https:' && !(inBrowser && parsedBase.protocol === 'http:')) || parsedBase.username || parsedBase.password || parsedBase.search || parsedBase.hash || parsedBase.pathname !== '/') throw new Error('Configure a raiz HTTPS do servidor Sofia.');
+export type BoardTopic = {title: string; started_at: string | null; message_id: string | null; decided: string[]; todo: string[]; open: {title: string; detail: string}[]; numbers: {label: string; value: string}[]; refs: string[]};
+export type BoardData = {topics: BoardTopic[]; updated_at: string | null};
 export type LoginCodeNeeded = {need_code: true; challenge: string; sent_to: string};
 const WEB_TRUST_KEY = 'sofia.web.trust.v1';
 // sem importar react-native aqui (os testes carregam este arquivo sozinho): no site existe document
@@ -221,6 +223,8 @@ export class SofiaApi {
   }
   selectChat(id:string) { return this.request<ChatSnapshot>('/chat-sync/select',{conversation_id:id}); }
   async deleteChatMessages(id:string,ids:string[]) {const result=await this.request<{deleted_ids:string[];failed:{id:string;error:string}[]}>('/chat-sync/delete',{conversation_id:id,ids});this.cacheGeneration++;this.startupReads.invalidate();const before=this.snapshots.peek<ChatSnapshot>('/chat-sync/current');if(before?.conversation?.id===id&&before){const removed=new Set(result.deleted_ids);this.snapshots.remember('/chat-sync/current',{...before,messages:before.messages.filter(m=>!removed.has(m.id)),deleted_ids:[...new Set([...before.deleted_ids,...result.deleted_ids])]});}this.snapshots.forget('/conversations/'+id);await this.snapshots.flush();return result;}
+  /** 0.3.265: Quadro da conversa (assuntos com decidido, a fazer, em aberto, numeros e referencias). */
+  conversationBoard(id: string) { return this.request<BoardData>('/conversations/' + encodeURIComponent(id) + '/board'); }
   conversations(offset = 0) { return this.request<{items: Conversation[]; has_more: boolean; next_offset: number}>('/conversations?offset=' + offset); }
   capsuleHistory(from:string,to:string){return this.request<{items:Entity[]}>('/md/capsules/doses?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to));}
   capsuleTake(capsule_id:string,day:string,time:string,taken=true){return this.request<{ok:boolean;item:Entity|null}>('/md/capsules/doses',{capsule_id,day,time,taken},'POST');}

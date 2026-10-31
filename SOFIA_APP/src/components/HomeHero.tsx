@@ -17,7 +17,7 @@ export function HomeHero({api, first, subtitle, wide, onContinue}: {api: SofiaAp
     setBusy(true); setAnswer({q, a: ''}); setText('');
     try {
       const page = await api.ensureChat(); const id = page.conversation?.id || '';
-      const r = await api.chat({conversation_id: id, content: q, client_message_id: 'home-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)});
+      const r = await api.chat({conversation_id: id, message: q, client_message_id: 'home-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)});
       setAnswer({q, a: String(r.reply || '').trim() || 'Pronto.'});
     } catch (e) { setAnswer({q, a: errorText(e), error: true}); } finally { setBusy(false); }
   }
