@@ -306,6 +306,7 @@ Workflow: `.github/workflows/sofia-native-047-update.yml`. Dispara em push na
 | 2026-10-11 | 0.3.116 | patch do arquiteto | Gravador de áudio criado só no 1º toque no microfone e consultado só enquanto grava; ciclo de vida próprio | Local: tsc e npm test verdes; 8 testes novos com o Composer real, o antigo reprova 7 e 3 defeitos reintroduzidos são pegos. Relatório 0.3.115: agenda:expand 0,6 ms (hipótese desmentida), composer:recorder 148,8 ms |
 | 2026-10-11 | 0.3.117 | patch do arquiteto | Esqueleto imediato + montagem em transição; fila ociosa quieta na abertura; sync da Conversa só com usuário parado; medição de toda renderização | Local: tsc e npm test 491/491; 6 testes novos; mutações A/B reprovadas. Celular pendente |
 | 2026-10-16 | 0.3.149 | PR desta rodada | Finanças: máscara monetária brasileira, reserva compacta sem caixinha redundante, detalhes e ações preservados | Código + testes em branch isolada; CI, APK e validação física a conferir. OTA não autorizado. |
+| 2026-10-31 | 0.3.267 | rodada 1 do site | Janela flutuante não pula ao fechar; saída no computador 170 ms; painel do Price Tracker anima a saída; site sem contorno de clique; Páginas/Apps/Perfil fora do menu de cima; título da página numa linha; tique de Cápsulas neutro | Local: tsc e npm test verdes; tests/lote-267 (5). APK candidato pelo CI. |
 
 ## 11. Lições de erro (para calibrar quem chegar)
 

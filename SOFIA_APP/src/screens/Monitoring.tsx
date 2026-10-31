@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {contextMenu} from '../components/ContextMenu';
 import {PALETTE} from '../lib/palette';
 import {rightClick} from '../lib/web-page';
@@ -61,6 +61,10 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
   const visible = (products || []).filter(p => !hidden.includes(p.monitor.id));
   const lines = visible.map(p => ({id: p.monitor.id, color: p.color, points: p.best}));
   const open = products?.find(p => p.monitor.id === openId) || null;
+  // 0.3.267: o painel continua montado enquanto anima a saída (antes sumia num corte seco ao fechar)
+  const lastOpen = useRef<typeof open>(null);
+  if (open) lastOpen.current = open;
+  const shown = open || lastOpen.current;
   const lastRead = Math.max(0, ...(products || []).map(p => p.lastAt || 0)) || null;
 
   const pad = useColumnPad(); // 0.3.253: cabecalho alinhado a coluna de leitura no computador
@@ -153,7 +157,7 @@ export function Monitoring({api, active, onBack, focusId = ''}: {api: SofiaApi; 
 
         {adding ? <AddProduct api={api} used={(products || []).map(p => p.color)} existing={products || []} onClose={() => setAdding(false)}
           onCreated={id => { setAdding(false); void load().then(() => setOpenId(id)); }} /> : null}
-        {open ? <ProductDetail others={(products || []).filter(p => p.monitor.id !== open.monitor.id).map(p => p.monitor)} api={api} product={open} issues={col.issues} running={col.running} onClose={() => setOpenId(null)} onChanged={load} onDeleted={() => { setOpenId(null); void load(); }} /> : null}
+        {shown ? <ProductDetail visible={!!open} others={(products || []).filter(p => p.monitor.id !== shown.monitor.id).map(p => p.monitor)} api={api} product={shown} issues={col.issues} running={col.running} onClose={() => setOpenId(null)} onChanged={load} onDeleted={() => { setOpenId(null); void load(); }} /> : null}
       </View>
     </InternalBackGesture>
   );

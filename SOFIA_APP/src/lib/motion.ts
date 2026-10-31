@@ -16,7 +16,7 @@ export function useKeyboardVisible(){
 // 0.3.263: no computador as entradas e saidas sao mais curtas e discretas (mouse e rapido; 280 ms parecia lento)
 const desktopWeb=()=>{try{return typeof document!=='undefined'&&typeof window!=='undefined'&&window.innerWidth>=900;}catch{return false;}};
 export function useMotionPresence(visible:boolean,{enterReady=true,enterDuration:enterBase=280,exitDuration:exitBase=220}:{enterReady?:boolean;enterDuration?:number;exitDuration?:number}={}){
- const enterDuration=desktopWeb()?Math.min(enterBase,160):enterBase,exitDuration=desktopWeb()?Math.min(exitBase,120):exitBase;
+ const enterDuration=desktopWeb()?Math.min(enterBase,160):enterBase,exitDuration=desktopWeb()?Math.min(exitBase,170):exitBase; // 0.3.267: saida com o mesmo ritmo da entrada (120 ms parecia corte seco)
  const reduced=useReducedMotion(),progress=useRef(new Animated.Value(0)).current,epoch=useRef(0);
  const [mounted,setMounted]=useState(visible);
  useEffect(()=>{

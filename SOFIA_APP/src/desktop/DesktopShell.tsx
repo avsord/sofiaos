@@ -149,7 +149,8 @@ export function DesktopFrame({api,tab,locked,profile,onNavigate,onOpenModule,onO
    <ScrollView testID="desktop-sidebar-scroll" keyboardShouldPersistTaps="handled" style={{flex:1}} contentContainerStyle={{paddingBottom:24}}>
     <Row icon="search" label="Buscar" hint="Ctrl+K" collapsed={collapsed} onPress={()=>setPalette(true)}/>
     <View style={{height:8}}/>
-    {TAB_ORDER.map(t=><Row key={t} testID={'desktop-nav-'+t} icon={TAB_LABELS[t].icon} label={TAB_LABELS[t].label} selected={tab===t} collapsed={collapsed} onPress={()=>onNavigate(t)}/>)}
+    {/* 0.3.267: Páginas e Apps já aparecem nas seções de baixo e o Perfil abre pela foto no topo */}
+    {TAB_ORDER.filter(t=>collapsed||!['pages','apps','profile'].includes(t)).map(t=><Row key={t} testID={'desktop-nav-'+t} icon={TAB_LABELS[t].icon} label={TAB_LABELS[t].label} selected={tab===t} collapsed={collapsed} onPress={()=>onNavigate(t)}/>)}
     {collapsed?null:<>
      <Section title="Apps">{APP_SHORTCUTS.map(a=><Row key={a.id} icon={a.icon} label={a.title} selected={tab==='apps'&&moduleTitle===a.title} onPress={()=>onOpenModule(a.id)}/>)}</Section>
      <Section title="Páginas" action={<Pressable accessibilityRole="button" accessibilityLabel="Nova página" onPress={onCreatePage} style={({hovered}:any)=>({padding:3,borderRadius:6,backgroundColor:hovered?c.line:'transparent'})}><Icon name="plus" size={15} color={c.muted}/></Pressable>}>

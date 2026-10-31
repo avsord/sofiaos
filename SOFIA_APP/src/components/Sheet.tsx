@@ -41,12 +41,13 @@ export function Sheet({visible,onClose,children,label='Fechar painel'}:{visible:
   if(!was&&visible&&Date.now()<handoffUntil){setDarkFromStart(true);return;}
   if(!visible)setDarkFromStart(false);
  },[visible]);
- useEffect(()=>{if(!mounted){setShown(false);setHeight(0);}},[mounted]);
+ useEffect(()=>{if(!mounted){setShown(false);setHeight(0);setAnchor(null);}},[mounted]);
  if(visible)last.current=children;
  // 0.3.263 (computador): a folha abre como janela flutuante PERTO de onde se clicou (menu), nao no centro da tela;
  // sem clique recente (atalho de teclado), continua no centro. No celular nada muda.
  const [anchor,setAnchor]=useState<{x:number;y:number}|null>(null);
- useEffect(()=>{if(!visible){setAnchor(null);return;}if(!desktop)return;const p=(globalThis as any).__sofiaPointer;setAnchor(p&&Date.now()-p.t<900?{x:p.x,y:p.y}:null);},[visible,desktop]);
+ // 0.3.267: a posicao so e esquecida depois que a janela termina de sair (antes ela pulava para o centro ao fechar = piscada)
+ useEffect(()=>{if(!visible)return;if(!desktop)return;const p=(globalThis as any).__sofiaPointer;setAnchor(p&&Date.now()-p.t<900?{x:p.x,y:p.y}:null);},[visible,desktop]);
  const PW=480,vw=windowWidth,vh=rootH||windowHeight,ph=Math.min(height||320,vh-32);
  const anchored=desktop&&anchor?{position:'absolute' as const,width:PW,left:Math.max(16,Math.min(anchor.x-PW/2,vw-PW-16)),top:anchor.y+12+ph<vh-16?anchor.y+12:Math.max(16,anchor.y-ph-12)}:null;
  return <Modal visible={mounted||hold} onShow={()=>{setShown(true);if(darkFromStart){handoffUntil=0;setTimeout(releaseHolders,40);}}} transparent statusBarTranslucent navigationBarTranslucent animationType="none" onRequestClose={()=>{if(visible)onClose();}}><KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>

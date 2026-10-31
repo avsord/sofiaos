@@ -30,6 +30,9 @@
       @media (prefers-color-scheme: dark) { body { background: #121017; } }
       #root { display: flex; height: 100%; flex: 1; }
       ::selection { background: rgba(114, 88, 232, 0.28); }
+      /* 0.3.267: sem contorno de clique em nenhum elemento do site */
+      *:focus, *:focus-visible { outline: none !important; }
+      input, textarea, select, button, [tabindex] { outline: none; -webkit-tap-highlight-color: transparent; }
     </style>
   </head>
   <body>

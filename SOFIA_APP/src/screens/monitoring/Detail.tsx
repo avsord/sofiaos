@@ -35,8 +35,8 @@ import {appAlert} from '../../lib/app-alert';
 import {GOOD, BAD, originLabel, storeColor, Delta, Chips} from './core';
 import {Tag, Header, ColorRow, DetailTab, VERDICT_COLOR, VERDICT_ICON, dateShort, dateTime} from './Add';
 import {AddStores, PageViewer} from './Stores';
-export function ProductDetail({api, product, issues, running, onClose, onChanged, onDeleted, others = []}:
-  {api: SofiaApi; product: ProductSeries; issues: Record<string, StoreIssue>; running: boolean; onClose: () => void; onChanged: () => Promise<void>; onDeleted: () => void; others?: Entity[]}) {
+export function ProductDetail({api, product, issues, running, onClose, onChanged, onDeleted, others = [], visible = true}:
+  {api: SofiaApi; product: ProductSeries; issues: Record<string, StoreIssue>; running: boolean; onClose: () => void; onChanged: () => Promise<void>; onDeleted: () => void; others?: Entity[]; visible?: boolean}) {
   const c = useTheme();
   const [monitor, setMonitor] = useState<Entity>(product.monitor), [win, setWin] = useState<Window>('30d'), [tab, setTab] = useState<DetailTab>('summary');
   const [saving, setSaving] = useState(''), [error, setError] = useState(''), [storeSheet, setStoreSheet] = useState(false);
@@ -141,7 +141,7 @@ export function ProductDetail({api, product, issues, running, onClose, onChanged
   };
 
   return (
-    <MotionModal visible animationType="slide" onRequestClose={onClose}>
+    <MotionModal visible={visible} animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{flex: 1, backgroundColor: c.bg}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Header title={monitor.title} onClose={onClose} right={<IconButton name="more" label="Opções do produto" onPress={() => setProductMenu(true)} />} />
         <ScrollView keyboardShouldPersistTaps="handled" stickyHeaderIndices={[1]} contentContainerStyle={{paddingBottom: 50}}>
